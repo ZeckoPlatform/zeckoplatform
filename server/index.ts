@@ -8,7 +8,7 @@ import { pool } from "@db";
 const app = express();
 app.set('trust proxy', 1);
 
-// Session configuration must come before any other middleware
+// Initialize session store
 const PostgresSessionStore = connectPg(session);
 const store = new PostgresSessionStore({
   pool,
@@ -21,7 +21,23 @@ store.on('error', function(error) {
   log(`Session store error: ${error}`);
 });
 
-// Global CORS configuration
+// Session middleware must be first
+app.use(session({
+  store,
+  secret: process.env.REPL_ID!,
+  name: 'connect.sid',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: false,
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: '/'
+  }
+}));
+
+// Then CORS configuration
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (origin) {
@@ -38,22 +54,6 @@ app.use((req, res, next) => {
   }
   next();
 });
-
-// Session middleware must be first after CORS
-app.use(session({
-  store,
-  secret: process.env.REPL_ID!,
-  name: 'connect.sid',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: false, // Set to false for development
-    httpOnly: true,
-    sameSite: 'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    path: '/'
-  }
-}));
 
 // Then body parsing middleware
 app.use(express.json());

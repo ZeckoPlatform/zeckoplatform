@@ -90,6 +90,7 @@ export function setupAuth(app: Express) {
 
   app.post("/api/login", (req, res, next) => {
     log(`Login attempt for username: ${req.body.username}`);
+    log(`Session before login: ${JSON.stringify(req.session)}`);
 
     passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) {
@@ -102,21 +103,24 @@ export function setupAuth(app: Express) {
         return res.status(401).json({ message: info?.message || "Invalid credentials" });
       }
 
-      req.login(user, (loginErr) => {
+      req.logIn(user, (loginErr) => {
         if (loginErr) {
           log(`Login error during session creation: ${loginErr}`);
           return next(loginErr);
         }
 
         log(`Login successful - User: ${user.id}, Session: ${req.sessionID}`);
-        res.cookie('connect.sid', req.sessionID, {
-          httpOnly: true,
-          secure: false,
-          sameSite: 'lax',
-          maxAge: 7 * 24 * 60 * 60 * 1000,
-          path: '/'
+        log(`Session after login: ${JSON.stringify(req.session)}`);
+
+        // Save session before sending response
+        req.session.save((err) => {
+          if (err) {
+            log(`Session save error: ${err}`);
+            return next(err);
+          }
+
+          res.status(200).json(user);
         });
-        res.status(200).json(user);
       });
     })(req, res, next);
   });
@@ -147,20 +151,22 @@ export function setupAuth(app: Express) {
 
       log(`User registered successfully: ${user.id}`);
 
-      req.login(user, (err) => {
+      req.logIn(user, (err) => {
         if (err) {
           log(`Registration error during session creation: ${err}`);
           return next(err);
         }
-        log(`Registration successful - User: ${user.id}, Session: ${req.sessionID}`);
-        res.cookie('connect.sid', req.sessionID, {
-          httpOnly: true,
-          secure: false,
-          sameSite: 'lax',
-          maxAge: 7 * 24 * 60 * 60 * 1000,
-          path: '/'
+
+        // Save session before sending response
+        req.session.save((err) => {
+          if (err) {
+            log(`Session save error: ${err}`);
+            return next(err);
+          }
+
+          log(`Registration successful - User: ${user.id}, Session: ${req.sessionID}`);
+          res.status(201).json(user);
         });
-        res.status(201).json(user);
       });
     } catch (error) {
       log(`Registration error: ${error}`);
@@ -177,14 +183,22 @@ export function setupAuth(app: Express) {
         log(`Logout error: ${err}`);
         return next(err);
       }
-      log(`Logout successful - Previous User: ${userId}`);
-      res.clearCookie('connect.sid');
-      res.sendStatus(200);
+
+      req.session.destroy((err) => {
+        if (err) {
+          log(`Session destruction error: ${err}`);
+          return next(err);
+        }
+
+        log(`Logout successful - Previous User: ${userId}`);
+        res.sendStatus(200);
+      });
     });
   });
 
   app.get("/api/user", (req, res) => {
     log(`User info request - Authenticated: ${req.isAuthenticated()}, Session: ${req.sessionID}`);
+    log(`Session data: ${JSON.stringify(req.session)}`);
 
     if (!req.isAuthenticated()) {
       log("User not authenticated");
