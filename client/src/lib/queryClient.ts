@@ -18,6 +18,8 @@ export async function apiRequest(
       headers: {
         ...(data ? { "Content-Type": "application/json" } : {}),
         "Accept": "application/json",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
       },
       body: data ? JSON.stringify(data) : undefined,
       credentials: "include",
@@ -74,7 +76,7 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "returnNull" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: 0, // Set to 0 to ensure fresh data
+      staleTime: 0,
       retry: false,
       networkMode: "always",
     },

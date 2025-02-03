@@ -53,13 +53,19 @@ export function setupAuth(app: Express) {
     new LocalStrategy(async (username, password, done) => {
       try {
         const [user] = await getUserByUsername(username);
-        if (!user || !(await comparePasswords(password, user.password))) {
-          log(`Authentication failed for username: ${username}`);
+        if (!user) {
+          log(`Authentication failed: User not found - ${username}`);
           return done(null, false, { message: "Invalid credentials" });
-        } else {
-          log(`Authenticating user: ${user.id}`);
-          return done(null, user);
         }
+
+        const isValidPassword = await comparePasswords(password, user.password);
+        if (!isValidPassword) {
+          log(`Authentication failed: Invalid password for user - ${username}`);
+          return done(null, false, { message: "Invalid credentials" });
+        }
+
+        log(`Authentication successful for user: ${user.id}`);
+        return done(null, user);
       } catch (error) {
         log(`Authentication error: ${error}`);
         return done(error);
@@ -80,7 +86,12 @@ export function setupAuth(app: Express) {
         .where(eq(users.id, id))
         .limit(1);
 
-      log(`Deserialized user: ${user?.id}`);
+      if (!user) {
+        log(`Deserialization failed: User not found - ${id}`);
+        return done(null, false);
+      }
+
+      log(`Deserialized user successfully: ${user.id}`);
       done(null, user);
     } catch (error) {
       log(`Deserialization error: ${error}`);
@@ -89,22 +100,32 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", (req, res, next) => {
+    log(`Login attempt for username: ${req.body.username}`);
+
     passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) {
         log(`Login error: ${err}`);
         return next(err);
       }
+
       if (!user) {
         log(`Login failed: ${info?.message || 'Invalid credentials'}`);
         return res.status(401).json({ message: info?.message || "Invalid credentials" });
       }
 
-      req.login(user, (err) => {
-        if (err) {
-          log(`Login error during session creation: ${err}`);
-          return next(err);
+      req.login(user, (loginErr) => {
+        if (loginErr) {
+          log(`Login error during session creation: ${loginErr}`);
+          return next(loginErr);
         }
-        log(`Login successful for user: ${user.id}`);
+
+        log(`Login successful - User: ${user.id}, Session: ${req.sessionID}`);
+        res.cookie('connect.sid', req.sessionID, {
+          httpOnly: true,
+          secure: app.get('env') === 'production',
+          sameSite: 'lax',
+          maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        });
         res.status(200).json(user);
       });
     })(req, res, next);
@@ -134,12 +155,14 @@ export function setupAuth(app: Express) {
         })
         .returning();
 
+      log(`User registered successfully: ${user.id}`);
+
       req.login(user, (err) => {
         if (err) {
           log(`Registration error during session creation: ${err}`);
           return next(err);
         }
-        log(`Registration successful for user: ${user.id}`);
+        log(`Registration successful - User: ${user.id}, Session: ${req.sessionID}`);
         res.status(201).json(user);
       });
     } catch (error) {
@@ -150,21 +173,28 @@ export function setupAuth(app: Express) {
 
   app.post("/api/logout", (req, res, next) => {
     const userId = req.user?.id;
+    log(`Logout attempt - User: ${userId}, Session: ${req.sessionID}`);
+
     req.logout((err) => {
       if (err) {
         log(`Logout error: ${err}`);
         return next(err);
       }
-      log(`Logout successful for user: ${userId}`);
+      log(`Logout successful - Previous User: ${userId}`);
+      res.clearCookie('connect.sid');
       res.sendStatus(200);
     });
   });
 
   app.get("/api/user", (req, res) => {
+    log(`User info request - Authenticated: ${req.isAuthenticated()}, Session: ${req.sessionID}`);
+
     if (!req.isAuthenticated()) {
       log("User not authenticated");
       return res.sendStatus(401);
     }
+
+    log(`Returning user info for: ${req.user.id}`);
     res.json(req.user);
   });
 }
