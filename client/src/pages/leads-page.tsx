@@ -28,6 +28,7 @@ export default function LeadsPage() {
 
   const { data: leads, isLoading: isLoadingLeads } = useQuery<any[]>({
     queryKey: ["/api/leads"],
+    enabled: !!user, // Only fetch leads when user is authenticated
   });
 
   const createLeadMutation = useMutation({
@@ -40,14 +41,11 @@ export default function LeadsPage() {
         throw new Error("Only free users can create leads");
       }
 
-      console.log("Creating lead with user:", user.id);
-
       const res = await apiRequest("POST", "/api/leads", {
         ...data,
         budget: parseInt(data.budget),
       });
 
-      console.log("Lead creation response:", res.status);
       return res.json();
     },
     onSuccess: () => {
