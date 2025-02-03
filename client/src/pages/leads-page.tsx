@@ -32,6 +32,10 @@ export default function LeadsPage() {
 
   const createLeadMutation = useMutation({
     mutationFn: async (data: any) => {
+      if (!user) {
+        throw new Error("You must be logged in to create a lead");
+      }
+
       const res = await apiRequest("POST", "/api/leads", {
         ...data,
         budget: parseInt(data.budget),
@@ -41,7 +45,7 @@ export default function LeadsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       toast({
-        title: "Lead Created",
+        title: "Success",
         description: "Your lead has been posted successfully.",
       });
       form.reset();
@@ -82,7 +86,7 @@ export default function LeadsPage() {
       ? lead.userId === user.id 
       : true
   );
-
+  
   const CreateLeadForm = () => (
     <form
       onSubmit={form.handleSubmit((data) => createLeadMutation.mutate(data))}
