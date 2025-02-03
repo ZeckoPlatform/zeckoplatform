@@ -58,7 +58,7 @@ export const getQueryFn: <T>(options: {
         throw new Error(await res.text());
       }
 
-      return await res.json();
+      return res.json();
     } catch (error) {
       console.error("Query error:", error);
       throw error;
