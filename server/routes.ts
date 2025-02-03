@@ -20,7 +20,7 @@ export function registerRoutes(app: Express): Server {
       status: "active",
       startDate: new Date(),
       endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-      price: req.user.userType === "business" ? 29.99 : 49.99,
+      price: req.user.userType === "business" ? 2999 : 4999, // prices in cents
     }).returning();
 
     await db.update(users)

@@ -76,7 +76,7 @@ export default function SubscriptionPage() {
               <div>
                 <p className="font-medium">{subscription.tier.charAt(0).toUpperCase() + subscription.tier.slice(1)} Plan</p>
                 <p className="text-sm text-muted-foreground">
-                  ${subscription.price}/month
+                  ${(subscription.price / 100).toFixed(2)}/month
                 </p>
               </div>
             </div>
