@@ -42,6 +42,7 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/leads", async (req, res) => {
     // Ensure user exists and is authenticated
     if (!req.user || !req.isAuthenticated()) {
+      log(`Lead creation failed: Not authenticated - Session ID: ${req.sessionID}`);
       return res.status(401).json({ message: "Authentication required" });
     }
 

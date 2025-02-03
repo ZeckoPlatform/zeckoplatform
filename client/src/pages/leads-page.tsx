@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2 } from "lucide-react";
@@ -41,9 +41,19 @@ export default function LeadsPage() {
       }
 
       try {
-        const res = await apiRequest("POST", "/api/leads", {
-          ...data,
-          budget: parseInt(data.budget),
+        const res = await fetch("/api/leads", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+          },
+          body: JSON.stringify({
+            ...data,
+            budget: parseInt(data.budget),
+          }),
+          credentials: "include",
+          mode: "cors",
+          cache: "no-cache",
         });
 
         if (!res.ok) {
@@ -77,7 +87,17 @@ export default function LeadsPage() {
 
   const respondToLeadMutation = useMutation({
     mutationFn: async ({ leadId, data }: { leadId: number; data: any }) => {
-      const res = await apiRequest("POST", `/api/leads/${leadId}/responses`, data);
+      const res = await fetch(`/api/leads/${leadId}/responses`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        body: JSON.stringify(data),
+        credentials: "include",
+        mode: "cors",
+        cache: "no-cache",
+      });
       return res.json();
     },
     onSuccess: () => {
@@ -257,7 +277,17 @@ export default function LeadsPage() {
                     max: parseInt(formData.get("maxBudget") as string),
                   },
                 };
-                apiRequest("PATCH", "/api/users/matching-preferences", preferences);
+                fetch("/api/users/matching-preferences", {
+                    method: "PATCH",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "Accept": "application/json",
+                    },
+                    body: JSON.stringify(preferences),
+                    credentials: "include",
+                    mode: "cors",
+                    cache: "no-cache",
+                  });
               }}
               className="space-y-4"
             >
