@@ -23,9 +23,17 @@ export default function SubscriptionPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/subscriptions/current"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       toast({
         title: "Subscription activated",
         description: "Your subscription has been successfully activated.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Subscription failed",
+        description: error.message,
+        variant: "destructive",
       });
     },
   });
