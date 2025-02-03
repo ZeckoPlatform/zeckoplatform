@@ -2,36 +2,47 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { db } from "@db";
-import { leads, products, leadResponses, subscriptions, users, UserType } from "@db/schema";
+import { leads, products, leadResponses, subscriptions, users } from "@db/schema";
 import { eq, and } from "drizzle-orm";
+import { log } from "./vite";
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
 
   // Subscription Routes
   app.post("/api/subscriptions", async (req, res) => {
-    if (!req.user || ![UserType.BUSINESS, UserType.VENDOR].includes(req.user.userType as UserType)) {
-      return res.sendStatus(401);
+    if (!req.user) {
+      return res.status(401).json({ message: "Not authenticated" });
     }
 
-    const subscription = await db.insert(subscriptions).values({
-      userId: req.user.id,
-      tier: req.user.userType,
-      status: "active",
-      startDate: new Date(),
-      endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-      price: req.user.userType === UserType.BUSINESS ? 2999 : 4999, // prices in cents
-    }).returning();
+    if (!["business", "vendor"].includes(req.user.userType)) {
+      return res.status(403).json({ message: "Invalid user type for subscription" });
+    }
 
-    await db.update(users)
-      .set({
-        subscriptionActive: true,
-        subscriptionTier: req.user.userType,
-        subscriptionEndsAt: subscription[0].endDate,
-      })
-      .where(eq(users.id, req.user.id));
+    try {
+      const subscription = await db.insert(subscriptions).values({
+        userId: req.user.id,
+        tier: req.user.userType,
+        status: "active",
+        startDate: new Date(),
+        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+        price: req.user.userType === "business" ? 2999 : 4999, // prices in cents
+        autoRenew: true,
+      }).returning();
 
-    res.json(subscription[0]);
+      await db.update(users)
+        .set({
+          subscriptionActive: true,
+          subscriptionTier: req.user.userType,
+          subscriptionEndsAt: subscription[0].endDate,
+        })
+        .where(eq(users.id, req.user.id));
+
+      res.json(subscription[0]);
+    } catch (error) {
+      log(`Subscription creation error: ${error}`);
+      res.status(500).json({ message: "Failed to create subscription" });
+    }
   });
 
   app.get("/api/subscriptions/current", async (req, res) => {
