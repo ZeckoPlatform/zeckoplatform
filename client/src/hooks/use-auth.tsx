@@ -24,7 +24,6 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
 
-  // Modified user query to handle auth state properly
   const {
     data: user,
     error,
@@ -32,33 +31,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refetch: refetchUser,
   } = useQuery<SelectUser | null>({
     queryKey: ["/api/user"],
-    queryFn: async () => {
-      try {
-        const res = await fetch("/api/user", {
-          credentials: "include",
-          mode: "cors",
-          cache: "no-cache",
-          headers: {
-            "Accept": "application/json",
-          }
-        });
-
-        if (res.status === 401) {
-          return null;
-        }
-
-        if (!res.ok) {
-          throw new Error(await res.text());
-        }
-
-        return res.json();
-      } catch (error) {
-        console.error("User fetch error:", error);
-        return null;
-      }
-    },
-    staleTime: 30000, // Cache for 30 seconds
     retry: false,
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
+    staleTime: Infinity,
   });
 
   const loginMutation = useMutation({
@@ -97,30 +73,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
   });
-
-  // Effect to verify auth state periodically
-  useEffect(() => {
-    const verifyAuth = async () => {
-      try {
-        const res = await fetch("/api/auth/verify", {
-          credentials: "include",
-          mode: "cors",
-          cache: "no-cache",
-        });
-        if (!res.ok && user) {
-          await refetchUser();
-        }
-      } catch (error) {
-        console.error("Auth verification error:", error);
-      }
-    };
-
-    // Initial verification
-    verifyAuth();
-
-    const interval = setInterval(verifyAuth, 60000); // Check every minute
-    return () => clearInterval(interval);
-  }, [user, refetchUser]);
 
   const registerMutation = useMutation({
     mutationFn: async (newUser: InsertUser) => {
@@ -187,6 +139,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
   });
+
+  // Effect to verify auth state only when user is logged in
+  useEffect(() => {
+    if (!user) return;
+
+    const verifyAuth = async () => {
+      try {
+        const res = await fetch("/api/auth/verify", {
+          credentials: "include",
+          mode: "cors",
+          cache: "no-cache",
+        });
+
+        if (!res.ok) {
+          queryClient.setQueryData(["/api/user"], null);
+        }
+      } catch (error) {
+        console.error("Auth verification error:", error);
+      }
+    };
+
+    const interval = setInterval(verifyAuth, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [user]);
 
   return (
     <AuthContext.Provider
