@@ -33,7 +33,16 @@ export async function apiRequest(
     console.log('Response status:', res.status);
     console.log('Response headers:', Object.fromEntries(res.headers.entries()));
 
-    await throwIfResNotOk(res);
+    if (!res.ok) {
+      const text = await res.text();
+      try {
+        const json = JSON.parse(text);
+        throw new Error(json.message || text);
+      } catch {
+        throw new Error(text);
+      }
+    }
+
     return res;
   } catch (error) {
     console.error("API request error:", error);
@@ -68,7 +77,13 @@ export const getQueryFn: <T>(options: {
       }
 
       if (!res.ok) {
-        throw new Error(await res.text());
+        const text = await res.text();
+        try {
+          const json = JSON.parse(text);
+          throw new Error(json.message || text);
+        } catch {
+          throw new Error(text);
+        }
       }
 
       return res.json();

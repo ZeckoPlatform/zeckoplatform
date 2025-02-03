@@ -39,15 +39,6 @@ export function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  app.use((req, res, next) => {
-    if (req.path.startsWith('/api')) {
-      log(`Auth Debug - Path: ${req.path}, Method: ${req.method}, Authenticated: ${req.isAuthenticated()}, User: ${req.user?.id}`);
-      log(`Session Debug - Session ID: ${req.sessionID}, Cookie: ${JSON.stringify(req.session?.cookie)}`);
-      log(`Headers Debug - Origin: ${req.headers.origin}, Referrer: ${req.headers.referer}`);
-    }
-    next();
-  });
-
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
@@ -121,9 +112,10 @@ export function setupAuth(app: Express) {
         log(`Login successful - User: ${user.id}, Session: ${req.sessionID}`);
         res.cookie('connect.sid', req.sessionID, {
           httpOnly: true,
-          secure: app.get('env') === 'production',
+          secure: false, // Set to false for development
           sameSite: 'lax',
-          maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+          maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+          path: '/'
         });
         res.status(200).json(user);
       });
@@ -164,9 +156,10 @@ export function setupAuth(app: Express) {
         log(`Registration successful - User: ${user.id}, Session: ${req.sessionID}`);
         res.cookie('connect.sid', req.sessionID, {
           httpOnly: true,
-          secure: app.get('env') === 'production',
+          secure: false, // Set to false for development
           sameSite: 'lax',
-          maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+          maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+          path: '/'
         });
         res.status(201).json(user);
       });
