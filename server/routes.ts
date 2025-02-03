@@ -40,10 +40,18 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/leads", async (req, res) => {
-    log(`Lead creation attempt - User: ${req.user?.id}, Session: ${req.sessionID}, Headers: ${JSON.stringify(req.headers)}`);
+    log(`Lead creation attempt - User: ${req.user?.id}, Session: ${req.sessionID}`);
+    log(`Request headers: ${JSON.stringify(req.headers)}`);
+    log(`Session data: ${JSON.stringify(req.session)}`);
+    log(`Auth status: ${req.isAuthenticated()}`);
 
-    if (!req.user || !req.isAuthenticated()) {
+    if (!req.isAuthenticated()) {
       log(`Lead creation failed: Not authenticated - Session ID: ${req.sessionID}`);
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
+    if (!req.user) {
+      log(`Lead creation failed: No user found - Session ID: ${req.sessionID}`);
       return res.status(401).json({ message: "Authentication required" });
     }
 
