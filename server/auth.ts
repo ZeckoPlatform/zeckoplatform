@@ -35,7 +35,6 @@ async function getUserByUsername(username: string) {
 }
 
 export function setupAuth(app: Express) {
-  // Initialize passport middleware
   app.use(passport.initialize());
   app.use(passport.session());
 
@@ -112,9 +111,9 @@ export function setupAuth(app: Express) {
         log(`Login successful - User: ${user.id}, Session: ${req.sessionID}`);
         res.cookie('connect.sid', req.sessionID, {
           httpOnly: true,
-          secure: false, // Set to false for development
+          secure: false,
           sameSite: 'lax',
-          maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+          maxAge: 7 * 24 * 60 * 60 * 1000,
           path: '/'
         });
         res.status(200).json(user);
@@ -156,9 +155,9 @@ export function setupAuth(app: Express) {
         log(`Registration successful - User: ${user.id}, Session: ${req.sessionID}`);
         res.cookie('connect.sid', req.sessionID, {
           httpOnly: true,
-          secure: false, // Set to false for development
+          secure: false,
           sameSite: 'lax',
-          maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+          maxAge: 7 * 24 * 60 * 60 * 1000,
           path: '/'
         });
         res.status(201).json(user);
