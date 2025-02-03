@@ -26,15 +26,24 @@ export function registerRoutes(app: Express): Server {
       return res.status(401).json({ message: 'Authentication required' });
     }
 
-    log(`Auth check passed - User: ${req.user?.id}, Session ID: ${req.sessionID}`);
+    log(`Auth check passed - User: ${req.user.id}, Session ID: ${req.sessionID}`);
     next();
   });
 
-  app.post("/api/leads", async (req, res) => {
-    log(`Creating lead - Session ID: ${req.sessionID}`);
-    log(`User authenticated: ${req.isAuthenticated()}`);
-    log(`User data: ${JSON.stringify(req.user)}`);
+  // Add route for verifying session is active
+  app.get("/api/auth/verify", (req, res) => {
+    if (req.isAuthenticated() && req.user) {
+      res.json({ authenticated: true, user: req.user });
+    } else {
+      res.status(401).json({ authenticated: false });
+    }
+  });
 
+  app.post("/api/leads", async (req, res) => {
+    // Ensure user exists and is authenticated
+    if (!req.user || !req.isAuthenticated()) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
 
     try {
       const lead = await db.insert(leads).values({
@@ -68,9 +77,9 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ message: "Failed to create lead" });
     }
   });
-  // Subscription Routes
+    // Subscription Routes
   app.post("/api/subscriptions", async (req, res) => {
-    if (!["business", "vendor"].includes(req.user.userType)) {
+    if (!req.user || !["business", "vendor"].includes(req.user.userType)) {
       return res.status(403).json({ message: "Invalid user type for subscription" });
     }
 
@@ -101,6 +110,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.get("/api/subscriptions/current", async (req, res) => {
+    if (!req.user) return res.sendStatus(401)
     const [subscription] = await db.select()
       .from(subscriptions)
       .where(
@@ -116,6 +126,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/subscriptions/cancel", async (req, res) => {
+    if(!req.user) return res.sendStatus(401);
     const [subscription] = await db.update(subscriptions)
       .set({ status: "cancelled" })
       .where(
@@ -139,6 +150,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.get("/api/leads", async (req, res) => {
+    if(!req.user) return res.sendStatus(401);
     try {
       const allLeads = await db.query.leads.findMany({
         with: {
@@ -171,7 +183,7 @@ export function registerRoutes(app: Express): Server {
 
   // Products Routes
   app.post("/api/products", async (req, res) => {
-    if (req.user.userType !== "vendor" || !req.user.subscriptionActive) {
+    if (!req.user || req.user.userType !== "vendor" || !req.user.subscriptionActive) {
       return res.sendStatus(401);
     }
     const product = await db.insert(products).values({
@@ -192,7 +204,7 @@ export function registerRoutes(app: Express): Server {
 
   // Lead Responses Routes
   app.post("/api/leads/:leadId/responses", async (req, res) => {
-      if (req.user.userType !== "business" || !req.user.subscriptionActive) {
+      if (!req.user || req.user.userType !== "business" || !req.user.subscriptionActive) {
           return res.sendStatus(401);
       }
     const response = await db.insert(leadResponses).values({
@@ -204,6 +216,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.patch("/api/leads/:leadId/responses/:responseId", async (req, res) => {
+      if(!req.user) return res.sendStatus(401);
     const [lead] = await db.select().from(leads).where(eq(leads.id, parseInt(req.params.leadId)));
     if (!lead || lead.userId !== req.user.id) return res.sendStatus(403);
 
@@ -221,7 +234,7 @@ export function registerRoutes(app: Express): Server {
 
   // Add route for businesses to update their matching preferences
   app.patch("/api/users/matching-preferences", async (req, res) => {
-    if (req.user.userType !== "business") {
+    if (!req.user || req.user.userType !== "business") {
       return res.status(403).json({ message: "Only business users can update matching preferences" });
     }
 
@@ -242,6 +255,7 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ message: "Failed to update matching preferences" });
     }
   });
+
 
   const httpServer = createServer(app);
   return httpServer;
