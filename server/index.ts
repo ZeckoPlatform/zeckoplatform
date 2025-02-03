@@ -29,7 +29,7 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false,
+    secure: app.get('env') === 'production',
     httpOnly: true,
     sameSite: 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
@@ -37,10 +37,13 @@ app.use(session({
   }
 }));
 
-// Then CORS configuration
+// Then CORS configuration - after session but before other middleware
 app.use((req, res, next) => {
+  // Get the origin from the request headers
   const origin = req.headers.origin;
+
   if (origin) {
+    // Only set CORS headers if there's an origin (i.e., it's a cross-origin request)
     res.header('Access-Control-Allow-Origin', origin);
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');

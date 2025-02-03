@@ -112,7 +112,7 @@ export function setupAuth(app: Express) {
         log(`Login successful - User: ${user.id}, Session: ${req.sessionID}`);
         log(`Session after login: ${JSON.stringify(req.session)}`);
 
-        // Save session before sending response
+        // Force session save before sending response
         req.session.save((err) => {
           if (err) {
             log(`Session save error: ${err}`);
@@ -157,7 +157,7 @@ export function setupAuth(app: Express) {
           return next(err);
         }
 
-        // Save session before sending response
+        // Force session save before sending response
         req.session.save((err) => {
           if (err) {
             log(`Session save error: ${err}`);
@@ -199,6 +199,8 @@ export function setupAuth(app: Express) {
   app.get("/api/user", (req, res) => {
     log(`User info request - Authenticated: ${req.isAuthenticated()}, Session: ${req.sessionID}`);
     log(`Session data: ${JSON.stringify(req.session)}`);
+    log(`Cookie Header: ${req.headers.cookie}`);
+    log(`User: ${JSON.stringify(req.user)}`);
 
     if (!req.isAuthenticated()) {
       log("User not authenticated");
@@ -207,5 +209,18 @@ export function setupAuth(app: Express) {
 
     log(`Returning user info for: ${req.user.id}`);
     res.json(req.user);
+  });
+
+  app.get("/api/auth/verify", (req, res) => {
+    log(`Auth verification - Session ID: ${req.sessionID}`);
+    log(`Cookie Header: ${req.headers.cookie}`);
+
+    if (req.isAuthenticated() && req.user) {
+      log(`Auth verified for user: ${req.user.id}`);
+      res.json({ authenticated: true, user: req.user });
+    } else {
+      log(`Auth verification failed - no valid session`);
+      res.status(401).json({ authenticated: false });
+    }
   });
 }
