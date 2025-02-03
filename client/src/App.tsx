@@ -10,6 +10,7 @@ import AuthPage from "@/pages/auth-page";
 import LeadsPage from "@/pages/leads-page";
 import MarketplacePage from "@/pages/marketplace-page";
 import SubscriptionPage from "@/pages/subscription-page";
+import VendorDashboard from "@/pages/vendor-dashboard";
 import Navbar from "@/components/navbar";
 
 function Router() {
@@ -22,6 +23,7 @@ function Router() {
         <ProtectedRoute path="/leads" component={LeadsPage} />
         <ProtectedRoute path="/marketplace" component={MarketplacePage} />
         <ProtectedRoute path="/subscription" component={SubscriptionPage} />
+        <ProtectedRoute path="/vendor" component={VendorDashboard} />
         <Route component={NotFound} />
       </Switch>
     </div>

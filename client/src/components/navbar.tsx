@@ -24,13 +24,15 @@ export default function Navbar() {
             </Link>
             <NavigationMenu className="ml-8">
               <NavigationMenuList>
-                <NavigationMenuItem>
-                  <Link href="/leads">
-                    <NavigationMenuLink className="cursor-pointer">
-                      Leads
-                    </NavigationMenuLink>
-                  </Link>
-                </NavigationMenuItem>
+                {user?.userType !== "vendor" && (
+                  <NavigationMenuItem>
+                    <Link href="/leads">
+                      <NavigationMenuLink className="cursor-pointer">
+                        Leads
+                      </NavigationMenuLink>
+                    </Link>
+                  </NavigationMenuItem>
+                )}
                 <NavigationMenuItem>
                   <Link href="/marketplace">
                     <NavigationMenuLink className="cursor-pointer">
@@ -38,6 +40,15 @@ export default function Navbar() {
                     </NavigationMenuLink>
                   </Link>
                 </NavigationMenuItem>
+                {user?.userType === "vendor" && (
+                  <NavigationMenuItem>
+                    <Link href="/vendor">
+                      <NavigationMenuLink className="cursor-pointer">
+                        Vendor Dashboard
+                      </NavigationMenuLink>
+                    </Link>
+                  </NavigationMenuItem>
+                )}
                 {user && user.userType !== "free" && (
                   <NavigationMenuItem>
                     <Link href="/subscription">
