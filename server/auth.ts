@@ -1,12 +1,10 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { Express } from "express";
-import session from "express-session";
-import connectPg from "connect-pg-simple";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { users, insertUserSchema, type SelectUser } from "@db/schema";
-import { db, pool } from "@db";
+import { db } from "@db";
 import { eq } from "drizzle-orm";
 import { fromZodError } from "zod-validation-error";
 import { log } from "./vite";
@@ -18,7 +16,6 @@ declare global {
 }
 
 const scryptAsync = promisify(scrypt);
-const PostgresSessionStore = connectPg(session);
 
 async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
@@ -38,52 +35,7 @@ async function getUserByUsername(username: string) {
 }
 
 export function setupAuth(app: Express) {
-  // Create the session store with explicit table creation first
-  const store = new PostgresSessionStore({
-    pool,
-    tableName: 'session',
-    createTableIfMissing: true,
-    pruneSessionInterval: 60
-  });
-
-  // Then configure session settings using the created store
-  const sessionSettings: session.SessionOptions = {
-    secret: process.env.REPL_ID!,
-    name: 'sid',
-    resave: false,
-    saveUninitialized: false,
-    store,
-    cookie: {
-      secure: false, // Set to true in production with HTTPS
-      httpOnly: true,
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      sameSite: 'lax',
-      path: '/'
-    }
-  };
-
-  if (app.get("env") === "production") {
-    app.set("trust proxy", 1);
-    if (sessionSettings.cookie) {
-      sessionSettings.cookie.secure = true;
-    }
-  }
-
-  // Add CORS headers before session middleware
-  app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,UPDATE,OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'X-Requested-With, X-HTTP-Method-Override, Content-Type, Accept');
-    next();
-  });
-
-  // Handle preflight requests
-  app.options('*', (req, res) => {
-    res.sendStatus(200);
-  });
-
-  app.use(session(sessionSettings));
+  // Initialize passport middleware
   app.use(passport.initialize());
   app.use(passport.session());
 

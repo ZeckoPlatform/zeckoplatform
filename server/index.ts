@@ -6,25 +6,8 @@ import connectPg from "connect-pg-simple";
 import { pool } from "@db";
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
 
-// Enhanced CORS configuration
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin) {
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,UPDATE,OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'X-Requested-With, X-HTTP-Method-Override, Content-Type, Accept');
-  }
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-  next();
-});
-
-// Session configuration
+// Session configuration must come before any other middleware
 const PostgresSessionStore = connectPg(session);
 const store = new PostgresSessionStore({
   pool,
@@ -33,6 +16,9 @@ const store = new PostgresSessionStore({
   pruneSessionInterval: 60
 });
 
+app.set('trust proxy', 1);
+
+// Session middleware must be first
 app.use(session({
   store,
   secret: process.env.REPL_ID!,
@@ -48,11 +34,33 @@ app.use(session({
   }
 }));
 
+// Then body parsing middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+
+// Enhanced CORS configuration after session but before routes
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,UPDATE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'X-Requested-With, X-HTTP-Method-Override, Content-Type, Accept');
+  }
+  next();
+});
+
+// Handle preflight requests
+app.options('*', (req, res) => {
+  res.sendStatus(200);
+});
+
 // Request logging middleware
 app.use((req, res, next) => {
   if (req.path.startsWith('/api')) {
     log(`Request: ${req.method} ${req.path} - Session ID: ${req.sessionID}`);
     log(`Headers: ${JSON.stringify(req.headers)}`);
+    log(`Session: ${JSON.stringify(req.session)}`);
   }
   next();
 });
