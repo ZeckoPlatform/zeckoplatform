@@ -41,25 +41,36 @@ export default function LeadsPage() {
         throw new Error("Only free users can create leads");
       }
 
+      console.log("Creating lead with user:", user.id);
+
       const res = await fetch("/api/leads", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
+          "Cache-Control": "no-cache",
+          "Pragma": "no-cache",
         },
         credentials: "include",
+        mode: "cors",
+        cache: "no-cache",
         body: JSON.stringify({
           ...data,
           budget: parseInt(data.budget),
         }),
       });
 
+      console.log("Lead creation response status:", res.status);
+
       if (!res.ok) {
         const error = await res.text();
+        console.error("Lead creation error response:", error);
         throw new Error(error);
       }
 
-      return res.json();
+      const result = await res.json();
+      console.log("Lead creation successful:", result);
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });

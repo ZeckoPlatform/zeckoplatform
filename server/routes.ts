@@ -43,6 +43,7 @@ export function registerRoutes(app: Express): Server {
     log(`Lead creation attempt - User: ${req.user?.id}, Session: ${req.sessionID}`);
     log(`Request headers: ${JSON.stringify(req.headers)}`);
     log(`Session data: ${JSON.stringify(req.session)}`);
+    log(`Cookie: ${JSON.stringify(req.headers.cookie)}`);
     log(`Auth status: ${req.isAuthenticated()}`);
 
     if (!req.isAuthenticated()) {
@@ -56,21 +57,20 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
+      log(`Creating lead for user ${req.user.id}`);
       const lead = await db.insert(leads).values({
         ...req.body,
         userId: req.user.id,
       }).returning();
 
       log(`Lead created successfully by user ${req.user.id}`);
-      res.json({
-        lead: lead[0],
-      });
+      res.json(lead[0]);
     } catch (error) {
       log(`Lead creation error: ${error}`);
       res.status(500).json({ message: "Failed to create lead" });
     }
   });
-    // Subscription Routes
+  // Subscription Routes
   app.post("/api/subscriptions", async (req, res) => {
     if (!req.user || !["business", "vendor"].includes(req.user.userType)) {
       return res.status(403).json({ message: "Invalid user type for subscription" });
