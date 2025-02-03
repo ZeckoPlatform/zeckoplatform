@@ -2,7 +2,7 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
-    const text = (await res.text()) || res.statusText;
+    const text = await res.text();
     throw new Error(`${res.status}: ${text}`);
   }
 }
@@ -54,12 +54,13 @@ export const getQueryFn: <T>(options: {
         if (unauthorizedBehavior === "returnNull") {
           return null;
         }
-        const error = await res.text();
-        throw new Error(`401: ${error}`);
+        const errorMessage = await res.text();
+        throw new Error(`401: ${errorMessage}`);
       }
 
       await throwIfResNotOk(res);
-      return res.json();
+      const data = await res.json();
+      return data;
     } catch (error) {
       console.error("Query error:", error);
       throw error;
@@ -69,7 +70,7 @@ export const getQueryFn: <T>(options: {
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      queryFn: getQueryFn({ on401: "throw" }),
+      queryFn: getQueryFn({ on401: "returnNull" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
       staleTime: Infinity,

@@ -44,18 +44,29 @@ app.use(express.urlencoded({ extended: false }));
 
 // Enhanced CORS configuration after session but before routes
 app.use((req, res, next) => {
+  // Get origin from request headers
   const origin = req.headers.origin;
   if (origin) {
+    // Only set Allow-Origin for known origins
     res.header('Access-Control-Allow-Origin', origin);
     res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,UPDATE,OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'X-Requested-With, X-HTTP-Method-Override, Content-Type, Accept');
+    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Cookie, Set-Cookie');
+    res.header('Access-Control-Expose-Headers', 'Set-Cookie');
   }
   next();
 });
 
 // Handle preflight requests
 app.options('*', (req, res) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Cookie, Set-Cookie');
+    res.header('Access-Control-Expose-Headers', 'Set-Cookie');
+  }
   res.sendStatus(200);
 });
 
