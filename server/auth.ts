@@ -162,6 +162,12 @@ export function setupAuth(app: Express) {
           return next(err);
         }
         log(`Registration successful - User: ${user.id}, Session: ${req.sessionID}`);
+        res.cookie('connect.sid', req.sessionID, {
+          httpOnly: true,
+          secure: app.get('env') === 'production',
+          sameSite: 'lax',
+          maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        });
         res.status(201).json(user);
       });
     } catch (error) {
