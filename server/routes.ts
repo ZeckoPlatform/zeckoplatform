@@ -21,8 +21,9 @@ export function registerRoutes(app: Express): Server {
       return next();
     }
 
-    if (!req.user || !req.isAuthenticated()) {
-      log(`Auth check failed - Session ID: ${req.sessionID}, Path: ${req.path}`);
+    if (!req.isAuthenticated() || !req.user) {
+      log(`Auth check failed - Session ID: ${req.sessionID}, Path: ${req.path}, Headers: ${JSON.stringify(req.headers)}`);
+      log(`Cookie Debug: ${req.headers.cookie}`);
       return res.status(401).json({ message: 'Authentication required' });
     }
 
@@ -30,7 +31,6 @@ export function registerRoutes(app: Express): Server {
     next();
   });
 
-  // Add route for verifying session is active
   app.get("/api/auth/verify", (req, res) => {
     if (req.isAuthenticated() && req.user) {
       res.json({ authenticated: true, user: req.user });
@@ -40,7 +40,8 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/leads", async (req, res) => {
-    // Ensure user exists and is authenticated
+    log(`Lead creation attempt - User: ${req.user?.id}, Session: ${req.sessionID}, Headers: ${JSON.stringify(req.headers)}`);
+
     if (!req.user || !req.isAuthenticated()) {
       log(`Lead creation failed: Not authenticated - Session ID: ${req.sessionID}`);
       return res.status(401).json({ message: "Authentication required" });
@@ -52,26 +53,9 @@ export function registerRoutes(app: Express): Server {
         userId: req.user.id,
       }).returning();
 
-      // Find matching businesses
-      const businesses = await db.query.users.findMany({
-        where: eq(users.userType, "business"),
-      });
-
-      const matchedBusinesses = businesses.length > 0 ? sortBusinessesByMatch(lead[0], businesses) : [];
-
-      // Store matching scores if there are matches
-      if (matchedBusinesses.length > 0) {
-        await db.update(leads)
-          .set({
-            matchingScore: calculateMatchScore(lead[0], matchedBusinesses[0]),
-          })
-          .where(eq(leads.id, lead[0].id));
-      }
-
       log(`Lead created successfully by user ${req.user.id}`);
       res.json({
         lead: lead[0],
-        matchedBusinesses: matchedBusinesses.slice(0, 5), // Return top 5 matches
       });
     } catch (error) {
       log(`Lead creation error: ${error}`);
