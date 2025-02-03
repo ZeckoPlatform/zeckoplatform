@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Progress } from "@/components/ui/progress";
 
 export default function LeadsPage() {
   const { user } = useAuth();
@@ -59,6 +60,59 @@ export default function LeadsPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Leads</h1>
+        {user?.userType === "business" && (
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline">Match Preferences</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Update Matching Preferences</DialogTitle>
+              </DialogHeader>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  const preferences = {
+                    preferredCategories: formData.getAll("categories"),
+                    locationPreference: formData.getAll("locations"),
+                    budgetRange: {
+                      min: parseInt(formData.get("minBudget") as string),
+                      max: parseInt(formData.get("maxBudget") as string),
+                    },
+                  };
+                  fetch("/api/users/matching-preferences", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(preferences),
+                    credentials: "include",
+                  });
+                }}
+                className="space-y-4"
+              >
+                <div>
+                  <Label>Preferred Categories</Label>
+                  <Input name="categories" placeholder="Enter categories" />
+                </div>
+                <div>
+                  <Label>Preferred Locations</Label>
+                  <Input name="locations" placeholder="Enter locations" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Min Budget</Label>
+                    <Input type="number" name="minBudget" />
+                  </div>
+                  <div>
+                    <Label>Max Budget</Label>
+                    <Input type="number" name="maxBudget" />
+                  </div>
+                </div>
+                <Button type="submit" className="w-full">Save Preferences</Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
         {user?.userType === "free" && (
           <Dialog>
             <DialogTrigger asChild>
@@ -112,9 +166,20 @@ export default function LeadsPage() {
 
       <div className="grid gap-6">
         {leads?.map((lead) => (
-          <Card key={lead.id}>
+          <Card key={lead.id} className={lead.matchScore?.totalScore > 0.7 ? "border-primary" : undefined}>
             <CardHeader>
-              <CardTitle>{lead.title}</CardTitle>
+              <div className="flex justify-between items-start">
+                <CardTitle>{lead.title}</CardTitle>
+                 {user?.userType === "business" && lead.matchScore && (
+                  <div className="text-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-muted-foreground">Match Score:</span>
+                      <Progress value={lead.matchScore.totalScore * 100} className="w-24" />
+                      <span className="font-medium">{Math.round(lead.matchScore.totalScore * 100)}%</span>
+                    </div>
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground mb-4">{lead.description}</p>

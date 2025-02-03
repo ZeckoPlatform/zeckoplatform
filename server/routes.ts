@@ -5,6 +5,11 @@ import { db } from "@db";
 import { leads, products, leadResponses, subscriptions, users } from "@db/schema";
 import { eq, and } from "drizzle-orm";
 import { log } from "./vite";
+import { calculateMatchScore, sortBusinessesByMatch } from "./utils/matching";
+import type { InferSelectModel } from "drizzle-orm";
+
+type Lead = InferSelectModel<typeof leads>;
+type User = InferSelectModel<typeof users>;
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
@@ -22,18 +27,18 @@ export function registerRoutes(app: Express): Server {
     try {
       const subscription = await db.insert(subscriptions).values({
         userId: req.user.id,
-        tier: req.user.userType,
+        tier: req.user.userType as "business" | "vendor",
         status: "active",
         startDate: new Date(),
         endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-        price: req.user.userType === "business" ? 2999 : 4999, // prices in cents
         autoRenew: true,
+        price: req.user.userType === "business" ? 2999 : 4999, // prices in cents
       }).returning();
 
       await db.update(users)
         .set({
           subscriptionActive: true,
-          subscriptionTier: req.user.userType,
+          subscriptionTier: req.user.userType as "business" | "vendor",
           subscriptionEndsAt: subscription[0].endDate,
         })
         .where(eq(users.id, req.user.id));
@@ -87,29 +92,71 @@ export function registerRoutes(app: Express): Server {
     res.json(subscription || null);
   });
 
-  // Leads Routes
+  // Modified Leads Routes
   app.post("/api/leads", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
-    const lead = await db.insert(leads).values({
-      ...req.body,
-      userId: req.user.id,
-    }).returning();
-    res.json(lead[0]);
+
+    try {
+      const lead = await db.insert(leads).values({
+        ...req.body,
+        userId: req.user.id,
+      }).returning();
+
+      // Find matching businesses
+      const businesses = await db.query.users.findMany({
+        where: eq(users.userType, "business"),
+      });
+
+      const matchedBusinesses = sortBusinessesByMatch(lead[0], businesses);
+
+      // Store matching scores
+      await db.update(leads)
+        .set({
+          matchingScore: calculateMatchScore(lead[0], matchedBusinesses[0]),
+        })
+        .where(eq(leads.id, lead[0].id));
+
+      res.json({
+        lead: lead[0],
+        matchedBusinesses: matchedBusinesses.slice(0, 5), // Return top 5 matches
+      });
+    } catch (error) {
+      log(`Lead creation error: ${error}`);
+      res.status(500).json({ message: "Failed to create lead" });
+    }
   });
 
   app.get("/api/leads", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
-    const allLeads = await db.query.leads.findMany({
-      with: {
-        user: true,
-        responses: {
-          with: {
-            business: true,
+
+    try {
+      const allLeads = await db.query.leads.findMany({
+        with: {
+          user: true,
+          responses: {
+            with: {
+              business: true,
+            },
           },
         },
-      },
-    });
-    res.json(allLeads);
+      });
+
+      if (req.user.userType === "business") {
+        // For business users, sort leads by match score
+        const sortedLeads = allLeads.map(lead => ({
+          ...lead,
+          matchScore: calculateMatchScore(lead, req.user),
+        }))
+        .sort((a, b) => (b.matchScore?.totalScore || 0) - (a.matchScore?.totalScore || 0));
+
+        return res.json(sortedLeads);
+      }
+
+      res.json(allLeads);
+    } catch (error) {
+      log(`Leads retrieval error: ${error}`);
+      res.status(500).json({ message: "Failed to retrieve leads" });
+    }
   });
 
   // Products Routes
@@ -162,6 +209,31 @@ export function registerRoutes(app: Express): Server {
       .returning();
     res.json(response);
   });
+
+  // Add route for businesses to update their matching preferences
+  app.patch("/api/users/matching-preferences", async (req, res) => {
+    if (!req.user || req.user.userType !== "business") {
+      return res.status(403).json({ message: "Only business users can update matching preferences" });
+    }
+
+    try {
+      const [updatedUser] = await db.update(users)
+        .set({
+          profile: {
+            ...req.user.profile,
+            matchPreferences: req.body,
+          },
+        })
+        .where(eq(users.id, req.user.id))
+        .returning();
+
+      res.json(updatedUser);
+    } catch (error) {
+      log(`Matching preferences update error: ${error}`);
+      res.status(500).json({ message: "Failed to update matching preferences" });
+    }
+  });
+
 
   const httpServer = createServer(app);
   return httpServer;

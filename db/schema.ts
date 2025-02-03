@@ -27,6 +27,30 @@ export const users = pgTable("users", {
     description?: string;
     categories?: string[];
     location?: string;
+    matchPreferences?: {
+      preferredCategories?: string[];
+      locationPreference?: string[];
+      budgetRange?: { min: number; max: number };
+    };
+  }>(),
+});
+
+export const leads = pgTable("leads", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  category: text("category").notNull(),
+  tags: text("tags").array(),
+  budget: integer("budget"),
+  location: text("location"),
+  status: text("status", { enum: ["open", "closed", "in_progress"] }).default("open"),
+  createdAt: timestamp("created_at").defaultNow(),
+  matchingScore: jsonb("matching_score").$type<{
+    categoryScore: number;
+    locationScore: number;
+    budgetScore: number;
+    totalScore: number;
   }>(),
 });
 
@@ -39,18 +63,6 @@ export const subscriptions = pgTable("subscriptions", {
   endDate: timestamp("end_date").notNull(),
   autoRenew: boolean("auto_renew").default(true),
   price: integer("price").notNull(),
-});
-
-export const leads = pgTable("leads", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  title: text("title").notNull(),
-  description: text("description").notNull(),
-  category: text("category").notNull(),
-  budget: integer("budget"),
-  location: text("location"),
-  status: text("status", { enum: ["open", "closed", "in_progress"] }).default("open"),
-  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const products = pgTable("products", {
