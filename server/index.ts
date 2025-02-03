@@ -34,7 +34,8 @@ app.use(session({
     httpOnly: true,
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     sameSite: 'lax',
-    path: '/'
+    path: '/',
+    domain: '.riker.replit.dev' // Allow cookies for all subdomains
   }
 }));
 
