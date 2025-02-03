@@ -12,6 +12,7 @@ import { queryClient } from "@/lib/queryClient";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2 } from "lucide-react";
+import { apiRequest } from "@/lib/api";
 
 export default function LeadsPage() {
   const { user } = useAuth();
@@ -40,32 +41,11 @@ export default function LeadsPage() {
         throw new Error("Only free users can create leads");
       }
 
-      try {
-        const res = await fetch("/api/leads", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-          },
-          body: JSON.stringify({
-            ...data,
-            budget: parseInt(data.budget),
-          }),
-          credentials: "include",
-          mode: "cors",
-          cache: "no-cache",
-        });
-
-        if (!res.ok) {
-          const error = await res.text();
-          throw new Error(error || "Failed to create lead");
-        }
-
-        return res.json();
-      } catch (error) {
-        console.error("Lead creation error:", error);
-        throw error;
-      }
+      const res = await apiRequest("POST", "/api/leads", {
+        ...data,
+        budget: parseInt(data.budget),
+      });
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
