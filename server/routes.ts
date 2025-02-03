@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { db } from "@db";
-import { leads, products, leadResponses, subscriptions, users } from "@db/schema";
+import { leads, products, leadResponses, subscriptions, users, UserType } from "@db/schema";
 import { eq, and } from "drizzle-orm";
 
 export function registerRoutes(app: Express): Server {
@@ -10,7 +10,7 @@ export function registerRoutes(app: Express): Server {
 
   // Subscription Routes
   app.post("/api/subscriptions", async (req, res) => {
-    if (!req.user || !["business", "vendor"].includes(req.user.userType)) {
+    if (!req.user || ![UserType.BUSINESS, UserType.VENDOR].includes(req.user.userType as UserType)) {
       return res.sendStatus(401);
     }
 
@@ -20,7 +20,7 @@ export function registerRoutes(app: Express): Server {
       status: "active",
       startDate: new Date(),
       endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-      price: req.user.userType === "business" ? 2999 : 4999, // prices in cents
+      price: req.user.userType === UserType.BUSINESS ? 2999 : 4999, // prices in cents
     }).returning();
 
     await db.update(users)
