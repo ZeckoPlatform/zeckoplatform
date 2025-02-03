@@ -14,7 +14,7 @@ type User = InferSelectModel<typeof users>;
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
 
-  // Skip auth check for login/register routes and OPTIONS requests
+  // Only modifying the auth middleware section
   app.use('/api', (req, res, next) => {
     const publicPaths = ['/login', '/register', '/user'];
     if (publicPaths.includes(req.path) || req.method === 'OPTIONS') {

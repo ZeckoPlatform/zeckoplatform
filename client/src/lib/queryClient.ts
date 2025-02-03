@@ -36,15 +36,7 @@ export async function apiRequest(
     console.log('Response status:', res.status);
     console.log('Response headers:', Object.fromEntries(res.headers.entries()));
 
-    if (!res.ok) {
-      const text = await res.text();
-      try {
-        const json = JSON.parse(text);
-        throw new Error(json.message || text);
-      } catch {
-        throw new Error(text);
-      }
-    }
+    await throwIfResNotOk(res);
     return res;
   } catch (error) {
     console.error("API request error:", error);
@@ -81,16 +73,7 @@ export const getQueryFn: <T>(options: {
         throw new Error("Authentication required");
       }
 
-      if (!res.ok) {
-        const text = await res.text();
-        try {
-          const json = JSON.parse(text);
-          throw new Error(json.message || text);
-        } catch {
-          throw new Error(text);
-        }
-      }
-
+      await throwIfResNotOk(res);
       return res.json();
     } catch (error) {
       console.error("Query error:", error);
@@ -104,7 +87,7 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "returnNull" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: 30000,
+      staleTime: Infinity,
       retry: false,
       networkMode: "always",
     },
