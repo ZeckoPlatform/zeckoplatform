@@ -98,6 +98,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  // Effect to verify auth state periodically
+  useEffect(() => {
+    const verifyAuth = async () => {
+      try {
+        const res = await fetch("/api/auth/verify", {
+          credentials: "include",
+          mode: "cors",
+          cache: "no-cache",
+        });
+        if (!res.ok && user) {
+          await refetchUser();
+        }
+      } catch (error) {
+        console.error("Auth verification error:", error);
+      }
+    };
+
+    // Initial verification
+    verifyAuth();
+
+    const interval = setInterval(verifyAuth, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [user, refetchUser]);
+
   const registerMutation = useMutation({
     mutationFn: async (newUser: InsertUser) => {
       const res = await fetch("/api/register", {
@@ -163,27 +187,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
   });
-
-  // Effect to verify auth state periodically
-  useEffect(() => {
-    const verifyAuth = async () => {
-      try {
-        const res = await fetch("/api/auth/verify", {
-          credentials: "include",
-          mode: "cors",
-          cache: "no-cache",
-        });
-        if (!res.ok && user) {
-          await refetchUser();
-        }
-      } catch (error) {
-        console.error("Auth verification error:", error);
-      }
-    };
-
-    const interval = setInterval(verifyAuth, 60000); // Check every minute
-    return () => clearInterval(interval);
-  }, [user, refetchUser]);
 
   return (
     <AuthContext.Provider
