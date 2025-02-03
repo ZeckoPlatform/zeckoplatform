@@ -61,8 +61,7 @@ export const getQueryFn: <T>(options: {
       }
 
       await throwIfResNotOk(res);
-      const data = await res.json();
-      return data;
+      return await res.json();
     } catch (error) {
       console.error("Query error:", error);
       throw error;
@@ -75,7 +74,7 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "returnNull" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
+      staleTime: 0, // Set to 0 to ensure fresh data
       retry: false,
       networkMode: "always",
     },

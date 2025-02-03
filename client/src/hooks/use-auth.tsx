@@ -1,4 +1,4 @@
-import { ReactNode, createContext, useContext } from "react";
+import { ReactNode, createContext, useContext, useEffect } from "react";
 import {
   useQuery,
   useMutation,
@@ -27,6 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     data: user,
     error,
     isLoading,
+    refetch: refetchUser,
   } = useQuery<SelectUser | null>({
     queryKey: ["/api/user"],
     queryFn: async ({ queryKey }) => {
@@ -119,6 +120,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
   });
+
+  // Effect to verify auth state periodically
+  useEffect(() => {
+    const verifyAuth = async () => {
+      try {
+        const res = await fetch("/api/auth/verify", {
+          credentials: "include",
+          mode: "cors",
+          cache: "no-cache",
+        });
+        if (!res.ok && user) {
+          await refetchUser();
+        }
+      } catch (error) {
+        console.error("Auth verification error:", error);
+      }
+    };
+
+    const interval = setInterval(verifyAuth, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [user, refetchUser]);
 
   return (
     <AuthContext.Provider
