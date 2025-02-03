@@ -37,45 +37,35 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex">
-            <Link href="/">
-              <a className="flex items-center font-bold text-xl">
-                LeadMarket
-              </a>
-            </Link>
+            <div className="flex items-center font-bold text-xl">
+              <Link href="/">LeadMarket</Link>
+            </div>
             <NavigationMenu className="ml-8">
               <NavigationMenuList>
                 {user?.userType !== "vendor" && (
                   <NavigationMenuItem>
-                    <Link href="/leads">
-                      <NavigationMenuLink className="cursor-pointer">
-                        Leads
-                      </NavigationMenuLink>
-                    </Link>
+                    <NavigationMenuLink asChild>
+                      <Link href="/leads">Leads</Link>
+                    </NavigationMenuLink>
                   </NavigationMenuItem>
                 )}
                 <NavigationMenuItem>
-                  <Link href="/marketplace">
-                    <NavigationMenuLink className="cursor-pointer">
-                      Marketplace
-                    </NavigationMenuLink>
-                  </Link>
+                  <NavigationMenuLink asChild>
+                    <Link href="/marketplace">Marketplace</Link>
+                  </NavigationMenuLink>
                 </NavigationMenuItem>
                 {user?.userType === "vendor" && (
                   <NavigationMenuItem>
-                    <Link href="/vendor">
-                      <NavigationMenuLink className="cursor-pointer">
-                        Vendor Dashboard
-                      </NavigationMenuLink>
-                    </Link>
+                    <NavigationMenuLink asChild>
+                      <Link href="/vendor">Vendor Dashboard</Link>
+                    </NavigationMenuLink>
                   </NavigationMenuItem>
                 )}
                 {user && user.userType !== "free" && (
                   <NavigationMenuItem>
-                    <Link href="/subscription">
-                      <NavigationMenuLink className="cursor-pointer">
-                        Subscription
-                      </NavigationMenuLink>
-                    </Link>
+                    <NavigationMenuLink asChild>
+                      <Link href="/subscription">Subscription</Link>
+                    </NavigationMenuLink>
                   </NavigationMenuItem>
                 )}
               </NavigationMenuList>
@@ -94,15 +84,11 @@ export default function Navbar() {
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link href={getDashboardLink()}>
-                      <a className="w-full">Dashboard</a>
-                    </Link>
+                    <Link href={getDashboardLink()}>Dashboard</Link>
                   </DropdownMenuItem>
                   {user.userType !== "free" && (
                     <DropdownMenuItem asChild>
-                      <Link href="/subscription">
-                        <a className="w-full">Subscription</a>
-                      </Link>
+                      <Link href="/subscription">Subscription</Link>
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuSeparator />
