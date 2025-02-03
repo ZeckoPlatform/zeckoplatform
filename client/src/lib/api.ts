@@ -20,6 +20,7 @@ export async function apiRequest(
 
     if (!res.ok) {
       const text = await res.text();
+      console.error(`API request failed: ${method} ${url}`, text);
       throw new Error(text);
     }
     return res;
