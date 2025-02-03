@@ -38,17 +38,26 @@ async function getUserByUsername(username: string) {
 }
 
 export function setupAuth(app: Express) {
-  const store = new PostgresSessionStore({ pool, createTableIfMissing: true });
+  // Create the session store with explicit table creation
+  const store = new PostgresSessionStore({
+    pool,
+    tableName: 'session',
+    createTableIfMissing: true,
+    pruneSessionInterval: 60
+  });
+
   const sessionSettings: session.SessionOptions = {
     secret: process.env.REPL_ID!,
-    resave: false,
-    saveUninitialized: false,
+    name: 'sid',
+    resave: true,
+    saveUninitialized: true,
     store,
     cookie: {
-      secure: false, // Set to false for development
+      secure: false,
       httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: 'lax'
+      maxAge: 24 * 60 * 60 * 1000,
+      sameSite: 'lax',
+      path: '/'
     }
   };
 
@@ -59,11 +68,17 @@ export function setupAuth(app: Express) {
     }
   }
 
+  app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    next();
+  });
+
   app.use(session(sessionSettings));
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Debug middleware to log session and auth status
+  // Debug middleware
   app.use((req, res, next) => {
     if (req.path.startsWith('/api')) {
       log(`Auth Debug - Path: ${req.path}, Authenticated: ${req.isAuthenticated()}, User: ${req.user?.id}`);
@@ -80,6 +95,7 @@ export function setupAuth(app: Express) {
         if (!user || !(await comparePasswords(password, user.password))) {
           return done(null, false);
         } else {
+          log(`Authenticating user: ${user.id}`);
           return done(null, user);
         }
       } catch (error) {
@@ -108,9 +124,17 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/login", passport.authenticate("local"), (req, res) => {
-    log(`Login successful for user: ${req.user?.id}`);
-    res.status(200).json(req.user);
+  app.post("/api/login", (req, res, next) => {
+    passport.authenticate("local", (err, user) => {
+      if (err) return next(err);
+      if (!user) return res.status(401).json({ message: "Invalid credentials" });
+
+      req.login(user, (err) => {
+        if (err) return next(err);
+        log(`Login successful for user: ${user.id}`);
+        res.status(200).json(user);
+      });
+    })(req, res, next);
   });
 
   app.post("/api/register", async (req, res, next) => {
