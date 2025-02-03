@@ -49,30 +49,19 @@ export function setupAuth(app: Express) {
     next();
   });
 
-  // Authentication check middleware
-  app.use('/api', (req, res, next) => {
-    if (req.path === '/login' || req.path === '/register' || req.method === 'OPTIONS') {
-      return next();
-    }
-
-    if (!req.isAuthenticated()) {
-      log(`Unauthorized access attempt to ${req.path}`);
-      return res.status(401).json({ message: 'Authentication required' });
-    }
-    next();
-  });
-
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
         const [user] = await getUserByUsername(username);
         if (!user || !(await comparePasswords(password, user.password))) {
+          log(`Authentication failed for username: ${username}`);
           return done(null, false);
         } else {
           log(`Authenticating user: ${user.id}`);
           return done(null, user);
         }
       } catch (error) {
+        log(`Authentication error: ${error}`);
         return done(error);
       }
     }),
@@ -94,17 +83,27 @@ export function setupAuth(app: Express) {
       log(`Deserialized user: ${user?.id}`);
       done(null, user);
     } catch (error) {
+      log(`Deserialization error: ${error}`);
       done(error);
     }
   });
 
   app.post("/api/login", (req, res, next) => {
     passport.authenticate("local", (err: any, user: any) => {
-      if (err) return next(err);
-      if (!user) return res.status(401).json({ message: "Invalid credentials" });
+      if (err) {
+        log(`Login error: ${err}`);
+        return next(err);
+      }
+      if (!user) {
+        log(`Login failed: Invalid credentials`);
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
 
       req.login(user, (err) => {
-        if (err) return next(err);
+        if (err) {
+          log(`Login error during session creation: ${err}`);
+          return next(err);
+        }
         log(`Login successful for user: ${user.id}`);
         res.status(200).json(user);
       });
@@ -115,15 +114,17 @@ export function setupAuth(app: Express) {
     const result = insertUserSchema.safeParse(req.body);
     if (!result.success) {
       const error = fromZodError(result.error);
+      log(`Registration validation error: ${error}`);
       return res.status(400).send(error.toString());
     }
 
-    const [existingUser] = await getUserByUsername(result.data.username);
-    if (existingUser) {
-      return res.status(400).send("Username already exists");
-    }
-
     try {
+      const [existingUser] = await getUserByUsername(result.data.username);
+      if (existingUser) {
+        log(`Registration failed: Username ${result.data.username} already exists`);
+        return res.status(400).send("Username already exists");
+      }
+
       const [user] = await db
         .insert(users)
         .values({
@@ -134,11 +135,15 @@ export function setupAuth(app: Express) {
         .returning();
 
       req.login(user, (err) => {
-        if (err) return next(err);
+        if (err) {
+          log(`Registration error during session creation: ${err}`);
+          return next(err);
+        }
         log(`Registration successful for user: ${user.id}`);
         res.status(201).json(user);
       });
     } catch (error) {
+      log(`Registration error: ${error}`);
       next(error);
     }
   });
@@ -146,7 +151,10 @@ export function setupAuth(app: Express) {
   app.post("/api/logout", (req, res, next) => {
     const userId = req.user?.id;
     req.logout((err) => {
-      if (err) return next(err);
+      if (err) {
+        log(`Logout error: ${err}`);
+        return next(err);
+      }
       log(`Logout successful for user: ${userId}`);
       res.sendStatus(200);
     });

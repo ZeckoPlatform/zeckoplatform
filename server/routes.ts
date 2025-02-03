@@ -14,16 +14,27 @@ type User = InferSelectModel<typeof users>;
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
 
-  // Modified Leads Routes with enhanced logging
+  // Authentication check middleware after auth setup
+  app.use('/api', (req, res, next) => {
+    // Skip auth check for login/register routes and OPTIONS requests
+    if (req.path === '/login' || req.path === '/register' || req.path === '/user' || req.method === 'OPTIONS') {
+      return next();
+    }
+
+    if (!req.isAuthenticated()) {
+      log(`Auth check failed - Session ID: ${req.sessionID}, Path: ${req.path}`);
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    log(`Auth check passed - User: ${req.user?.id}, Session ID: ${req.sessionID}`);
+    next();
+  });
+
   app.post("/api/leads", async (req, res) => {
     log(`Creating lead - Session ID: ${req.sessionID}`);
     log(`User authenticated: ${req.isAuthenticated()}`);
     log(`User data: ${JSON.stringify(req.user)}`);
 
-    if (!req.user || !req.isAuthenticated()) {
-      log(`Lead creation failed - No authenticated user. Session ID: ${req.sessionID}`);
-      return res.status(401).json({ message: "Not authenticated" });
-    }
 
     try {
       const lead = await db.insert(leads).values({
@@ -59,10 +70,6 @@ export function registerRoutes(app: Express): Server {
   });
   // Subscription Routes
   app.post("/api/subscriptions", async (req, res) => {
-    if (!req.user) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-
     if (!["business", "vendor"].includes(req.user.userType)) {
       return res.status(403).json({ message: "Invalid user type for subscription" });
     }
@@ -94,8 +101,6 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.get("/api/subscriptions/current", async (req, res) => {
-    if (!req.user) return res.sendStatus(401);
-
     const [subscription] = await db.select()
       .from(subscriptions)
       .where(
@@ -111,8 +116,6 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/subscriptions/cancel", async (req, res) => {
-    if (!req.user) return res.sendStatus(401);
-
     const [subscription] = await db.update(subscriptions)
       .set({ status: "cancelled" })
       .where(
@@ -136,8 +139,6 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.get("/api/leads", async (req, res) => {
-    if (!req.user) return res.sendStatus(401);
-
     try {
       const allLeads = await db.query.leads.findMany({
         with: {
@@ -156,7 +157,7 @@ export function registerRoutes(app: Express): Server {
           ...lead,
           matchScore: calculateMatchScore(lead, req.user),
         }))
-        .sort((a, b) => (b.matchScore?.totalScore || 0) - (a.matchScore?.totalScore || 0));
+          .sort((a, b) => (b.matchScore?.totalScore || 0) - (a.matchScore?.totalScore || 0));
 
         return res.json(sortedLeads);
       }
@@ -170,7 +171,7 @@ export function registerRoutes(app: Express): Server {
 
   // Products Routes
   app.post("/api/products", async (req, res) => {
-    if (!req.user || req.user.userType !== "vendor" || !req.user.subscriptionActive) {
+    if (req.user.userType !== "vendor" || !req.user.subscriptionActive) {
       return res.sendStatus(401);
     }
     const product = await db.insert(products).values({
@@ -191,9 +192,9 @@ export function registerRoutes(app: Express): Server {
 
   // Lead Responses Routes
   app.post("/api/leads/:leadId/responses", async (req, res) => {
-    if (!req.user || req.user.userType !== "business" || !req.user.subscriptionActive) {
-      return res.sendStatus(401);
-    }
+      if (req.user.userType !== "business" || !req.user.subscriptionActive) {
+          return res.sendStatus(401);
+      }
     const response = await db.insert(leadResponses).values({
       ...req.body,
       leadId: parseInt(req.params.leadId),
@@ -203,7 +204,6 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.patch("/api/leads/:leadId/responses/:responseId", async (req, res) => {
-    if (!req.user) return res.sendStatus(401);
     const [lead] = await db.select().from(leads).where(eq(leads.id, parseInt(req.params.leadId)));
     if (!lead || lead.userId !== req.user.id) return res.sendStatus(403);
 
@@ -221,7 +221,7 @@ export function registerRoutes(app: Express): Server {
 
   // Add route for businesses to update their matching preferences
   app.patch("/api/users/matching-preferences", async (req, res) => {
-    if (!req.user || req.user.userType !== "business") {
+    if (req.user.userType !== "business") {
       return res.status(403).json({ message: "Only business users can update matching preferences" });
     }
 
