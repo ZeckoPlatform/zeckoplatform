@@ -20,15 +20,42 @@ type AuthContextType = {
 type LoginData = Pick<InsertUser, "username" | "password">;
 
 export const AuthContext = createContext<AuthContextType | null>(null);
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const {
     data: user,
     error,
     isLoading,
-  } = useQuery<SelectUser | undefined, Error>({
+  } = useQuery<SelectUser | null>({
     queryKey: ["/api/user"],
-    queryFn: getQueryFn({ on401: "returnNull" }),
+    queryFn: async ({ queryKey }) => {
+      try {
+        const res = await fetch(queryKey[0] as string, {
+          credentials: "include",
+          mode: "cors",
+          cache: "no-cache",
+          headers: {
+            "Accept": "application/json",
+          }
+        });
+
+        if (res.status === 401) {
+          return null;
+        }
+
+        if (!res.ok) {
+          throw new Error(await res.text());
+        }
+
+        return res.json();
+      } catch (error) {
+        console.error("User fetch error:", error);
+        return null;
+      }
+    },
+    staleTime: Infinity,
+    retry: false,
   });
 
   const loginMutation = useMutation({
@@ -38,6 +65,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
+      toast({
+        title: "Welcome back!",
+        description: `Logged in as ${user.username}`,
+      });
     },
     onError: (error: Error) => {
       toast({
@@ -55,6 +86,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
+      toast({
+        title: "Welcome!",
+        description: "Your account has been created successfully.",
+      });
     },
     onError: (error: Error) => {
       toast({
@@ -71,6 +106,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: () => {
       queryClient.setQueryData(["/api/user"], null);
+      toast({
+        title: "Logged out",
+        description: "You have been logged out successfully.",
+      });
     },
     onError: (error: Error) => {
       toast({
