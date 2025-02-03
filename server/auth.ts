@@ -55,7 +55,7 @@ export function setupAuth(app: Express) {
         const [user] = await getUserByUsername(username);
         if (!user || !(await comparePasswords(password, user.password))) {
           log(`Authentication failed for username: ${username}`);
-          return done(null, false);
+          return done(null, false, { message: "Invalid credentials" });
         } else {
           log(`Authenticating user: ${user.id}`);
           return done(null, user);
@@ -89,14 +89,14 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", (err: any, user: any) => {
+    passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) {
         log(`Login error: ${err}`);
         return next(err);
       }
       if (!user) {
-        log(`Login failed: Invalid credentials`);
-        return res.status(401).json({ message: "Invalid credentials" });
+        log(`Login failed: ${info?.message || 'Invalid credentials'}`);
+        return res.status(401).json({ message: info?.message || "Invalid credentials" });
       }
 
       req.login(user, (err) => {
