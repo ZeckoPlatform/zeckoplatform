@@ -26,16 +26,14 @@ app.set('trust proxy', 1);
 app.use(session({
   store,
   secret: process.env.REPL_ID!,
-  name: 'sid',
+  name: 'connect.sid',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false, // Set to true in production with HTTPS
+    secure: app.get('env') === 'production',
     httpOnly: true,
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     sameSite: 'lax',
-    path: '/',
-    domain: undefined // Let the browser set the appropriate domain
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   }
 }));
 
@@ -45,15 +43,16 @@ app.use(express.urlencoded({ extended: false }));
 
 // Enhanced CORS configuration after session but before routes
 app.use((req, res, next) => {
-  // Get origin from request headers
   const origin = req.headers.origin;
-  if (origin) {
-    // Only set Allow-Origin for known origins
-    res.header('Access-Control-Allow-Origin', origin);
+  // Always set CORS headers for API requests
+  if (req.path.startsWith('/api')) {
+    if (origin) {
+      res.header('Access-Control-Allow-Origin', origin);
+    }
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Cookie, Set-Cookie');
-    res.header('Access-Control-Expose-Headers', 'Set-Cookie');
+    res.header('Vary', 'Origin');
   }
   next();
 });
@@ -66,7 +65,7 @@ app.options('*', (req, res) => {
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Cookie, Set-Cookie');
-    res.header('Access-Control-Expose-Headers', 'Set-Cookie');
+    res.header('Vary', 'Origin');
   }
   res.sendStatus(200);
 });
@@ -79,35 +78,6 @@ app.use((req, res, next) => {
     log(`Session: ${JSON.stringify(req.session)}`);
     log(`Cookie: ${JSON.stringify(req.headers.cookie)}`);
   }
-  next();
-});
-
-// Response logging middleware
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
-
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-      log(logLine);
-    }
-  });
-
   next();
 });
 
