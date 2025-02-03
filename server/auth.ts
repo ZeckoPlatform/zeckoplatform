@@ -68,7 +68,7 @@ export function setupAuth(app: Express) {
     }
   }
 
-  // Set CORS headers before session middleware
+  // Add CORS headers before session middleware
   app.use((req, res, next) => {
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
