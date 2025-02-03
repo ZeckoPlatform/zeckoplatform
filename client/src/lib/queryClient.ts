@@ -12,20 +12,25 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
-    method,
-    headers: {
-      ...(data ? { "Content-Type": "application/json" } : {}),
-      "Accept": "application/json",
-    },
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-    mode: "cors",
-    cache: "no-cache",
-  });
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: {
+        ...(data ? { "Content-Type": "application/json" } : {}),
+        "Accept": "application/json",
+      },
+      body: data ? JSON.stringify(data) : undefined,
+      credentials: "include",
+      mode: "cors",
+      cache: "no-cache",
+    });
 
-  await throwIfResNotOk(res);
-  return res;
+    await throwIfResNotOk(res);
+    return res;
+  } catch (error) {
+    console.error("API request error:", error);
+    throw error;
+  }
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
@@ -44,12 +49,17 @@ export const getQueryFn: <T>(options: {
         }
       });
 
-      if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-        return null;
+      // Handle 401 according to the specified behavior
+      if (res.status === 401) {
+        if (unauthorizedBehavior === "returnNull") {
+          return null;
+        }
+        const error = await res.text();
+        throw new Error(`401: ${error}`);
       }
 
       await throwIfResNotOk(res);
-      return await res.json();
+      return res.json();
     } catch (error) {
       console.error("Query error:", error);
       throw error;
