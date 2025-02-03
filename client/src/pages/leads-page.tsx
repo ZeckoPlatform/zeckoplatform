@@ -8,11 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
-import { queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2 } from "lucide-react";
-import { apiRequest } from "@/lib/api";
 
 export default function LeadsPage() {
   const { user } = useAuth();
@@ -43,34 +42,13 @@ export default function LeadsPage() {
 
       console.log("Creating lead with user:", user.id);
 
-      const res = await fetch("/api/leads", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-          "Cache-Control": "no-cache",
-          "Pragma": "no-cache",
-        },
-        credentials: "include",
-        mode: "cors",
-        cache: "no-cache",
-        body: JSON.stringify({
-          ...data,
-          budget: parseInt(data.budget),
-        }),
+      const res = await apiRequest("POST", "/api/leads", {
+        ...data,
+        budget: parseInt(data.budget),
       });
 
-      console.log("Lead creation response status:", res.status);
-
-      if (!res.ok) {
-        const error = await res.text();
-        console.error("Lead creation error response:", error);
-        throw new Error(error);
-      }
-
-      const result = await res.json();
-      console.log("Lead creation successful:", result);
-      return result;
+      console.log("Lead creation response:", res.status);
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
