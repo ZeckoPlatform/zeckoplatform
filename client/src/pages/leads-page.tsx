@@ -36,11 +36,26 @@ export default function LeadsPage() {
         throw new Error("You must be logged in to create a lead");
       }
 
-      const res = await apiRequest("POST", "/api/leads", {
-        ...data,
-        budget: parseInt(data.budget),
-      });
-      return res.json();
+      if (user.userType !== "free") {
+        throw new Error("Only free users can create leads");
+      }
+
+      try {
+        const res = await apiRequest("POST", "/api/leads", {
+          ...data,
+          budget: parseInt(data.budget),
+        });
+
+        if (!res.ok) {
+          const error = await res.text();
+          throw new Error(error || "Failed to create lead");
+        }
+
+        return res.json();
+      } catch (error) {
+        console.error("Lead creation error:", error);
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
@@ -51,6 +66,7 @@ export default function LeadsPage() {
       form.reset();
     },
     onError: (error: Error) => {
+      console.error("Lead mutation error:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to create lead. Please try again.",

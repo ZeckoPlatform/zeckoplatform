@@ -53,9 +53,9 @@ export function setupAuth(app: Express) {
     saveUninitialized: true,
     store,
     cookie: {
-      secure: false,
+      secure: false, // Set to true in production with HTTPS
       httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
       sameSite: 'lax',
       path: '/'
     }
