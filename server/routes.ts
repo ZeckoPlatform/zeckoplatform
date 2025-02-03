@@ -46,24 +46,15 @@ export function registerRoutes(app: Express): Server {
     log(`Cookie: ${JSON.stringify(req.headers.cookie)}`);
     log(`Auth status: ${req.isAuthenticated()}`);
 
-    if (!req.isAuthenticated()) {
-      log(`Lead creation failed: Not authenticated - Session ID: ${req.sessionID}`);
-      return res.status(401).json({ message: "Authentication required" });
-    }
-
-    if (!req.user) {
-      log(`Lead creation failed: No user found - Session ID: ${req.sessionID}`);
-      return res.status(401).json({ message: "Authentication required" });
-    }
 
     try {
-      log(`Creating lead for user ${req.user.id}`);
+      log(`Creating lead for user ${req.user!.id}`);
       const lead = await db.insert(leads).values({
         ...req.body,
-        userId: req.user.id,
+        userId: req.user!.id,
       }).returning();
 
-      log(`Lead created successfully by user ${req.user.id}`);
+      log(`Lead created successfully by user ${req.user!.id}`);
       res.json(lead[0]);
     } catch (error) {
       log(`Lead creation error: ${error}`);

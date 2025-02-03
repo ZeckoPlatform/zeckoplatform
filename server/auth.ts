@@ -39,7 +39,6 @@ export function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Debug middleware - log every request
   app.use((req, res, next) => {
     if (req.path.startsWith('/api')) {
       log(`Auth Debug - Path: ${req.path}, Method: ${req.method}, Authenticated: ${req.isAuthenticated()}, User: ${req.user?.id}`);
