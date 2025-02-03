@@ -8,9 +8,29 @@ import {
 } from "@/components/ui/navigation-menu";
 import { Button } from "@/components/ui/button";
 import { UserCircle } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function Navbar() {
   const { user, logoutMutation } = useAuth();
+
+  const getDashboardLink = () => {
+    switch (user?.userType) {
+      case "vendor":
+        return "/vendor";
+      case "business":
+      case "free":
+        return "/leads";
+      default:
+        return "/";
+    }
+  };
 
   return (
     <nav className="border-b">
@@ -63,18 +83,37 @@ export default function Navbar() {
           </div>
           <div className="flex items-center gap-4">
             {user ? (
-              <>
-                <div className="flex items-center gap-2">
-                  <UserCircle className="h-6 w-6" />
-                  <span>{user.username}</span>
-                </div>
-                <Button
-                  variant="outline"
-                  onClick={() => logoutMutation.mutate()}
-                >
-                  Logout
-                </Button>
-              </>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="flex items-center gap-2">
+                    <UserCircle className="h-6 w-6" />
+                    <span>{user.username}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href={getDashboardLink()}>
+                      <a className="w-full">Dashboard</a>
+                    </Link>
+                  </DropdownMenuItem>
+                  {user.userType !== "free" && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/subscription">
+                        <a className="w-full">Subscription</a>
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive"
+                    onClick={() => logoutMutation.mutate()}
+                  >
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : (
               <Link href="/auth">
                 <Button>Login</Button>

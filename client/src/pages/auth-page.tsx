@@ -27,9 +27,27 @@ export default function AuthPage() {
     },
   });
 
+  const onLoginSuccess = (data: any) => {
+    switch (data.userType) {
+      case "free":
+        setLocation("/leads");
+        break;
+      case "business":
+        setLocation("/leads");
+        break;
+      case "vendor":
+        setLocation("/vendor");
+        break;
+      default:
+        setLocation("/");
+    }
+  };
+
   const onRegisterSuccess = (data: any) => {
     if (data.userType !== "free") {
       setLocation("/subscription");
+    } else {
+      setLocation("/leads");
     }
   };
 
@@ -73,7 +91,9 @@ export default function AuthPage() {
               <TabsContent value="login">
                 <form
                   onSubmit={loginForm.handleSubmit((data) =>
-                    loginMutation.mutate(data)
+                    loginMutation.mutate(data, {
+                      onSuccess: onLoginSuccess,
+                    })
                   )}
                   className="space-y-4"
                 >
