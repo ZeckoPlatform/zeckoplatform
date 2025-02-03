@@ -35,7 +35,7 @@ app.use(session({
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     sameSite: 'lax',
     path: '/',
-    domain: '.riker.replit.dev' // Allow cookies for all subdomains
+    domain: undefined // Let the browser set the appropriate domain
   }
 }));
 

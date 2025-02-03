@@ -21,7 +21,7 @@ export function registerRoutes(app: Express): Server {
       return next();
     }
 
-    if (!req.isAuthenticated()) {
+    if (!req.user || !req.isAuthenticated()) {
       log(`Auth check failed - Session ID: ${req.sessionID}, Path: ${req.path}`);
       return res.status(401).json({ message: 'Authentication required' });
     }
