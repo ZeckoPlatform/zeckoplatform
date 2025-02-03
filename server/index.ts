@@ -6,6 +6,7 @@ import connectPg from "connect-pg-simple";
 import { pool } from "@db";
 
 const app = express();
+app.set('trust proxy', 1);
 
 // Session configuration must come before any other middleware
 const PostgresSessionStore = connectPg(session);
@@ -19,8 +20,6 @@ const store = new PostgresSessionStore({
 store.on('error', function(error) {
   log(`Session store error: ${error}`);
 });
-
-app.set('trust proxy', 1);
 
 // Global CORS configuration
 app.use((req, res, next) => {

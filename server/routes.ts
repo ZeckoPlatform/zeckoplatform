@@ -14,35 +14,25 @@ type User = InferSelectModel<typeof users>;
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
 
-  // Enhanced CORS and Authentication middleware
+  // Skip auth check for login/register routes and OPTIONS requests
   app.use('/api', (req, res, next) => {
-    // Skip auth check for login/register routes and OPTIONS requests
-    if (req.path === '/login' || req.path === '/register' || req.path === '/user' || req.method === 'OPTIONS') {
+    const publicPaths = ['/login', '/register', '/user'];
+    if (publicPaths.includes(req.path) || req.method === 'OPTIONS') {
       return next();
     }
 
-    log(`Auth middleware - Path: ${req.path}, Method: ${req.method}`);
-    log(`Session info - ID: ${req.sessionID}`);
-    log(`Cookie info: ${JSON.stringify(req.headers.cookie)}`);
-    log(`User info: ${JSON.stringify(req.user)}`);
-    log(`Is authenticated: ${req.isAuthenticated()}`);
-
-    // Set CORS headers for all API routes
-    const origin = req.headers.origin;
-    if (origin) {
-      res.header('Access-Control-Allow-Origin', origin);
-      res.header('Access-Control-Allow-Credentials', 'true');
-      res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Cookie, Set-Cookie');
-      res.header('Vary', 'Origin');
-    }
+    // Log complete request details for debugging
+    log(`Auth check - Path: ${req.path}, Method: ${req.method}`);
+    log(`Session ID: ${req.sessionID}`);
+    log(`Cookie Header: ${req.headers.cookie}`);
+    log(`Is Authenticated: ${req.isAuthenticated()}`);
+    log(`User: ${JSON.stringify(req.user)}`);
 
     if (!req.isAuthenticated() || !req.user) {
       log(`Authentication failed - Session ID: ${req.sessionID}`);
       return res.status(401).json({ message: 'Authentication required' });
     }
 
-    log(`Authentication successful - User: ${req.user.id}`);
     next();
   });
 
