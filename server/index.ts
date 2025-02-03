@@ -16,6 +16,10 @@ const store = new PostgresSessionStore({
   pruneSessionInterval: 60
 });
 
+store.on('error', function(error) {
+  log(`Session store error: ${error}`);
+});
+
 app.set('trust proxy', 1);
 
 // Session middleware must be first
@@ -61,6 +65,7 @@ app.use((req, res, next) => {
     log(`Request: ${req.method} ${req.path} - Session ID: ${req.sessionID}`);
     log(`Headers: ${JSON.stringify(req.headers)}`);
     log(`Session: ${JSON.stringify(req.session)}`);
+    log(`Cookie: ${JSON.stringify(req.headers.cookie)}`);
   }
   next();
 });
