@@ -23,10 +23,13 @@ export async function apiRequest(
       headers: {
         ...(data ? { "Content-Type": "application/json" } : {}),
         "Accept": "application/json",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
       },
       body: data ? JSON.stringify(data) : undefined,
       credentials: "include",
       mode: "cors",
+      cache: "no-cache",
     });
 
     console.log(`API Request - ${method} ${url}`);
@@ -42,7 +45,6 @@ export async function apiRequest(
         throw new Error(text);
       }
     }
-
     return res;
   } catch (error) {
     console.error("API request error:", error);
@@ -61,8 +63,11 @@ export const getQueryFn: <T>(options: {
       const res = await fetch(queryKey[0] as string, {
         credentials: "include",
         mode: "cors",
+        cache: "no-cache",
         headers: {
           "Accept": "application/json",
+          "Cache-Control": "no-cache",
+          "Pragma": "no-cache",
         }
       });
 

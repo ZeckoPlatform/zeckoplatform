@@ -22,7 +22,25 @@ store.on('error', function(error) {
 
 app.set('trust proxy', 1);
 
-// Session middleware must be first
+// Global CORS configuration
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Cookie, Set-Cookie');
+    res.header('Vary', 'Origin');
+  }
+
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
+// Session middleware must be first after CORS
 app.use(session({
   store,
   secret: process.env.REPL_ID!,
