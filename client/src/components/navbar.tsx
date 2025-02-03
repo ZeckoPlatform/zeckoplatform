@@ -38,6 +38,15 @@ export default function Navbar() {
                     </NavigationMenuLink>
                   </Link>
                 </NavigationMenuItem>
+                {user && user.userType !== "free" && (
+                  <NavigationMenuItem>
+                    <Link href="/subscription">
+                      <NavigationMenuLink className="cursor-pointer">
+                        Subscription
+                      </NavigationMenuLink>
+                    </Link>
+                  </NavigationMenuItem>
+                )}
               </NavigationMenuList>
             </NavigationMenu>
           </div>

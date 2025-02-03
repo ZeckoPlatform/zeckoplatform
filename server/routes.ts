@@ -2,11 +2,79 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { db } from "@db";
-import { leads, products, leadResponses } from "@db/schema";
+import { leads, products, leadResponses, subscriptions, users } from "@db/schema";
 import { eq, and } from "drizzle-orm";
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
+
+  // Subscription Routes
+  app.post("/api/subscriptions", async (req, res) => {
+    if (!req.user || !["business", "vendor"].includes(req.user.userType)) {
+      return res.sendStatus(401);
+    }
+
+    const subscription = await db.insert(subscriptions).values({
+      userId: req.user.id,
+      tier: req.user.userType,
+      status: "active",
+      startDate: new Date(),
+      endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+      price: req.user.userType === "business" ? 29.99 : 49.99,
+    }).returning();
+
+    await db.update(users)
+      .set({
+        subscriptionActive: true,
+        subscriptionTier: req.user.userType,
+        subscriptionEndsAt: subscription[0].endDate,
+      })
+      .where(eq(users.id, req.user.id));
+
+    res.json(subscription[0]);
+  });
+
+  app.get("/api/subscriptions/current", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+
+    const [subscription] = await db.select()
+      .from(subscriptions)
+      .where(
+        and(
+          eq(subscriptions.userId, req.user.id),
+          eq(subscriptions.status, "active")
+        )
+      )
+      .orderBy(subscriptions.startDate)
+      .limit(1);
+
+    res.json(subscription || null);
+  });
+
+  app.post("/api/subscriptions/cancel", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+
+    const [subscription] = await db.update(subscriptions)
+      .set({ status: "cancelled" })
+      .where(
+        and(
+          eq(subscriptions.userId, req.user.id),
+          eq(subscriptions.status, "active")
+        )
+      )
+      .returning();
+
+    if (subscription) {
+      await db.update(users)
+        .set({
+          subscriptionActive: false,
+          subscriptionTier: "none",
+        })
+        .where(eq(users.id, req.user.id));
+    }
+
+    res.json(subscription || null);
+  });
 
   // Leads Routes
   app.post("/api/leads", async (req, res) => {
@@ -35,7 +103,9 @@ export function registerRoutes(app: Express): Server {
 
   // Products Routes
   app.post("/api/products", async (req, res) => {
-    if (!req.user || req.user.userType !== "vendor") return res.sendStatus(401);
+    if (!req.user || req.user.userType !== "vendor" || !req.user.subscriptionActive) {
+      return res.sendStatus(401);
+    }
     const product = await db.insert(products).values({
       ...req.body,
       vendorId: req.user.id,
@@ -54,7 +124,9 @@ export function registerRoutes(app: Express): Server {
 
   // Lead Responses Routes
   app.post("/api/leads/:leadId/responses", async (req, res) => {
-    if (!req.user || req.user.userType !== "business") return res.sendStatus(401);
+    if (!req.user || req.user.userType !== "business" || !req.user.subscriptionActive) {
+      return res.sendStatus(401);
+    }
     const response = await db.insert(leadResponses).values({
       ...req.body,
       leadId: parseInt(req.params.leadId),
@@ -67,7 +139,7 @@ export function registerRoutes(app: Express): Server {
     if (!req.user) return res.sendStatus(401);
     const [lead] = await db.select().from(leads).where(eq(leads.id, parseInt(req.params.leadId)));
     if (!lead || lead.userId !== req.user.id) return res.sendStatus(403);
-    
+
     const [response] = await db.update(leadResponses)
       .set({ status: req.body.status })
       .where(
