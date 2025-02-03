@@ -11,6 +11,7 @@ import { useForm } from "react-hook-form";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Loader2 } from "lucide-react";
 
 export default function LeadsPage() {
   const { user } = useAuth();
@@ -25,13 +26,16 @@ export default function LeadsPage() {
     },
   });
 
-  const { data: leads } = useQuery<any[]>({
+  const { data: leads, isLoading: isLoadingLeads } = useQuery<any[]>({
     queryKey: ["/api/leads"],
   });
 
   const createLeadMutation = useMutation({
     mutationFn: async (data: any) => {
-      const res = await apiRequest("POST", "/api/leads", data);
+      const res = await apiRequest("POST", "/api/leads", {
+        ...data,
+        budget: parseInt(data.budget),
+      });
       return res.json();
     },
     onSuccess: () => {
@@ -39,6 +43,14 @@ export default function LeadsPage() {
       toast({
         title: "Lead Created",
         description: "Your lead has been posted successfully.",
+      });
+      form.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create lead. Please try again.",
+        variant: "destructive",
       });
     },
   });
@@ -53,6 +65,13 @@ export default function LeadsPage() {
       toast({
         title: "Response Submitted",
         description: "Your response has been submitted successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to submit response. Please try again.",
+        variant: "destructive",
       });
     },
   });
@@ -98,11 +117,30 @@ export default function LeadsPage() {
         <Label htmlFor="location">Location</Label>
         <Input id="location" {...form.register("location")} required />
       </div>
-      <Button type="submit" className="w-full">
-        Post Lead
+      <Button 
+        type="submit" 
+        className="w-full"
+        disabled={createLeadMutation.isPending}
+      >
+        {createLeadMutation.isPending ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Posting...
+          </>
+        ) : (
+          'Post Lead'
+        )}
       </Button>
     </form>
   );
+
+  if (isLoadingLeads) {
+    return (
+      <div className="flex items-center justify-center min-h-[200px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (user?.userType === "free") {
     return (
