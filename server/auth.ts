@@ -38,7 +38,7 @@ async function getUserByUsername(username: string) {
 }
 
 export function setupAuth(app: Express) {
-  // Create the session store with explicit table creation
+  // Create the session store with explicit table creation first
   const store = new PostgresSessionStore({
     pool,
     tableName: 'session',
@@ -46,11 +46,12 @@ export function setupAuth(app: Express) {
     pruneSessionInterval: 60
   });
 
+  // Then configure session settings using the created store
   const sessionSettings: session.SessionOptions = {
     secret: process.env.REPL_ID!,
     name: 'sid',
-    resave: true,
-    saveUninitialized: true,
+    resave: false,
+    saveUninitialized: false,
     store,
     cookie: {
       secure: false, // Set to true in production with HTTPS
@@ -86,12 +87,25 @@ export function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Debug middleware
+  // Debug middleware - log every request
   app.use((req, res, next) => {
     if (req.path.startsWith('/api')) {
-      log(`Auth Debug - Path: ${req.path}, Authenticated: ${req.isAuthenticated()}, User: ${req.user?.id}`);
+      log(`Auth Debug - Path: ${req.path}, Method: ${req.method}, Authenticated: ${req.isAuthenticated()}, User: ${req.user?.id}`);
       log(`Session Debug - Session ID: ${req.sessionID}, Cookie: ${JSON.stringify(req.session?.cookie)}`);
-      log(`Headers Debug - ${JSON.stringify(req.headers)}`);
+      log(`Headers Debug - Origin: ${req.headers.origin}, Referrer: ${req.headers.referer}`);
+    }
+    next();
+  });
+
+  // Authentication check middleware
+  app.use('/api', (req, res, next) => {
+    if (req.path === '/login' || req.path === '/register' || req.method === 'OPTIONS') {
+      return next();
+    }
+
+    if (!req.isAuthenticated()) {
+      log(`Unauthorized access attempt to ${req.path}`);
+      return res.status(401).json({ message: 'Authentication required' });
     }
     next();
   });
@@ -133,7 +147,7 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", (err, user) => {
+    passport.authenticate("local", (err: any, user: any) => {
       if (err) return next(err);
       if (!user) return res.status(401).json({ message: "Invalid credentials" });
 
