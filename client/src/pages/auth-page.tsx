@@ -1,5 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
-import { Redirect } from "wouter";
+import { Redirect, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
-  
+  const [location, setLocation] = useLocation();
+
   const loginForm = useForm({
     defaultValues: {
       username: "",
@@ -25,6 +26,12 @@ export default function AuthPage() {
       userType: "free" as const,
     },
   });
+
+  const onRegisterSuccess = (data: any) => {
+    if (data.userType !== "free") {
+      setLocation("/subscription");
+    }
+  };
 
   if (user) {
     return <Redirect to="/" />;
@@ -98,7 +105,9 @@ export default function AuthPage() {
               <TabsContent value="register">
                 <form
                   onSubmit={registerForm.handleSubmit((data) =>
-                    registerMutation.mutate(data)
+                    registerMutation.mutate(data, {
+                      onSuccess: onRegisterSuccess,
+                    })
                   )}
                   className="space-y-4"
                 >

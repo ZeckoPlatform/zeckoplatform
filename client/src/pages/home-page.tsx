@@ -1,11 +1,34 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useAuth } from "@/hooks/use-auth";
+import { AlertTriangle } from "lucide-react";
 
 export default function HomePage() {
+  const { user } = useAuth();
+
+  const showSubscriptionAlert = user && 
+    ["business", "vendor"].includes(user.userType) && 
+    !user.subscriptionActive;
+
   return (
     <div className="min-h-screen">
-      {/* Hero Section */}
+      {showSubscriptionAlert && (
+        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+          <div className="bg-muted rounded-lg p-4 flex items-center gap-4">
+            <AlertTriangle className="h-6 w-6 text-yellow-500" />
+            <div>
+              <p className="font-medium">Complete Your Setup</p>
+              <p className="text-sm text-muted-foreground">
+                Activate your {user.userType} subscription to access all features.
+              </p>
+            </div>
+            <Link href="/subscription">
+              <Button className="ml-auto">Setup Subscription</Button>
+            </Link>
+          </div>
+        </div>
+      )}
       <div className="relative">
         <div className="absolute inset-0">
           <img
@@ -35,7 +58,6 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Features Section */}
       <div className="py-24 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
