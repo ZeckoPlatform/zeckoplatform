@@ -46,6 +46,8 @@ export const getQueryFn: <T>(options: {
         cache: "no-cache",
         headers: {
           "Accept": "application/json",
+          "Cache-Control": "no-cache",
+          "Pragma": "no-cache",
         }
       });
 
