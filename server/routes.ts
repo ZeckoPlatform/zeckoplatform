@@ -14,11 +14,21 @@ type User = InferSelectModel<typeof users>;
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
 
-  // Authentication check middleware after auth setup
+  // Enhanced CORS and Authentication middleware
   app.use('/api', (req, res, next) => {
     // Skip auth check for login/register routes and OPTIONS requests
     if (req.path === '/login' || req.path === '/register' || req.path === '/user' || req.method === 'OPTIONS') {
       return next();
+    }
+
+    // Set CORS headers for all API routes
+    const origin = req.headers.origin;
+    if (origin) {
+      res.header('Access-Control-Allow-Origin', origin);
+      res.header('Access-Control-Allow-Credentials', 'true');
+      res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
+      res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Cookie, Set-Cookie');
+      res.header('Vary', 'Origin');
     }
 
     if (!req.isAuthenticated() || !req.user) {
@@ -31,6 +41,7 @@ export function registerRoutes(app: Express): Server {
     next();
   });
 
+  // Routes start here
   app.get("/api/auth/verify", (req, res) => {
     if (req.isAuthenticated() && req.user) {
       res.json({ authenticated: true, user: req.user });
@@ -44,8 +55,6 @@ export function registerRoutes(app: Express): Server {
     log(`Request headers: ${JSON.stringify(req.headers)}`);
     log(`Session data: ${JSON.stringify(req.session)}`);
     log(`Cookie: ${JSON.stringify(req.headers.cookie)}`);
-    log(`Auth status: ${req.isAuthenticated()}`);
-
 
     try {
       log(`Creating lead for user ${req.user!.id}`);
