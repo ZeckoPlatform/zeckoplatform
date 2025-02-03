@@ -14,6 +14,49 @@ type User = InferSelectModel<typeof users>;
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
 
+  // Modified Leads Routes with enhanced logging
+  app.post("/api/leads", async (req, res) => {
+    log(`Creating lead - Session ID: ${req.sessionID}`);
+    log(`User authenticated: ${req.isAuthenticated()}`);
+    log(`User data: ${JSON.stringify(req.user)}`);
+
+    if (!req.user || !req.isAuthenticated()) {
+      log(`Lead creation failed - No authenticated user. Session ID: ${req.sessionID}`);
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const lead = await db.insert(leads).values({
+        ...req.body,
+        userId: req.user.id,
+      }).returning();
+
+      // Find matching businesses
+      const businesses = await db.query.users.findMany({
+        where: eq(users.userType, "business"),
+      });
+
+      const matchedBusinesses = businesses.length > 0 ? sortBusinessesByMatch(lead[0], businesses) : [];
+
+      // Store matching scores if there are matches
+      if (matchedBusinesses.length > 0) {
+        await db.update(leads)
+          .set({
+            matchingScore: calculateMatchScore(lead[0], matchedBusinesses[0]),
+          })
+          .where(eq(leads.id, lead[0].id));
+      }
+
+      log(`Lead created successfully by user ${req.user.id}`);
+      res.json({
+        lead: lead[0],
+        matchedBusinesses: matchedBusinesses.slice(0, 5), // Return top 5 matches
+      });
+    } catch (error) {
+      log(`Lead creation error: ${error}`);
+      res.status(500).json({ message: "Failed to create lead" });
+    }
+  });
   // Subscription Routes
   app.post("/api/subscriptions", async (req, res) => {
     if (!req.user) {
@@ -90,44 +133,6 @@ export function registerRoutes(app: Express): Server {
     }
 
     res.json(subscription || null);
-  });
-
-  // Modified Leads Routes
-  app.post("/api/leads", async (req, res) => {
-    if (!req.user) {
-      log(`Lead creation failed - No authenticated user. Session ID: ${req.sessionID}`);
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-
-    try {
-      const lead = await db.insert(leads).values({
-        ...req.body,
-        userId: req.user.id,
-      }).returning();
-
-      // Find matching businesses
-      const businesses = await db.query.users.findMany({
-        where: eq(users.userType, "business"),
-      });
-
-      const matchedBusinesses = sortBusinessesByMatch(lead[0], businesses);
-
-      // Store matching scores
-      await db.update(leads)
-        .set({
-          matchingScore: calculateMatchScore(lead[0], matchedBusinesses[0]),
-        })
-        .where(eq(leads.id, lead[0].id));
-
-      log(`Lead created successfully by user ${req.user.id}`);
-      res.json({
-        lead: lead[0],
-        matchedBusinesses: matchedBusinesses.slice(0, 5), // Return top 5 matches
-      });
-    } catch (error) {
-      log(`Lead creation error: ${error}`);
-      res.status(500).json({ message: "Failed to create lead" });
-    }
   });
 
   app.get("/api/leads", async (req, res) => {
@@ -237,7 +242,6 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ message: "Failed to update matching preferences" });
     }
   });
-
 
   const httpServer = createServer(app);
   return httpServer;
