@@ -5,7 +5,7 @@ import {
   UseMutationResult,
 } from "@tanstack/react-query";
 import type { SelectUser, InsertUser } from "@db/schema";
-import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
+import { apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 type AuthContextType = {
@@ -23,6 +23,8 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
+
+  // Modified user query to handle auth state properly
   const {
     data: user,
     error,
@@ -30,9 +32,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refetch: refetchUser,
   } = useQuery<SelectUser | null>({
     queryKey: ["/api/user"],
-    queryFn: async ({ queryKey }) => {
+    queryFn: async () => {
       try {
-        const res = await fetch(queryKey[0] as string, {
+        const res = await fetch("/api/user", {
           credentials: "include",
           mode: "cors",
           cache: "no-cache",
@@ -55,14 +57,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return null;
       }
     },
-    staleTime: Infinity,
+    staleTime: 30000, // Cache for 30 seconds
     retry: false,
   });
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
-      const res = await apiRequest("POST", "/api/login", credentials);
-      return await res.json();
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        body: JSON.stringify(credentials),
+        credentials: "include",
+        mode: "cors",
+        cache: "no-cache",
+      });
+
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error);
+      }
+
+      return res.json();
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
@@ -82,8 +100,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const registerMutation = useMutation({
     mutationFn: async (newUser: InsertUser) => {
-      const res = await apiRequest("POST", "/api/register", newUser);
-      return await res.json();
+      const res = await fetch("/api/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        body: JSON.stringify(newUser),
+        credentials: "include",
+        mode: "cors",
+        cache: "no-cache",
+      });
+
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error);
+      }
+
+      return res.json();
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
@@ -103,7 +137,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", "/api/logout");
+      const res = await fetch("/api/logout", {
+        method: "POST",
+        credentials: "include",
+        mode: "cors",
+        cache: "no-cache",
+      });
+
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
     },
     onSuccess: () => {
       queryClient.setQueryData(["/api/user"], null);
