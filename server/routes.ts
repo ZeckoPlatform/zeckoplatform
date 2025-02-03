@@ -21,6 +21,12 @@ export function registerRoutes(app: Express): Server {
       return next();
     }
 
+    log(`Auth middleware - Path: ${req.path}, Method: ${req.method}`);
+    log(`Session info - ID: ${req.sessionID}`);
+    log(`Cookie info: ${JSON.stringify(req.headers.cookie)}`);
+    log(`User info: ${JSON.stringify(req.user)}`);
+    log(`Is authenticated: ${req.isAuthenticated()}`);
+
     // Set CORS headers for all API routes
     const origin = req.headers.origin;
     if (origin) {
@@ -32,16 +38,14 @@ export function registerRoutes(app: Express): Server {
     }
 
     if (!req.isAuthenticated() || !req.user) {
-      log(`Auth check failed - Session ID: ${req.sessionID}, Path: ${req.path}, Headers: ${JSON.stringify(req.headers)}`);
-      log(`Cookie Debug: ${req.headers.cookie}`);
+      log(`Authentication failed - Session ID: ${req.sessionID}`);
       return res.status(401).json({ message: 'Authentication required' });
     }
 
-    log(`Auth check passed - User: ${req.user.id}, Session ID: ${req.sessionID}`);
+    log(`Authentication successful - User: ${req.user.id}`);
     next();
   });
 
-  // Routes start here
   app.get("/api/auth/verify", (req, res) => {
     if (req.isAuthenticated() && req.user) {
       res.json({ authenticated: true, user: req.user });
@@ -51,19 +55,16 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/leads", async (req, res) => {
-    log(`Lead creation attempt - User: ${req.user?.id}, Session: ${req.sessionID}`);
-    log(`Request headers: ${JSON.stringify(req.headers)}`);
-    log(`Session data: ${JSON.stringify(req.session)}`);
-    log(`Cookie: ${JSON.stringify(req.headers.cookie)}`);
-
     try {
-      log(`Creating lead for user ${req.user!.id}`);
+      log(`Creating lead - User: ${req.user?.id}, Session: ${req.sessionID}`);
+      log(`Request body: ${JSON.stringify(req.body)}`);
+
       const lead = await db.insert(leads).values({
         ...req.body,
         userId: req.user!.id,
       }).returning();
 
-      log(`Lead created successfully by user ${req.user!.id}`);
+      log(`Lead created successfully - ID: ${lead[0].id}`);
       res.json(lead[0]);
     } catch (error) {
       log(`Lead creation error: ${error}`);

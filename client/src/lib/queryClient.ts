@@ -3,7 +3,12 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text);
+    try {
+      const json = JSON.parse(text);
+      throw new Error(json.message || text);
+    } catch {
+      throw new Error(text);
+    }
   }
 }
 
@@ -24,6 +29,10 @@ export async function apiRequest(
       mode: "cors",
     });
 
+    console.log(`API Request - ${method} ${url}`);
+    console.log('Response status:', res.status);
+    console.log('Response headers:', Object.fromEntries(res.headers.entries()));
+
     await throwIfResNotOk(res);
     return res;
   } catch (error) {
@@ -38,6 +47,8 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     try {
+      console.log(`Query request - ${queryKey[0]}`);
+
       const res = await fetch(queryKey[0] as string, {
         credentials: "include",
         mode: "cors",
@@ -46,7 +57,9 @@ export const getQueryFn: <T>(options: {
         }
       });
 
-      // Handle 401 according to the specified behavior
+      console.log('Query response status:', res.status);
+      console.log('Query response headers:', Object.fromEntries(res.headers.entries()));
+
       if (res.status === 401) {
         if (unauthorizedBehavior === "returnNull") {
           return null;
@@ -71,7 +84,7 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "returnNull" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: 30000, // Cache for 30 seconds
+      staleTime: 30000,
       retry: false,
       networkMode: "always",
     },
