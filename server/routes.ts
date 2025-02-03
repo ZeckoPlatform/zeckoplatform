@@ -94,7 +94,10 @@ export function registerRoutes(app: Express): Server {
 
   // Modified Leads Routes
   app.post("/api/leads", async (req, res) => {
-    if (!req.user) return res.sendStatus(401);
+    if (!req.user) {
+      log(`Lead creation failed - No authenticated user. Session ID: ${req.sessionID}`);
+      return res.status(401).json({ message: "Not authenticated" });
+    }
 
     try {
       const lead = await db.insert(leads).values({
@@ -116,6 +119,7 @@ export function registerRoutes(app: Express): Server {
         })
         .where(eq(leads.id, lead[0].id));
 
+      log(`Lead created successfully by user ${req.user.id}`);
       res.json({
         lead: lead[0],
         matchedBusinesses: matchedBusinesses.slice(0, 5), // Return top 5 matches

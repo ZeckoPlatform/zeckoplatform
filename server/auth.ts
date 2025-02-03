@@ -45,7 +45,7 @@ export function setupAuth(app: Express) {
     saveUninitialized: false,
     store,
     cookie: {
-      secure: app.get("env") === "production",
+      secure: false, // Set to false for development
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       sameSite: 'lax'
@@ -54,6 +54,9 @@ export function setupAuth(app: Express) {
 
   if (app.get("env") === "production") {
     app.set("trust proxy", 1);
+    if (sessionSettings.cookie) {
+      sessionSettings.cookie.secure = true;
+    }
   }
 
   app.use(session(sessionSettings));
@@ -64,6 +67,8 @@ export function setupAuth(app: Express) {
   app.use((req, res, next) => {
     if (req.path.startsWith('/api')) {
       log(`Auth Debug - Path: ${req.path}, Authenticated: ${req.isAuthenticated()}, User: ${req.user?.id}`);
+      log(`Session Debug - Session ID: ${req.sessionID}, Cookie: ${JSON.stringify(req.session?.cookie)}`);
+      log(`Headers Debug - ${JSON.stringify(req.headers)}`);
     }
     next();
   });
@@ -124,8 +129,9 @@ export function setupAuth(app: Express) {
       const [user] = await db
         .insert(users)
         .values({
-          ...result.data,
+          username: result.data.username,
           password: await hashPassword(result.data.password),
+          userType: result.data.userType,
         })
         .returning();
 
