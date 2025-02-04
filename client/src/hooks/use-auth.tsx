@@ -163,35 +163,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // Effect to verify auth state periodically
+  // Effect to verify auth state only on mount and user change
   useEffect(() => {
     const verifyAuth = async () => {
       try {
+        if (!user) return; // Don't verify if there's no user
+
         const res = await fetch("/api/auth/verify", {
           credentials: "include",
         });
 
         if (!res.ok) {
+          console.error("Auth verification failed:", await res.text());
+          return;
+        }
+
+        const data = await res.json();
+        if (!data.authenticated) {
           queryClient.setQueryData(["/api/user"], null);
-          await refetchUser();
           setLocation("/auth");
         }
       } catch (error) {
         console.error("Auth verification error:", error);
-        queryClient.setQueryData(["/api/user"], null);
-        await refetchUser();
-        setLocation("/auth");
       }
     };
 
-    if (user) {
-      // Initial verification
-      verifyAuth();
-      // Set up interval for periodic verification
-      const interval = setInterval(verifyAuth, 60000); // Check every minute
-      return () => clearInterval(interval);
-    }
-  }, [user, refetchUser, setLocation]);
+    verifyAuth();
+  }, [user, setLocation]);
 
   return (
     <AuthContext.Provider
