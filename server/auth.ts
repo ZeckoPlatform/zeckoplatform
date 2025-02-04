@@ -106,14 +106,23 @@ export function setupAuth(app: Express) {
           return next(err);
         }
 
-        // Set session cookie
-        req.session.save((err) => {
+        // Force session save before responding
+        req.session.regenerate((err) => {
           if (err) {
-            log(`Session save error: ${err}`);
+            log(`Session regeneration error: ${err}`);
             return next(err);
           }
-          log(`Login successful for user: ${user.id}, Session ID: ${req.sessionID}`);
-          res.json({ user });
+
+          req.session.user = user;
+          req.session.save((err) => {
+            if (err) {
+              log(`Session save error: ${err}`);
+              return next(err);
+            }
+
+            log(`Login successful for user: ${user.id}, Session ID: ${req.sessionID}`);
+            res.json({ user });
+          });
         });
       });
     })(req, res, next);
@@ -190,7 +199,7 @@ export function setupAuth(app: Express) {
 
     if (req.isAuthenticated() && req.user) {
       log(`Auth verified for user: ${req.user.id}`);
-      res.status(200).json({
+      res.json({
         authenticated: true,
         user: req.user,
         sessionId: req.sessionID

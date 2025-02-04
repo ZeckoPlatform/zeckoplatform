@@ -21,7 +21,7 @@ store.on('error', function(error) {
   log(`Session store error: ${error}`);
 });
 
-// Enhanced session configuration
+// Enhanced session configuration with proper cookie settings
 app.use(session({
   store,
   secret: process.env.REPL_ID!,
@@ -29,12 +29,14 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   proxy: true,
+  rolling: true, // Enables session expiry to reset on activity
   cookie: {
     secure: true,
     httpOnly: true,
     sameSite: 'none',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    path: '/'
+    path: '/',
+    domain: undefined // Allow the browser to set the cookie domain
   }
 }));
 
