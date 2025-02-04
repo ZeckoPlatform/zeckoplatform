@@ -41,25 +41,26 @@ store.on('error', function(error) {
   log(`Session store error: ${error}`);
 });
 
-// Session configuration with secure cookie settings
+const isProd = app.get('env') === 'production';
+
+// Session configuration with environment-aware cookie settings
 const sessionConfig = {
   store,
   secret: process.env.REPL_ID!,
   name: 'sid',
-  resave: true, // Changed to true to ensure session is saved
-  saveUninitialized: true, // Changed to true to ensure session is created
+  resave: false,
+  saveUninitialized: false,
   proxy: true,
   cookie: {
-    secure: app.get('env') === 'production', // Only use secure in production
+    secure: isProd,
     httpOnly: true,
-    sameSite: app.get('env') === 'production' ? 'none' as const : 'lax' as const,
+    sameSite: isProd ? 'none' as const : 'lax' as const,
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
     path: '/',
   }
 };
 
-// Enable secure cookies in production
-if (app.get('env') === 'production') {
+if (isProd) {
   app.set('trust proxy', 1);
   sessionConfig.cookie.secure = true;
 }
