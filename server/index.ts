@@ -35,14 +35,14 @@ const store = new PostgresSessionStore({
   pool,
   tableName: 'session',
   createTableIfMissing: true,
-  pruneSessionInterval: 60
+  pruneSessionInterval: 60 * 60 // Prune expired sessions every hour
 });
 
 store.on('error', function(error) {
   log(`Session store error: ${error}`);
 });
 
-// Enhanced session configuration with proper cookie settings
+// Enhanced session configuration with extended duration
 app.use(session({
   store,
   secret: process.env.REPL_ID!,
@@ -50,12 +50,12 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   proxy: true,
-  rolling: true, // Enables session expiry to reset on activity
+  rolling: true, // Reset expiry on every request
   cookie: {
     secure: true,
     httpOnly: true,
     sameSite: 'none',
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
     path: '/',
     domain: undefined // Allow the browser to set the cookie domain
   }
