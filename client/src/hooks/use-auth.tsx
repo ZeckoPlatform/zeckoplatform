@@ -7,6 +7,7 @@ import {
 import type { SelectUser, InsertUser } from "@db/schema";
 import { queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
 type AuthContextType = {
   user: SelectUser | null;
@@ -23,6 +24,7 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const {
     data: user,
@@ -55,6 +57,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const { user } = await res.json();
       await refetchUser(); // Refetch user data to ensure session is established
+
+      // Determine redirect path based on user type
+      let redirectPath = "/";
+      switch (user.userType) {
+        case "free":
+          redirectPath = "/leads";
+          break;
+        case "business":
+          redirectPath = "/leads";
+          break;
+        case "vendor":
+          redirectPath = "/vendor";
+          break;
+      }
+      setLocation(redirectPath);
+
       return user;
     },
     onSuccess: (user: SelectUser) => {
@@ -91,6 +109,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const { user } = await res.json();
       await refetchUser(); // Refetch user data to ensure session is established
+
+      // Redirect based on user type after registration
+      if (user.userType !== "free") {
+        setLocation("/subscription");
+      } else {
+        setLocation("/leads");
+      }
+
       return user;
     },
     onSuccess: (user: SelectUser) => {
@@ -122,6 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: () => {
       queryClient.setQueryData(["/api/user"], null);
+      setLocation("/");
       toast({
         title: "Logged out",
         description: "You have been logged out successfully.",
@@ -147,11 +174,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!res.ok) {
           queryClient.setQueryData(["/api/user"], null);
           await refetchUser();
+          setLocation("/auth");
         }
       } catch (error) {
         console.error("Auth verification error:", error);
         queryClient.setQueryData(["/api/user"], null);
         await refetchUser();
+        setLocation("/auth");
       }
     };
 
@@ -162,7 +191,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const interval = setInterval(verifyAuth, 60000); // Check every minute
       return () => clearInterval(interval);
     }
-  }, [user, refetchUser]);
+  }, [user, refetchUser, setLocation]);
 
   return (
     <AuthContext.Provider
