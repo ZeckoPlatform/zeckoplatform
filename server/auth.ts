@@ -103,6 +103,7 @@ export function setupAuth(app: Express) {
       }
 
       try {
+        // Explicitly wait for login completion
         await new Promise<void>((resolve, reject) => {
           req.logIn(user, (err) => {
             if (err) {
@@ -113,7 +114,7 @@ export function setupAuth(app: Express) {
           });
         });
 
-        // Save session explicitly
+        // Save session explicitly before responding
         await new Promise<void>((resolve, reject) => {
           req.session.save((err) => {
             if (err) {

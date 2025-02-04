@@ -42,7 +42,7 @@ const sessionConfig = {
 if (isProd) {
   app.set('trust proxy', 1);
   sessionConfig.cookie.secure = true;
-  sessionConfig.cookie.sameSite = 'none' as const;
+  sessionConfig.cookie.sameSite = 'none';
 }
 
 // Apply session middleware first
