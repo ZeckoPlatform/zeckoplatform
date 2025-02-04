@@ -100,22 +100,24 @@ export function setupAuth(app: Express) {
         return res.status(401).json({ message: info?.message || "Invalid credentials" });
       }
 
-      // Save the session before sending response
-      req.login(user, (err) => {
+      // First regenerate the session to prevent session fixation
+      req.session.regenerate((err) => {
         if (err) {
-          log(`Login error: ${err}`);
+          log(`Session regeneration error: ${err}`);
           return next(err);
         }
 
-        req.session.regenerate((err) => {
+        // Then log the user in
+        req.login(user, (err) => {
           if (err) {
-            log(`Session regeneration error: ${err}`);
+            log(`Login error: ${err}`);
             return next(err);
           }
 
+          // Set passport data
           req.session.passport = { user: user.id };
 
-          // Force session save
+          // Finally save the session
           req.session.save((err) => {
             if (err) {
               log(`Session save error: ${err}`);
@@ -180,20 +182,28 @@ export function setupAuth(app: Express) {
 
   app.post("/api/logout", (req, res) => {
     const userId = req.user?.id;
-    log(`Logout attempt - User: ${userId}`);
+    log(`Logout attempt - User: ${userId}, Session: ${req.sessionID}`);
 
-    req.logout(() => {
+    req.logout((err) => {
+      if (err) {
+        log(`Logout error: ${err}`);
+        return res.status(500).json({ message: "Logout failed" });
+      }
+
       req.session.destroy((err) => {
         if (err) {
-          log(`Logout error: ${err}`);
+          log(`Session destruction error: ${err}`);
           return res.status(500).json({ message: "Logout failed" });
         }
+
         res.clearCookie("connect.sid", {
           path: '/',
           httpOnly: true,
           secure: true,
           sameSite: 'none'
         });
+
+        log(`Logout successful - User: ${userId}`);
         res.sendStatus(200);
       });
     });
