@@ -7,36 +7,63 @@ import { eq, and } from "drizzle-orm";
 import { log } from "./vite";
 import { calculateMatchScore, sortBusinessesByMatch } from "./utils/matching";
 import type { InferSelectModel } from "drizzle-orm";
+import type { SessionData } from "express-session";
 
 type Lead = InferSelectModel<typeof leads>;
 type User = InferSelectModel<typeof users>;
 
+declare module "express-session" {
+  interface SessionData {
+    passport?: {
+      user?: number;
+    };
+  }
+}
+
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
 
-  // Authentication middleware with enhanced session handling
+  // Authentication middleware with enhanced session validation
   app.use('/api', (req, res, next) => {
     // Skip auth check for public routes
-    const publicPaths = ['/login', '/register'];
-    if (publicPaths.includes(req.path) || req.method === 'OPTIONS') {
+    const publicPaths = ['/login', '/register', '/auth/verify'];
+    if (publicPaths.some(path => req.path.endsWith(path)) || req.method === 'OPTIONS') {
       return next();
     }
 
-    // Enhanced session verification
-    if (!req.session || !req.session.passport || !req.session.passport.user) {
-      log(`No valid session found - Session ID: ${req.sessionID}`);
-      return res.status(401).json({ message: 'Authentication required' });
+    // Enhanced session verification with detailed logging
+    log(`Session verification - Path: ${req.path}`);
+    log(`Session ID: ${req.sessionID}`);
+    log(`Session Data: ${JSON.stringify(req.session)}`);
+    log(`Is Authenticated: ${req.isAuthenticated()}`);
+    log(`User: ${JSON.stringify(req.user)}`);
+    log(`Passport Session: ${JSON.stringify(req.session?.passport)}`);
+
+    // Comprehensive session validation
+    if (!req.session) {
+      log(`No session found - Path: ${req.path}`);
+      return res.status(401).json({ message: 'No session found' });
+    }
+
+    if (!req.session.passport?.user) {
+      log(`No passport session - Path: ${req.path}`);
+      return res.status(401).json({ message: 'No passport session' });
     }
 
     if (!req.isAuthenticated()) {
-      log(`Authentication failed - Session ID: ${req.sessionID}`);
-      return res.status(401).json({ message: 'Authentication required' });
+      log(`Not authenticated - Path: ${req.path}, Session ID: ${req.sessionID}`);
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
+
+    if (!req.user) {
+      log(`No user in request - Path: ${req.path}`);
+      return res.status(401).json({ message: 'No user found' });
     }
 
     next();
   });
 
-  // Rest of the routes remain unchanged
+  // Rest of the routes remain unchanged...
   app.get("/api/auth/verify", (req, res) => {
     if (req.isAuthenticated() && req.user) {
       log(`Verified auth for user: ${req.user.id}, Session: ${req.sessionID}`);

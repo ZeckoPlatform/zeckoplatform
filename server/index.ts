@@ -42,7 +42,7 @@ store.on('error', function(error) {
   log(`Session store error: ${error}`);
 });
 
-// Enhanced session configuration with extended duration
+// Session configuration with enhanced security and persistence
 app.use(session({
   store,
   secret: process.env.REPL_ID!,

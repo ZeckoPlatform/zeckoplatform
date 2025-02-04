@@ -33,10 +33,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refetch: refetchUser,
   } = useQuery<SelectUser | null>({
     queryKey: ["/api/user"],
-    retry: 2,
-    refetchInterval: 15000, // Check every 15 seconds
+    retry: 3,
+    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
+    refetchInterval: 60000, // Check every minute instead of 15 seconds
     refetchOnWindowFocus: true,
-    staleTime: 10000, // Consider data stale after 10 seconds
+    staleTime: 55000, // Consider data stale after 55 seconds
   });
 
   const loginMutation = useMutation({
@@ -162,7 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // Enhanced session verification with better error handling
+  // Enhanced session verification with better error handling and less frequent checks
   useEffect(() => {
     const verifyAuth = async () => {
       try {
@@ -170,8 +171,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           credentials: "include",
         });
 
+        // Only update state if verification fails
+        if (!res.ok) {
+          console.log("Session verification failed, clearing user state");
+          queryClient.setQueryData(["/api/user"], null);
+          await refetchUser();
+          return;
+        }
+
         const data = await res.json();
-        console.log("Auth verification response:", data);
 
         if (!data.authenticated) {
           console.log("Session invalid, clearing user state");
@@ -192,8 +200,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    // Verify auth state every 10 seconds and on mount
-    const interval = setInterval(verifyAuth, 10000);
+    // Verify auth state every 30 seconds instead of 10
+    const interval = setInterval(verifyAuth, 30000);
     verifyAuth();
 
     return () => clearInterval(interval);

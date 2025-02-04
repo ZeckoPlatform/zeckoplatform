@@ -60,7 +60,9 @@ export const getQueryFn: <T>(options: {
         cache: "no-cache",
       });
 
+      // Handle 401 more gracefully
       if (res.status === 401) {
+        console.log("Authentication check failed for", queryKey[0]);
         if (unauthorizedBehavior === "returnNull") {
           return null;
         }
@@ -82,7 +84,7 @@ export const queryClient = new QueryClient({
       refetchInterval: false,
       refetchOnWindowFocus: true,
       staleTime: 5 * 60 * 1000, // 5 minutes
-      retry: true,
+      retry: 3,
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
       networkMode: "always",
     },

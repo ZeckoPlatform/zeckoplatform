@@ -202,7 +202,7 @@ export function setupAuth(app: Express) {
   });
 
   app.get("/api/auth/verify", (req, res) => {
-    log(`Auth verification - Session ID: ${req.sessionID}`);
+    log(`Auth verification request - Session ID: ${req.sessionID}`);
     log(`Cookie Header: ${req.headers.cookie}`);
     log(`Session Data: ${JSON.stringify(req.session)}`);
     log(`Is Authenticated: ${req.isAuthenticated()}`);
