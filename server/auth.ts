@@ -100,33 +100,51 @@ export function setupAuth(app: Express) {
         return res.status(401).json({ message: info?.message || "Invalid credentials" });
       }
 
-      req.logIn(user, (err) => {
+      // First regenerate the session to prevent session fixation
+      req.session.regenerate((err) => {
         if (err) {
-          log(`Login error: ${err}`);
+          log(`Session regeneration error: ${err}`);
           return next(err);
         }
 
-        // Debug session state before save
-        log('=== Pre-Save Session State ===');
-        log(`User ID: ${user.id}`);
-        log(`Session ID: ${req.sessionID}`);
-        log(`Session Data: ${JSON.stringify(req.session)}`);
-
-        // Force session save
-        req.session.save((err) => {
-          if (err) {
-            log(`Session save error: ${err}`);
-            return next(err);
+        // Then log the user in
+        req.logIn(user, (loginErr) => {
+          if (loginErr) {
+            log(`Login error: ${loginErr}`);
+            return next(loginErr);
           }
 
-          // Debug final state
-          log('=== Post-Save Session State ===');
+          // Debug session state
+          log('=== Session Debug Info ===');
           log(`User ID: ${user.id}`);
           log(`Session ID: ${req.sessionID}`);
           log(`Session Data: ${JSON.stringify(req.session)}`);
-          log(`Response Headers: ${JSON.stringify(res.getHeaders())}`);
+          log(`Cookie Header: ${req.headers.cookie}`);
 
-          res.json({ user });
+          // Explicitly set session data
+          req.session.userId = user.id;
+          req.session.authenticated = true;
+
+          // Force session save
+          req.session.save((saveErr) => {
+            if (saveErr) {
+              log(`Session save error: ${saveErr}`);
+              return next(saveErr);
+            }
+
+            // Set cookie explicitly
+            const isProd = req.app.get('env') === 'production';
+            res.cookie('sid', req.sessionID, {
+              httpOnly: true,
+              secure: isProd,
+              sameSite: isProd ? 'none' : 'lax',
+              path: '/',
+              maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+            });
+
+            log(`Response headers:`, res.getHeaders());
+            res.json({ user });
+          });
         });
       });
     })(req, res, next);
