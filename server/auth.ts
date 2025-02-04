@@ -36,6 +36,7 @@ async function getUserByUsername(username: string) {
 }
 
 export function setupAuth(app: Express) {
+  // Initialize passport middleware
   app.use(passport.initialize());
   app.use(passport.session());
 
@@ -90,32 +91,48 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", (req, res, next) => {
-    try {
-      passport.authenticate("local", (err: any, user: SelectUser | false, info: any) => {
-        if (err) {
-          log(`Login error: ${err}`);
-          return next(err);
-        }
+    passport.authenticate("local", async (err: any, user: SelectUser | false, info: any) => {
+      if (err) {
+        log(`Login error: ${err}`);
+        return next(err);
+      }
 
-        if (!user) {
-          log(`Login failed: ${info?.message || 'Invalid credentials'}`);
-          return res.status(401).json({ message: info?.message || "Invalid credentials" });
-        }
+      if (!user) {
+        log(`Login failed: ${info?.message || 'Invalid credentials'}`);
+        return res.status(401).json({ message: info?.message || "Invalid credentials" });
+      }
 
-        req.logIn(user, (err) => {
-          if (err) {
-            log(`Login error: ${err}`);
-            return next(err);
-          }
-
-          log(`Login successful for user: ${user.id}`);
-          res.json({ user });
+      try {
+        await new Promise<void>((resolve, reject) => {
+          req.logIn(user, (err) => {
+            if (err) {
+              reject(err);
+            } else {
+              resolve();
+            }
+          });
         });
-      })(req, res, next);
-    } catch (error) {
-      log(`Unexpected login error: ${error}`);
-      next(error);
-    }
+
+        // Save session explicitly
+        await new Promise<void>((resolve, reject) => {
+          req.session.save((err) => {
+            if (err) {
+              reject(err);
+            } else {
+              resolve();
+            }
+          });
+        });
+
+        log(`Login successful for user: ${user.id}`);
+        log(`Session ID: ${req.sessionID}`);
+        log(`Session data: ${JSON.stringify(req.session)}`);
+        res.json({ user });
+      } catch (error) {
+        log(`Login process error: ${error}`);
+        next(error);
+      }
+    })(req, res, next);
   });
 
   app.post("/api/register", async (req, res, next) => {
@@ -142,23 +159,23 @@ export function setupAuth(app: Express) {
         })
         .returning();
 
-      log(`User registered successfully: ${user.id}`);
-
-      req.logIn(user, (err) => {
-        if (err) {
-          log(`Login error after registration: ${err}`);
-          return next(err);
-        }
-
-        res.status(201).json({ user });
+      // Log in the user after registration
+      await new Promise<void>((resolve, reject) => {
+        req.logIn(user, (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
       });
+
+      log(`Registration successful for user: ${user.id}`);
+      res.status(201).json({ user });
     } catch (error) {
       log(`Registration error: ${error}`);
       next(error);
     }
   });
 
-  app.post("/api/logout", (req, res) => {
+  app.post("/api/logout", (req, res, next) => {
     if (!req.isAuthenticated()) {
       return res.sendStatus(200);
     }
@@ -169,17 +186,21 @@ export function setupAuth(app: Express) {
     req.logout((err) => {
       if (err) {
         log(`Logout error: ${err}`);
-        return res.status(500).json({ message: "Logout failed" });
+        return next(err);
       }
 
       req.session.destroy((err) => {
         if (err) {
           log(`Session destruction error: ${err}`);
-          return res.status(500).json({ message: "Logout failed" });
+          return next(err);
         }
 
-        res.clearCookie("connect.sid", {
-          path: '/'
+        const isProd = req.app.get('env') === 'production';
+        res.clearCookie('connect.sid', {
+          path: '/',
+          httpOnly: true,
+          secure: isProd,
+          sameSite: isProd ? 'none' as const : 'lax' as const
         });
 
         log(`Logout successful - User: ${userId}`);
@@ -189,6 +210,10 @@ export function setupAuth(app: Express) {
   });
 
   app.get("/api/user", (req, res) => {
+    log(`User request - Session ID: ${req.sessionID}`);
+    log(`Session Data: ${JSON.stringify(req.session)}`);
+    log(`Is Authenticated: ${req.isAuthenticated()}`);
+
     if (!req.isAuthenticated() || !req.user) {
       log(`User request failed - not authenticated`);
       return res.status(401).json({ message: "Not authenticated" });
@@ -199,6 +224,9 @@ export function setupAuth(app: Express) {
   });
 
   app.get("/api/auth/verify", (req, res) => {
+    log(`Auth verification request - Session ID: ${req.sessionID}`);
+    log(`Session Data: ${JSON.stringify(req.session)}`);
+
     if (req.isAuthenticated() && req.user) {
       log(`Auth verified for user: ${req.user.id}, Session: ${req.sessionID}`);
       res.json({ 

@@ -21,25 +21,28 @@ store.on('error', function(error) {
   log(`Session store error: ${error}`);
 });
 
-// Session configuration with strict cookie settings
+// Session configuration
 const sessionConfig = {
   store,
   secret: process.env.REPL_ID!,
-  name: 'connect.sid', // Match cookie name with what we're using in auth.ts
+  name: 'connect.sid',
   resave: false,
   saveUninitialized: false,
+  rolling: true,
   proxy: true,
   cookie: {
     httpOnly: true,
     secure: isProd,
-    sameSite: isProd ? 'none' : 'lax',
-    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    sameSite: 'lax' as const,
     path: '/',
+    maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
   }
 };
 
 if (isProd) {
   app.set('trust proxy', 1);
+  sessionConfig.cookie.secure = true;
+  sessionConfig.cookie.sameSite = 'none' as const;
 }
 
 // Apply session middleware first
@@ -49,7 +52,7 @@ app.use(session(sessionConfig));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Enhanced CORS setup after session middleware
+// CORS configuration
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (!origin) {
@@ -80,6 +83,7 @@ app.use((req, res, next) => {
     log(`Session ID: ${req.sessionID}`);
     log(`Cookie Header: ${req.headers.cookie}`);
     log(`Session Data: ${JSON.stringify(req.session)}`);
+    log(`Is Authenticated: ${req.isAuthenticated?.()}`);
     log('=== End Debug Info ===');
   }
   next();
