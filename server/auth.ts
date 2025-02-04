@@ -124,7 +124,10 @@ export function setupAuth(app: Express) {
               return next(err);
             }
 
-            log(`Login successful for user: ${user.id}, Session ID: ${req.sessionID}`);
+            log(`Login successful for user: ${user.id}`);
+            log(`Session ID: ${req.sessionID}`);
+            log(`Session data: ${JSON.stringify(req.session)}`);
+
             res.json({ user });
           });
         });
@@ -158,20 +161,33 @@ export function setupAuth(app: Express) {
 
       log(`User registered successfully: ${user.id}`);
 
-      req.logIn(user, (err) => {
+      // First regenerate the session
+      req.session.regenerate((err) => {
         if (err) {
-          log(`Registration login error: ${err}`);
+          log(`Session regeneration error: ${err}`);
           return next(err);
         }
 
-        // Save session before sending response
-        req.session.save((err) => {
+        // Then log the user in
+        req.login(user, (err) => {
           if (err) {
-            log(`Session save error: ${err}`);
+            log(`Login error after registration: ${err}`);
             return next(err);
           }
 
-          res.status(201).json({ user });
+          // Set passport data
+          req.session.passport = { user: user.id };
+
+          // Finally save the session
+          req.session.save((err) => {
+            if (err) {
+              log(`Session save error: ${err}`);
+              return next(err);
+            }
+
+            log(`Registration and login successful for user: ${user.id}`);
+            res.status(201).json({ user });
+          });
         });
       });
     } catch (error) {
@@ -196,10 +212,11 @@ export function setupAuth(app: Express) {
           return res.status(500).json({ message: "Logout failed" });
         }
 
-        res.clearCookie("connect.sid", {
+        // Clear the session cookie
+        res.clearCookie("sid", {
           path: '/',
           httpOnly: true,
-          secure: true,
+          secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
           sameSite: 'none'
         });
 
@@ -213,10 +230,12 @@ export function setupAuth(app: Express) {
     log(`User request - Session ID: ${req.sessionID}`);
     log(`Is Authenticated: ${req.isAuthenticated()}`);
     log(`User: ${JSON.stringify(req.user)}`);
+    log(`Session: ${JSON.stringify(req.session)}`);
 
-    if (!req.isAuthenticated()) {
+    if (!req.isAuthenticated() || !req.user) {
       return res.status(401).json({ message: "Not authenticated" });
     }
+
     res.json(req.user);
   });
 

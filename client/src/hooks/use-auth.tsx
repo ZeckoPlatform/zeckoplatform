@@ -3,7 +3,7 @@ import {
   useQuery,
   useMutation,
 } from "@tanstack/react-query";
-import { queryClient } from "../lib/queryClient";
+import { queryClient, apiRequest } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import type { SelectUser, InsertUser } from "@db/schema";
@@ -23,7 +23,7 @@ function useAuthState() {
     refetch: refetchUser,
   } = useQuery<SelectUser | null>({
     queryKey: ["/api/user"],
-    retry: false, // Don't retry on 401s
+    retry: false,
     retryOnMount: false,
     refetchOnWindowFocus: true,
     staleTime: 30000, // Consider data stale after 30 seconds
@@ -39,6 +39,9 @@ function useAuthState() {
         body: JSON.stringify(credentials),
         credentials: "include",
       });
+
+      console.log("Login response status:", res.status);
+      console.log("Login response headers:", res.headers);
 
       if (!res.ok) {
         const text = await res.text();
@@ -82,14 +85,7 @@ function useAuthState() {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/logout", {
-        method: "POST",
-        credentials: "include",
-      });
-
-      if (!res.ok) {
-        throw new Error(await res.text());
-      }
+      await apiRequest("POST", "/api/logout");
     },
     onSuccess: () => {
       queryClient.setQueryData(["/api/user"], null);
@@ -110,22 +106,8 @@ function useAuthState() {
 
   const registerMutation = useMutation({
     mutationFn: async (newUser: InsertUser) => {
-      const res = await fetch("/api/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(newUser),
-        credentials: "include",
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text);
-      }
-
-      const { user } = await res.json();
-      return user;
+      const res = await apiRequest("POST", "/api/register", newUser);
+      return res.json();
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
@@ -158,7 +140,6 @@ function useAuthState() {
         });
 
         if (!res.ok) {
-          // Only clear if we get an explicit 401
           if (res.status === 401) {
             console.log("Session verification failed, clearing user state");
             queryClient.setQueryData(["/api/user"], null);
@@ -175,10 +156,9 @@ function useAuthState() {
       }
     };
 
-    // Verify session less frequently (every 30 seconds)
+    // Verify session on mount and periodically
+    verifySession();
     const interval = setInterval(verifySession, 30000);
-    verifySession(); // Initial verification
-
     return () => clearInterval(interval);
   }, []);
 

@@ -15,7 +15,6 @@ app.use((req, res, next) => {
     return next();
   }
 
-  // Set specific CORS headers for cookie handling
   res.header('Access-Control-Allow-Origin', origin);
   res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Cookie, Set-Cookie');
@@ -29,7 +28,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Session store setup
+// Session store setup with enhanced error handling
 const PostgresSessionStore = connectPg(session);
 const store = new PostgresSessionStore({
   pool,
@@ -42,22 +41,28 @@ store.on('error', function(error) {
   log(`Session store error: ${error}`);
 });
 
-// Session configuration
+// Session configuration with secure cookie settings
 const sessionConfig = {
   store,
   secret: process.env.REPL_ID!,
-  name: 'sid', // Changed from connect.sid to avoid conflicts
-  resave: false,
-  saveUninitialized: false,
+  name: 'sid',
+  resave: true, // Changed to true to ensure session is saved
+  saveUninitialized: true, // Changed to true to ensure session is created
   proxy: true,
   cookie: {
-    secure: true,
+    secure: app.get('env') === 'production', // Only use secure in production
     httpOnly: true,
-    sameSite: 'none',
+    sameSite: app.get('env') === 'production' ? 'none' as const : 'lax' as const,
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
     path: '/',
   }
 };
+
+// Enable secure cookies in production
+if (app.get('env') === 'production') {
+  app.set('trust proxy', 1);
+  sessionConfig.cookie.secure = true;
+}
 
 app.use(session(sessionConfig));
 
@@ -65,14 +70,18 @@ app.use(session(sessionConfig));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Request logging middleware
+// Enhanced request logging middleware
 app.use((req, res, next) => {
   if (req.path.startsWith('/api')) {
-    log(`Request: ${req.method} ${req.path} - Session ID: ${req.sessionID}`);
+    log(`Request: ${req.method} ${req.path}`);
+    log(`Session ID: ${req.sessionID}`);
     log(`Headers: ${JSON.stringify(req.headers)}`);
     log(`Session Data: ${JSON.stringify(req.session)}`);
     log(`Cookie Header: ${req.headers.cookie}`);
+    log(`Is Authenticated: ${req.isAuthenticated?.()}`);
+    log(`User: ${JSON.stringify(req.user)}`);
 
+    // Ensure session is touched on each request
     if (req.session) {
       req.session.touch();
     }
