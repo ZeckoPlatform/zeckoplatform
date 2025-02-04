@@ -100,22 +100,31 @@ export function setupAuth(app: Express) {
         return res.status(401).json({ message: info?.message || "Invalid credentials" });
       }
 
-      // Force session save before responding
-      req.logIn(user, (err) => {
+      // Save the session before sending response
+      req.login(user, (err) => {
         if (err) {
           log(`Login error: ${err}`);
           return next(err);
         }
 
-        // Save session before sending response
-        req.session.save((err) => {
+        req.session.regenerate((err) => {
           if (err) {
-            log(`Session save error: ${err}`);
+            log(`Session regeneration error: ${err}`);
             return next(err);
           }
 
-          log(`Login successful for user: ${user.id}, Session ID: ${req.sessionID}`);
-          res.json({ user });
+          req.session.passport = { user: user.id };
+
+          // Force session save
+          req.session.save((err) => {
+            if (err) {
+              log(`Session save error: ${err}`);
+              return next(err);
+            }
+
+            log(`Login successful for user: ${user.id}, Session ID: ${req.sessionID}`);
+            res.json({ user });
+          });
         });
       });
     })(req, res, next);

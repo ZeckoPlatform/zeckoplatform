@@ -48,7 +48,7 @@ app.use(session({
   store,
   secret: process.env.REPL_ID!,
   name: 'connect.sid',
-  resave: false,
+  resave: true, // Changed to true to ensure session updates
   saveUninitialized: false,
   proxy: true,
   rolling: true, // Reset expiry on every request
@@ -75,6 +75,11 @@ app.use((req, res, next) => {
     log(`Cookie: ${JSON.stringify(req.headers.cookie)}`);
     log(`Is Authenticated: ${req.isAuthenticated?.()}`);
     log(`User: ${JSON.stringify(req.user)}`);
+
+    // Add session touch to prevent premature expiration
+    if (req.session) {
+      req.session.touch();
+    }
   }
   next();
 });
