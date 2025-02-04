@@ -21,47 +21,56 @@ store.on('error', function(error) {
   log(`Session store error: ${error}`);
 });
 
-// Session configuration
-const sessionConfig = {
+if (isProd) {
+  app.set('trust proxy', 1);
+}
+
+// Configure session before any other middleware
+app.use(session({
   store,
   secret: process.env.REPL_ID!,
   name: 'connect.sid',
   resave: false,
   saveUninitialized: false,
   rolling: true,
-  proxy: true,
+  proxy: isProd,
   cookie: {
     httpOnly: true,
-    secure: isProd, // Only use secure cookies in production
-    sameSite: isProd ? 'none' as const : 'lax' as const,
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax',
     path: '/',
     maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
   }
-};
+}));
 
-if (isProd) {
-  app.set('trust proxy', 1);
-}
-
-// Apply session middleware first
-app.use(session(sessionConfig));
+// Debug middleware for session tracking
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    log('=== Request Debug Info ===');
+    log(`Path: ${req.method} ${req.path}`);
+    log(`Session ID: ${req.sessionID}`);
+    log(`Cookie Header: ${req.headers.cookie}`);
+    log(`Session Data: ${JSON.stringify(req.session)}`);
+    log('=== End Debug Info ===');
+  }
+  next();
+});
 
 // Body parsing middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// CORS configuration - Simplified for development
+// CORS configuration - Development focused
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (!origin) {
     return next();
   }
 
-  // Log CORS-related headers for debugging
   log(`Request origin: ${origin}`);
   log(`Request method: ${req.method}`);
+  log(`Request headers: ${JSON.stringify(req.headers)}`);
 
-  // Allow the specific origin instead of *
   res.header('Access-Control-Allow-Origin', origin);
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
@@ -70,21 +79,6 @@ app.use((req, res, next) => {
 
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
-  }
-  next();
-});
-
-// Debug middleware for session and cookie tracking
-app.use((req, res, next) => {
-  if (req.path.startsWith('/api')) {
-    log('=== Request Debug Info ===');
-    log(`Path: ${req.method} ${req.path}`);
-    log(`Session ID: ${req.sessionID}`);
-    log(`Cookie Header: ${req.headers.cookie}`);
-    log(`Session Data: ${JSON.stringify(req.session)}`);
-    log(`Is Authenticated: ${req.isAuthenticated?.()}`);
-    log(`Passport Session: ${JSON.stringify(req.session?.passport)}`);
-    log('=== End Debug Info ===');
   }
   next();
 });

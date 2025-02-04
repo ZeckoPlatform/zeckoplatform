@@ -9,7 +9,6 @@ import { eq } from "drizzle-orm";
 import { fromZodError } from "zod-validation-error";
 import { log } from "./vite";
 
-// Add proper type definition for Express.User
 declare global {
   namespace Express {
     interface User extends SelectUser {}
@@ -36,7 +35,6 @@ async function getUserByUsername(username: string) {
 }
 
 export function setupAuth(app: Express) {
-  // Initialize passport middleware
   app.use(passport.initialize());
   app.use(passport.session());
 
@@ -71,6 +69,7 @@ export function setupAuth(app: Express) {
 
   passport.deserializeUser(async (id: number, done) => {
     try {
+      log(`Attempting to deserialize user: ${id}`);
       const [user] = await db
         .select()
         .from(users)
@@ -91,6 +90,9 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", (req, res, next) => {
+    log(`Login attempt - Username: ${req.body.username}`);
+    log(`Session before login: ${JSON.stringify(req.session)}`);
+
     passport.authenticate("local", async (err: any, user: SelectUser | false, info: any) => {
       if (err) {
         log(`Login error: ${err}`);
@@ -103,41 +105,34 @@ export function setupAuth(app: Express) {
       }
 
       try {
-        // Explicitly wait for login completion
         await new Promise<void>((resolve, reject) => {
           req.logIn(user, (err) => {
             if (err) {
               log(`Login error during req.logIn: ${err}`);
               reject(err);
             } else {
+              log(`Login successful, session ID: ${req.sessionID}`);
               resolve();
             }
           });
         });
 
-        // Save session explicitly before responding
+        // Save session explicitly
         await new Promise<void>((resolve, reject) => {
           req.session.save((err) => {
             if (err) {
               log(`Session save error: ${err}`);
               reject(err);
             } else {
+              log(`Session saved successfully`);
               resolve();
             }
           });
         });
 
         log(`Login successful for user: ${user.id}`);
+        log(`Session after login: ${JSON.stringify(req.session)}`);
         log(`Session ID: ${req.sessionID}`);
-        log(`Session data: ${JSON.stringify(req.session)}`);
-
-        // Set an explicit cookie header as backup
-        res.cookie('connect.sid', req.sessionID, {
-          httpOnly: true,
-          secure: req.secure,
-          sameSite: req.secure ? 'none' : 'lax',
-          maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
-        });
 
         res.json({ user });
       } catch (error) {
@@ -147,6 +142,39 @@ export function setupAuth(app: Express) {
     })(req, res, next);
   });
 
+  app.get("/api/user", (req, res) => {
+    log(`User request - Session ID: ${req.sessionID}`);
+    log(`Session Data: ${JSON.stringify(req.session)}`);
+    log(`Is Authenticated: ${req.isAuthenticated()}`);
+    log(`User: ${JSON.stringify(req.user)}`);
+
+    if (!req.isAuthenticated() || !req.user) {
+      log(`User request failed - not authenticated`);
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    log(`User request successful - ID: ${req.user.id}`);
+    res.json(req.user);
+  });
+
+  app.get("/api/auth/verify", (req, res) => {
+    log(`Auth verification request - Session ID: ${req.sessionID}`);
+    log(`Session Data: ${JSON.stringify(req.session)}`);
+    log(`Is Authenticated: ${req.isAuthenticated()}`);
+    log(`User: ${JSON.stringify(req.user)}`);
+
+    if (req.isAuthenticated() && req.user) {
+      log(`Auth verified for user: ${req.user.id}, Session: ${req.sessionID}`);
+      res.json({ 
+        authenticated: true, 
+        user: req.user,
+        sessionId: req.sessionID 
+      });
+    } else {
+      log(`Auth verification failed - Session: ${req.sessionID}`);
+      res.status(401).json({ authenticated: false });
+    }
+  });
   app.post("/api/register", async (req, res, next) => {
     try {
       const result = insertUserSchema.safeParse(req.body);
@@ -170,6 +198,11 @@ export function setupAuth(app: Express) {
           userType: result.data.userType,
         })
         .returning();
+
+      // Initialize session for new user
+      if (!req.session) {
+        req.session = {} as any;
+      }
 
       // Log in the user after registration
       await new Promise<void>((resolve, reject) => {
@@ -219,36 +252,5 @@ export function setupAuth(app: Express) {
         res.sendStatus(200);
       });
     });
-  });
-
-  app.get("/api/user", (req, res) => {
-    log(`User request - Session ID: ${req.sessionID}`);
-    log(`Session Data: ${JSON.stringify(req.session)}`);
-    log(`Is Authenticated: ${req.isAuthenticated()}`);
-
-    if (!req.isAuthenticated() || !req.user) {
-      log(`User request failed - not authenticated`);
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-
-    log(`User request successful - ID: ${req.user.id}`);
-    res.json(req.user);
-  });
-
-  app.get("/api/auth/verify", (req, res) => {
-    log(`Auth verification request - Session ID: ${req.sessionID}`);
-    log(`Session Data: ${JSON.stringify(req.session)}`);
-
-    if (req.isAuthenticated() && req.user) {
-      log(`Auth verified for user: ${req.user.id}, Session: ${req.sessionID}`);
-      res.json({ 
-        authenticated: true, 
-        user: req.user,
-        sessionId: req.sessionID 
-      });
-    } else {
-      log(`Auth verification failed - Session: ${req.sessionID}`);
-      res.status(401).json({ authenticated: false });
-    }
   });
 }
