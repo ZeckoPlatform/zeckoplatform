@@ -5,7 +5,7 @@ import {
   UseMutationResult,
 } from "@tanstack/react-query";
 import type { SelectUser, InsertUser } from "@db/schema";
-import { apiRequest, queryClient } from "../lib/queryClient";
+import { queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 type AuthContextType = {
@@ -46,34 +46,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
         body: JSON.stringify(credentials),
         credentials: "include",
-        mode: "cors",
       });
 
       if (!res.ok) {
-        const error = await res.text();
-        throw new Error(error);
+        const text = await res.text();
+        throw new Error(text);
       }
 
       const { user } = await res.json();
-
-      // Add a delay to ensure the session is properly established
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Verify the session
-      const verifyRes = await fetch("/api/auth/verify", {
-        credentials: "include",
-        mode: "cors",
-      });
-
-      if (!verifyRes.ok) {
-        throw new Error("Failed to establish session");
-      }
-
-      const { authenticated } = await verifyRes.json();
-      if (!authenticated) {
-        throw new Error("Session verification failed");
-      }
-
       return user;
     },
     onSuccess: (user: SelectUser) => {
@@ -98,32 +78,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Accept": "application/json",
         },
         body: JSON.stringify(newUser),
         credentials: "include",
-        mode: "cors",
-        cache: "no-cache",
       });
 
       if (!res.ok) {
-        const error = await res.text();
-        throw new Error(error);
+        const text = await res.text();
+        throw new Error(text);
       }
 
       const { user } = await res.json();
-
-      // Verify session after registration
-      const verifyRes = await fetch("/api/auth/verify", {
-        credentials: "include",
-        mode: "cors",
-        cache: "no-cache",
-      });
-
-      if (!verifyRes.ok) {
-        throw new Error("Failed to establish session");
-      }
-
       return user;
     },
     onSuccess: (user: SelectUser) => {
@@ -147,8 +112,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await fetch("/api/logout", {
         method: "POST",
         credentials: "include",
-        mode: "cors",
-        cache: "no-cache",
       });
 
       if (!res.ok) {
@@ -179,7 +142,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const res = await fetch("/api/auth/verify", {
           credentials: "include",
-          mode: "cors",
           cache: "no-cache",
         });
 

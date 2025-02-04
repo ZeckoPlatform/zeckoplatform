@@ -26,11 +26,11 @@ app.use(session({
   store,
   secret: process.env.REPL_ID!,
   name: 'connect.sid',
-  resave: false,
+  resave: true,
   saveUninitialized: false,
   proxy: true,
   cookie: {
-    secure: false, // Set to true only in production with HTTPS
+    secure: false,
     httpOnly: true,
     sameSite: 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
@@ -38,14 +38,17 @@ app.use(session({
   }
 }));
 
-// Updated CORS configuration to properly handle credentials
+// Body parsing middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+
+// Updated CORS configuration
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (!origin) {
     return next();
   }
 
-  // Set CORS headers
   res.header('Access-Control-Allow-Origin', origin);
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
@@ -58,10 +61,6 @@ app.use((req, res, next) => {
   }
   next();
 });
-
-// Body parsing middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
 
 // Request logging middleware
 app.use((req, res, next) => {

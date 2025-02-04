@@ -89,11 +89,7 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", (req, res, next) => {
-    log(`Login attempt for username: ${req.body.username}`);
-    log(`Session before login: ${JSON.stringify(req.session)}`);
-    log(`Cookie Header: ${req.headers.cookie}`);
-
-    passport.authenticate("local", (err: any, user: any, info: any) => {
+    passport.authenticate("local", (err: any, user: Express.User | false, info: any) => {
       if (err) {
         log(`Login error: ${err}`);
         return next(err);
@@ -104,27 +100,14 @@ export function setupAuth(app: Express) {
         return res.status(401).json({ message: info?.message || "Invalid credentials" });
       }
 
-      req.logIn(user, (loginErr) => {
-        if (loginErr) {
-          log(`Login error during session creation: ${loginErr}`);
-          return next(loginErr);
+      req.logIn(user, (err) => {
+        if (err) {
+          log(`Login error: ${err}`);
+          return next(err);
         }
 
-        // Force session save before sending response
-        req.session.save((err) => {
-          if (err) {
-            log(`Session save error: ${err}`);
-            return next(err);
-          }
-
-          log(`Login successful - User: ${user.id}, Session: ${req.sessionID}`);
-          log(`Session after login: ${JSON.stringify(req.session)}`);
-
-          res.status(200).json({
-            user,
-            sessionId: req.sessionID
-          });
-        });
+        log(`Login successful for user: ${user.id}, Session ID: ${req.sessionID}`);
+        res.json({ user });
       });
     })(req, res, next);
   });
@@ -134,14 +117,14 @@ export function setupAuth(app: Express) {
     if (!result.success) {
       const error = fromZodError(result.error);
       log(`Registration validation error: ${error}`);
-      return res.status(400).send(error.toString());
+      return res.status(400).json({ message: error.toString() });
     }
 
     try {
       const [existingUser] = await getUserByUsername(result.data.username);
       if (existingUser) {
         log(`Registration failed: Username ${result.data.username} already exists`);
-        return res.status(400).send("Username already exists");
+        return res.status(400).json({ message: "Username already exists" });
       }
 
       const [user] = await db
@@ -157,23 +140,10 @@ export function setupAuth(app: Express) {
 
       req.logIn(user, (err) => {
         if (err) {
-          log(`Registration error during session creation: ${err}`);
+          log(`Registration login error: ${err}`);
           return next(err);
         }
-
-        // Force session save before sending response
-        req.session.save((err) => {
-          if (err) {
-            log(`Session save error: ${err}`);
-            return next(err);
-          }
-
-          log(`Registration successful - User: ${user.id}, Session: ${req.sessionID}`);
-          res.status(201).json({
-            user,
-            sessionId: req.sessionID
-          });
-        });
+        res.status(201).json({ user });
       });
     } catch (error) {
       log(`Registration error: ${error}`);
@@ -181,6 +151,28 @@ export function setupAuth(app: Express) {
     }
   });
 
+  app.post("/api/logout", (req, res) => {
+    const userId = req.user?.id;
+    log(`Logout attempt - User: ${userId}`);
+
+    req.logout(() => {
+      req.session.destroy((err) => {
+        if (err) {
+          log(`Logout error: ${err}`);
+          return res.status(500).json({ message: "Logout failed" });
+        }
+        res.clearCookie("connect.sid");
+        res.sendStatus(200);
+      });
+    });
+  });
+
+  app.get("/api/user", (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.sendStatus(401);
+    }
+    res.json(req.user);
+  });
   app.get("/api/auth/verify", (req, res) => {
     log(`Auth verification - Session ID: ${req.sessionID}`);
     log(`Cookie Header: ${req.headers.cookie}`);
@@ -202,42 +194,5 @@ export function setupAuth(app: Express) {
         message: "No valid session found"
       });
     }
-  });
-
-  app.get("/api/user", (req, res) => {
-    log(`User info request - Authenticated: ${req.isAuthenticated()}, Session: ${req.sessionID}`);
-    log(`Session data: ${JSON.stringify(req.session)}`);
-    log(`Cookie Header: ${req.headers.cookie}`);
-    log(`User: ${JSON.stringify(req.user)}`);
-
-    if (!req.isAuthenticated()) {
-      log("User not authenticated");
-      return res.sendStatus(401);
-    }
-
-    log(`Returning user info for: ${req.user.id}`);
-    res.json(req.user);
-  });
-
-  app.post("/api/logout", (req, res, next) => {
-    const userId = req.user?.id;
-    log(`Logout attempt - User: ${userId}, Session: ${req.sessionID}`);
-
-    req.logout((err) => {
-      if (err) {
-        log(`Logout error: ${err}`);
-        return next(err);
-      }
-
-      req.session.destroy((err) => {
-        if (err) {
-          log(`Session destruction error: ${err}`);
-          return next(err);
-        }
-
-        log(`Logout successful - Previous User: ${userId}`);
-        res.sendStatus(200);
-      });
-    });
   });
 }
