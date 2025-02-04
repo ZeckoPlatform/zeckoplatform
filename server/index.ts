@@ -26,13 +26,13 @@ const sessionConfig = {
   store,
   secret: process.env.REPL_ID!,
   name: 'connect.sid',
-  resave: true,
-  saveUninitialized: true,
+  resave: false,
+  saveUninitialized: false,
   rolling: true,
   proxy: true,
   cookie: {
     httpOnly: true,
-    secure: false, // Will be set to true in production
+    secure: false,
     sameSite: 'lax' as const,
     path: '/',
     maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days

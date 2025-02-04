@@ -107,6 +107,7 @@ export function setupAuth(app: Express) {
         await new Promise<void>((resolve, reject) => {
           req.logIn(user, (err) => {
             if (err) {
+              log(`Login error during req.logIn: ${err}`);
               reject(err);
             } else {
               resolve();
@@ -118,6 +119,7 @@ export function setupAuth(app: Express) {
         await new Promise<void>((resolve, reject) => {
           req.session.save((err) => {
             if (err) {
+              log(`Session save error: ${err}`);
               reject(err);
             } else {
               resolve();
@@ -128,6 +130,15 @@ export function setupAuth(app: Express) {
         log(`Login successful for user: ${user.id}`);
         log(`Session ID: ${req.sessionID}`);
         log(`Session data: ${JSON.stringify(req.session)}`);
+
+        // Set an explicit cookie header as backup
+        res.cookie('connect.sid', req.sessionID, {
+          httpOnly: true,
+          secure: req.secure,
+          sameSite: req.secure ? 'none' : 'lax',
+          maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+        });
+
         res.json({ user });
       } catch (error) {
         log(`Login process error: ${error}`);
