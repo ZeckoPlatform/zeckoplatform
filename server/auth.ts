@@ -100,25 +100,31 @@ export function setupAuth(app: Express) {
         return res.status(401).json({ message: info?.message || "Invalid credentials" });
       }
 
-      req.login(user, (err) => {
+      req.logIn(user, (err) => {
         if (err) {
           log(`Login error: ${err}`);
           return next(err);
         }
 
-        // Set passport data
-        req.session.passport = { user: user.id };
+        // Debug session state before save
+        log('=== Pre-Save Session State ===');
+        log(`User ID: ${user.id}`);
+        log(`Session ID: ${req.sessionID}`);
+        log(`Session Data: ${JSON.stringify(req.session)}`);
 
-        // Save the session
+        // Force session save
         req.session.save((err) => {
           if (err) {
             log(`Session save error: ${err}`);
             return next(err);
           }
 
-          log(`Login successful for user: ${user.id}`);
+          // Debug final state
+          log('=== Post-Save Session State ===');
+          log(`User ID: ${user.id}`);
           log(`Session ID: ${req.sessionID}`);
-          log(`Session data: ${JSON.stringify(req.session)}`);
+          log(`Session Data: ${JSON.stringify(req.session)}`);
+          log(`Response Headers: ${JSON.stringify(res.getHeaders())}`);
 
           res.json({ user });
         });
@@ -152,33 +158,20 @@ export function setupAuth(app: Express) {
 
       log(`User registered successfully: ${user.id}`);
 
-      // First regenerate the session
-      req.session.regenerate((err) => {
+      req.logIn(user, (err) => {
         if (err) {
-          log(`Session regeneration error: ${err}`);
+          log(`Login error after registration: ${err}`);
           return next(err);
         }
 
-        // Then log the user in
-        req.login(user, (err) => {
+        req.session.save((err) => {
           if (err) {
-            log(`Login error after registration: ${err}`);
+            log(`Session save error: ${err}`);
             return next(err);
           }
 
-          // Set passport data
-          req.session.passport = { user: user.id };
-
-          // Finally save the session
-          req.session.save((err) => {
-            if (err) {
-              log(`Session save error: ${err}`);
-              return next(err);
-            }
-
-            log(`Registration and login successful for user: ${user.id}`);
-            res.status(201).json({ user });
-          });
+          log(`Registration and login successful for user: ${user.id}`);
+          res.status(201).json({ user });
         });
       });
     } catch (error) {
@@ -203,11 +196,12 @@ export function setupAuth(app: Express) {
           return res.status(500).json({ message: "Logout failed" });
         }
 
+        const isProd = app.get('env') === 'production';
         res.clearCookie("sid", {
           path: '/',
           httpOnly: true,
-          secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
-          sameSite: app.get('env') === 'production' ? 'none' : 'lax'
+          secure: isProd,
+          sameSite: isProd ? 'none' as const : 'lax' as const,
         });
 
         log(`Logout successful - User: ${userId}`);

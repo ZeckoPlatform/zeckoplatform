@@ -6,29 +6,9 @@ import connectPg from "connect-pg-simple";
 import { pool } from "@db";
 
 const app = express();
-app.set('trust proxy', 1);
+const isProd = app.get('env') === 'production';
 
-// CORS configuration for secure cookie handling
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (!origin) {
-    return next();
-  }
-
-  res.header('Access-Control-Allow-Origin', origin);
-  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Cookie, Set-Cookie');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Expose-Headers', 'Set-Cookie');
-  res.header('Vary', 'Origin');
-
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-  next();
-});
-
-// Session store setup with enhanced error handling
+// Session store setup
 const PostgresSessionStore = connectPg(session);
 const store = new PostgresSessionStore({
   pool,
@@ -41,20 +21,18 @@ store.on('error', function(error) {
   log(`Session store error: ${error}`);
 });
 
-const isProd = app.get('env') === 'production';
-
-// Session configuration with environment-aware cookie settings
+// Session configuration with simplified cookie settings
 const sessionConfig = {
   store,
   secret: process.env.REPL_ID!,
   name: 'sid',
-  resave: false,
-  saveUninitialized: false,
+  resave: true,
+  saveUninitialized: true,
   proxy: true,
   cookie: {
-    secure: isProd,
     httpOnly: true,
-    sameSite: isProd ? 'none' as const : 'lax' as const,
+    secure: false, // Set to false in development for http
+    sameSite: 'lax' as const,
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
     path: '/',
   }
@@ -63,29 +41,59 @@ const sessionConfig = {
 if (isProd) {
   app.set('trust proxy', 1);
   sessionConfig.cookie.secure = true;
+  sessionConfig.cookie.sameSite = 'none';
 }
 
+// Apply session middleware before CORS
 app.use(session(sessionConfig));
+
+// Enhanced CORS setup for cookie handling
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (!origin) {
+    return next();
+  }
+
+  // Log CORS-related headers for debugging
+  log(`Request origin: ${origin}`);
+  log(`Request method: ${req.method}`);
+
+  res.header('Access-Control-Allow-Origin', origin);
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Cookie, Set-Cookie');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Expose-Headers', 'Set-Cookie');
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
 
 // Body parsing middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Enhanced request logging middleware
+// Debug middleware for session and cookie tracking
 app.use((req, res, next) => {
   if (req.path.startsWith('/api')) {
-    log(`Request: ${req.method} ${req.path}`);
+    log('=== Request Debug Info ===');
+    log(`Path: ${req.method} ${req.path}`);
     log(`Session ID: ${req.sessionID}`);
-    log(`Headers: ${JSON.stringify(req.headers)}`);
-    log(`Session Data: ${JSON.stringify(req.session)}`);
     log(`Cookie Header: ${req.headers.cookie}`);
+    log(`Session Data: ${JSON.stringify(req.session)}`);
     log(`Is Authenticated: ${req.isAuthenticated?.()}`);
     log(`User: ${JSON.stringify(req.user)}`);
+    log('=== End Debug Info ===');
 
-    // Ensure session is touched on each request
-    if (req.session) {
-      req.session.touch();
-    }
+    // Track response cookies
+    const originalSetHeader = res.setHeader;
+    res.setHeader = function(name, value) {
+      if (name.toLowerCase() === 'set-cookie') {
+        log(`Setting cookie: ${value}`);
+      }
+      return originalSetHeader.apply(res, [name, value]);
+    };
   }
   next();
 });
