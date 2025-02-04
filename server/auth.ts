@@ -9,6 +9,7 @@ import { eq } from "drizzle-orm";
 import { fromZodError } from "zod-validation-error";
 import { log } from "./vite";
 
+// Add proper type definition for Express.User
 declare global {
   namespace Express {
     interface User extends SelectUser {}
@@ -89,67 +90,43 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", (err: any, user: Express.User | false, info: any) => {
-      if (err) {
-        log(`Login error: ${err}`);
-        return next(err);
-      }
-
-      if (!user) {
-        log(`Login failed: ${info?.message || 'Invalid credentials'}`);
-        return res.status(401).json({ message: info?.message || "Invalid credentials" });
-      }
-
-      req.logIn(user, (err) => {
+    try {
+      passport.authenticate("local", (err: any, user: SelectUser | false, info: any) => {
         if (err) {
           log(`Login error: ${err}`);
           return next(err);
         }
 
-        // Debug session state
-        log('=== Session Debug Info ===');
-        log(`User ID: ${user.id}`);
-        log(`Session ID: ${req.sessionID}`);
-        log(`Session Data: ${JSON.stringify(req.session)}`);
+        if (!user) {
+          log(`Login failed: ${info?.message || 'Invalid credentials'}`);
+          return res.status(401).json({ message: info?.message || "Invalid credentials" });
+        }
 
-        // Save session explicitly
-        req.session.save((err) => {
+        req.logIn(user, (err) => {
           if (err) {
-            log(`Session save error: ${err}`);
+            log(`Login error: ${err}`);
             return next(err);
           }
 
-          // Set secure cookie options
-          const isProd = app.get('env') === 'production';
-          const cookieOptions = {
-            httpOnly: true,
-            secure: isProd,
-            sameSite: isProd ? 'none' as const : 'lax' as const,
-            path: '/',
-            maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
-          };
-
-          // Set session cookie
-          res.cookie('connect.sid', req.sessionID, cookieOptions);
-
-          log(`Login successful - Set cookie with options:`, cookieOptions);
-          log(`Response headers:`, res.getHeaders());
-
+          log(`Login successful for user: ${user.id}`);
           res.json({ user });
         });
-      });
-    })(req, res, next);
+      })(req, res, next);
+    } catch (error) {
+      log(`Unexpected login error: ${error}`);
+      next(error);
+    }
   });
 
   app.post("/api/register", async (req, res, next) => {
-    const result = insertUserSchema.safeParse(req.body);
-    if (!result.success) {
-      const error = fromZodError(result.error);
-      log(`Registration validation error: ${error}`);
-      return res.status(400).json({ message: error.toString() });
-    }
-
     try {
+      const result = insertUserSchema.safeParse(req.body);
+      if (!result.success) {
+        const error = fromZodError(result.error);
+        log(`Registration validation error: ${error}`);
+        return res.status(400).json({ message: error.toString() });
+      }
+
       const [existingUser] = await getUserByUsername(result.data.username);
       if (existingUser) {
         log(`Registration failed: Username ${result.data.username} already exists`);
@@ -173,15 +150,7 @@ export function setupAuth(app: Express) {
           return next(err);
         }
 
-        req.session.save((err) => {
-          if (err) {
-            log(`Session save error: ${err}`);
-            return next(err);
-          }
-
-          log(`Registration and login successful for user: ${user.id}`);
-          res.status(201).json({ user });
-        });
+        res.status(201).json({ user });
       });
     } catch (error) {
       log(`Registration error: ${error}`);
@@ -190,6 +159,10 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/logout", (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.sendStatus(200);
+    }
+
     const userId = req.user?.id;
     log(`Logout attempt - User: ${userId}, Session: ${req.sessionID}`);
 
@@ -205,7 +178,10 @@ export function setupAuth(app: Express) {
           return res.status(500).json({ message: "Logout failed" });
         }
 
-        res.clearCookie("connect.sid");
+        res.clearCookie("connect.sid", {
+          path: '/'
+        });
+
         log(`Logout successful - User: ${userId}`);
         res.sendStatus(200);
       });
@@ -213,33 +189,25 @@ export function setupAuth(app: Express) {
   });
 
   app.get("/api/user", (req, res) => {
-    log(`User request - Session ID: ${req.sessionID}`);
-    log(`Is Authenticated: ${req.isAuthenticated()}`);
-    log(`User: ${JSON.stringify(req.user)}`);
-    log(`Session: ${JSON.stringify(req.session)}`);
-
     if (!req.isAuthenticated() || !req.user) {
+      log(`User request failed - not authenticated`);
       return res.status(401).json({ message: "Not authenticated" });
     }
 
+    log(`User request successful - ID: ${req.user.id}`);
     res.json(req.user);
   });
 
   app.get("/api/auth/verify", (req, res) => {
-    log(`Auth verification request - Session ID: ${req.sessionID}`);
-    log(`Session Data: ${JSON.stringify(req.session)}`);
-    log(`Is Authenticated: ${req.isAuthenticated()}`);
-    log(`User: ${JSON.stringify(req.user)}`);
-
     if (req.isAuthenticated() && req.user) {
-      log(`Auth verified for user: ${req.user.id}`);
+      log(`Auth verified for user: ${req.user.id}, Session: ${req.sessionID}`);
       res.json({ 
         authenticated: true, 
         user: req.user,
         sessionId: req.sessionID 
       });
     } else {
-      log(`Auth verification failed - no valid session`);
+      log(`Auth verification failed - Session: ${req.sessionID}`);
       res.status(401).json({ authenticated: false });
     }
   });

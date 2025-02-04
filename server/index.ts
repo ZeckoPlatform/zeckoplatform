@@ -8,7 +8,7 @@ import { pool } from "@db";
 const app = express();
 const isProd = app.get('env') === 'production';
 
-// Session store setup
+// Session store setup with error handling
 const PostgresSessionStore = connectPg(session);
 const store = new PostgresSessionStore({
   pool,
@@ -21,18 +21,18 @@ store.on('error', function(error) {
   log(`Session store error: ${error}`);
 });
 
-// Session configuration with simplified cookie settings
+// Session configuration with strict cookie settings
 const sessionConfig = {
   store,
   secret: process.env.REPL_ID!,
-  name: 'sid',
-  resave: true,
-  saveUninitialized: true,
+  name: 'connect.sid', // Match cookie name with what we're using in auth.ts
+  resave: false,
+  saveUninitialized: false,
   proxy: true,
   cookie: {
     httpOnly: true,
-    secure: false, // Set to false in development for http
-    sameSite: 'lax' as const,
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax',
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
     path: '/',
   }
@@ -40,14 +40,16 @@ const sessionConfig = {
 
 if (isProd) {
   app.set('trust proxy', 1);
-  sessionConfig.cookie.secure = true;
-  sessionConfig.cookie.sameSite = 'none';
 }
 
-// Apply session middleware before CORS
+// Apply session middleware first
 app.use(session(sessionConfig));
 
-// Enhanced CORS setup for cookie handling
+// Body parsing middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+
+// Enhanced CORS setup after session middleware
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (!origin) {
@@ -70,10 +72,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Body parsing middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
-
 // Debug middleware for session and cookie tracking
 app.use((req, res, next) => {
   if (req.path.startsWith('/api')) {
@@ -82,26 +80,16 @@ app.use((req, res, next) => {
     log(`Session ID: ${req.sessionID}`);
     log(`Cookie Header: ${req.headers.cookie}`);
     log(`Session Data: ${JSON.stringify(req.session)}`);
-    log(`Is Authenticated: ${req.isAuthenticated?.()}`);
-    log(`User: ${JSON.stringify(req.user)}`);
     log('=== End Debug Info ===');
-
-    // Track response cookies
-    const originalSetHeader = res.setHeader;
-    res.setHeader = function(name, value) {
-      if (name.toLowerCase() === 'set-cookie') {
-        log(`Setting cookie: ${value}`);
-      }
-      return originalSetHeader.apply(res, [name, value]);
-    };
   }
   next();
 });
 
-// Error handling
+// Global error handling
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   log(`Server error: ${err.message}`);
-  res.status(500).json({ message: err.message });
+  log(`Stack trace: ${err.stack}`);
+  res.status(500).json({ message: "Internal server error" });
 });
 
 (async () => {
