@@ -8,6 +8,27 @@ import { pool } from "@db";
 const app = express();
 app.set('trust proxy', 1);
 
+// CORS configuration must come before session middleware
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (!origin) {
+    return next();
+  }
+
+  // Set CORS headers
+  res.header('Access-Control-Allow-Origin', origin);
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Cookie, Set-Cookie');
+  res.header('Access-Control-Expose-Headers', 'Set-Cookie');
+  res.header('Vary', 'Origin');
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 // Initialize session store with more detailed configuration
 const PostgresSessionStore = connectPg(session);
 const store = new PostgresSessionStore({
@@ -43,27 +64,6 @@ app.use(session({
 // Body parsing middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-
-// Updated CORS configuration for secure cookie handling
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (!origin) {
-    return next();
-  }
-
-  // Set CORS headers
-  res.header('Access-Control-Allow-Origin', origin);
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Cookie, Set-Cookie');
-  res.header('Access-Control-Expose-Headers', 'Set-Cookie');
-  res.header('Vary', 'Origin');
-
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-  next();
-});
 
 // Enhanced request logging middleware
 app.use((req, res, next) => {

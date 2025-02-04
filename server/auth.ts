@@ -100,29 +100,22 @@ export function setupAuth(app: Express) {
         return res.status(401).json({ message: info?.message || "Invalid credentials" });
       }
 
+      // Force session save before responding
       req.logIn(user, (err) => {
         if (err) {
           log(`Login error: ${err}`);
           return next(err);
         }
 
-        // Force session save before responding
-        req.session.regenerate((err) => {
+        // Save session before sending response
+        req.session.save((err) => {
           if (err) {
-            log(`Session regeneration error: ${err}`);
+            log(`Session save error: ${err}`);
             return next(err);
           }
 
-          req.session.user = user;
-          req.session.save((err) => {
-            if (err) {
-              log(`Session save error: ${err}`);
-              return next(err);
-            }
-
-            log(`Login successful for user: ${user.id}, Session ID: ${req.sessionID}`);
-            res.json({ user });
-          });
+          log(`Login successful for user: ${user.id}, Session ID: ${req.sessionID}`);
+          res.json({ user });
         });
       });
     })(req, res, next);
@@ -159,7 +152,16 @@ export function setupAuth(app: Express) {
           log(`Registration login error: ${err}`);
           return next(err);
         }
-        res.status(201).json({ user });
+
+        // Save session before sending response
+        req.session.save((err) => {
+          if (err) {
+            log(`Session save error: ${err}`);
+            return next(err);
+          }
+
+          res.status(201).json({ user });
+        });
       });
     } catch (error) {
       log(`Registration error: ${error}`);
@@ -177,7 +179,12 @@ export function setupAuth(app: Express) {
           log(`Logout error: ${err}`);
           return res.status(500).json({ message: "Logout failed" });
         }
-        res.clearCookie("connect.sid");
+        res.clearCookie("connect.sid", {
+          path: '/',
+          httpOnly: true,
+          secure: true,
+          sameSite: 'none'
+        });
         res.sendStatus(200);
       });
     });
@@ -189,7 +196,7 @@ export function setupAuth(app: Express) {
     log(`User: ${JSON.stringify(req.user)}`);
 
     if (!req.isAuthenticated()) {
-      return res.sendStatus(401);
+      return res.status(401).json({ message: "Not authenticated" });
     }
     res.json(req.user);
   });
