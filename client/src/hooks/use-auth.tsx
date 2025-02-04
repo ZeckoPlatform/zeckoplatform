@@ -39,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
+      // First, attempt to log in
       const res = await fetch("/api/login", {
         method: "POST",
         headers: {
@@ -51,15 +52,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         cache: "no-cache",
       });
 
-      console.log('Login response status:', res.status);
-      console.log('Login response headers:', Object.fromEntries(res.headers.entries()));
-
       if (!res.ok) {
         const error = await res.text();
         throw new Error(error);
       }
 
       const userData = await res.json();
+
+      // Add a small delay before session verification
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       // Verify session is established
       const verifyRes = await fetch("/api/auth/verify", {
@@ -68,7 +69,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         cache: "no-cache",
       });
 
-      console.log('Verify response status:', verifyRes.status);
       if (!verifyRes.ok) {
         throw new Error("Failed to establish session");
       }
@@ -157,7 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // Effect to verify auth state only when user is logged in
+  // Effect to verify auth state
   useEffect(() => {
     if (!user) return;
 
@@ -180,6 +180,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
+    // Initial verification
+    verifyAuth();
+
+    // Set up interval for periodic verification
     const interval = setInterval(verifyAuth, 60000); // Check every minute
     return () => clearInterval(interval);
   }, [user, refetchUser]);

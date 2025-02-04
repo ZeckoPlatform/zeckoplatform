@@ -37,18 +37,16 @@ app.use(session({
   }
 }));
 
-// CORS configuration updated to properly handle credentials
+// Updated CORS configuration to properly handle credentials
 app.use((req, res, next) => {
   const origin = req.headers.origin;
 
-  // Always allow the request origin
   if (origin) {
     res.header('Access-Control-Allow-Origin', origin);
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Cookie, Set-Cookie');
     res.header('Access-Control-Expose-Headers', 'Set-Cookie');
-    res.header('Vary', 'Origin');
   }
 
   if (req.method === 'OPTIONS') {
