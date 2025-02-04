@@ -21,7 +21,7 @@ store.on('error', function(error) {
   log(`Session store error: ${error}`);
 });
 
-// Session middleware must be first
+// Session middleware configuration updated for Replit environment
 app.use(session({
   store,
   secret: process.env.REPL_ID!,
@@ -30,9 +30,9 @@ app.use(session({
   saveUninitialized: false,
   proxy: true,
   cookie: {
-    secure: false,
+    secure: true, // Enable secure cookies for HTTPS
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: 'none', // Required for cross-site cookies
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     path: '/'
   }
@@ -42,7 +42,7 @@ app.use(session({
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Updated CORS configuration
+// Updated CORS configuration for secure cookie handling
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (!origin) {

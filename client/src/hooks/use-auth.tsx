@@ -54,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const { user } = await res.json();
+      await refetchUser(); // Refetch user data to ensure session is established
       return user;
     },
     onSuccess: (user: SelectUser) => {
@@ -89,6 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const { user } = await res.json();
+      await refetchUser(); // Refetch user data to ensure session is established
       return user;
     },
     onSuccess: (user: SelectUser) => {
@@ -134,15 +136,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // Effect to verify auth state
+  // Effect to verify auth state periodically
   useEffect(() => {
-    if (!user) return;
-
     const verifyAuth = async () => {
       try {
         const res = await fetch("/api/auth/verify", {
           credentials: "include",
-          cache: "no-cache",
         });
 
         if (!res.ok) {
@@ -156,12 +155,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    // Initial verification
-    verifyAuth();
-
-    // Set up interval for periodic verification
-    const interval = setInterval(verifyAuth, 60000); // Check every minute
-    return () => clearInterval(interval);
+    if (user) {
+      // Initial verification
+      verifyAuth();
+      // Set up interval for periodic verification
+      const interval = setInterval(verifyAuth, 60000); // Check every minute
+      return () => clearInterval(interval);
+    }
   }, [user, refetchUser]);
 
   return (
