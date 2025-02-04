@@ -109,19 +109,15 @@ export function setupAuth(app: Express) {
           return next(loginErr);
         }
 
-        // Save user data to session
-        req.session.passport = { user: user.id };
+        log(`Login successful - User: ${user.id}, Session: ${req.sessionID}`);
+        log(`Session after login: ${JSON.stringify(req.session)}`);
 
-        // Force session save and wait for completion
+        // Force session save before sending response
         req.session.save((err) => {
           if (err) {
             log(`Session save error: ${err}`);
             return next(err);
           }
-
-          log(`Login successful - User: ${user.id}, Session: ${req.sessionID}`);
-          log(`Session after login: ${JSON.stringify(req.session)}`);
-          log(`Response cookies: ${res.getHeader('set-cookie')}`);
 
           res.status(200).json(user);
         });
@@ -129,19 +125,53 @@ export function setupAuth(app: Express) {
     })(req, res, next);
   });
 
-  app.get("/api/user", (req, res) => {
-    log(`User info request - Authenticated: ${req.isAuthenticated()}, Session: ${req.sessionID}`);
-    log(`Session data: ${JSON.stringify(req.session)}`);
-    log(`Cookie Header: ${req.headers.cookie}`);
-    log(`User: ${JSON.stringify(req.user)}`);
-
-    if (!req.isAuthenticated() || !req.user) {
-      log("User not authenticated");
-      return res.status(401).json({ message: "Authentication required" });
+  app.post("/api/register", async (req, res, next) => {
+    const result = insertUserSchema.safeParse(req.body);
+    if (!result.success) {
+      const error = fromZodError(result.error);
+      log(`Registration validation error: ${error}`);
+      return res.status(400).send(error.toString());
     }
 
-    log(`Returning user info for: ${req.user.id}`);
-    res.json(req.user);
+    try {
+      const [existingUser] = await getUserByUsername(result.data.username);
+      if (existingUser) {
+        log(`Registration failed: Username ${result.data.username} already exists`);
+        return res.status(400).send("Username already exists");
+      }
+
+      const [user] = await db
+        .insert(users)
+        .values({
+          username: result.data.username,
+          password: await hashPassword(result.data.password),
+          userType: result.data.userType,
+        })
+        .returning();
+
+      log(`User registered successfully: ${user.id}`);
+
+      req.logIn(user, (err) => {
+        if (err) {
+          log(`Registration error during session creation: ${err}`);
+          return next(err);
+        }
+
+        // Force session save before sending response
+        req.session.save((err) => {
+          if (err) {
+            log(`Session save error: ${err}`);
+            return next(err);
+          }
+
+          log(`Registration successful - User: ${user.id}, Session: ${req.sessionID}`);
+          res.status(201).json(user);
+        });
+      });
+    } catch (error) {
+      log(`Registration error: ${error}`);
+      next(error);
+    }
   });
 
   app.post("/api/logout", (req, res, next) => {
@@ -164,5 +194,33 @@ export function setupAuth(app: Express) {
         res.sendStatus(200);
       });
     });
+  });
+
+  app.get("/api/user", (req, res) => {
+    log(`User info request - Authenticated: ${req.isAuthenticated()}, Session: ${req.sessionID}`);
+    log(`Session data: ${JSON.stringify(req.session)}`);
+    log(`Cookie Header: ${req.headers.cookie}`);
+    log(`User: ${JSON.stringify(req.user)}`);
+
+    if (!req.isAuthenticated()) {
+      log("User not authenticated");
+      return res.sendStatus(401);
+    }
+
+    log(`Returning user info for: ${req.user.id}`);
+    res.json(req.user);
+  });
+
+  app.get("/api/auth/verify", (req, res) => {
+    log(`Auth verification - Session ID: ${req.sessionID}`);
+    log(`Cookie Header: ${req.headers.cookie}`);
+
+    if (req.isAuthenticated() && req.user) {
+      log(`Auth verified for user: ${req.user.id}`);
+      res.json({ authenticated: true, user: req.user });
+    } else {
+      log(`Auth verification failed - no valid session`);
+      res.status(401).json({ authenticated: false });
+    }
   });
 }
