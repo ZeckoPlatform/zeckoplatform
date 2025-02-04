@@ -173,6 +173,7 @@ export function setupAuth(app: Express) {
     }
     res.json(req.user);
   });
+
   app.get("/api/auth/verify", (req, res) => {
     log(`Auth verification - Session ID: ${req.sessionID}`);
     log(`Cookie Header: ${req.headers.cookie}`);

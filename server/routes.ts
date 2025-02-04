@@ -28,7 +28,7 @@ export function registerRoutes(app: Express): Server {
     log(`Is Authenticated: ${req.isAuthenticated()}`);
     log(`User: ${JSON.stringify(req.user)}`);
 
-    if (!req.isAuthenticated() || !req.user) {
+    if (!req.isAuthenticated()) {
       log(`Authentication failed - Session ID: ${req.sessionID}`);
       return res.status(401).json({ message: 'Authentication required' });
     }
@@ -46,12 +46,16 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/leads", async (req, res) => {
     try {
-      log(`Creating lead - User: ${req.user?.id}, Session: ${req.sessionID}`);
+      if (!req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      log(`Creating lead - User: ${req.user.id}, Session: ${req.sessionID}`);
       log(`Request body: ${JSON.stringify(req.body)}`);
 
       const lead = await db.insert(leads).values({
         ...req.body,
-        userId: req.user!.id,
+        userId: req.user.id,
       }).returning();
 
       log(`Lead created successfully - ID: ${lead[0].id}`);

@@ -45,9 +45,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Cache-Control": "no-cache",
+          "Pragma": "no-cache",
         },
         body: JSON.stringify(credentials),
         credentials: "include",
+        cache: "no-cache",
       });
 
       if (!res.ok) {
@@ -56,23 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const { user } = await res.json();
-      await refetchUser(); // Refetch user data to ensure session is established
-
-      // Determine redirect path based on user type
-      let redirectPath = "/";
-      switch (user.userType) {
-        case "free":
-          redirectPath = "/leads";
-          break;
-        case "business":
-          redirectPath = "/leads";
-          break;
-        case "vendor":
-          redirectPath = "/vendor";
-          break;
-      }
-      setLocation(redirectPath);
-
+      await refetchUser();
       return user;
     },
     onSuccess: (user: SelectUser) => {
@@ -81,6 +68,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         title: "Welcome back!",
         description: `Logged in as ${user.username}`,
       });
+
+      // Redirect based on user type
+      switch (user.userType) {
+        case "vendor":
+          setLocation("/vendor");
+          break;
+        case "business":
+        case "free":
+          setLocation("/leads");
+          break;
+        default:
+          setLocation("/");
+      }
     },
     onError: (error: Error) => {
       toast({
@@ -97,9 +97,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Cache-Control": "no-cache",
+          "Pragma": "no-cache",
         },
         body: JSON.stringify(newUser),
         credentials: "include",
+        cache: "no-cache",
       });
 
       if (!res.ok) {
@@ -108,15 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const { user } = await res.json();
-      await refetchUser(); // Refetch user data to ensure session is established
-
-      // Redirect based on user type after registration
-      if (user.userType !== "free") {
-        setLocation("/subscription");
-      } else {
-        setLocation("/leads");
-      }
-
+      await refetchUser();
       return user;
     },
     onSuccess: (user: SelectUser) => {
@@ -125,6 +120,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         title: "Welcome!",
         description: "Your account has been created successfully.",
       });
+
+      // Redirect based on user type after registration
+      if (user.userType !== "free") {
+        setLocation("/subscription");
+      } else {
+        setLocation("/leads");
+      }
     },
     onError: (error: Error) => {
       toast({
@@ -140,6 +142,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await fetch("/api/logout", {
         method: "POST",
         credentials: "include",
+        cache: "no-cache",
+        headers: {
+          "Cache-Control": "no-cache",
+          "Pragma": "no-cache",
+        }
       });
 
       if (!res.ok) {
@@ -163,25 +170,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // Effect to verify auth state only on mount and user change
+  // Auth verification effect
   useEffect(() => {
     const verifyAuth = async () => {
-      try {
-        if (!user) return; // Don't verify if there's no user
+      if (!user) return;
 
+      try {
         const res = await fetch("/api/auth/verify", {
           credentials: "include",
+          cache: "no-cache",
+          headers: {
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache"
+          }
         });
 
         if (!res.ok) {
           console.error("Auth verification failed:", await res.text());
+          queryClient.setQueryData(["/api/user"], null);
           return;
         }
 
         const data = await res.json();
         if (!data.authenticated) {
+          console.error("Session invalid, clearing user state");
           queryClient.setQueryData(["/api/user"], null);
-          setLocation("/auth");
         }
       } catch (error) {
         console.error("Auth verification error:", error);
@@ -189,7 +202,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     verifyAuth();
-  }, [user, setLocation]);
+  }, [user]);
 
   return (
     <AuthContext.Provider

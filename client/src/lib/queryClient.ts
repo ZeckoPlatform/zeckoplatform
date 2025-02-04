@@ -23,17 +23,20 @@ export async function apiRequest(
       headers: {
         ...(data ? { "Content-Type": "application/json" } : {}),
         "Accept": "application/json",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
       },
       body: data ? JSON.stringify(data) : undefined,
       credentials: "include",
       mode: "cors",
+      cache: "no-cache",
     });
 
-    console.log(`API Request - ${method} ${url}`);
-    console.log('Response status:', res.status);
-    console.log('Response headers:', Object.fromEntries(res.headers.entries()));
-
-    await throwIfResNotOk(res);
+    if (!res.ok) {
+      const text = await res.text();
+      console.error(`API request failed: ${method} ${url}`, text);
+      throw new Error(text);
+    }
     return res;
   } catch (error) {
     console.error("API request error:", error);
@@ -47,18 +50,16 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     try {
-      console.log(`Query request - ${queryKey[0]}`);
-
       const res = await fetch(queryKey[0] as string, {
         credentials: "include",
         mode: "cors",
         headers: {
           "Accept": "application/json",
-        }
+          "Cache-Control": "no-cache",
+          "Pragma": "no-cache",
+        },
+        cache: "no-cache"
       });
-
-      console.log('Query response status:', res.status);
-      console.log('Query response headers:', Object.fromEntries(res.headers.entries()));
 
       if (res.status === 401) {
         console.log('Authentication failed, clearing user state');
