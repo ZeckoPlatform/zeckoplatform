@@ -128,6 +128,45 @@ export function setupAuth(app: Express) {
     })(req, res, next);
   });
 
+  app.post("/api/register", async (req, res, next) => {
+    const result = insertUserSchema.safeParse(req.body);
+    if (!result.success) {
+      const error = fromZodError(result.error);
+      log(`Registration validation error: ${error}`);
+      return res.status(400).json({ message: error.toString() });
+    }
+
+    try {
+      const [existingUser] = await getUserByUsername(result.data.username);
+      if (existingUser) {
+        log(`Registration failed: Username ${result.data.username} already exists`);
+        return res.status(400).json({ message: "Username already exists" });
+      }
+
+      const [user] = await db
+        .insert(users)
+        .values({
+          username: result.data.username,
+          password: await hashPassword(result.data.password),
+          userType: result.data.userType,
+        })
+        .returning();
+
+      log(`User registered successfully: ${user.id}`);
+
+      req.logIn(user, (err) => {
+        if (err) {
+          log(`Registration login error: ${err}`);
+          return next(err);
+        }
+        res.status(201).json({ user });
+      });
+    } catch (error) {
+      log(`Registration error: ${error}`);
+      next(error);
+    }
+  });
+
   app.post("/api/logout", (req, res) => {
     const userId = req.user?.id;
     log(`Logout attempt - User: ${userId}`);
@@ -175,45 +214,6 @@ export function setupAuth(app: Express) {
         authenticated: false,
         message: "No valid session found"
       });
-    }
-  });
-
-  app.post("/api/register", async (req, res, next) => {
-    const result = insertUserSchema.safeParse(req.body);
-    if (!result.success) {
-      const error = fromZodError(result.error);
-      log(`Registration validation error: ${error}`);
-      return res.status(400).json({ message: error.toString() });
-    }
-
-    try {
-      const [existingUser] = await getUserByUsername(result.data.username);
-      if (existingUser) {
-        log(`Registration failed: Username ${result.data.username} already exists`);
-        return res.status(400).json({ message: "Username already exists" });
-      }
-
-      const [user] = await db
-        .insert(users)
-        .values({
-          username: result.data.username,
-          password: await hashPassword(result.data.password),
-          userType: result.data.userType,
-        })
-        .returning();
-
-      log(`User registered successfully: ${user.id}`);
-
-      req.logIn(user, (err) => {
-        if (err) {
-          log(`Registration login error: ${err}`);
-          return next(err);
-        }
-        res.status(201).json({ user });
-      });
-    } catch (error) {
-      log(`Registration error: ${error}`);
-      next(error);
     }
   });
 }
