@@ -51,10 +51,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         cache: "no-cache",
       });
 
+      console.log('Login response status:', res.status);
+      console.log('Login response headers:', Object.fromEntries(res.headers.entries()));
+
       if (!res.ok) {
         const error = await res.text();
         throw new Error(error);
       }
+
+      // Force a session check after login
+      await fetch("/api/auth/verify", {
+        credentials: "include",
+        mode: "cors",
+      });
 
       return res.json();
     },

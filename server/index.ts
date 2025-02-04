@@ -8,7 +8,7 @@ import { pool } from "@db";
 const app = express();
 app.set('trust proxy', 1);
 
-// Initialize session store
+// Initialize session store with more detailed configuration
 const PostgresSessionStore = connectPg(session);
 const store = new PostgresSessionStore({
   pool,
@@ -37,7 +37,7 @@ app.use(session({
   }
 }));
 
-// CORS configuration
+// CORS configuration updated to properly handle credentials
 app.use((req, res, next) => {
   const origin = req.headers.origin;
 
