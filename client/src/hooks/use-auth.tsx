@@ -33,11 +33,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refetch: refetchUser,
   } = useQuery<SelectUser | null>({
     queryKey: ["/api/user"],
-    retry: 3,
-    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
-    refetchInterval: 60000, // Check every minute instead of 15 seconds
+    retry: false, // Don't retry on 401s
+    retryOnMount: false,
     refetchOnWindowFocus: true,
-    staleTime: 55000, // Consider data stale after 55 seconds
+    staleTime: 30000, // Consider data stale after 30 seconds
   });
 
   const loginMutation = useMutation({
@@ -69,6 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         description: `Logged in as ${user.username}`,
       });
 
+      // Redirect based on user type
       switch (user.userType) {
         case "vendor":
           setLocation("/vendor");
@@ -84,6 +84,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onError: (error: Error) => {
       toast({
         title: "Login failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+    },
+    onSuccess: () => {
+      queryClient.setQueryData(["/api/user"], null);
+      setLocation("/");
+      toast({
+        title: "Logged out",
+        description: "You have been logged out successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Logout failed",
         description: error.message,
         variant: "destructive",
       });
@@ -109,11 +137,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { user } = await res.json();
       return user;
     },
-    onSuccess: async (user: SelectUser) => {
-      // Force immediate cache update
+    onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
-      await refetchUser();
-
       toast({
         title: "Welcome!",
         description: "Your account has been created successfully.",
@@ -134,78 +159,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  const logoutMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch("/api/logout", {
-        method: "POST",
-        credentials: "include",
-      });
-
-      if (!res.ok) {
-        throw new Error(await res.text());
-      }
-    },
-    onSuccess: async () => {
-      queryClient.setQueryData(["/api/user"], null);
-      await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      setLocation("/");
-      toast({
-        title: "Logged out",
-        description: "You have been logged out successfully.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Logout failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Enhanced session verification with better error handling and less frequent checks
+  // Session verification
   useEffect(() => {
-    const verifyAuth = async () => {
+    const verifySession = async () => {
       try {
         const res = await fetch("/api/auth/verify", {
           credentials: "include",
         });
 
-        // Only update state if verification fails
         if (!res.ok) {
-          console.log("Session verification failed, clearing user state");
-          queryClient.setQueryData(["/api/user"], null);
-          await refetchUser();
+          // Only clear if we get an explicit 401
+          if (res.status === 401) {
+            queryClient.setQueryData(["/api/user"], null);
+          }
           return;
         }
 
         const data = await res.json();
-
-        if (!data.authenticated) {
-          console.log("Session invalid, clearing user state");
-          queryClient.setQueryData(["/api/user"], null);
-          await refetchUser();
-          return;
-        }
-
-        // Update user data if different
-        const currentUser = queryClient.getQueryData(["/api/user"]);
-        if (JSON.stringify(currentUser) !== JSON.stringify(data.user)) {
-          console.log("Updating user data from verification");
+        if (data.authenticated && data.user) {
           queryClient.setQueryData(["/api/user"], data.user);
-          await refetchUser();
         }
       } catch (error) {
-        console.error("Auth verification error:", error);
+        console.error("Session verification error:", error);
       }
     };
 
-    // Verify auth state every 30 seconds instead of 10
-    const interval = setInterval(verifyAuth, 30000);
-    verifyAuth();
+    // Verify session less frequently (every 30 seconds)
+    const interval = setInterval(verifySession, 30000);
+    verifySession(); // Initial verification
 
     return () => clearInterval(interval);
-  }, [refetchUser]);
+  }, []);
 
   return (
     <AuthContext.Provider

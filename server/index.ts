@@ -8,14 +8,14 @@ import { pool } from "@db";
 const app = express();
 app.set('trust proxy', 1);
 
-// CORS configuration must come before session middleware
+// Comprehensive CORS configuration for session cookies
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (!origin) {
     return next();
   }
 
-  // Set CORS headers
+  // Set CORS headers with explicit cookie handling
   res.header('Access-Control-Allow-Origin', origin);
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
@@ -29,7 +29,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Initialize session store with more detailed configuration
+// Initialize session store with enhanced configuration
 const PostgresSessionStore = connectPg(session);
 const store = new PostgresSessionStore({
   pool,
@@ -42,7 +42,7 @@ store.on('error', function(error) {
   log(`Session store error: ${error}`);
 });
 
-// Session configuration with enhanced security and persistence
+// Enhanced session configuration with explicit cookie settings
 app.use(session({
   store,
   secret: process.env.REPL_ID!,

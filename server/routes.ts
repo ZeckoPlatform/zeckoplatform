@@ -39,20 +39,10 @@ export function registerRoutes(app: Express): Server {
     log(`User: ${JSON.stringify(req.user)}`);
     log(`Passport Session: ${JSON.stringify(req.session?.passport)}`);
 
-    // Comprehensive session validation
-    if (!req.session) {
-      log(`No session found - Path: ${req.path}`);
-      return res.status(401).json({ message: 'No session found' });
-    }
-
-    if (!req.session.passport?.user) {
-      log(`No passport session - Path: ${req.path}`);
-      return res.status(401).json({ message: 'No passport session' });
-    }
-
+    // Less strict session validation - only check authentication
     if (!req.isAuthenticated()) {
       log(`Not authenticated - Path: ${req.path}, Session ID: ${req.sessionID}`);
-      return res.status(401).json({ message: 'Not authenticated' });
+      return res.status(401).json({ message: 'Authentication required' });
     }
 
     if (!req.user) {
