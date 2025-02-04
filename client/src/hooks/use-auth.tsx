@@ -26,7 +26,7 @@ function useAuthState() {
     retry: false,
     retryOnMount: false,
     refetchOnWindowFocus: true,
-    staleTime: 30000, // Consider data stale after 30 seconds
+    staleTime: 5000, // Consider data stale after 5 seconds for quicker updates
   });
 
   const loginMutation = useMutation({
@@ -131,13 +131,19 @@ function useAuthState() {
     },
   });
 
-  // Session verification
+  // Verify session immediately and periodically
   useEffect(() => {
     const verifySession = async () => {
       try {
         const res = await fetch("/api/auth/verify", {
           credentials: "include",
+          headers: {
+            "Accept": "application/json",
+          },
         });
+
+        console.log("Session verification response:", res.status);
+        console.log("Session verification headers:", res.headers);
 
         if (!res.ok) {
           if (res.status === 401) {
@@ -149,6 +155,7 @@ function useAuthState() {
 
         const data = await res.json();
         if (data.authenticated && data.user) {
+          console.log("Session verified, updating user state");
           queryClient.setQueryData(["/api/user"], data.user);
         }
       } catch (error) {
@@ -156,9 +163,8 @@ function useAuthState() {
       }
     };
 
-    // Verify session on mount and periodically
     verifySession();
-    const interval = setInterval(verifySession, 30000); // Check every 30 seconds
+    const interval = setInterval(verifySession, 5000); // Check more frequently
     return () => clearInterval(interval);
   }, []);
 
