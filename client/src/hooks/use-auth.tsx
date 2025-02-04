@@ -26,7 +26,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
-  // Use staleTime: 0 to ensure fresh data on each request
   const {
     data: user,
     error,
@@ -67,7 +66,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         description: `Logged in as ${user.username}`,
       });
 
-      // Redirect based on user type
       switch (user.userType) {
         case "vendor":
           setLocation("/vendor");
@@ -159,7 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // Enhanced session verification
+  // Enhanced session verification with error handling
   useEffect(() => {
     const verifyAuth = async () => {
       try {
@@ -167,28 +165,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           credentials: "include",
         });
 
-        if (!res.ok) {
+        // Only invalidate if we get a clear "not authenticated" response
+        if (res.status === 401) {
           if (user) {
+            console.log("Authentication failed, clearing user state");
             await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
             await refetchUser();
           }
           return;
         }
 
+        // For other errors, don't invalidate the session
+        if (!res.ok) {
+          console.error("Auth verification error:", await res.text());
+          return;
+        }
+
         const data = await res.json();
-        if (!data.authenticated) {
-          if (user) {
-            await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-            await refetchUser();
-          }
+        if (!data.authenticated && user) {
+          console.log("Authentication failed, clearing user state");
+          await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+          await refetchUser();
         }
       } catch (error) {
         console.error("Auth verification error:", error);
       }
     };
 
-    // Verify auth state periodically and on mount
-    const interval = setInterval(verifyAuth, 15000);
+    // Verify auth state every 30 seconds and on mount
+    const interval = setInterval(verifyAuth, 30000);
     verifyAuth();
 
     return () => clearInterval(interval);
