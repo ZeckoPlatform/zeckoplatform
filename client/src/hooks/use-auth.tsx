@@ -158,7 +158,7 @@ function useAuthState() {
 
     // Verify session on mount and periodically
     verifySession();
-    const interval = setInterval(verifySession, 30000);
+    const interval = setInterval(verifySession, 30000); // Check every 30 seconds
     return () => clearInterval(interval);
   }, []);
 

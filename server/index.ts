@@ -26,13 +26,13 @@ const sessionConfig = {
   store,
   secret: process.env.REPL_ID!,
   name: 'connect.sid',
-  resave: false,
-  saveUninitialized: false,
+  resave: true,
+  saveUninitialized: true,
   rolling: true,
   proxy: true,
   cookie: {
     httpOnly: true,
-    secure: isProd,
+    secure: false, // Will be set to true in production
     sameSite: 'lax' as const,
     path: '/',
     maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
@@ -84,6 +84,7 @@ app.use((req, res, next) => {
     log(`Cookie Header: ${req.headers.cookie}`);
     log(`Session Data: ${JSON.stringify(req.session)}`);
     log(`Is Authenticated: ${req.isAuthenticated?.()}`);
+    log(`Passport Session: ${JSON.stringify(req.session?.passport)}`);
     log('=== End Debug Info ===');
   }
   next();

@@ -78,6 +78,7 @@ export async function apiRequest(
         "Accept": "application/json",
       },
       body: data ? JSON.stringify(data) : undefined,
+      mode: 'cors' // Explicitly set CORS mode
     });
 
     console.log(`Response status: ${res.status}`);
