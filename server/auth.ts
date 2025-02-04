@@ -100,51 +100,42 @@ export function setupAuth(app: Express) {
         return res.status(401).json({ message: info?.message || "Invalid credentials" });
       }
 
-      // First regenerate the session to prevent session fixation
-      req.session.regenerate((err) => {
+      req.logIn(user, (err) => {
         if (err) {
-          log(`Session regeneration error: ${err}`);
+          log(`Login error: ${err}`);
           return next(err);
         }
 
-        // Then log the user in
-        req.logIn(user, (loginErr) => {
-          if (loginErr) {
-            log(`Login error: ${loginErr}`);
-            return next(loginErr);
+        // Debug session state
+        log('=== Session Debug Info ===');
+        log(`User ID: ${user.id}`);
+        log(`Session ID: ${req.sessionID}`);
+        log(`Session Data: ${JSON.stringify(req.session)}`);
+
+        // Save session explicitly
+        req.session.save((err) => {
+          if (err) {
+            log(`Session save error: ${err}`);
+            return next(err);
           }
 
-          // Debug session state
-          log('=== Session Debug Info ===');
-          log(`User ID: ${user.id}`);
-          log(`Session ID: ${req.sessionID}`);
-          log(`Session Data: ${JSON.stringify(req.session)}`);
-          log(`Cookie Header: ${req.headers.cookie}`);
+          // Set secure cookie options
+          const isProd = app.get('env') === 'production';
+          const cookieOptions = {
+            httpOnly: true,
+            secure: isProd,
+            sameSite: isProd ? 'none' as const : 'lax' as const,
+            path: '/',
+            maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+          };
 
-          // Explicitly set session data
-          req.session.userId = user.id;
-          req.session.authenticated = true;
+          // Set session cookie
+          res.cookie('connect.sid', req.sessionID, cookieOptions);
 
-          // Force session save
-          req.session.save((saveErr) => {
-            if (saveErr) {
-              log(`Session save error: ${saveErr}`);
-              return next(saveErr);
-            }
+          log(`Login successful - Set cookie with options:`, cookieOptions);
+          log(`Response headers:`, res.getHeaders());
 
-            // Set cookie explicitly
-            const isProd = req.app.get('env') === 'production';
-            res.cookie('sid', req.sessionID, {
-              httpOnly: true,
-              secure: isProd,
-              sameSite: isProd ? 'none' : 'lax',
-              path: '/',
-              maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
-            });
-
-            log(`Response headers:`, res.getHeaders());
-            res.json({ user });
-          });
+          res.json({ user });
         });
       });
     })(req, res, next);
@@ -214,14 +205,7 @@ export function setupAuth(app: Express) {
           return res.status(500).json({ message: "Logout failed" });
         }
 
-        const isProd = app.get('env') === 'production';
-        res.clearCookie("sid", {
-          path: '/',
-          httpOnly: true,
-          secure: isProd,
-          sameSite: isProd ? 'none' as const : 'lax' as const,
-        });
-
+        res.clearCookie("connect.sid");
         log(`Logout successful - User: ${userId}`);
         res.sendStatus(200);
       });
@@ -243,24 +227,20 @@ export function setupAuth(app: Express) {
 
   app.get("/api/auth/verify", (req, res) => {
     log(`Auth verification request - Session ID: ${req.sessionID}`);
-    log(`Cookie Header: ${req.headers.cookie}`);
     log(`Session Data: ${JSON.stringify(req.session)}`);
     log(`Is Authenticated: ${req.isAuthenticated()}`);
     log(`User: ${JSON.stringify(req.user)}`);
 
     if (req.isAuthenticated() && req.user) {
       log(`Auth verified for user: ${req.user.id}`);
-      res.json({
-        authenticated: true,
+      res.json({ 
+        authenticated: true, 
         user: req.user,
-        sessionId: req.sessionID
+        sessionId: req.sessionID 
       });
     } else {
       log(`Auth verification failed - no valid session`);
-      res.status(401).json({
-        authenticated: false,
-        message: "No valid session found"
-      });
+      res.status(401).json({ authenticated: false });
     }
   });
 }
