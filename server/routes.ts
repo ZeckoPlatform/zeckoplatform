@@ -14,19 +14,21 @@ type User = InferSelectModel<typeof users>;
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
 
-  // Only modifying the auth middleware section
+  // Authentication middleware - simplified and more robust
   app.use('/api', (req, res, next) => {
     const publicPaths = ['/login', '/register', '/user'];
-    if (publicPaths.includes(req.path) || req.method === 'OPTIONS') {
-      return next();
-    }
 
     // Log complete request details for debugging
     log(`Auth check - Path: ${req.path}, Method: ${req.method}`);
     log(`Session ID: ${req.sessionID}`);
+    log(`Session Data: ${JSON.stringify(req.session)}`);
     log(`Cookie Header: ${req.headers.cookie}`);
     log(`Is Authenticated: ${req.isAuthenticated()}`);
     log(`User: ${JSON.stringify(req.user)}`);
+
+    if (publicPaths.includes(req.path) || req.method === 'OPTIONS') {
+      return next();
+    }
 
     if (!req.isAuthenticated() || !req.user) {
       log(`Authentication failed - Session ID: ${req.sessionID}`);

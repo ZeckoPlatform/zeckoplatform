@@ -2,7 +2,6 @@ import { ReactNode, createContext, useContext, useEffect } from "react";
 import {
   useQuery,
   useMutation,
-  UseMutationResult,
 } from "@tanstack/react-query";
 import type { SelectUser, InsertUser } from "@db/schema";
 import { apiRequest, queryClient } from "../lib/queryClient";
@@ -12,9 +11,9 @@ type AuthContextType = {
   user: SelectUser | null;
   isLoading: boolean;
   error: Error | null;
-  loginMutation: UseMutationResult<SelectUser, Error, LoginData>;
-  logoutMutation: UseMutationResult<void, Error, void>;
-  registerMutation: UseMutationResult<SelectUser, Error, InsertUser>;
+  loginMutation: any;
+  logoutMutation: any;
+  registerMutation: any;
 };
 
 type LoginData = Pick<InsertUser, "username" | "password">;
@@ -39,33 +38,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
-      const res = await fetch("/api/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-        },
-        body: JSON.stringify(credentials),
-        credentials: "include",
-        mode: "cors",
-        cache: "no-cache",
-      });
-
-      if (!res.ok) {
-        const error = await res.text();
-        throw new Error(error);
-      }
-
+      const res = await apiRequest("POST", "/api/login", credentials);
       return res.json();
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
+      refetchUser(); // Force refresh auth state
       toast({
         title: "Welcome back!",
         description: `Logged in as ${user.username}`,
       });
     },
     onError: (error: Error) => {
+      console.error("Login error:", error);
       toast({
         title: "Login failed",
         description: error.message,
@@ -76,33 +61,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const registerMutation = useMutation({
     mutationFn: async (newUser: InsertUser) => {
-      const res = await fetch("/api/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-        },
-        body: JSON.stringify(newUser),
-        credentials: "include",
-        mode: "cors",
-        cache: "no-cache",
-      });
-
-      if (!res.ok) {
-        const error = await res.text();
-        throw new Error(error);
-      }
-
+      const res = await apiRequest("POST", "/api/register", newUser);
       return res.json();
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
+      refetchUser(); // Force refresh auth state
       toast({
         title: "Welcome!",
         description: "Your account has been created successfully.",
       });
     },
     onError: (error: Error) => {
+      console.error("Registration error:", error);
       toast({
         title: "Registration failed",
         description: error.message,
@@ -113,16 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/logout", {
-        method: "POST",
-        credentials: "include",
-        mode: "cors",
-        cache: "no-cache",
-      });
-
-      if (!res.ok) {
-        throw new Error(await res.text());
-      }
+      await apiRequest("POST", "/api/logout");
     },
     onSuccess: () => {
       queryClient.setQueryData(["/api/user"], null);
@@ -132,6 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
     onError: (error: Error) => {
+      console.error("Logout error:", error);
       toast({
         title: "Logout failed",
         description: error.message,
@@ -140,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // Effect to verify auth state only when user is logged in
+  // Effect to verify auth state periodically
   useEffect(() => {
     if (!user) return;
 
@@ -149,10 +112,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const res = await fetch("/api/auth/verify", {
           credentials: "include",
           mode: "cors",
-          cache: "no-cache",
         });
 
         if (!res.ok) {
+          console.log("Auth verification failed, clearing user state");
           queryClient.setQueryData(["/api/user"], null);
         }
       } catch (error) {
@@ -160,7 +123,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    const interval = setInterval(verifyAuth, 60000); // Check every minute
+    // Verify immediately and then every minute
+    verifyAuth();
+    const interval = setInterval(verifyAuth, 60000);
     return () => clearInterval(interval);
   }, [user]);
 
