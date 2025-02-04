@@ -57,10 +57,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(error);
       }
 
-      const userData = await res.json();
+      const { user, sessionId } = await res.json();
 
       // Add a small delay before session verification
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Verify session is established
       const verifyRes = await fetch("/api/auth/verify", {
@@ -73,7 +73,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error("Failed to establish session");
       }
 
-      return userData;
+      const { authenticated } = await verifyRes.json();
+      if (!authenticated) {
+        throw new Error("Session verification failed");
+      }
+
+      return user;
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
@@ -110,7 +115,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(error);
       }
 
-      return res.json();
+      const { user } = await res.json();
+
+      // Verify session after registration
+      const verifyRes = await fetch("/api/auth/verify", {
+        credentials: "include",
+        mode: "cors",
+        cache: "no-cache",
+      });
+
+      if (!verifyRes.ok) {
+        throw new Error("Failed to establish session");
+      }
+
+      return user;
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);

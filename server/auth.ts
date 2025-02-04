@@ -120,7 +120,10 @@ export function setupAuth(app: Express) {
           log(`Login successful - User: ${user.id}, Session: ${req.sessionID}`);
           log(`Session after login: ${JSON.stringify(req.session)}`);
 
-          res.json(user);
+          res.status(200).json({
+            user,
+            sessionId: req.sessionID
+          });
         });
       });
     })(req, res, next);
@@ -166,13 +169,54 @@ export function setupAuth(app: Express) {
           }
 
           log(`Registration successful - User: ${user.id}, Session: ${req.sessionID}`);
-          res.status(201).json(user);
+          res.status(201).json({
+            user,
+            sessionId: req.sessionID
+          });
         });
       });
     } catch (error) {
       log(`Registration error: ${error}`);
       next(error);
     }
+  });
+
+  app.get("/api/auth/verify", (req, res) => {
+    log(`Auth verification - Session ID: ${req.sessionID}`);
+    log(`Cookie Header: ${req.headers.cookie}`);
+    log(`Session Data: ${JSON.stringify(req.session)}`);
+    log(`Is Authenticated: ${req.isAuthenticated()}`);
+    log(`User: ${JSON.stringify(req.user)}`);
+
+    if (req.isAuthenticated() && req.user) {
+      log(`Auth verified for user: ${req.user.id}`);
+      res.status(200).json({ 
+        authenticated: true, 
+        user: req.user,
+        sessionId: req.sessionID
+      });
+    } else {
+      log(`Auth verification failed - no valid session`);
+      res.status(401).json({ 
+        authenticated: false,
+        message: "No valid session found"
+      });
+    }
+  });
+
+  app.get("/api/user", (req, res) => {
+    log(`User info request - Authenticated: ${req.isAuthenticated()}, Session: ${req.sessionID}`);
+    log(`Session data: ${JSON.stringify(req.session)}`);
+    log(`Cookie Header: ${req.headers.cookie}`);
+    log(`User: ${JSON.stringify(req.user)}`);
+
+    if (!req.isAuthenticated()) {
+      log("User not authenticated");
+      return res.sendStatus(401);
+    }
+
+    log(`Returning user info for: ${req.user.id}`);
+    res.json(req.user);
   });
 
   app.post("/api/logout", (req, res, next) => {
@@ -195,39 +239,5 @@ export function setupAuth(app: Express) {
         res.sendStatus(200);
       });
     });
-  });
-
-  app.get("/api/user", (req, res) => {
-    log(`User info request - Authenticated: ${req.isAuthenticated()}, Session: ${req.sessionID}`);
-    log(`Session data: ${JSON.stringify(req.session)}`);
-    log(`Cookie Header: ${req.headers.cookie}`);
-    log(`User: ${JSON.stringify(req.user)}`);
-
-    if (!req.isAuthenticated()) {
-      log("User not authenticated");
-      return res.sendStatus(401);
-    }
-
-    log(`Returning user info for: ${req.user.id}`);
-    res.json(req.user);
-  });
-
-  app.get("/api/auth/verify", (req, res) => {
-    log(`Auth verification - Session ID: ${req.sessionID}`);
-    log(`Cookie Header: ${req.headers.cookie}`);
-    log(`Session Data: ${JSON.stringify(req.session)}`);
-    log(`Is Authenticated: ${req.isAuthenticated()}`);
-    log(`User: ${JSON.stringify(req.user)}`);
-
-    if (req.isAuthenticated() && req.user) {
-      log(`Auth verified for user: ${req.user.id}`);
-      res.status(200).json({ authenticated: true, user: req.user });
-    } else {
-      log(`Auth verification failed - no valid session`);
-      res.status(401).json({ 
-        authenticated: false,
-        message: "No valid session found"
-      });
-    }
   });
 }
