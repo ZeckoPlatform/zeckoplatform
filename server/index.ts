@@ -29,7 +29,7 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: app.get('env') === 'production',
+    secure: false, // Set to true only in production with HTTPS
     httpOnly: true,
     sameSite: 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
@@ -37,28 +37,27 @@ app.use(session({
   }
 }));
 
-// Then CORS configuration - after session but before other middleware
+// CORS configuration
 app.use((req, res, next) => {
-  // Get the origin from the request headers
   const origin = req.headers.origin;
 
+  // Always allow the request origin
   if (origin) {
-    // Only set CORS headers if there's an origin (i.e., it's a cross-origin request)
     res.header('Access-Control-Allow-Origin', origin);
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Cookie, Set-Cookie');
+    res.header('Access-Control-Expose-Headers', 'Set-Cookie');
     res.header('Vary', 'Origin');
   }
 
-  // Handle preflight requests
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
   next();
 });
 
-// Then body parsing middleware
+// Body parsing middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 

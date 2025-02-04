@@ -23,13 +23,10 @@ export async function apiRequest(
       headers: {
         ...(data ? { "Content-Type": "application/json" } : {}),
         "Accept": "application/json",
-        "Cache-Control": "no-cache",
-        "Pragma": "no-cache",
       },
       body: data ? JSON.stringify(data) : undefined,
       credentials: "include",
       mode: "cors",
-      cache: "no-cache",
     });
 
     console.log(`API Request - ${method} ${url}`);
@@ -55,11 +52,8 @@ export const getQueryFn: <T>(options: {
       const res = await fetch(queryKey[0] as string, {
         credentials: "include",
         mode: "cors",
-        cache: "no-cache",
         headers: {
           "Accept": "application/json",
-          "Cache-Control": "no-cache",
-          "Pragma": "no-cache",
         }
       });
 
