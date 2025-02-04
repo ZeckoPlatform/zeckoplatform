@@ -4,24 +4,32 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   try {
-    const res = await fetch(url, {
+    const fetchOptions: RequestInit = {
       method,
+      credentials: 'include',
       headers: {
         ...(data ? { "Content-Type": "application/json" } : {}),
         "Accept": "application/json",
-        "Cache-Control": "no-cache",
-        "Pragma": "no-cache",
       },
       body: data ? JSON.stringify(data) : undefined,
-      credentials: "include",
-      mode: "cors",
-      cache: "no-cache",
-    });
+    };
+
+    const res = await fetch(url, fetchOptions);
 
     if (!res.ok) {
       const text = await res.text();
-      console.error(`API request failed: ${method} ${url}`, text);
-      throw new Error(text);
+      let errorMessage: string;
+      try {
+        const json = JSON.parse(text);
+        errorMessage = json.message || text;
+      } catch {
+        errorMessage = text;
+      }
+      const error = new Error(errorMessage);
+      if (res.status === 401) {
+        error.name = "AuthenticationError";
+      }
+      throw error;
     }
     return res;
   } catch (error) {
