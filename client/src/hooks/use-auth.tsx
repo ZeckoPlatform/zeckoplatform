@@ -33,10 +33,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refetch: refetchUser,
   } = useQuery<SelectUser | null>({
     queryKey: ["/api/user"],
-    retry: false,
-    refetchInterval: false,
-    refetchOnWindowFocus: false,
-    staleTime: 0,
+    retry: 2,
+    refetchInterval: 15000, // Check every 15 seconds
+    refetchOnWindowFocus: true,
+    staleTime: 10000, // Consider data stale after 10 seconds
   });
 
   const loginMutation = useMutation({
@@ -59,8 +59,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return user;
     },
     onSuccess: async (user: SelectUser) => {
-      await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      // Force immediate refetch and update cache
       await refetchUser();
+      queryClient.setQueryData(["/api/user"], user);
+
       toast({
         title: "Welcome back!",
         description: `Logged in as ${user.username}`,
@@ -107,8 +109,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return user;
     },
     onSuccess: async (user: SelectUser) => {
-      await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      // Force immediate cache update
+      queryClient.setQueryData(["/api/user"], user);
       await refetchUser();
+
       toast({
         title: "Welcome!",
         description: "Your account has been created successfully.",
@@ -141,6 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     },
     onSuccess: async () => {
+      queryClient.setQueryData(["/api/user"], null);
       await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       setLocation("/");
       toast({
@@ -157,7 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // Enhanced session verification with error handling
+  // Enhanced session verification with better error handling
   useEffect(() => {
     const verifyAuth = async () => {
       try {
@@ -165,26 +170,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           credentials: "include",
         });
 
-        // Only invalidate if we get a clear "not authenticated" response
-        if (res.status === 401) {
-          if (user) {
-            console.log("Authentication failed, clearing user state");
-            await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-            await refetchUser();
-          }
-          return;
-        }
-
-        // For other errors, don't invalidate the session
-        if (!res.ok) {
-          console.error("Auth verification error:", await res.text());
-          return;
-        }
-
         const data = await res.json();
-        if (!data.authenticated && user) {
-          console.log("Authentication failed, clearing user state");
-          await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+        console.log("Auth verification response:", data);
+
+        if (!data.authenticated) {
+          console.log("Session invalid, clearing user state");
+          queryClient.setQueryData(["/api/user"], null);
+          await refetchUser();
+          return;
+        }
+
+        // Update user data if different
+        const currentUser = queryClient.getQueryData(["/api/user"]);
+        if (JSON.stringify(currentUser) !== JSON.stringify(data.user)) {
+          console.log("Updating user data from verification");
+          queryClient.setQueryData(["/api/user"], data.user);
           await refetchUser();
         }
       } catch (error) {
@@ -192,12 +192,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    // Verify auth state every 30 seconds and on mount
-    const interval = setInterval(verifyAuth, 30000);
+    // Verify auth state every 10 seconds and on mount
+    const interval = setInterval(verifyAuth, 10000);
     verifyAuth();
 
     return () => clearInterval(interval);
-  }, [user, refetchUser]);
+  }, [refetchUser]);
 
   return (
     <AuthContext.Provider

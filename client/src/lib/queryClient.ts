@@ -23,9 +23,13 @@ export async function apiRequest(
       headers: {
         ...(data ? { "Content-Type": "application/json" } : {}),
         "Accept": "application/json",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
       },
       body: data ? JSON.stringify(data) : undefined,
       credentials: "include",
+      mode: "cors",
+      cache: "no-cache",
     });
 
     if (!res.ok) {
@@ -50,7 +54,10 @@ export const getQueryFn: <T>(options: {
         credentials: "include",
         headers: {
           "Accept": "application/json",
+          "Cache-Control": "no-cache",
+          "Pragma": "no-cache",
         },
+        cache: "no-cache",
       });
 
       if (res.status === 401) {
@@ -73,9 +80,10 @@ export const queryClient = new QueryClient({
     queries: {
       queryFn: getQueryFn({ on401: "returnNull" }),
       refetchInterval: false,
-      refetchOnWindowFocus: false,
-      staleTime: 0,
-      retry: false,
+      refetchOnWindowFocus: true,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      retry: true,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
       networkMode: "always",
     },
     mutations: {

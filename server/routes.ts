@@ -14,19 +14,19 @@ type User = InferSelectModel<typeof users>;
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
 
-  // Only modifying the auth middleware section
+  // Authentication middleware with enhanced session handling
   app.use('/api', (req, res, next) => {
-    const publicPaths = ['/login', '/register', '/user'];
+    // Skip auth check for public routes
+    const publicPaths = ['/login', '/register'];
     if (publicPaths.includes(req.path) || req.method === 'OPTIONS') {
       return next();
     }
 
-    // Log complete request details for debugging
-    log(`Auth check - Path: ${req.path}, Method: ${req.method}`);
-    log(`Session ID: ${req.sessionID}`);
-    log(`Cookie Header: ${req.headers.cookie}`);
-    log(`Is Authenticated: ${req.isAuthenticated()}`);
-    log(`User: ${JSON.stringify(req.user)}`);
+    // Enhanced session verification
+    if (!req.session || !req.session.passport || !req.session.passport.user) {
+      log(`No valid session found - Session ID: ${req.sessionID}`);
+      return res.status(401).json({ message: 'Authentication required' });
+    }
 
     if (!req.isAuthenticated()) {
       log(`Authentication failed - Session ID: ${req.sessionID}`);
@@ -36,10 +36,17 @@ export function registerRoutes(app: Express): Server {
     next();
   });
 
+  // Rest of the routes remain unchanged
   app.get("/api/auth/verify", (req, res) => {
     if (req.isAuthenticated() && req.user) {
-      res.json({ authenticated: true, user: req.user });
+      log(`Verified auth for user: ${req.user.id}, Session: ${req.sessionID}`);
+      res.json({ 
+        authenticated: true, 
+        user: req.user,
+        sessionId: req.sessionID 
+      });
     } else {
+      log(`Auth verification failed - Session: ${req.sessionID}`);
       res.status(401).json({ authenticated: false });
     }
   });
