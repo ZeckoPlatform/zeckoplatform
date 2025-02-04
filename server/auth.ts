@@ -221,10 +221,13 @@ export function setupAuth(app: Express) {
 
     if (req.isAuthenticated() && req.user) {
       log(`Auth verified for user: ${req.user.id}`);
-      res.json({ authenticated: true, user: req.user });
+      res.status(200).json({ authenticated: true, user: req.user });
     } else {
       log(`Auth verification failed - no valid session`);
-      res.status(401).json({ authenticated: false });
+      res.status(401).json({ 
+        authenticated: false,
+        message: "No valid session found"
+      });
     }
   });
 }
