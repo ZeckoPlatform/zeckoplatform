@@ -35,7 +35,8 @@ const store = new PostgresSessionStore({
   pool,
   tableName: 'session',
   createTableIfMissing: true,
-  pruneSessionInterval: 60 * 60 // Prune expired sessions every hour
+  pruneSessionInterval: 60, // Prune expired sessions every minute
+  schemaName: 'public', // Explicitly set schema
 });
 
 store.on('error', function(error) {
@@ -86,6 +87,7 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 
 (async () => {
   try {
+    log('Initializing server...');
     const server = registerRoutes(app);
 
     if (app.get("env") === "development") {
