@@ -53,7 +53,6 @@ export function registerRoutes(app: Express): Server {
     next();
   });
 
-  // Rest of the routes remain unchanged...
   app.get("/api/auth/verify", (req, res) => {
     if (req.isAuthenticated() && req.user) {
       log(`Verified auth for user: ${req.user.id}, Session: ${req.sessionID}`);

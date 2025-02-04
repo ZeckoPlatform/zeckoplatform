@@ -2,27 +2,17 @@ import { ReactNode, createContext, useContext, useEffect } from "react";
 import {
   useQuery,
   useMutation,
-  UseMutationResult,
 } from "@tanstack/react-query";
-import type { SelectUser, InsertUser } from "@db/schema";
 import { queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-
-type AuthContextType = {
-  user: SelectUser | null;
-  isLoading: boolean;
-  error: Error | null;
-  loginMutation: UseMutationResult<SelectUser, Error, LoginData>;
-  logoutMutation: UseMutationResult<void, Error, void>;
-  registerMutation: UseMutationResult<SelectUser, Error, InsertUser>;
-};
+import type { SelectUser, InsertUser } from "@db/schema";
 
 type LoginData = Pick<InsertUser, "username" | "password">;
 
-export const AuthContext = createContext<AuthContextType | null>(null);
+export const AuthContext = createContext<ReturnType<typeof useAuthState> | null>(null);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+function useAuthState() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -170,6 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!res.ok) {
           // Only clear if we get an explicit 401
           if (res.status === 401) {
+            console.log("Session verification failed, clearing user state");
             queryClient.setQueryData(["/api/user"], null);
           }
           return;
@@ -191,17 +182,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, []);
 
+  return {
+    user: user ?? null,
+    isLoading,
+    error,
+    loginMutation,
+    logoutMutation,
+    registerMutation,
+  };
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const auth = useAuthState();
+
   return (
-    <AuthContext.Provider
-      value={{
-        user: user ?? null,
-        isLoading,
-        error,
-        loginMutation,
-        logoutMutation,
-        registerMutation,
-      }}
-    >
+    <AuthContext.Provider value={auth}>
       {children}
     </AuthContext.Provider>
   );

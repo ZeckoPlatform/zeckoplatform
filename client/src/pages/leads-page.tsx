@@ -27,9 +27,22 @@ export default function LeadsPage() {
     },
   });
 
-  const { data: leads, isLoading: isLoadingLeads } = useQuery<any[]>({
+  const { data: leads, isLoading: isLoadingLeads, error: leadsError } = useQuery<any[]>({
     queryKey: ["/api/leads"],
-    enabled: !!user, 
+    enabled: !!user,
+    retry: (failureCount, error: any) => {
+      if (error?.name === "AuthenticationError") return false;
+      return failureCount < 3;
+    },
+    onError: (error: any) => {
+      if (error?.name !== "AuthenticationError") {
+        toast({
+          title: "Error loading leads",
+          description: error.message || "Failed to load leads",
+          variant: "destructive",
+        });
+      }
+    }
   });
 
   const createLeadMutation = useMutation({
@@ -42,12 +55,19 @@ export default function LeadsPage() {
         throw new Error("Only free users can create leads");
       }
 
-      const res = await apiRequest("POST", "/api/leads", {
-        ...data,
-        budget: parseInt(data.budget),
-      });
+      try {
+        const res = await apiRequest("POST", "/api/leads", {
+          ...data,
+          budget: parseInt(data.budget),
+        });
 
-      return res.json();
+        return res.json();
+      } catch (error: any) {
+        if (error.name === "AuthenticationError") {
+          throw new Error("Please log in again to create a lead");
+        }
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
@@ -75,7 +95,6 @@ export default function LeadsPage() {
     );
   }
 
-  
   const userLeads = leads?.filter(lead =>
     user?.userType === "free"
       ? lead.userId === user.id
@@ -144,7 +163,6 @@ export default function LeadsPage() {
           </Button>
         </div>
 
-        
         <div className="grid md:grid-cols-3 gap-6 mb-8">
           <Card>
             <CardHeader>

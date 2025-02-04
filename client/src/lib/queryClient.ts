@@ -18,11 +18,13 @@ export const getQueryFn: <T>(options: {
 
       // Handle 401 more gracefully
       if (res.status === 401) {
-        console.log("Authentication check failed for", queryKey[0]);
+        console.log("Auth check failed for", queryKey[0]);
         if (unauthorizedBehavior === "returnNull") {
           return null;
         }
-        throw new Error("Authentication required");
+        const error = new Error("Authentication required");
+        error.name = "AuthenticationError";
+        throw error;
       }
 
       if (!res.ok) {
@@ -49,7 +51,11 @@ export const queryClient = new QueryClient({
       refetchInterval: false,
       refetchOnWindowFocus: true,
       staleTime: 5 * 60 * 1000, // 5 minutes
-      retry: 3,
+      retry: (failureCount, error: any) => {
+        // Don't retry on authentication errors
+        if (error?.name === "AuthenticationError") return false;
+        return failureCount < 3;
+      },
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
       networkMode: "always",
     },
@@ -82,8 +88,16 @@ export async function apiRequest(
 
     if (!res.ok) {
       const text = await res.text();
-      console.error(`API request failed: ${method} ${url}`, text);
-      throw new Error(text);
+      try {
+        const json = JSON.parse(text);
+        const error = new Error(json.message || text);
+        if (res.status === 401) {
+          error.name = "AuthenticationError";
+        }
+        throw error;
+      } catch (e) {
+        throw new Error(text);
+      }
     }
     return res;
   } catch (error) {
