@@ -32,8 +32,8 @@ const sessionConfig = {
   proxy: true,
   cookie: {
     httpOnly: true,
-    secure: false,
-    sameSite: 'lax' as const,
+    secure: isProd, // Only use secure cookies in production
+    sameSite: isProd ? 'none' as const : 'lax' as const,
     path: '/',
     maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
   }
@@ -41,8 +41,6 @@ const sessionConfig = {
 
 if (isProd) {
   app.set('trust proxy', 1);
-  sessionConfig.cookie.secure = true;
-  sessionConfig.cookie.sameSite = 'none';
 }
 
 // Apply session middleware first
@@ -52,7 +50,7 @@ app.use(session(sessionConfig));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// CORS configuration
+// CORS configuration - Simplified for development
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (!origin) {
@@ -63,10 +61,11 @@ app.use((req, res, next) => {
   log(`Request origin: ${origin}`);
   log(`Request method: ${req.method}`);
 
+  // Allow the specific origin instead of *
   res.header('Access-Control-Allow-Origin', origin);
+  res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Cookie, Set-Cookie');
-  res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Expose-Headers', 'Set-Cookie');
 
   if (req.method === 'OPTIONS') {
