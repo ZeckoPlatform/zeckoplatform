@@ -28,6 +28,7 @@ app.use(session({
   name: 'connect.sid',
   resave: false,
   saveUninitialized: false,
+  proxy: true,
   cookie: {
     secure: false, // Set to true only in production with HTTPS
     httpOnly: true,
@@ -44,6 +45,7 @@ app.use((req, res, next) => {
     return next();
   }
 
+  // Set CORS headers
   res.header('Access-Control-Allow-Origin', origin);
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');

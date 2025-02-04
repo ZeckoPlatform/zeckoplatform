@@ -39,17 +39,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
-      // First, attempt to log in
       const res = await fetch("/api/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Accept": "application/json",
         },
         body: JSON.stringify(credentials),
         credentials: "include",
         mode: "cors",
-        cache: "no-cache",
       });
 
       if (!res.ok) {
@@ -57,16 +54,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(error);
       }
 
-      const { user, sessionId } = await res.json();
+      const { user } = await res.json();
 
-      // Add a small delay before session verification
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Add a delay to ensure the session is properly established
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Verify session is established
+      // Verify the session
       const verifyRes = await fetch("/api/auth/verify", {
         credentials: "include",
         mode: "cors",
-        cache: "no-cache",
       });
 
       if (!verifyRes.ok) {
