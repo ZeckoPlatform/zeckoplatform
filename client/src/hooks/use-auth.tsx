@@ -154,15 +154,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (!res.ok) {
           queryClient.setQueryData(["/api/user"], null);
+          await refetchUser();
         }
       } catch (error) {
         console.error("Auth verification error:", error);
+        queryClient.setQueryData(["/api/user"], null);
+        await refetchUser();
       }
     };
 
     const interval = setInterval(verifyAuth, 60000); // Check every minute
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, refetchUser]);
 
   return (
     <AuthContext.Provider

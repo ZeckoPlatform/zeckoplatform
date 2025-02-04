@@ -61,6 +61,7 @@ export const getQueryFn: <T>(options: {
       console.log('Query response headers:', Object.fromEntries(res.headers.entries()));
 
       if (res.status === 401) {
+        console.log('Authentication failed, clearing user state');
         if (unauthorizedBehavior === "returnNull") {
           return null;
         }

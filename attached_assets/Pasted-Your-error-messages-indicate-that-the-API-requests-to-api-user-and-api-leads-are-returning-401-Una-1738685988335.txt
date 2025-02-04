@@ -1,0 +1,90 @@
+Your error messages indicate that the API requests to /api/user and /api/leads are returning 401 Unauthorized, which means that the authentication process is failing. Here are the possible causes and solutions:
+
+🔎 Possible Causes and Fixes
+1. Missing or Invalid Authentication Token (JWT)
+
+Your API might require a JWT token (JSON Web Token) for authentication, but it's either missing or incorrect.
+🔹 Fix: Check Your Headers
+
+Ensure that when making a request, you are passing the Authorization header correctly with the Bearer token:
+
+fetch("/api/leads", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${localStorage.getItem("token")}`,  // Ensure this is set
+  },
+  body: JSON.stringify({ title: "Lead Title", description: "Lead Description" }),
+});
+👉 Check if localStorage.getItem("token") actually contains a valid token. If it's null, your user might not be logged in.
+
+2. Token Expired or Invalid
+
+If the user was logged in earlier but the token expired, the request will fail with 401.
+🔹 Fix: Refresh the Token
+
+If your backend supports token refreshing, try requesting a new token before making the lead request.
+
+3. No Authentication Middleware in Backend
+
+Your /api/leads route may have authentication middleware that is rejecting the request.
+🔹 Fix: Check Your Backend Middleware
+
+Ensure your backend is properly verifying the token. In Node.js with Express, the route might look like:
+
+router.post("/leads", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id; // Ensure this is available
+    const newLead = new Lead({ ...req.body, user: userId });
+    await newLead.save();
+    res.status(201).json(newLead);
+  } catch (err) {
+    res.status(500).json({ error: "Server Error" });
+  }
+});
+👉 Check if req.user exists inside your authMiddleware. If it's undefined, your token is not being verified properly.
+
+4. CORS Issues
+
+The access-control-allow-origin in the response headers suggests that your API might be rejecting requests from the frontend due to CORS restrictions.
+🔹 Fix: Adjust CORS Settings in Backend
+
+If using Express, update your CORS policy:
+
+const cors = require("cors");
+
+app.use(cors({
+  origin: "https://your-frontend-url.com", 
+  credentials: true,
+}));
+Ensure that credentials: true is set if your authentication relies on cookies.
+5. Server Not Receiving the Correct Cookies
+
+If you're using cookies for authentication, ensure that your requests are configured to include credentials.
+
+🔹 Fix: Include Credentials in Fetch Requests
+
+If your authentication is cookie-based, your frontend request should look like this:
+
+fetch("/api/leads", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  credentials: "include", // Ensures cookies are sent
+  body: JSON.stringify({ title: "Lead Title", description: "Lead Description" }),
+});
+👉 Ensure the backend is actually setting cookies by checking your browser's DevTools (Application > Cookies).
+
+✅ Next Steps to Debug
+Check if the token is being sent in the request headers.
+Open DevTools > Network > API Requests and inspect the Authorization header.
+If missing, ensure it's being set in your frontend code.
+Manually verify your token.
+Copy the token from localStorage and decode it using jwt.io to see if it is valid.
+Check your authentication middleware.
+Add a console.log(req.headers.authorization); in your backend to see if the token is received.
+Check if your API requires cookies.
+If your backend uses sessions/cookies, ensure credentials: "include" is set in the fetch request.
+Check for expired tokens.
+If the token is expired, you'll need to refresh or log in again.
