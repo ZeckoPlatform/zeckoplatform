@@ -1,0 +1,36 @@
+[vite] connecting...
+[vite] connected.
+Query request - /api/user
+Query response status: 401
+Query response headers: 
+Object {content-length: "12", content-type: "text/plain; charset=utf-8", date: "Tue, 04 Feb 2025 18:35:43 GMT", etag: "W/"c-dAuDFQrdjS3hezqxDTNgW7AOlYk"", replit-cluster: "riker", …}
+Authentication failed, clearing user state
+Login response status: 200
+Login response headers: 
+Object {access-control-allow-credentials: "true", access-control-allow-headers: "Origin, X-Requested-With, Content-Type, Accept, Cookie, Set-Cookie", access-control-allow-methods: "GET,PUT,POST,DELETE,PATCH,OPTIONS", access-control-allow-origin: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev", access-control-expose-headers: "Set-Cookie", …}
+Query request - /api/leads
+Query response status: 401
+Query response headers: 
+Object {content-length: "37", content-type: "application/json; charset=utf-8", date: "Tue, 04 Feb 2025 18:36:09 GMT", etag: "W/"25-SetIB6wLsPt3Ogr5oCd0XHpTaMw"", replit-cluster: "riker", …}
+Authentication failed, clearing user state
+API Request - POST /api/leads
+Response status: 401
+Response headers: 
+Object {access-control-allow-credentials: "true", access-control-allow-headers: "Origin, X-Requested-With, Content-Type, Accept, Cookie, Set-Cookie", access-control-allow-methods: "GET,PUT,POST,DELETE,PATCH,OPTIONS", access-control-allow-origin: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev", access-control-expose-headers: "Set-Cookie", …}
+API request error: 
+Error {}
+column: 22
+line: 9
+message: "{"message":"Authentication required"}"
+sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/lib/queryClient.ts"
+stack: "@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/lib/queryClient.ts:9:22"
+[[Prototype]]: Object
+
+Lead mutation error: 
+Error {}
+column: 22
+line: 9
+message: "{"message":"Authentication required"}"
+sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/lib/queryClient.ts"
+stack: "@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/lib/queryClient.ts:9:22"
+[[Prototype]]: Object

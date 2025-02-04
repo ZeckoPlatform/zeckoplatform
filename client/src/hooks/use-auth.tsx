@@ -59,13 +59,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(error);
       }
 
-      // Force a session check after login
-      await fetch("/api/auth/verify", {
+      const userData = await res.json();
+
+      // Verify session is established
+      const verifyRes = await fetch("/api/auth/verify", {
         credentials: "include",
         mode: "cors",
+        cache: "no-cache",
       });
 
-      return res.json();
+      console.log('Verify response status:', verifyRes.status);
+      if (!verifyRes.ok) {
+        throw new Error("Failed to establish session");
+      }
+
+      return userData;
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);

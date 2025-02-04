@@ -91,6 +91,7 @@ export function setupAuth(app: Express) {
   app.post("/api/login", (req, res, next) => {
     log(`Login attempt for username: ${req.body.username}`);
     log(`Session before login: ${JSON.stringify(req.session)}`);
+    log(`Cookie Header: ${req.headers.cookie}`);
 
     passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) {
@@ -109,9 +110,6 @@ export function setupAuth(app: Express) {
           return next(loginErr);
         }
 
-        log(`Login successful - User: ${user.id}, Session: ${req.sessionID}`);
-        log(`Session after login: ${JSON.stringify(req.session)}`);
-
         // Force session save before sending response
         req.session.save((err) => {
           if (err) {
@@ -119,7 +117,10 @@ export function setupAuth(app: Express) {
             return next(err);
           }
 
-          res.status(200).json(user);
+          log(`Login successful - User: ${user.id}, Session: ${req.sessionID}`);
+          log(`Session after login: ${JSON.stringify(req.session)}`);
+
+          res.json(user);
         });
       });
     })(req, res, next);
@@ -214,6 +215,9 @@ export function setupAuth(app: Express) {
   app.get("/api/auth/verify", (req, res) => {
     log(`Auth verification - Session ID: ${req.sessionID}`);
     log(`Cookie Header: ${req.headers.cookie}`);
+    log(`Session Data: ${JSON.stringify(req.session)}`);
+    log(`Is Authenticated: ${req.isAuthenticated()}`);
+    log(`User: ${JSON.stringify(req.user)}`);
 
     if (req.isAuthenticated() && req.user) {
       log(`Auth verified for user: ${req.user.id}`);
