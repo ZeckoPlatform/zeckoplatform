@@ -59,10 +59,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const { user } = await res.json();
-      await refetchUser();
       return user;
     },
-    onSuccess: (user: SelectUser) => {
+    onSuccess: async (user: SelectUser) => {
+      await refetchUser();
       queryClient.setQueryData(["/api/user"], user);
       toast({
         title: "Welcome back!",
@@ -111,17 +111,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const { user } = await res.json();
-      await refetchUser();
       return user;
     },
-    onSuccess: (user: SelectUser) => {
+    onSuccess: async (user: SelectUser) => {
+      await refetchUser();
       queryClient.setQueryData(["/api/user"], user);
       toast({
         title: "Welcome!",
         description: "Your account has been created successfully.",
       });
 
-      // Redirect based on user type after registration
       if (user.userType !== "free") {
         setLocation("/subscription");
       } else {
@@ -170,7 +169,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // Auth verification effect
+  // Session verification effect
   useEffect(() => {
     const verifyAuth = async () => {
       if (!user) return;
@@ -181,28 +180,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           cache: "no-cache",
           headers: {
             "Cache-Control": "no-cache",
-            "Pragma": "no-cache"
+            "Pragma": "no-cache",
           }
         });
 
         if (!res.ok) {
-          console.error("Auth verification failed:", await res.text());
-          queryClient.setQueryData(["/api/user"], null);
+          await refetchUser();
           return;
         }
 
         const data = await res.json();
-        if (!data.authenticated) {
-          console.error("Session invalid, clearing user state");
+        if (!data.authenticated || !data.user) {
           queryClient.setQueryData(["/api/user"], null);
+          await refetchUser();
+        } else {
+          queryClient.setQueryData(["/api/user"], data.user);
         }
       } catch (error) {
         console.error("Auth verification error:", error);
       }
     };
 
-    verifyAuth();
-  }, [user]);
+    // Set up periodic verification
+    const interval = setInterval(verifyAuth, 30000); // Check every 30 seconds
+    verifyAuth(); // Initial verification
+
+    return () => clearInterval(interval);
+  }, [user, refetchUser]);
 
   return (
     <AuthContext.Provider

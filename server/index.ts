@@ -21,18 +21,18 @@ store.on('error', function(error) {
   log(`Session store error: ${error}`);
 });
 
-// Session middleware configuration updated for Replit environment
+// Enhanced session configuration
 app.use(session({
   store,
   secret: process.env.REPL_ID!,
   name: 'connect.sid',
-  resave: true,
+  resave: false,
   saveUninitialized: false,
   proxy: true,
   cookie: {
-    secure: true, // Enable secure cookies for HTTPS
+    secure: true,
     httpOnly: true,
-    sameSite: 'none', // Required for cross-site cookies
+    sameSite: 'none',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     path: '/'
   }
@@ -49,6 +49,7 @@ app.use((req, res, next) => {
     return next();
   }
 
+  // Set CORS headers
   res.header('Access-Control-Allow-Origin', origin);
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
@@ -62,13 +63,15 @@ app.use((req, res, next) => {
   next();
 });
 
-// Request logging middleware
+// Enhanced request logging middleware
 app.use((req, res, next) => {
   if (req.path.startsWith('/api')) {
     log(`Request: ${req.method} ${req.path} - Session ID: ${req.sessionID}`);
     log(`Headers: ${JSON.stringify(req.headers)}`);
     log(`Session: ${JSON.stringify(req.session)}`);
     log(`Cookie: ${JSON.stringify(req.headers.cookie)}`);
+    log(`Is Authenticated: ${req.isAuthenticated?.()}`);
+    log(`User: ${JSON.stringify(req.user)}`);
   }
   next();
 });

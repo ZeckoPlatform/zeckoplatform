@@ -106,8 +106,15 @@ export function setupAuth(app: Express) {
           return next(err);
         }
 
-        log(`Login successful for user: ${user.id}, Session ID: ${req.sessionID}`);
-        res.json({ user });
+        // Set session cookie
+        req.session.save((err) => {
+          if (err) {
+            log(`Session save error: ${err}`);
+            return next(err);
+          }
+          log(`Login successful for user: ${user.id}, Session ID: ${req.sessionID}`);
+          res.json({ user });
+        });
       });
     })(req, res, next);
   });
@@ -183,14 +190,14 @@ export function setupAuth(app: Express) {
 
     if (req.isAuthenticated() && req.user) {
       log(`Auth verified for user: ${req.user.id}`);
-      res.status(200).json({ 
-        authenticated: true, 
+      res.status(200).json({
+        authenticated: true,
         user: req.user,
         sessionId: req.sessionID
       });
     } else {
       log(`Auth verification failed - no valid session`);
-      res.status(401).json({ 
+      res.status(401).json({
         authenticated: false,
         message: "No valid session found"
       });
