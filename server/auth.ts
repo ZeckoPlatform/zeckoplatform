@@ -137,18 +137,6 @@ export function setupAuth(app: Express) {
     })(req, res, next);
   });
 
-  // Middleware to log session and auth state for debugging
-  app.use((req, res, next) => {
-    if (req.path.startsWith('/api')) {
-      log(`Request to ${req.path} - Session ID: ${req.sessionID}`);
-      log(`Auth state: ${req.isAuthenticated()}`);
-      log(`Session data: ${JSON.stringify(req.session)}`);
-      log(`User data: ${JSON.stringify(req.user)}`);
-      log(`Cookies: ${JSON.stringify(req.headers.cookie)}`);
-    }
-    next();
-  });
-
   app.get("/api/user", (req, res) => {
     log(`User info request - Authenticated: ${req.isAuthenticated()}, Session: ${req.sessionID}`);
     log(`Session data: ${JSON.stringify(req.session)}`);

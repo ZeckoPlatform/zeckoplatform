@@ -50,10 +50,22 @@ export function registerRoutes(app: Express): Server {
     try {
       log(`Creating lead - User: ${req.user?.id}, Session: ${req.sessionID}`);
       log(`Request body: ${JSON.stringify(req.body)}`);
+      log(`Is authenticated: ${req.isAuthenticated()}`);
+      log(`Session data: ${JSON.stringify(req.session)}`);
+
+      if (!req.isAuthenticated() || !req.user) {
+        log('Lead creation failed: User not authenticated');
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      if (req.user.userType !== "free") {
+        log('Lead creation failed: Invalid user type');
+        return res.status(403).json({ message: "Only free users can create leads" });
+      }
 
       const lead = await db.insert(leads).values({
         ...req.body,
-        userId: req.user!.id,
+        userId: req.user.id,
       }).returning();
 
       log(`Lead created successfully - ID: ${lead[0].id}`);
