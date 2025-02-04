@@ -128,6 +128,56 @@ export function setupAuth(app: Express) {
     })(req, res, next);
   });
 
+  app.post("/api/logout", (req, res) => {
+    const userId = req.user?.id;
+    log(`Logout attempt - User: ${userId}`);
+
+    req.logout(() => {
+      req.session.destroy((err) => {
+        if (err) {
+          log(`Logout error: ${err}`);
+          return res.status(500).json({ message: "Logout failed" });
+        }
+        res.clearCookie("connect.sid");
+        res.sendStatus(200);
+      });
+    });
+  });
+
+  app.get("/api/user", (req, res) => {
+    log(`User request - Session ID: ${req.sessionID}`);
+    log(`Is Authenticated: ${req.isAuthenticated()}`);
+    log(`User: ${JSON.stringify(req.user)}`);
+
+    if (!req.isAuthenticated()) {
+      return res.sendStatus(401);
+    }
+    res.json(req.user);
+  });
+
+  app.get("/api/auth/verify", (req, res) => {
+    log(`Auth verification - Session ID: ${req.sessionID}`);
+    log(`Cookie Header: ${req.headers.cookie}`);
+    log(`Session Data: ${JSON.stringify(req.session)}`);
+    log(`Is Authenticated: ${req.isAuthenticated()}`);
+    log(`User: ${JSON.stringify(req.user)}`);
+
+    if (req.isAuthenticated() && req.user) {
+      log(`Auth verified for user: ${req.user.id}`);
+      res.json({
+        authenticated: true,
+        user: req.user,
+        sessionId: req.sessionID
+      });
+    } else {
+      log(`Auth verification failed - no valid session`);
+      res.status(401).json({
+        authenticated: false,
+        message: "No valid session found"
+      });
+    }
+  });
+
   app.post("/api/register", async (req, res, next) => {
     const result = insertUserSchema.safeParse(req.body);
     if (!result.success) {
@@ -164,52 +214,6 @@ export function setupAuth(app: Express) {
     } catch (error) {
       log(`Registration error: ${error}`);
       next(error);
-    }
-  });
-
-  app.post("/api/logout", (req, res) => {
-    const userId = req.user?.id;
-    log(`Logout attempt - User: ${userId}`);
-
-    req.logout(() => {
-      req.session.destroy((err) => {
-        if (err) {
-          log(`Logout error: ${err}`);
-          return res.status(500).json({ message: "Logout failed" });
-        }
-        res.clearCookie("connect.sid");
-        res.sendStatus(200);
-      });
-    });
-  });
-
-  app.get("/api/user", (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.sendStatus(401);
-    }
-    res.json(req.user);
-  });
-
-  app.get("/api/auth/verify", (req, res) => {
-    log(`Auth verification - Session ID: ${req.sessionID}`);
-    log(`Cookie Header: ${req.headers.cookie}`);
-    log(`Session Data: ${JSON.stringify(req.session)}`);
-    log(`Is Authenticated: ${req.isAuthenticated()}`);
-    log(`User: ${JSON.stringify(req.user)}`);
-
-    if (req.isAuthenticated() && req.user) {
-      log(`Auth verified for user: ${req.user.id}`);
-      res.json({
-        authenticated: true,
-        user: req.user,
-        sessionId: req.sessionID
-      });
-    } else {
-      log(`Auth verification failed - no valid session`);
-      res.status(401).json({
-        authenticated: false,
-        message: "No valid session found"
-      });
     }
   });
 }

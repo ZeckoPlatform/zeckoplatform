@@ -23,13 +23,9 @@ export async function apiRequest(
       headers: {
         ...(data ? { "Content-Type": "application/json" } : {}),
         "Accept": "application/json",
-        "Cache-Control": "no-cache",
-        "Pragma": "no-cache",
       },
       body: data ? JSON.stringify(data) : undefined,
       credentials: "include",
-      mode: "cors",
-      cache: "no-cache",
     });
 
     if (!res.ok) {
@@ -52,17 +48,12 @@ export const getQueryFn: <T>(options: {
     try {
       const res = await fetch(queryKey[0] as string, {
         credentials: "include",
-        mode: "cors",
         headers: {
           "Accept": "application/json",
-          "Cache-Control": "no-cache",
-          "Pragma": "no-cache",
         },
-        cache: "no-cache"
       });
 
       if (res.status === 401) {
-        console.log('Authentication failed, clearing user state');
         if (unauthorizedBehavior === "returnNull") {
           return null;
         }
@@ -83,7 +74,7 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "returnNull" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
+      staleTime: 0,
       retry: false,
       networkMode: "always",
     },

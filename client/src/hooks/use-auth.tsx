@@ -26,6 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
+  // Use staleTime: 0 to ensure fresh data on each request
   const {
     data: user,
     error,
@@ -36,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     retry: false,
     refetchInterval: false,
     refetchOnWindowFocus: false,
-    staleTime: Infinity,
+    staleTime: 0,
   });
 
   const loginMutation = useMutation({
@@ -45,12 +46,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Cache-Control": "no-cache",
-          "Pragma": "no-cache",
         },
         body: JSON.stringify(credentials),
         credentials: "include",
-        cache: "no-cache",
       });
 
       if (!res.ok) {
@@ -62,8 +60,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return user;
     },
     onSuccess: async (user: SelectUser) => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       await refetchUser();
-      queryClient.setQueryData(["/api/user"], user);
       toast({
         title: "Welcome back!",
         description: `Logged in as ${user.username}`,
@@ -97,12 +95,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Cache-Control": "no-cache",
-          "Pragma": "no-cache",
         },
         body: JSON.stringify(newUser),
         credentials: "include",
-        cache: "no-cache",
       });
 
       if (!res.ok) {
@@ -114,8 +109,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return user;
     },
     onSuccess: async (user: SelectUser) => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       await refetchUser();
-      queryClient.setQueryData(["/api/user"], user);
       toast({
         title: "Welcome!",
         description: "Your account has been created successfully.",
@@ -141,19 +136,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await fetch("/api/logout", {
         method: "POST",
         credentials: "include",
-        cache: "no-cache",
-        headers: {
-          "Cache-Control": "no-cache",
-          "Pragma": "no-cache",
-        }
       });
 
       if (!res.ok) {
         throw new Error(await res.text());
       }
     },
-    onSuccess: () => {
-      queryClient.setQueryData(["/api/user"], null);
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       setLocation("/");
       toast({
         title: "Logged out",
@@ -169,41 +159,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // Session verification effect
+  // Enhanced session verification
   useEffect(() => {
     const verifyAuth = async () => {
-      if (!user) return;
-
       try {
         const res = await fetch("/api/auth/verify", {
           credentials: "include",
-          cache: "no-cache",
-          headers: {
-            "Cache-Control": "no-cache",
-            "Pragma": "no-cache",
-          }
         });
 
         if (!res.ok) {
-          await refetchUser();
+          if (user) {
+            await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+            await refetchUser();
+          }
           return;
         }
 
         const data = await res.json();
-        if (!data.authenticated || !data.user) {
-          queryClient.setQueryData(["/api/user"], null);
-          await refetchUser();
-        } else {
-          queryClient.setQueryData(["/api/user"], data.user);
+        if (!data.authenticated) {
+          if (user) {
+            await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+            await refetchUser();
+          }
         }
       } catch (error) {
         console.error("Auth verification error:", error);
       }
     };
 
-    // Set up periodic verification
-    const interval = setInterval(verifyAuth, 30000); // Check every 30 seconds
-    verifyAuth(); // Initial verification
+    // Verify auth state periodically and on mount
+    const interval = setInterval(verifyAuth, 15000);
+    verifyAuth();
 
     return () => clearInterval(interval);
   }, [user, refetchUser]);
