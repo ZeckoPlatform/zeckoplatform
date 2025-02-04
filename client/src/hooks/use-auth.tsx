@@ -117,17 +117,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!res.ok) {
           console.log("Auth verification failed, clearing user state");
           queryClient.setQueryData(["/api/user"], null);
+          // Force refresh auth state
+          refetchUser();
         }
       } catch (error) {
         console.error("Auth verification error:", error);
       }
     };
 
-    // Verify immediately and then every minute
+    // Initial verification
     verifyAuth();
-    const interval = setInterval(verifyAuth, 60000);
+
+    // Set up periodic verification
+    const interval = setInterval(verifyAuth, 30000); // Check every 30 seconds
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, refetchUser]);
 
   return (
     <AuthContext.Provider

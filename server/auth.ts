@@ -109,29 +109,21 @@ export function setupAuth(app: Express) {
           return next(loginErr);
         }
 
-        // Regenerate session on login
-        req.session.regenerate((err) => {
+        // Save user data to session
+        req.session.passport = { user: user.id };
+
+        // Force session save and wait for completion
+        req.session.save((err) => {
           if (err) {
-            log(`Session regeneration error: ${err}`);
+            log(`Session save error: ${err}`);
             return next(err);
           }
 
-          // Save user data to session
-          req.session.passport = { user: user.id };
+          log(`Login successful - User: ${user.id}, Session: ${req.sessionID}`);
+          log(`Session after login: ${JSON.stringify(req.session)}`);
+          log(`Response cookies: ${res.getHeader('set-cookie')}`);
 
-          // Force session save and wait for completion
-          req.session.save((err) => {
-            if (err) {
-              log(`Session save error: ${err}`);
-              return next(err);
-            }
-
-            log(`Login successful - User: ${user.id}, Session: ${req.sessionID}`);
-            log(`Session after login: ${JSON.stringify(req.session)}`);
-            log(`Response cookies: ${res.getHeader('set-cookie')}`);
-
-            res.status(200).json(user);
-          });
+          res.status(200).json(user);
         });
       });
     })(req, res, next);
