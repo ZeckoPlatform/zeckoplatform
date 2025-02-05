@@ -32,6 +32,20 @@ export const users = pgTable("users", {
       locationPreference?: string[];
       budgetRange?: { min: number; max: number };
     };
+    // Vendor specific fields
+    services?: string[];
+    portfolio?: Array<{
+      title: string;
+      description: string;
+      imageUrl?: string;
+      completionDate?: string;
+    }>;
+    ratings?: Array<{
+      rating: number;
+      comment?: string;
+      date: string;
+    }>;
+    averageRating?: number;
   }>(),
 });
 

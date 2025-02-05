@@ -100,6 +100,34 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ message: "Invalid user type. Must be 'free', 'business', or 'vendor'" });
       }
 
+      // Initialize profile based on user type
+      let profileData = {
+        name: result.data.username,
+        description: "",
+        categories: [],
+        location: "",
+      };
+
+      // Add specific fields based on user type
+      if (result.data.userType === "business") {
+        profileData = {
+          ...profileData,
+          matchPreferences: {
+            preferredCategories: [],
+            locationPreference: [],
+            budgetRange: { min: 0, max: 1000000 }
+          }
+        };
+      } else if (result.data.userType === "vendor") {
+        profileData = {
+          ...profileData,
+          services: [],
+          portfolio: [],
+          ratings: [],
+          averageRating: 0
+        };
+      }
+
       const [user] = await db.insert(users)
         .values({
           username: result.data.username,
@@ -107,12 +135,7 @@ export function setupAuth(app: Express) {
           userType: result.data.userType,
           subscriptionActive: false,
           subscriptionTier: "none",
-          profile: {
-            name: result.data.username,
-            description: "",
-            categories: [],
-            location: "",
-          },
+          profile: profileData,
         })
         .returning();
 
