@@ -42,13 +42,17 @@ export function ProductForm() {
         const base64String = reader.result as string;
 
         const response = await apiRequest("POST", "/api/upload", {
-          file: base64String,
+          file: base64String.split(',')[1], // Remove data URL prefix
           fileName: file.name,
         });
 
         const data = await response.json();
         form.setValue("imageUrl", data.url);
         setPreviewUrl(URL.createObjectURL(file));
+        toast({
+          title: "Success",
+          description: "Image uploaded successfully",
+        });
       };
       reader.readAsDataURL(file);
     } catch (error) {
@@ -64,8 +68,8 @@ export function ProductForm() {
 
   const createProductMutation = useMutation({
     mutationFn: async (data: ProductFormData) => {
-      // Parse price, replacing comma with dot and removing any currency symbols
-      const cleanPrice = data.price.replace(/[^\d,.-]/g, '').replace(',', '.');
+      // Parse price, replacing comma with dot and trimming whitespace
+      const cleanPrice = data.price.trim().replace(/[^\d,.-]/g, '').replace(',', '.');
       const price = parseFloat(cleanPrice);
 
       if (isNaN(price)) {
@@ -112,6 +116,7 @@ export function ProductForm() {
         <Input
           id="price"
           type="text"
+          inputMode="decimal"
           placeholder="0.00"
           {...form.register("price")}
           required
@@ -125,37 +130,38 @@ export function ProductForm() {
 
       <div>
         <Label htmlFor="image">Product Image</Label>
-        <div className="mt-1 flex items-center gap-4">
-          <div className="w-full">
-            <label
-              htmlFor="image"
-              className="flex justify-center w-full h-32 px-4 transition bg-white border-2 border-gray-300 border-dashed rounded-md appearance-none cursor-pointer hover:border-primary focus:outline-none"
-            >
-              <span className="flex items-center space-x-2">
-                {uploading ? (
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                ) : (
-                  <Upload className="h-6 w-6" />
-                )}
-                <span className="font-medium text-sm">
-                  {uploading ? 'Uploading...' : 'Click to upload image'}
-                </span>
-              </span>
-              <input
-                id="image"
-                type="file"
-                accept="image/*"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-            </label>
-          </div>
+        <div className="mt-1 flex flex-col gap-4">
+          <label
+            htmlFor="image"
+            className="flex flex-col items-center justify-center w-full h-32 px-4 transition bg-white border-2 border-gray-300 border-dashed rounded-md appearance-none cursor-pointer hover:border-primary focus:outline-none"
+          >
+            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+              {uploading ? (
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              ) : (
+                <>
+                  <Upload className="h-8 w-8 mb-2 text-primary" />
+                  <p className="mb-2 text-sm text-gray-500">
+                    <span className="font-semibold">Click to upload</span> or drag and drop
+                  </p>
+                  <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                </>
+              )}
+            </div>
+            <input
+              id="image"
+              type="file"
+              accept="image/*"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+          </label>
           {previewUrl && (
-            <div className="relative h-32 w-32">
+            <div className="relative w-full h-48">
               <img
                 src={previewUrl}
                 alt="Preview"
-                className="h-full w-full object-cover rounded-md"
+                className="w-full h-full object-contain rounded-md border border-border"
               />
             </div>
           )}
