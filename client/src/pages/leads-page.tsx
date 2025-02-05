@@ -92,7 +92,9 @@ export default function LeadsPage() {
       return res.json();
     },
     onSuccess: (updatedUser: SelectUser) => {
+      // Update both the user and leads queries
       queryClient.setQueryData(["/api/user"], updatedUser);
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       toast({
         title: "Profile Updated",
         description: "Your profile has been updated successfully.",

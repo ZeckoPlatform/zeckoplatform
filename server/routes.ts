@@ -155,16 +155,15 @@ export function registerRoutes(app: Express): Server {
       let query = db.select()
         .from(leads)
         .where(
-          and(
-            // Only show non-expired leads
-            or(
-              eq(leads.status, "closed"),
-              gt(leads.expires_at, new Date())
-            )
+          // Only show non-expired leads
+          or(
+            eq(leads.status, "closed"),
+            gt(leads.expires_at, new Date())
           )
         );
 
       // If user is "free", only show their own leads
+      // For business users, show all leads
       if (req.user.userType === "free") {
         query = query.where(eq(leads.user_id, req.user.id));
       }
