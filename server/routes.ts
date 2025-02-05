@@ -21,17 +21,19 @@ declare module "express-session" {
 }
 
 export function registerRoutes(app: Express): Server {
+  // Setup auth first, before any route middleware
   setupAuth(app);
 
-  // Authentication middleware with enhanced session validation
+  // Authentication middleware with detailed logging
   app.use('/api', (req, res, next) => {
-    // Skip auth check for public routes
-    const publicPaths = ['/login', '/register', '/auth/verify'];
-    if (publicPaths.some(path => req.path.endsWith(path)) || req.method === 'OPTIONS') {
+    // Skip auth check for public routes and OPTIONS
+    if (req.path.endsWith('/login') || 
+        req.path.endsWith('/register') || 
+        req.path.endsWith('/auth/verify') || 
+        req.method === 'OPTIONS') {
       return next();
     }
 
-    // Enhanced session verification with detailed logging
     log(`Session verification - Path: ${req.path}`);
     log(`Session ID: ${req.sessionID}`);
     log(`Session Data: ${JSON.stringify(req.session)}`);
@@ -39,7 +41,6 @@ export function registerRoutes(app: Express): Server {
     log(`User: ${JSON.stringify(req.user)}`);
     log(`Passport Session: ${JSON.stringify(req.session?.passport)}`);
 
-    // Less strict session validation - only check authentication
     if (!req.isAuthenticated()) {
       log(`Not authenticated - Path: ${req.path}, Session ID: ${req.sessionID}`);
       return res.status(401).json({ message: 'Authentication required' });

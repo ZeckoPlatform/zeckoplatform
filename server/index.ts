@@ -4,6 +4,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "@db";
+import passport from "passport";
 
 const app = express();
 const isProd = app.get('env') === 'production';
@@ -25,6 +26,10 @@ if (isProd) {
   app.set('trust proxy', 1);
 }
 
+// Body parsing middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+
 // Configure session before any other middleware
 app.use(session({
   store,
@@ -36,12 +41,16 @@ app.use(session({
   proxy: isProd,
   cookie: {
     httpOnly: true,
-    secure: isProd,
-    sameSite: isProd ? 'none' : 'lax',
+    secure: false, // Set to false for development
+    sameSite: 'lax',
     path: '/',
     maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
   }
 }));
+
+// Initialize passport after session
+app.use(passport.initialize());
+app.use(passport.session());
 
 // Debug middleware for session tracking
 app.use((req, res, next) => {
@@ -51,14 +60,12 @@ app.use((req, res, next) => {
     log(`Session ID: ${req.sessionID}`);
     log(`Cookie Header: ${req.headers.cookie}`);
     log(`Session Data: ${JSON.stringify(req.session)}`);
+    log(`Is Authenticated: ${req.isAuthenticated()}`);
+    log(`Passport Session: ${JSON.stringify(req.session?.passport)}`);
     log('=== End Debug Info ===');
   }
   next();
 });
-
-// Body parsing middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
 
 // CORS configuration - Development focused
 app.use((req, res, next) => {

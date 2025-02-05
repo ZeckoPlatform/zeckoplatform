@@ -134,6 +134,15 @@ export function setupAuth(app: Express) {
         log(`Session after login: ${JSON.stringify(req.session)}`);
         log(`Session ID: ${req.sessionID}`);
 
+        // Set cookie manually to ensure it's properly set
+        res.cookie('connect.sid', req.sessionID, {
+          httpOnly: true,
+          secure: false, // Set to false for development
+          sameSite: 'lax',
+          path: '/',
+          maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+        });
+
         res.json({ user });
       } catch (error) {
         log(`Login process error: ${error}`);
@@ -157,24 +166,6 @@ export function setupAuth(app: Express) {
     res.json(req.user);
   });
 
-  app.get("/api/auth/verify", (req, res) => {
-    log(`Auth verification request - Session ID: ${req.sessionID}`);
-    log(`Session Data: ${JSON.stringify(req.session)}`);
-    log(`Is Authenticated: ${req.isAuthenticated()}`);
-    log(`User: ${JSON.stringify(req.user)}`);
-
-    if (req.isAuthenticated() && req.user) {
-      log(`Auth verified for user: ${req.user.id}, Session: ${req.sessionID}`);
-      res.json({ 
-        authenticated: true, 
-        user: req.user,
-        sessionId: req.sessionID 
-      });
-    } else {
-      log(`Auth verification failed - Session: ${req.sessionID}`);
-      res.status(401).json({ authenticated: false });
-    }
-  });
   app.post("/api/register", async (req, res, next) => {
     try {
       const result = insertUserSchema.safeParse(req.body);
@@ -199,14 +190,16 @@ export function setupAuth(app: Express) {
         })
         .returning();
 
-      // Initialize session for new user
-      if (!req.session) {
-        req.session = {} as any;
-      }
-
-      // Log in the user after registration
       await new Promise<void>((resolve, reject) => {
         req.logIn(user, (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
+      // Save session after registration
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err) => {
           if (err) reject(err);
           else resolve();
         });
@@ -217,6 +210,25 @@ export function setupAuth(app: Express) {
     } catch (error) {
       log(`Registration error: ${error}`);
       next(error);
+    }
+  });
+
+  app.get("/api/auth/verify", (req, res) => {
+    log(`Auth verification request - Session ID: ${req.sessionID}`);
+    log(`Session Data: ${JSON.stringify(req.session)}`);
+    log(`Is Authenticated: ${req.isAuthenticated()}`);
+    log(`User: ${JSON.stringify(req.user)}`);
+
+    if (req.isAuthenticated() && req.user) {
+      log(`Auth verified for user: ${req.user.id}, Session: ${req.sessionID}`);
+      res.json({ 
+        authenticated: true, 
+        user: req.user,
+        sessionId: req.sessionID 
+      });
+    } else {
+      log(`Auth verification failed - Session: ${req.sessionID}`);
+      res.status(401).json({ authenticated: false });
     }
   });
 
@@ -240,12 +252,11 @@ export function setupAuth(app: Express) {
           return next(err);
         }
 
-        const isProd = req.app.get('env') === 'production';
         res.clearCookie('connect.sid', {
           path: '/',
           httpOnly: true,
-          secure: isProd,
-          sameSite: isProd ? 'none' as const : 'lax' as const
+          secure: false,
+          sameSite: 'lax'
         });
 
         log(`Logout successful - User: ${userId}`);
