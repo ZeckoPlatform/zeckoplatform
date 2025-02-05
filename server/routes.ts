@@ -289,6 +289,33 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add this route after the other routes in registerRoutes function
+  app.patch("/api/user/profile", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      log(`Updating profile for user ${req.user.id}`);
+
+      const [updatedUser] = await db.update(users)
+        .set({
+          profile: req.body.profile
+        })
+        .where(eq(users.id, req.user.id))
+        .returning();
+
+      log(`Profile updated successfully for user ${req.user.id}`);
+      res.json(updatedUser);
+    } catch (error) {
+      log(`Profile update error: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('Full error:', error);
+      res.status(500).json({ 
+        message: "Failed to update profile",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;

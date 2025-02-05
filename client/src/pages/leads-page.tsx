@@ -13,7 +13,7 @@ import { queryClient } from "@/lib/queryClient";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Settings } from "lucide-react";
-import type { SelectLead } from "@db/schema";
+import type { SelectLead, SelectUser } from "@db/schema";
 
 interface LeadFormData {
   title: string;
@@ -21,6 +21,13 @@ interface LeadFormData {
   category: string;
   budget: string;
   location: string;
+}
+
+interface ProfileFormData {
+  name?: string;
+  description?: string;
+  categories?: string;
+  location?: string;
 }
 
 export default function LeadsPage() {
@@ -33,6 +40,44 @@ export default function LeadsPage() {
       category: "",
       budget: "",
       location: "",
+    },
+  });
+
+  const profileForm = useForm<ProfileFormData>({
+    defaultValues: {
+      name: user?.profile?.name || "",
+      description: user?.profile?.description || "",
+      categories: user?.profile?.categories?.join(", ") || "",
+      location: user?.profile?.location || "",
+    },
+  });
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: ProfileFormData) => {
+      const res = await apiRequest("PATCH", "/api/user/profile", {
+        profile: {
+          ...user?.profile,
+          name: data.name,
+          description: data.description,
+          categories: data.categories?.split(",").map(c => c.trim()),
+          location: data.location,
+        },
+      });
+      return res.json();
+    },
+    onSuccess: (updatedUser: SelectUser) => {
+      queryClient.setQueryData(["/api/user"], updatedUser);
+      toast({
+        title: "Profile Updated",
+        description: "Your profile has been updated successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update profile",
+        variant: "destructive",
+      });
     },
   });
 
@@ -143,10 +188,47 @@ export default function LeadsPage() {
       <div className="mb-8">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Dashboard</h1>
-          <Button variant="outline" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            Account Settings
-          </Button>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                Account Settings
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Account Settings</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={profileForm.handleSubmit((data) => updateProfileMutation.mutate(data))} className="space-y-4">
+                <div>
+                  <Label htmlFor="name">Name</Label>
+                  <Input id="name" {...profileForm.register("name")} />
+                </div>
+                <div>
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea id="description" {...profileForm.register("description")} />
+                </div>
+                <div>
+                  <Label htmlFor="categories">Categories (comma-separated)</Label>
+                  <Input id="categories" {...profileForm.register("categories")} />
+                </div>
+                <div>
+                  <Label htmlFor="location">Location</Label>
+                  <Input id="location" {...profileForm.register("location")} />
+                </div>
+                <Button type="submit" className="w-full" disabled={updateProfileMutation.isPending}>
+                  {updateProfileMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Changes'
+                  )}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
 
         <div className="grid md:grid-cols-3 gap-6 mb-8">
