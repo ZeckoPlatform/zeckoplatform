@@ -28,6 +28,7 @@ export function ProductForm() {
       description: "",
       price: "",
       category: "",
+      imageUrl: "",
     },
   });
 
@@ -35,14 +36,24 @@ export function ProductForm() {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // Validate file size (10MB limit)
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: "Error",
+        description: "File size must be less than 10MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setUploading(true);
       const reader = new FileReader();
 
       reader.onloadend = async () => {
-        const base64Data = (reader.result as string).split(',')[1]; // Remove data URL prefix
-
         try {
+          const base64Data = (reader.result as string).split(',')[1];
+
           const response = await apiRequest("POST", "/api/upload", {
             file: base64Data,
             fileName: file.name,
@@ -62,6 +73,7 @@ export function ProductForm() {
             description: "Failed to upload image. Please try again.",
             variant: "destructive",
           });
+          console.error('Upload error:', error);
         }
       };
 
@@ -72,6 +84,7 @@ export function ProductForm() {
         description: "Failed to process image. Please try again.",
         variant: "destructive",
       });
+      console.error('File processing error:', error);
     } finally {
       setUploading(false);
     }
@@ -79,13 +92,12 @@ export function ProductForm() {
 
   const createProductMutation = useMutation({
     mutationFn: async (data: ProductFormData) => {
-      // Clean and validate price
-      const cleanPrice = data.price
-        .replace(/[^\d.,]/g, '') // Remove any non-numeric characters except . ,
+      const priceString = data.price
+        .replace(/[^\d.,]/g, '') // Remove any non-numeric characters except . and ,
         .replace(',', '.') // Replace comma with dot for decimal
         .trim();
 
-      const price = parseFloat(cleanPrice);
+      const price = parseFloat(priceString);
 
       if (isNaN(price)) {
         throw new Error("Invalid price format. Please enter a valid number.");
@@ -168,6 +180,7 @@ export function ProductForm() {
               </>
             )}
           </Button>
+
           <input
             id="file-upload"
             type="file"

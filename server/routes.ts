@@ -527,16 +527,25 @@ export function registerRoutes(app: Express): Server {
       const uniqueFileName = `${Date.now()}-${fileName}`;
       const filePath = `${uploadDir}/${uniqueFileName}`;
 
-      // Decode and save the base64 file
-      fs.writeFileSync(filePath, Buffer.from(file, 'base64'));
+      try {
+        // Decode and save the base64 file
+        const buffer = Buffer.from(file, 'base64');
+        await fs.promises.writeFile(filePath, buffer);
 
-      // Return the URL that can be used to access the file
-      const fileUrl = `/uploads/${uniqueFileName}`;
-      console.log(`File uploaded successfully: ${fileUrl}`);
+        // Return the URL that can be used to access the file
+        const fileUrl = `/uploads/${uniqueFileName}`;
+        console.log(`File uploaded successfully: ${fileUrl}`);
+        log(`File uploaded successfully to ${filePath}`);
 
-      res.json({ url: fileUrl });
+        res.json({ url: fileUrl });
+      } catch (writeError) {
+        console.error('Error writing file:', writeError);
+        log(`Error writing file: ${writeError}`);
+        res.status(500).json({ message: "Failed to write file" });
+      }
     } catch (error) {
       console.error('File upload error:', error);
+      log(`File upload error: ${error}`);
       res.status(500).json({ message: "Failed to upload file" });
     }
   });
