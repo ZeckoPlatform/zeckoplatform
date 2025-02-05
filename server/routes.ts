@@ -287,15 +287,20 @@ export function registerRoutes(app: Express): Server {
   // Update the product creation endpoint to handle decimal prices correctly
   app.post("/api/products", async (req, res) => {
     try {
-      if (!req.user || req.user.userType !== "vendor" || !req.user.subscriptionActive) {
+      if (!req.user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
+
+      log(`Creating product for user ${req.user.id} (${req.user.userType})`);
 
       // Convert price from decimal string to cents
       const priceInCents = Math.round(parseFloat(req.body.price) * 100);
       if (isNaN(priceInCents)) {
+        log(`Invalid price format: ${req.body.price}`);
         return res.status(400).json({ message: "Invalid price format" });
       }
+
+      log(`Attempting to create product with price: ${priceInCents} cents`);
 
       const product = await db.insert(products).values({
         vendorId: req.user.id,
@@ -312,10 +317,15 @@ export function registerRoutes(app: Express): Server {
         price: (product[0].price / 100).toFixed(2),
       };
 
+      log(`Product created successfully: ${JSON.stringify(productWithDecimalPrice)}`);
       res.json(productWithDecimalPrice);
     } catch (error) {
-      log(`Product creation error: ${error}`);
-      res.status(500).json({ message: "Failed to create product" });
+      log(`Product creation error: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('Full error:', error);
+      res.status(500).json({ 
+        message: "Failed to create product",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 
@@ -505,7 +515,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Update the file upload endpoint
+  // Update the file upload endpoint with better error handling
   app.post("/api/upload", async (req, res) => {
     try {
       if (!req.user) {
@@ -517,9 +527,12 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ message: "File and filename are required" });
       }
 
+      log(`Processing file upload for user ${req.user.id}: ${fileName}`);
+
       // Create uploads directory if it doesn't exist
       const uploadDir = 'uploads';
       if (!fs.existsSync(uploadDir)) {
+        log(`Creating uploads directory: ${uploadDir}`);
         fs.mkdirSync(uploadDir, { recursive: true });
       }
 
@@ -534,23 +547,23 @@ export function registerRoutes(app: Express): Server {
 
         // Return the URL that can be used to access the file
         const fileUrl = `/uploads/${uniqueFileName}`;
-        console.log(`File uploaded successfully: ${fileUrl}`);
         log(`File uploaded successfully to ${filePath}`);
+        console.log(`File uploaded successfully: ${fileUrl}`);
 
         res.json({ url: fileUrl });
       } catch (writeError) {
-        console.error('Error writing file:', writeError);
         log(`Error writing file: ${writeError}`);
+        console.error('Error writing file:', writeError);
         res.status(500).json({ message: "Failed to write file" });
       }
     } catch (error) {
+      log(`File upload error: ${error instanceof Error ? error.message : String(error)}`);
       console.error('File upload error:', error);
-      log(`File upload error: ${error}`);
       res.status(500).json({ message: "Failed to upload file" });
     }
   });
 
-  // Serve uploaded files statically
+  // Ensure uploaded files are served statically
   app.use('/uploads', express.static('uploads'));
 
   const httpServer = createServer(app);

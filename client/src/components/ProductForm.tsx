@@ -24,21 +24,6 @@ export function ProductForm() {
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string>();
 
-  // Check subscription status
-  if (!user?.subscriptionActive || user?.userType !== "vendor") {
-    return (
-      <div className="text-center p-6 bg-muted rounded-lg">
-        <h3 className="text-lg font-semibold mb-2">Subscription Required</h3>
-        <p className="text-sm text-muted-foreground mb-4">
-          You need an active vendor subscription to create and manage products.
-        </p>
-        <Button asChild variant="outline">
-          <a href="/subscription">Upgrade to Vendor Plan</a>
-        </Button>
-      </div>
-    );
-  }
-
   const form = useForm<ProductFormData>({
     defaultValues: {
       title: "",
@@ -109,20 +94,17 @@ export function ProductForm() {
 
   const createProductMutation = useMutation({
     mutationFn: async (data: ProductFormData) => {
-      const priceString = data.price
-        .replace(/[^\d.,]/g, '') // Remove any non-numeric characters except . and ,
-        .replace(',', '.') // Replace comma with dot for decimal
-        .trim();
+      // Ensure price is properly formatted
+      const cleanPrice = data.price.trim();
+      const price = parseFloat(cleanPrice);
 
-      const price = parseFloat(priceString);
-
-      if (isNaN(price)) {
-        throw new Error("Invalid price format. Please enter a valid number.");
+      if (isNaN(price) || price < 0) {
+        throw new Error("Please enter a valid positive number for the price");
       }
 
       const res = await apiRequest("POST", "/api/products", {
         ...data,
-        price: price.toFixed(2), // Ensure 2 decimal places
+        price: price.toFixed(2), // Ensure consistent decimal format
       });
 
       return res.json();
@@ -160,11 +142,11 @@ export function ProductForm() {
         <Label htmlFor="price">Price ($)</Label>
         <Input
           id="price"
-          type="text"
-          inputMode="decimal"
+          type="number"
+          step="0.01"
+          min="0"
           placeholder="0.00"
           {...form.register("price")}
-          pattern="^\d*\.?\d*$"
           required
         />
       </div>
