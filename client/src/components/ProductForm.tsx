@@ -148,37 +148,34 @@ export function ProductForm() {
       <div className="space-y-4">
         <Label>Product Image</Label>
         <div className="flex flex-col gap-4">
-          <label
-            htmlFor="image-upload"
-            className={`
-              flex flex-col items-center justify-center w-full h-32
-              border-2 border-dashed rounded-lg cursor-pointer
-              transition-colors duration-200
-              ${uploading ? 'border-primary' : 'border-gray-300 hover:border-primary'}
-            `}
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full h-32 flex flex-col items-center justify-center gap-2 border-2 border-dashed"
+            onClick={() => document.getElementById('file-upload')?.click()}
+            disabled={uploading}
           >
-            <div className="flex flex-col items-center justify-center pt-5 pb-6">
-              {uploading ? (
+            {uploading ? (
+              <>
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              ) : (
-                <>
-                  <Upload className="h-8 w-8 mb-2 text-primary" />
-                  <p className="mb-2 text-sm text-gray-500">
-                    <span className="font-semibold">Click to upload</span> or drag and drop
-                  </p>
-                  <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
-                </>
-              )}
-            </div>
-            <input
-              id="image-upload"
-              type="file"
-              accept="image/*"
-              onChange={handleFileUpload}
-              className="hidden"
-              disabled={uploading}
-            />
-          </label>
+                <span>Uploading...</span>
+              </>
+            ) : (
+              <>
+                <Upload className="h-8 w-8 text-primary" />
+                <span>Click to upload image</span>
+                <span className="text-xs text-muted-foreground">PNG, JPG, GIF up to 10MB</span>
+              </>
+            )}
+          </Button>
+          <input
+            id="file-upload"
+            type="file"
+            accept="image/*"
+            onChange={handleFileUpload}
+            className="hidden"
+            disabled={uploading}
+          />
 
           {previewUrl && (
             <div className="relative w-full h-48">

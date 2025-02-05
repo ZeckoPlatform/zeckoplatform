@@ -517,28 +517,30 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Create uploads directory if it doesn't exist
-      if (!fs.existsSync('uploads')) {
-        fs.mkdirSync('uploads', { recursive: true });
+      const uploadDir = 'uploads';
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
       }
 
       // Generate a unique filename
       const uniqueFileName = `${Date.now()}-${fileName}`;
-      const filePath = `uploads/${uniqueFileName}`;
+      const filePath = `${uploadDir}/${uniqueFileName}`;
 
       // Decode and save the base64 file
       fs.writeFileSync(filePath, Buffer.from(file, 'base64'));
 
       // Return the URL that can be used to access the file
       const fileUrl = `/uploads/${uniqueFileName}`;
+      console.log(`File uploaded successfully: ${fileUrl}`);
 
       res.json({ url: fileUrl });
     } catch (error) {
-      log(`File upload error: ${error}`);
+      console.error('File upload error:', error);
       res.status(500).json({ message: "Failed to upload file" });
     }
   });
 
-  // Add static file serving for uploads
+  // Serve uploaded files statically
   app.use('/uploads', express.static('uploads'));
 
   const httpServer = createServer(app);
