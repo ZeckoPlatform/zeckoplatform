@@ -9,7 +9,11 @@ import passport from "passport";
 const app = express();
 const isProd = app.get('env') === 'production';
 
-// Session store setup with error handling
+// Body parsing middleware first
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+
+// Session store setup
 const PostgresSessionStore = connectPg(session);
 const store = new PostgresSessionStore({
   pool,
@@ -22,29 +26,18 @@ store.on('error', function(error) {
   log(`Session store error: ${error}`);
 });
 
-if (isProd) {
-  app.set('trust proxy', 1);
-}
-
-// Body parsing middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
-
-// Configure session before any other middleware
+// Session middleware
 app.use(session({
-  store,
   secret: process.env.REPL_ID!,
-  name: 'connect.sid',
+  store,
+  name: 'sid',
   resave: false,
   saveUninitialized: false,
-  rolling: true,
-  proxy: isProd,
   cookie: {
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
     httpOnly: true,
-    secure: false, // Set to false for development
+    secure: false,
     sameSite: 'lax',
-    path: '/',
-    maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
   }
 }));
 
@@ -52,7 +45,23 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Debug middleware for session tracking
+// CORS configuration after session/passport
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
+// Debug middleware
 app.use((req, res, next) => {
   if (req.path.startsWith('/api')) {
     log('=== Request Debug Info ===');
@@ -67,30 +76,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// CORS configuration - Development focused
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (!origin) {
-    return next();
-  }
-
-  log(`Request origin: ${origin}`);
-  log(`Request method: ${req.method}`);
-  log(`Request headers: ${JSON.stringify(req.headers)}`);
-
-  res.header('Access-Control-Allow-Origin', origin);
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Cookie, Set-Cookie');
-  res.header('Access-Control-Expose-Headers', 'Set-Cookie');
-
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-  next();
-});
-
-// Global error handling
+// Error handling
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   log(`Server error: ${err.message}`);
   log(`Stack trace: ${err.stack}`);
