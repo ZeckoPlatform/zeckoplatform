@@ -3,8 +3,10 @@ import { createServer, type Server } from "http";
 import { setupAuth, authenticateToken } from "./auth";
 import { db } from "@db";
 import { leads, users, subscriptions, products, leadResponses } from "@db/schema";
-import { eq, and, or, gt } from "drizzle-orm";
+import { eq, and, or, gt, not } from "drizzle-orm";
 import { log } from "./vite";
+import { comparePasswords, hashPassword } from './auth'; // Assuming these functions exist
+
 
 declare global {
   namespace Express {
@@ -373,7 +375,75 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add this route after the other routes in registerRoutes function
+  // Add these new routes in the registerRoutes function before the return statement
+  app.patch("/api/user/password", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const { currentPassword, newPassword } = req.body;
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: "Both current and new password are required" });
+      }
+
+      // Verify current password
+      const [user] = await db.select().from(users).where(eq(users.id, req.user.id));
+      const isValidPassword = await comparePasswords(currentPassword, user.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ message: "Current password is incorrect" });
+      }
+
+      // Update password
+      const hashedPassword = await hashPassword(newPassword);
+      const [updatedUser] = await db.update(users)
+        .set({ password: hashedPassword })
+        .where(eq(users.id, req.user.id))
+        .returning();
+
+      res.json({ message: "Password updated successfully" });
+    } catch (error) {
+      log(`Password update error: ${error instanceof Error ? error.message : String(error)}`);
+      res.status(500).json({ message: "Failed to update password" });
+    }
+  });
+
+  app.patch("/api/user/username", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const { username } = req.body;
+      if (!username) {
+        return res.status(400).json({ message: "Username is required" });
+      }
+
+      // Check if username is already taken
+      const [existingUser] = await db.select()
+        .from(users)
+        .where(and(
+          eq(users.username, username),
+          not(eq(users.id, req.user.id))
+        ));
+
+      if (existingUser) {
+        return res.status(400).json({ message: "Username already taken" });
+      }
+
+      // Update username
+      const [updatedUser] = await db.update(users)
+        .set({ username })
+        .where(eq(users.id, req.user.id))
+        .returning();
+
+      res.json(updatedUser);
+    } catch (error) {
+      log(`Username update error: ${error instanceof Error ? error.message : String(error)}`);
+      res.status(500).json({ message: "Failed to update username" });
+    }
+  });
+
   app.patch("/api/user/profile", async (req, res) => {
     try {
       if (!req.user) {

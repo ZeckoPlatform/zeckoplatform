@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { apiRequest } from "@/lib/queryClient";
-import { queryClient } from "@/lib/queryClient";  
+import { queryClient } from "@/lib/queryClient";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Settings, Edit, Trash2 } from "lucide-react";
@@ -30,6 +30,16 @@ interface ProfileFormData {
   description?: string;
   categories?: string;
   location?: string;
+}
+
+interface PasswordFormData {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+interface UsernameFormData {
+  username: string;
 }
 
 export default function LeadsPage() {
@@ -93,23 +103,17 @@ export default function LeadsPage() {
       return updatedUser;
     },
     onSuccess: (updatedUser: SelectUser) => {
-      // Immediately update the cache with the new user data
       queryClient.setQueryData(["/api/user"], updatedUser);
-
-      // Reset form with new values
       profileForm.reset({
         name: updatedUser.profile?.name || "",
         description: updatedUser.profile?.description || "",
         categories: updatedUser.profile?.categories?.join(", ") || "",
         location: updatedUser.profile?.location || "",
       });
-
       toast({
         title: "Profile Updated",
         description: "Your profile has been updated successfully.",
       });
-
-      // Force a refetch after a short delay to ensure UI consistency
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       }, 100);
@@ -120,6 +124,71 @@ export default function LeadsPage() {
         description: error.message || "Failed to update profile",
         variant: "destructive",
       });
+    },
+  });
+
+  const updatePasswordMutation = useMutation({
+    mutationFn: async (data: PasswordFormData) => {
+      if (data.newPassword !== data.confirmPassword) {
+        throw new Error("New passwords do not match");
+      }
+      const res = await apiRequest("PATCH", "/api/user/password", {
+        currentPassword: data.currentPassword,
+        newPassword: data.newPassword,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Your password has been updated successfully.",
+      });
+      passwordForm.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update password",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateUsernameMutation = useMutation({
+    mutationFn: async (data: UsernameFormData) => {
+      const res = await apiRequest("PATCH", "/api/user/username", {
+        username: data.username,
+      });
+      return res.json();
+    },
+    onSuccess: (updatedUser: SelectUser) => {
+      queryClient.setQueryData(["/api/user"], updatedUser);
+      toast({
+        title: "Success",
+        description: "Your username has been updated successfully.",
+      });
+      usernameForm.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update username",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const passwordForm = useForm<PasswordFormData>({
+    defaultValues: {
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    },
+  });
+
+  const usernameForm = useForm<UsernameFormData>({
+    defaultValues: {
+      username: user?.username || "",
     },
   });
 
@@ -287,38 +356,109 @@ export default function LeadsPage() {
                 Account Settings
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>Account Settings</DialogTitle>
               </DialogHeader>
-              <form onSubmit={profileForm.handleSubmit((data) => updateProfileMutation.mutate(data))} className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Name</Label>
-                  <Input id="name" {...profileForm.register("name")} />
-                </div>
-                <div>
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea id="description" {...profileForm.register("description")} />
-                </div>
-                <div>
-                  <Label htmlFor="categories">Categories (comma-separated)</Label>
-                  <Input id="categories" {...profileForm.register("categories")} />
-                </div>
-                <div>
-                  <Label htmlFor="location">Location</Label>
-                  <Input id="location" {...profileForm.register("location")} />
-                </div>
-                <Button type="submit" className="w-full" disabled={updateProfileMutation.isPending}>
-                  {updateProfileMutation.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    'Save Changes'
-                  )}
-                </Button>
-              </form>
+              <Tabs defaultValue="profile">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="profile">Profile</TabsTrigger>
+                  <TabsTrigger value="username">Username</TabsTrigger>
+                  <TabsTrigger value="password">Password</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="profile">
+                  <form onSubmit={profileForm.handleSubmit((data) => updateProfileMutation.mutate(data))} className="space-y-4">
+                    <div>
+                      <Label htmlFor="name">Display Name</Label>
+                      <Input id="name" {...profileForm.register("name")} />
+                    </div>
+                    <div>
+                      <Label htmlFor="description">Description</Label>
+                      <Textarea id="description" {...profileForm.register("description")} />
+                    </div>
+                    <div>
+                      <Label htmlFor="categories">Categories (comma-separated)</Label>
+                      <Input id="categories" {...profileForm.register("categories")} />
+                    </div>
+                    <div>
+                      <Label htmlFor="location">Location</Label>
+                      <Input id="location" {...profileForm.register("location")} />
+                    </div>
+                    <Button type="submit" className="w-full" disabled={updateProfileMutation.isPending}>
+                      {updateProfileMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        'Save Profile'
+                      )}
+                    </Button>
+                  </form>
+                </TabsContent>
+
+                <TabsContent value="username">
+                  <form onSubmit={usernameForm.handleSubmit((data) => updateUsernameMutation.mutate(data))} className="space-y-4">
+                    <div>
+                      <Label htmlFor="username">Username</Label>
+                      <Input id="username" {...usernameForm.register("username")} required />
+                    </div>
+                    <Button type="submit" className="w-full" disabled={updateUsernameMutation.isPending}>
+                      {updateUsernameMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Updating...
+                        </>
+                      ) : (
+                        'Update Username'
+                      )}
+                    </Button>
+                  </form>
+                </TabsContent>
+
+                <TabsContent value="password">
+                  <form onSubmit={passwordForm.handleSubmit((data) => updatePasswordMutation.mutate(data))} className="space-y-4">
+                    <div>
+                      <Label htmlFor="currentPassword">Current Password</Label>
+                      <Input
+                        id="currentPassword"
+                        type="password"
+                        {...passwordForm.register("currentPassword")}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="newPassword">New Password</Label>
+                      <Input
+                        id="newPassword"
+                        type="password"
+                        {...passwordForm.register("newPassword")}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                      <Input
+                        id="confirmPassword"
+                        type="password"
+                        {...passwordForm.register("confirmPassword")}
+                        required
+                      />
+                    </div>
+                    <Button type="submit" className="w-full" disabled={updatePasswordMutation.isPending}>
+                      {updatePasswordMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Updating...
+                        </>
+                      ) : (
+                        'Update Password'
+                      )}
+                    </Button>
+                  </form>
+                </TabsContent>
+              </Tabs>
             </DialogContent>
           </Dialog>
         </div>
