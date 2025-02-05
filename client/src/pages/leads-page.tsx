@@ -93,10 +93,8 @@ export default function LeadsPage() {
       return updatedUser;
     },
     onSuccess: (updatedUser: SelectUser) => {
-      // Update user data in cache
+      // Immediately update the cache with the new user data
       queryClient.setQueryData(["/api/user"], updatedUser);
-      // Force a refetch to ensure we have the latest data
-      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
 
       // Reset form with new values
       profileForm.reset({
@@ -110,6 +108,11 @@ export default function LeadsPage() {
         title: "Profile Updated",
         description: "Your profile has been updated successfully.",
       });
+
+      // Force a refetch after a short delay to ensure UI consistency
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      }, 100);
     },
     onError: (error: Error) => {
       toast({

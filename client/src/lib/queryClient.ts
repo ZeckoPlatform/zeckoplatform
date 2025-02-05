@@ -8,7 +8,7 @@ export const getQueryFn: <T>(options: {
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(queryKey[0] as string, {
-        credentials: 'omit', // Don't send credentials since we're using token auth
+        credentials: 'include',
         headers: {
           "Accept": "application/json",
           "Content-Type": "application/json",
@@ -55,7 +55,8 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "returnNull" }),
       refetchInterval: false,
       refetchOnWindowFocus: true,
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: 0, // Set staleTime to 0 to always refetch
+      cacheTime: 5 * 60 * 1000, // Cache for 5 minutes
       retry: (failureCount, error: any) => {
         if (error?.name === "AuthenticationError") return false;
         return failureCount < 3;
@@ -76,7 +77,7 @@ export async function apiRequest(
 
     const fetchOptions: RequestInit = {
       method,
-      credentials: 'omit', // Don't send credentials since we're using token auth
+      credentials: 'include',
       headers: {
         ...(data ? { "Content-Type": "application/json" } : {}),
         "Accept": "application/json",
