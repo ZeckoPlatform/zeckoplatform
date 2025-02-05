@@ -6,20 +6,21 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     try {
+      const token = localStorage.getItem("token");
       const res = await fetch(queryKey[0] as string, {
-        credentials: "include",
         headers: {
           "Accept": "application/json",
           "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
         },
       });
 
+      console.log(`Query request - ${queryKey[0]}`);
       console.log(`Query response status: ${res.status}`);
-      console.log(`Query response headers:`, res.headers);
-      console.log(`Request cookies:`, document.cookie);
 
       if (res.status === 401) {
         console.log("Authentication failed, clearing user state");
+        localStorage.removeItem("token");
         if (unauthorizedBehavior === "returnNull") {
           return null;
         }
@@ -70,19 +71,21 @@ export async function apiRequest(
 ): Promise<Response> {
   try {
     console.log(`API Request - ${method} ${url}`);
-    const res = await fetch(url, {
+    const token = localStorage.getItem("token");
+
+    const fetchOptions: RequestInit = {
       method,
-      credentials: "include",
       headers: {
         ...(data ? { "Content-Type": "application/json" } : {}),
         "Accept": "application/json",
+        ...(token ? { "Authorization": `Bearer ${token}` } : {}),
       },
       body: data ? JSON.stringify(data) : undefined,
-    });
+    };
+
+    const res = await fetch(url, fetchOptions);
 
     console.log(`Response status: ${res.status}`);
-    console.log(`Response headers:`, res.headers);
-    console.log(`Response cookies:`, document.cookie);
 
     if (!res.ok) {
       const text = await res.text();
@@ -95,6 +98,7 @@ export async function apiRequest(
       }
       const error = new Error(errorMessage);
       if (res.status === 401) {
+        localStorage.removeItem("token");
         error.name = "AuthenticationError";
       }
       throw error;

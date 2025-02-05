@@ -1,6 +1,6 @@
-import { ReactNode, createContext, useContext, useEffect } from "react";
+import { ReactNode, createContext, useContext } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import type { SelectUser, InsertUser } from "@db/schema";
@@ -17,26 +17,34 @@ function useAuthState() {
     data: user,
     error,
     isLoading,
-    refetch: refetchUser,
   } = useQuery<SelectUser | null>({
     queryKey: ["/api/user"],
     retry: false,
     retryOnMount: false,
     refetchOnWindowFocus: true,
-    staleTime: 5000, // Consider data stale after 5 seconds for quicker updates
   });
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
-      const res = await apiRequest("POST", "/api/login", credentials);
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(credentials),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Login failed");
+      }
+
       const data = await res.json();
+      localStorage.setItem("token", data.token);
       return data.user;
     },
-    onSuccess: async (user: SelectUser) => {
-      // Force immediate refetch and update cache
-      await refetchUser();
+    onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
-
       toast({
         title: "Welcome back!",
         description: `Logged in as ${user.username}`,
@@ -66,8 +74,21 @@ function useAuthState() {
 
   const registerMutation = useMutation({
     mutationFn: async (newUser: InsertUser) => {
-      const res = await apiRequest("POST", "/api/register", newUser);
+      const res = await fetch("/api/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(newUser),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Registration failed");
+      }
+
       const data = await res.json();
+      localStorage.setItem("token", data.token);
       return data.user;
     },
     onSuccess: (user: SelectUser) => {
@@ -94,7 +115,7 @@ function useAuthState() {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", "/api/logout");
+      localStorage.removeItem("token");
       queryClient.setQueryData(["/api/user"], null);
     },
     onSuccess: () => {
@@ -104,48 +125,7 @@ function useAuthState() {
         description: "You have been logged out successfully.",
       });
     },
-    onError: (error: Error) => {
-      toast({
-        title: "Logout failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
   });
-
-  // Verify session periodically
-  useEffect(() => {
-    const verifySession = async () => {
-      try {
-        const res = await fetch("/api/auth/verify", {
-          credentials: "include",
-          headers: {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-          },
-        });
-
-        if (!res.ok) {
-          console.log("Session verification failed, clearing user state");
-          queryClient.setQueryData(["/api/user"], null);
-          return;
-        }
-
-        const data = await res.json();
-        if (data.authenticated && data.user) {
-          queryClient.setQueryData(["/api/user"], data.user);
-        }
-      } catch (error) {
-        console.error("Session verification error:", error);
-        queryClient.setQueryData(["/api/user"], null);
-      }
-    };
-
-    // Check session immediately and then every 30 seconds
-    verifySession();
-    const interval = setInterval(verifySession, 30000);
-    return () => clearInterval(interval);
-  }, []);
 
   return {
     user: user ?? null,

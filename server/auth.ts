@@ -1,5 +1,3 @@
-import passport from "passport";
-import { Strategy as LocalStrategy } from "passport-local";
 import { Express } from "express";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
@@ -8,16 +6,10 @@ import { db } from "@db";
 import { eq } from "drizzle-orm";
 import { fromZodError } from "zod-validation-error";
 import { log } from "./vite";
+import jwt from 'jsonwebtoken';
 
 const scryptAsync = promisify(scrypt);
-
-declare module "express-session" {
-  interface SessionData {
-    passport: {
-      user?: number;
-    };
-  }
-}
+const JWT_SECRET = process.env.REPL_ID!;
 
 async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
@@ -36,99 +28,73 @@ async function getUserByUsername(username: string) {
   return db.select().from(users).where(eq(users.username, username)).limit(1);
 }
 
-export function setupAuth(app: Express) {
-  passport.use(
-    new LocalStrategy(async (username, password, done) => {
-      try {
-        log(`Attempting authentication for username: ${username}`);
-        const [user] = await getUserByUsername(username);
-
-        if (!user || !(await comparePasswords(password, user.password))) {
-          log(`Authentication failed for username: ${username}`);
-          return done(null, false, { message: "Invalid credentials" });
-        }
-
-        log(`Authentication successful for user: ${user.id}`);
-        return done(null, user);
-      } catch (error) {
-        log(`Authentication error: ${error}`);
-        return done(error);
-      }
-    })
+function generateToken(user: SelectUser) {
+  return jwt.sign(
+    { 
+      id: user.id, 
+      username: user.username,
+      userType: user.userType,
+      subscriptionActive: user.subscriptionActive,
+      subscriptionTier: user.subscriptionTier
+    },
+    JWT_SECRET,
+    { expiresIn: '24h' }
   );
+}
 
-  passport.serializeUser((user: SelectUser, done) => {
-    log(`Serializing user: ${user.id}`);
-    done(null, user.id);
-  });
+export function authenticateToken(req: any, res: any, next: any) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
 
-  passport.deserializeUser(async (id: number, done) => {
+  if (!token) {
+    log('No token provided');
+    return res.status(401).json({ message: 'Authentication required' });
+  }
+
+  jwt.verify(token, JWT_SECRET, async (err: any, decoded: any) => {
+    if (err) {
+      log('Token verification failed:', err);
+      return res.status(401).json({ message: 'Invalid or expired token' });
+    }
+
     try {
-      log(`Deserializing user: ${id}`);
-      const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
-
+      // Get fresh user data from database
+      const [user] = await db.select().from(users).where(eq(users.id, decoded.id));
       if (!user) {
-        log(`Deserialization failed - user not found: ${id}`);
-        return done(null, false);
+        log('User not found in database');
+        return res.status(401).json({ message: 'User not found' });
       }
 
-      log(`User deserialized successfully: ${user.id}`);
-      done(null, user);
+      req.user = user;
+      next();
     } catch (error) {
-      log(`Deserialization error: ${error}`);
-      done(error);
+      log('Database error during authentication:', error);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+}
+
+export function setupAuth(app: Express) {
+  app.post("/api/login", async (req, res) => {
+    try {
+      log(`Login attempt for username: ${req.body.username}`);
+      const [user] = await getUserByUsername(req.body.username);
+
+      if (!user || !(await comparePasswords(req.body.password, user.password))) {
+        log(`Invalid credentials for username: ${req.body.username}`);
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      const token = generateToken(user);
+      log(`Login successful for user: ${user.id}`);
+      res.json({ user, token });
+    } catch (error) {
+      log(`Login error: ${error}`);
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
-  app.post("/api/login", (req, res, next) => {
-    log(`Login attempt for username: ${req.body.username}`);
-    log(`Session before login: ${JSON.stringify(req.session)}`);
-    log(`Request cookies: ${JSON.stringify(req.headers.cookie)}`);
-
-    passport.authenticate("local", (err: any, user: SelectUser | false, info: any) => {
-      if (err) {
-        log(`Login error: ${err}`);
-        return next(err);
-      }
-
-      if (!user) {
-        log(`Login failed for username: ${req.body.username}`);
-        return res.status(401).json({ message: info?.message || "Invalid credentials" });
-      }
-
-      req.logIn(user, (err) => {
-        if (err) {
-          log(`Login error during req.logIn: ${err}`);
-          return next(err);
-        }
-
-        // Force session save and wait for completion
-        req.session.save((err) => {
-          if (err) {
-            log(`Session save error: ${err}`);
-            return next(err);
-          }
-
-          log(`Login successful for user: ${user.id}`);
-          log(`Session after login: ${JSON.stringify(req.session)}`);
-          log(`Response cookies to be set: ${JSON.stringify(res.getHeader('set-cookie'))}`);
-
-          // Set session cookie explicitly
-          res.cookie('sid', req.sessionID, {
-            httpOnly: true,
-            secure: false,
-            sameSite: 'lax',
-            path: '/',
-            maxAge: 24 * 60 * 60 * 1000 // 24 hours
-          });
-
-          res.json({ user });
-        });
-      });
-    })(req, res, next);
-  });
-
-  app.post("/api/register", async (req, res, next) => {
+  app.post("/api/register", async (req, res) => {
     try {
       const result = insertUserSchema.safeParse(req.body);
       if (!result.success) {
@@ -147,74 +113,20 @@ export function setupAuth(app: Express) {
         })
         .returning();
 
-      req.logIn(user, (err) => {
-        if (err) return next(err);
-
-        // Force session save after registration
-        req.session.save((err) => {
-          if (err) return next(err);
-
-          log(`Registration successful for user: ${user.id}`);
-          res.status(201).json({ user });
-        });
-      });
+      const token = generateToken(user);
+      log(`Registration successful for user: ${user.id}`);
+      res.status(201).json({ user, token });
     } catch (error) {
-      next(error);
+      log(`Registration error: ${error}`);
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
-  app.post("/api/logout", (req, res, next) => {
-    if (!req.isAuthenticated()) {
-      return res.sendStatus(200);
-    }
-
-    const userId = req.user?.id;
-    log(`Logout attempt for user: ${userId}`);
-
-    req.logout((err) => {
-      if (err) {
-        log(`Logout error: ${err}`);
-        return next(err);
-      }
-
-      req.session.destroy((err) => {
-        if (err) {
-          log(`Session destruction error: ${err}`);
-          return next(err);
-        }
-
-        log(`Logout successful for user: ${userId}`);
-        res.sendStatus(200);
-      });
-    });
+  app.get("/api/auth/verify", authenticateToken, (req, res) => {
+    res.json({ authenticated: true, user: req.user });
   });
 
-  app.get("/api/auth/verify", (req, res) => {
-    log(`Auth verification request - Session ID: ${req.sessionID}`);
-    log(`Session data: ${JSON.stringify(req.session)}`);
-    log(`Is Authenticated: ${req.isAuthenticated()}`);
-    log(`User: ${JSON.stringify(req.user)}`);
-
-    if (req.isAuthenticated() && req.user) {
-      log(`Auth verified for user: ${req.user.id}`);
-      res.json({ authenticated: true, user: req.user });
-    } else {
-      log(`Auth verification failed - Session: ${req.sessionID}`);
-      res.status(401).json({ authenticated: false });
-    }
-  });
-
-  app.get("/api/user", (req, res) => {
-    log(`User info request - Session ID: ${req.sessionID}`);
-    log(`Session data: ${JSON.stringify(req.session)}`);
-    log(`Is Authenticated: ${req.isAuthenticated()}`);
-
-    if (!req.isAuthenticated() || !req.user) {
-      log(`User info request failed - not authenticated`);
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-
-    log(`User info request successful - User: ${req.user.id}`);
+  app.get("/api/user", authenticateToken, (req, res) => {
     res.json(req.user);
   });
 }
