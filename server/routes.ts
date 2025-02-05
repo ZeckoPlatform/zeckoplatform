@@ -2,16 +2,10 @@ import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth, authenticateToken } from "./auth";
 import { db } from "@db";
-import { leads, products, leadResponses, subscriptions, users } from "@db/schema";
-import { eq, and } from "drizzle-orm";
+import { leads, users } from "@db/schema";
+import { eq } from "drizzle-orm";
 import { log } from "./vite";
-import { calculateMatchScore, sortBusinessesByMatch } from "./utils/matching";
-import type { InferSelectModel } from "drizzle-orm";
 
-type Lead = InferSelectModel<typeof leads>;
-type User = InferSelectModel<typeof users>;
-
-// Extend Express Request type to include our user property
 declare global {
   namespace Express {
     interface Request {
@@ -21,20 +15,87 @@ declare global {
 }
 
 export function registerRoutes(app: Express): Server {
-  // Setup auth first, before any route middleware
   setupAuth(app);
 
-  // Authentication middleware
   app.use('/api', (req, res, next) => {
-    // Skip auth check for public routes and OPTIONS
     if (req.path.endsWith('/login') || 
         req.path.endsWith('/register') || 
         req.path.endsWith('/auth/verify') || 
         req.method === 'OPTIONS') {
       return next();
     }
-
     authenticateToken(req, res, next);
+  });
+
+  // POST /api/leads - Create a new lead
+  app.post("/api/leads", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      log(`Creating lead for user ${req.user.id} (${req.user.userType})`);
+
+      if (req.user.userType !== "free") {
+        return res.status(403).json({ message: "Only free users can create leads" });
+      }
+
+      const newLead = {
+        user_id: req.user.id,
+        title: req.body.title,
+        description: req.body.description,
+        category: req.body.category,
+        budget: parseInt(req.body.budget),
+        location: req.body.location,
+        status: "open" as const,
+      };
+
+      log(`Attempting to create lead: ${JSON.stringify(newLead)}`);
+
+      const [lead] = await db.insert(leads)
+        .values(newLead)
+        .returning();
+
+      log(`Lead created successfully: ${JSON.stringify(lead)}`);
+      res.status(201).json(lead);
+    } catch (error) {
+      log(`Lead creation error: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('Full error:', error);
+      res.status(500).json({ 
+        message: "Failed to create lead",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // GET /api/leads - Get all leads
+  app.get("/api/leads", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      log(`Fetching leads for user ${req.user.id} (${req.user.userType})`);
+
+      let query = db.select().from(leads);
+
+      // If user is "free", only show their own leads
+      if (req.user.userType === "free") {
+        query = query.where(eq(leads.user_id, req.user.id));
+      }
+
+      const fetchedLeads = await query;
+      log(`Successfully fetched ${fetchedLeads.length} leads`);
+
+      res.json(fetchedLeads);
+    } catch (error) {
+      log(`Leads fetch error: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('Full error:', error);
+      res.status(500).json({ 
+        message: "Failed to fetch leads",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
   });
 
   app.get("/api/auth/verify", (req, res) => {
@@ -51,32 +112,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/leads", async (req, res) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ message: "Authentication required" });
-      }
 
-      log(`Creating lead - User: ${req.user.id}`);
-
-      // Validate user type
-      if (req.user.userType !== "free") {
-        return res.status(403).json({ message: "Only free users can create leads" });
-      }
-
-      const lead = await db.insert(leads).values({
-        ...req.body,
-        userId: req.user.id,
-      }).returning();
-
-      log(`Lead created successfully - ID: ${lead[0].id}`);
-      res.json(lead[0]);
-    } catch (error) {
-      log(`Lead creation error: ${error}`);
-      res.status(500).json({ message: "Failed to create lead" });
-    }
-  });
-  // Subscription Routes
   app.post("/api/subscriptions", async (req, res) => {
     if (!req.user || !["business", "vendor"].includes(req.user.userType)) {
       return res.status(403).json({ message: "Invalid user type for subscription" });
@@ -148,42 +184,6 @@ export function registerRoutes(app: Express): Server {
     res.json(subscription || null);
   });
 
-  app.get("/api/leads", async (req, res) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ message: "Authentication required" });
-      }
-
-      const allLeads = await db.query.leads.findMany({
-        with: {
-          user: true,
-          responses: {
-            with: {
-              business: true,
-            },
-          },
-        },
-      });
-
-      if (req.user.userType === "business") {
-        // For business users, sort leads by match score
-        const sortedLeads = allLeads.map(lead => ({
-          ...lead,
-          matchScore: calculateMatchScore(lead, req.user!),
-        }))
-          .sort((a, b) => (b.matchScore?.totalScore || 0) - (a.matchScore?.totalScore || 0));
-
-        return res.json(sortedLeads);
-      }
-
-      res.json(allLeads);
-    } catch (error) {
-      log(`Leads retrieval error: ${error}`);
-      res.status(500).json({ message: "Failed to retrieve leads" });
-    }
-  });
-
-  // Products Routes
   app.post("/api/products", async (req, res) => {
     try {
       if (!req.user || req.user.userType !== "vendor" || !req.user.subscriptionActive) {
@@ -216,7 +216,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Lead Responses Routes
   app.post("/api/leads/:leadId/responses", async (req, res) => {
     try {
       if (!req.user || req.user.userType !== "business" || !req.user.subscriptionActive) {
@@ -267,7 +266,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add route for businesses to update their matching preferences
   app.patch("/api/users/matching-preferences", async (req, res) => {
     if (!req.user || req.user.userType !== "business") {
       return res.status(403).json({ message: "Only business users can update matching preferences" });
