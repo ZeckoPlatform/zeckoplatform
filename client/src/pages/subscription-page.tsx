@@ -7,11 +7,28 @@ import { useToast } from "@/hooks/use-toast";
 import { CalendarDays, CreditCard, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 
+type SubscriptionResponse = {
+  status: {
+    isActive: boolean;
+    tier: string;
+    endsAt: string | null;
+  };
+  subscription: {
+    id: number;
+    tier: "business" | "vendor";
+    status: "active" | "cancelled" | "expired";
+    start_date: string;
+    end_date: string;
+    auto_renew: boolean;
+    price: number;
+  } | null;
+};
+
 export default function SubscriptionPage() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const { data: subscription } = useQuery<any>({
+  const { data: subscriptionData } = useQuery<SubscriptionResponse>({
     queryKey: ["/api/subscriptions/current"],
     enabled: user?.userType !== "free",
   });
@@ -69,11 +86,14 @@ export default function SubscriptionPage() {
     );
   }
 
+  const isSubscriptionActive = subscriptionData?.status.isActive;
+  const currentSubscription = subscriptionData?.subscription;
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-8">Subscription Management</h1>
 
-      {subscription ? (
+      {isSubscriptionActive && currentSubscription ? (
         <Card>
           <CardHeader>
             <CardTitle>Active Subscription</CardTitle>
@@ -82,9 +102,12 @@ export default function SubscriptionPage() {
             <div className="flex items-center gap-2">
               <CreditCard className="h-5 w-5 text-primary" />
               <div>
-                <p className="font-medium">{subscription.tier.charAt(0).toUpperCase() + subscription.tier.slice(1)} Plan</p>
+                <p className="font-medium">
+                  {currentSubscription.tier.charAt(0).toUpperCase() + 
+                   currentSubscription.tier.slice(1)} Plan
+                </p>
                 <p className="text-sm text-muted-foreground">
-                  ${(subscription.price / 100).toFixed(2)}/month
+                  ${(currentSubscription.price / 100).toFixed(2)}/month
                 </p>
               </div>
             </div>
@@ -94,13 +117,13 @@ export default function SubscriptionPage() {
               <div>
                 <p className="font-medium">Subscription Period</p>
                 <p className="text-sm text-muted-foreground">
-                  {format(new Date(subscription.startDate), "PPP")} -{" "}
-                  {format(new Date(subscription.endDate), "PPP")}
+                  {format(new Date(currentSubscription.start_date), "PPP")} -{" "}
+                  {format(new Date(currentSubscription.end_date), "PPP")}
                 </p>
               </div>
             </div>
 
-            {subscription.status === "active" && (
+            {currentSubscription.status === "active" && (
               <div className="pt-4">
                 <Button
                   variant="destructive"

@@ -253,6 +253,12 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
+      // First get the user's current subscription status
+      const [currentUser] = await db.select()
+        .from(users)
+        .where(eq(users.id, req.user.id));
+
+      // Then get the actual subscription record
       const [subscription] = await db.select()
         .from(subscriptions)
         .where(
@@ -264,7 +270,15 @@ export function registerRoutes(app: Express): Server {
         .orderBy({ columns: [{ column: subscriptions.start_date, order: 'desc' }] })
         .limit(1);
 
-      res.json(subscription || null);
+      // Return both user subscription status and subscription details
+      res.json({
+        status: {
+          isActive: currentUser.subscriptionActive,
+          tier: currentUser.subscriptionTier,
+          endsAt: currentUser.subscriptionEndsAt,
+        },
+        subscription: subscription || null
+      });
     } catch (error) {
       log(`Subscription fetch error: ${error instanceof Error ? error.message : String(error)}`);
       console.error('Full error:', error);
