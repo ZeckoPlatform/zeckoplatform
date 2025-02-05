@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Upload } from "lucide-react";
@@ -23,6 +23,29 @@ export function ProductForm() {
   const { user } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string>();
+
+  // Fetch current subscription status
+  const { data: subscription } = useQuery({
+    queryKey: ["/api/subscriptions/current"],
+    enabled: !!user && user.userType === "vendor",
+  });
+
+  // Check if the user can create products
+  const canCreateProducts = user?.userType === "vendor" && user?.subscriptionActive;
+
+  if (!canCreateProducts) {
+    return (
+      <div className="text-center p-6 bg-muted rounded-lg">
+        <h3 className="text-lg font-semibold mb-2">Subscription Required</h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          You need an active vendor subscription to create and manage products.
+        </p>
+        <Button asChild variant="outline">
+          <a href="/subscription">Upgrade to Vendor Plan</a>
+        </Button>
+      </div>
+    );
+  }
 
   const form = useForm<ProductFormData>({
     defaultValues: {
