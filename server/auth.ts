@@ -81,6 +81,54 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
 }
 
 export function setupAuth(app: Express) {
+  app.post("/api/register", async (req, res) => {
+    try {
+      log(`Registration attempt - Username: ${req.body.username}, Type: ${req.body.userType}`);
+      const result = insertUserSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ message: fromZodError(result.error).toString() });
+      }
+
+      const [existingUser] = await getUserByUsername(result.data.username);
+      if (existingUser) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+
+      // Validate userType
+      const validUserTypes = ["free", "business", "vendor"];
+      if (!validUserTypes.includes(result.data.userType)) {
+        return res.status(400).json({ message: "Invalid user type. Must be 'free', 'business', or 'vendor'" });
+      }
+
+      const [user] = await db.insert(users)
+        .values({
+          username: result.data.username,
+          password: await hashPassword(result.data.password),
+          userType: result.data.userType,
+          subscriptionActive: false,
+          subscriptionTier: "none",
+          profile: {
+            name: result.data.username,
+            description: "",
+            categories: [],
+            location: "",
+          },
+        })
+        .returning();
+
+      const token = generateToken(user);
+      log(`Registration successful for user: ${user.id} (${user.userType})`);
+      res.status(201).json({ user, token });
+    } catch (error) {
+      log(`Registration error: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('Full error:', error);
+      res.status(500).json({ 
+        message: "Registration failed",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
   app.post("/api/login", async (req, res) => {
     try {
       log(`Login attempt for username: ${req.body.username}`);
@@ -92,38 +140,10 @@ export function setupAuth(app: Express) {
       }
 
       const token = generateToken(user);
-      log(`Login successful for user: ${user.id}`);
+      log(`Login successful for user: ${user.id} (${user.userType})`);
       res.json({ user, token });
     } catch (error) {
       log(`Login error: ${error}`);
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
-  app.post("/api/register", async (req, res) => {
-    try {
-      const result = insertUserSchema.safeParse(req.body);
-      if (!result.success) {
-        return res.status(400).json({ message: fromZodError(result.error).toString() });
-      }
-
-      const [existingUser] = await getUserByUsername(result.data.username);
-      if (existingUser) {
-        return res.status(400).json({ message: "Username already exists" });
-      }
-
-      const [user] = await db.insert(users)
-        .values({
-          ...result.data,
-          password: await hashPassword(result.data.password),
-        })
-        .returning();
-
-      const token = generateToken(user);
-      log(`Registration successful for user: ${user.id}`);
-      res.status(201).json({ user, token });
-    } catch (error) {
-      log(`Registration error: ${error}`);
       res.status(500).json({ message: "Internal server error" });
     }
   });
