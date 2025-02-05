@@ -1,5 +1,6 @@
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -12,8 +13,9 @@ import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";  
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Settings } from "lucide-react";
+import { Loader2, Settings, Edit, Trash2 } from "lucide-react";
 import type { SelectLead, SelectUser } from "@db/schema";
+import { format } from "date-fns";
 
 interface LeadFormData {
   title: string;
@@ -33,6 +35,8 @@ interface ProfileFormData {
 export default function LeadsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [editingLead, setEditingLead] = useState<SelectLead | null>(null);
+
   const form = useForm<LeadFormData>({
     defaultValues: {
       title: "",
@@ -42,6 +46,28 @@ export default function LeadsPage() {
       location: "",
     },
   });
+
+  const editForm = useForm<LeadFormData>({
+    defaultValues: {
+      title: editingLead?.title || "",
+      description: editingLead?.description || "",
+      category: editingLead?.category || "",
+      budget: editingLead?.budget?.toString() || "",
+      location: editingLead?.location || "",
+    },
+  });
+
+  useEffect(() => {
+    if (editingLead) {
+      editForm.reset({
+        title: editingLead.title,
+        description: editingLead.description,
+        category: editingLead.category,
+        budget: editingLead.budget?.toString(),
+        location: editingLead.location || "",
+      });
+    }
+  }, [editingLead, editForm]);
 
   const profileForm = useForm<ProfileFormData>({
     defaultValues: {
@@ -115,6 +141,51 @@ export default function LeadsPage() {
       toast({
         title: "Error",
         description: error.message || "Failed to create lead. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateLeadMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: LeadFormData }) => {
+      const res = await apiRequest("PATCH", `/api/leads/${id}`, {
+        ...data,
+        budget: parseInt(data.budget),
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      toast({
+        title: "Success",
+        description: "Lead updated successfully.",
+      });
+      setEditingLead(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update lead",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteLeadMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/leads/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      toast({
+        title: "Success",
+        description: "Lead deleted successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete lead",
         variant: "destructive",
       });
     },
@@ -270,7 +341,102 @@ export default function LeadsPage() {
               {userLeads?.map((lead) => (
                 <Card key={lead.id}>
                   <CardHeader>
-                    <CardTitle>{lead.title}</CardTitle>
+                    <div className="flex justify-between items-start">
+                      <CardTitle>{lead.title}</CardTitle>
+                      {lead.user_id === user?.id && (
+                        <div className="flex gap-2">
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => setEditingLead(lead)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Edit Lead</DialogTitle>
+                              </DialogHeader>
+                              <form
+                                onSubmit={editForm.handleSubmit((data) =>
+                                  updateLeadMutation.mutate({ id: lead.id, data })
+                                )}
+                                className="space-y-4"
+                              >
+                                <div>
+                                  <Label htmlFor="edit-title">Title</Label>
+                                  <Input
+                                    id="edit-title"
+                                    {...editForm.register("title")}
+                                    required
+                                  />
+                                </div>
+                                <div>
+                                  <Label htmlFor="edit-description">Description</Label>
+                                  <Textarea
+                                    id="edit-description"
+                                    {...editForm.register("description")}
+                                    required
+                                  />
+                                </div>
+                                <div>
+                                  <Label htmlFor="edit-category">Category</Label>
+                                  <Input
+                                    id="edit-category"
+                                    {...editForm.register("category")}
+                                    required
+                                  />
+                                </div>
+                                <div>
+                                  <Label htmlFor="edit-budget">Budget ($)</Label>
+                                  <Input
+                                    id="edit-budget"
+                                    type="number"
+                                    {...editForm.register("budget")}
+                                    required
+                                  />
+                                </div>
+                                <div>
+                                  <Label htmlFor="edit-location">Location</Label>
+                                  <Input
+                                    id="edit-location"
+                                    {...editForm.register("location")}
+                                    required
+                                  />
+                                </div>
+                                <Button
+                                  type="submit"
+                                  className="w-full"
+                                  disabled={updateLeadMutation.isPending}
+                                >
+                                  {updateLeadMutation.isPending ? (
+                                    <>
+                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                      Saving...
+                                    </>
+                                  ) : (
+                                    'Save Changes'
+                                  )}
+                                </Button>
+                              </form>
+                            </DialogContent>
+                          </Dialog>
+                          <Button
+                            variant="destructive"
+                            size="icon"
+                            onClick={() => {
+                              if (confirm('Are you sure you want to delete this lead?')) {
+                                deleteLeadMutation.mutate(lead.id);
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <p className="text-muted-foreground mb-4">{lead.description}</p>
@@ -286,6 +452,11 @@ export default function LeadsPage() {
                       </div>
                     </div>
                   </CardContent>
+                  <CardFooter>
+                    <p className="text-sm text-muted-foreground">
+                      Posted {lead.created_at ? format(new Date(lead.created_at), 'PPp') : 'Recently'}
+                    </p>
+                  </CardFooter>
                 </Card>
               ))}
               {(!userLeads || userLeads.length === 0) && (

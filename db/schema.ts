@@ -45,6 +45,7 @@ export const leads = pgTable("leads", {
   location: text("location"),
   status: text("status", { enum: ["open", "closed", "in_progress"] }).default("open"),
   created_at: timestamp("created_at").defaultNow(),
+  expires_at: timestamp("expires_at"), // Add this field for 30-day expiration
 });
 
 export const leadResponses = pgTable("lead_responses", {

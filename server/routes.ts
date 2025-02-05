@@ -2,8 +2,8 @@ import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth, authenticateToken } from "./auth";
 import { db } from "@db";
-import { leads, users } from "@db/schema";
-import { eq } from "drizzle-orm";
+import { leads, users, subscriptions, products, leadResponses } from "@db/schema";
+import { eq, and, or, gt } from "drizzle-orm";
 import { log } from "./vite";
 
 declare global {
@@ -27,6 +27,76 @@ export function registerRoutes(app: Express): Server {
     authenticateToken(req, res, next);
   });
 
+  // DELETE /api/leads/:id - Delete a lead
+  app.delete("/api/leads/:id", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const leadId = parseInt(req.params.id);
+      const [lead] = await db.select().from(leads).where(eq(leads.id, leadId));
+
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      if (lead.user_id !== req.user.id) {
+        return res.status(403).json({ message: "You can only delete your own leads" });
+      }
+
+      await db.delete(leads).where(eq(leads.id, leadId));
+      res.json({ message: "Lead deleted successfully" });
+    } catch (error) {
+      log(`Lead deletion error: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('Full error:', error);
+      res.status(500).json({ 
+        message: "Failed to delete lead",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // PATCH /api/leads/:id - Update a lead
+  app.patch("/api/leads/:id", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const leadId = parseInt(req.params.id);
+      const [lead] = await db.select().from(leads).where(eq(leads.id, leadId));
+
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      if (lead.user_id !== req.user.id) {
+        return res.status(403).json({ message: "You can only update your own leads" });
+      }
+
+      const [updatedLead] = await db.update(leads)
+        .set({
+          title: req.body.title,
+          description: req.body.description,
+          category: req.body.category,
+          budget: req.body.budget,
+          location: req.body.location,
+        })
+        .where(eq(leads.id, leadId))
+        .returning();
+
+      res.json(updatedLead);
+    } catch (error) {
+      log(`Lead update error: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('Full error:', error);
+      res.status(500).json({ 
+        message: "Failed to update lead",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
   // POST /api/leads - Create a new lead
   app.post("/api/leads", async (req, res) => {
     try {
@@ -40,6 +110,10 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).json({ message: "Only free users can create leads" });
       }
 
+      // Add expiration date (30 days from now)
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30);
+
       const newLead = {
         user_id: req.user.id,
         title: req.body.title,
@@ -48,6 +122,7 @@ export function registerRoutes(app: Express): Server {
         budget: parseInt(req.body.budget),
         location: req.body.location,
         status: "open" as const,
+        expires_at: expiresAt,
       };
 
       log(`Attempting to create lead: ${JSON.stringify(newLead)}`);
@@ -68,7 +143,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // GET /api/leads - Get all leads
+  // GET /api/leads - Get all leads (with expiration filter)
   app.get("/api/leads", async (req, res) => {
     try {
       if (!req.user) {
@@ -77,7 +152,17 @@ export function registerRoutes(app: Express): Server {
 
       log(`Fetching leads for user ${req.user.id} (${req.user.userType})`);
 
-      let query = db.select().from(leads);
+      let query = db.select()
+        .from(leads)
+        .where(
+          and(
+            // Only show non-expired leads
+            or(
+              eq(leads.status, "closed"),
+              gt(leads.expires_at, new Date())
+            )
+          )
+        );
 
       // If user is "free", only show their own leads
       if (req.user.userType === "free") {
