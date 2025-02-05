@@ -38,27 +38,39 @@ export function ProductForm() {
     try {
       setUploading(true);
       const reader = new FileReader();
+
       reader.onloadend = async () => {
         const base64String = reader.result as string;
+        const base64Data = base64String.split(',')[1]; // Remove data URL prefix
 
-        const response = await apiRequest("POST", "/api/upload", {
-          file: base64String.split(',')[1], // Remove data URL prefix
-          fileName: file.name,
-        });
+        try {
+          const response = await apiRequest("POST", "/api/upload", {
+            file: base64Data,
+            fileName: file.name,
+          });
 
-        const data = await response.json();
-        form.setValue("imageUrl", data.url);
-        setPreviewUrl(URL.createObjectURL(file));
-        toast({
-          title: "Success",
-          description: "Image uploaded successfully",
-        });
+          const data = await response.json();
+          form.setValue("imageUrl", data.url);
+          setPreviewUrl(URL.createObjectURL(file));
+
+          toast({
+            title: "Success",
+            description: "Image uploaded successfully",
+          });
+        } catch (error) {
+          toast({
+            title: "Error",
+            description: "Failed to upload image. Please try again.",
+            variant: "destructive",
+          });
+        }
       };
+
       reader.readAsDataURL(file);
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to upload image",
+        description: "Failed to process image. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -68,18 +80,23 @@ export function ProductForm() {
 
   const createProductMutation = useMutation({
     mutationFn: async (data: ProductFormData) => {
-      // Parse price, replacing comma with dot and trimming whitespace
-      const cleanPrice = data.price.trim().replace(/[^\d,.-]/g, '').replace(',', '.');
+      // Clean and validate price
+      const cleanPrice = data.price
+        .replace(/[^\d,.-]/g, '') // Remove any non-numeric characters except . , -
+        .replace(',', '.') // Replace comma with dot
+        .trim();
+
       const price = parseFloat(cleanPrice);
 
       if (isNaN(price)) {
-        throw new Error("Invalid price format");
+        throw new Error("Invalid price format. Please enter a valid number.");
       }
 
       const res = await apiRequest("POST", "/api/products", {
         ...data,
-        price: price.toString(),
+        price: price.toFixed(2), // Ensure 2 decimal places
       });
+
       return res.json();
     },
     onSuccess: () => {
@@ -100,7 +117,7 @@ export function ProductForm() {
   });
 
   return (
-    <form onSubmit={form.handleSubmit((data) => createProductMutation.mutate(data))} className="space-y-4">
+    <form onSubmit={form.handleSubmit((data) => createProductMutation.mutate(data))} className="space-y-6">
       <div>
         <Label htmlFor="title">Title</Label>
         <Input id="title" {...form.register("title")} required />
@@ -128,12 +145,17 @@ export function ProductForm() {
         <Input id="category" {...form.register("category")} required />
       </div>
 
-      <div>
-        <Label htmlFor="image">Product Image</Label>
-        <div className="mt-1 flex flex-col gap-4">
+      <div className="space-y-4">
+        <Label>Product Image</Label>
+        <div className="flex flex-col gap-4">
           <label
-            htmlFor="image"
-            className="flex flex-col items-center justify-center w-full h-32 px-4 transition bg-white border-2 border-gray-300 border-dashed rounded-md appearance-none cursor-pointer hover:border-primary focus:outline-none"
+            htmlFor="image-upload"
+            className={`
+              flex flex-col items-center justify-center w-full h-32
+              border-2 border-dashed rounded-lg cursor-pointer
+              transition-colors duration-200
+              ${uploading ? 'border-primary' : 'border-gray-300 hover:border-primary'}
+            `}
           >
             <div className="flex flex-col items-center justify-center pt-5 pb-6">
               {uploading ? (
@@ -149,19 +171,21 @@ export function ProductForm() {
               )}
             </div>
             <input
-              id="image"
+              id="image-upload"
               type="file"
               accept="image/*"
               onChange={handleFileUpload}
               className="hidden"
+              disabled={uploading}
             />
           </label>
+
           {previewUrl && (
             <div className="relative w-full h-48">
               <img
                 src={previewUrl}
-                alt="Preview"
-                className="w-full h-full object-contain rounded-md border border-border"
+                alt="Product preview"
+                className="w-full h-full object-contain rounded-lg border"
               />
             </div>
           )}
@@ -176,7 +200,7 @@ export function ProductForm() {
         {createProductMutation.isPending ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Creating...
+            Creating Product...
           </>
         ) : (
           'Create Product'

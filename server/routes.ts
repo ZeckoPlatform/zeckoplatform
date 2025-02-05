@@ -6,6 +6,8 @@ import { leads, users, subscriptions, products, leadResponses } from "@db/schema
 import { eq, and, or, gt, not } from "drizzle-orm";
 import { log } from "./vite";
 import { comparePasswords, hashPassword } from './auth'; // Assuming these functions exist
+import fs from 'fs';
+import express from 'express';
 
 declare global {
   namespace Express {
@@ -502,27 +504,32 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add file upload endpoint
+  // Update the file upload endpoint
   app.post("/api/upload", async (req, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      // TODO: Implement file upload handling
-      // For now, we'll assume the file is being sent as a base64 string
       const { file, fileName } = req.body;
       if (!file || !fileName) {
         return res.status(400).json({ message: "File and filename are required" });
+      }
+
+      // Create uploads directory if it doesn't exist
+      if (!fs.existsSync('uploads')) {
+        fs.mkdirSync('uploads', { recursive: true });
       }
 
       // Generate a unique filename
       const uniqueFileName = `${Date.now()}-${fileName}`;
       const filePath = `uploads/${uniqueFileName}`;
 
-      // Save the file (implementation depends on your storage solution)
-      // For now, we'll just return a mock URL
-      const fileUrl = `/api/uploads/${uniqueFileName}`;
+      // Decode and save the base64 file
+      fs.writeFileSync(filePath, Buffer.from(file, 'base64'));
+
+      // Return the URL that can be used to access the file
+      const fileUrl = `/uploads/${uniqueFileName}`;
 
       res.json({ url: fileUrl });
     } catch (error) {
@@ -530,6 +537,9 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ message: "Failed to upload file" });
     }
   });
+
+  // Add static file serving for uploads
+  app.use('/uploads', express.static('uploads'));
 
   const httpServer = createServer(app);
   return httpServer;
