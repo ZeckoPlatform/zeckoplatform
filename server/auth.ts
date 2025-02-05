@@ -1,4 +1,4 @@
-import { Express } from "express";
+import { Express, Request, Response, NextFunction } from "express";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { users, insertUserSchema, type SelectUser } from "@db/schema";
@@ -42,36 +42,41 @@ function generateToken(user: SelectUser) {
   );
 }
 
-export function authenticateToken(req: any, res: any, next: any) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+export function authenticateToken(req: Request, res: Response, next: NextFunction) {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
 
-  if (!token) {
-    log('No token provided');
-    return res.status(401).json({ message: 'Authentication required' });
-  }
-
-  jwt.verify(token, JWT_SECRET, async (err: any, decoded: any) => {
-    if (err) {
-      log('Token verification failed:', err);
-      return res.status(401).json({ message: 'Invalid or expired token' });
+    if (!token) {
+      log('No token provided');
+      return res.status(401).json({ message: 'Authentication required' });
     }
 
-    try {
-      // Get fresh user data from database
-      const [user] = await db.select().from(users).where(eq(users.id, decoded.id));
-      if (!user) {
-        log('User not found in database');
-        return res.status(401).json({ message: 'User not found' });
+    jwt.verify(token, JWT_SECRET, async (err: any, decoded: any) => {
+      if (err) {
+        log('Token verification failed:', err);
+        return res.status(401).json({ message: 'Invalid or expired token' });
       }
 
-      req.user = user;
-      next();
-    } catch (error) {
-      log('Database error during authentication:', error);
-      return res.status(500).json({ message: 'Internal server error' });
-    }
-  });
+      try {
+        // Get fresh user data from database
+        const [user] = await db.select().from(users).where(eq(users.id, decoded.id));
+        if (!user) {
+          log('User not found in database');
+          return res.status(401).json({ message: 'User not found' });
+        }
+
+        req.user = user;
+        next();
+      } catch (error) {
+        log('Database error during authentication:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+      }
+    });
+  } catch (error) {
+    log('Authentication middleware error:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
 }
 
 export function setupAuth(app: Express) {

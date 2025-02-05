@@ -8,6 +8,7 @@ export const getQueryFn: <T>(options: {
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(queryKey[0] as string, {
+        credentials: 'omit', // Don't send credentials since we're using token auth
         headers: {
           "Accept": "application/json",
           "Content-Type": "application/json",
@@ -75,6 +76,7 @@ export async function apiRequest(
 
     const fetchOptions: RequestInit = {
       method,
+      credentials: 'omit', // Don't send credentials since we're using token auth
       headers: {
         ...(data ? { "Content-Type": "application/json" } : {}),
         "Accept": "application/json",
@@ -84,7 +86,6 @@ export async function apiRequest(
     };
 
     const res = await fetch(url, fetchOptions);
-
     console.log(`Response status: ${res.status}`);
 
     if (!res.ok) {

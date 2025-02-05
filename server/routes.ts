@@ -1,22 +1,22 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
-import { setupAuth } from "./auth";
+import { setupAuth, authenticateToken } from "./auth";
 import { db } from "@db";
 import { leads, products, leadResponses, subscriptions, users } from "@db/schema";
 import { eq, and } from "drizzle-orm";
 import { log } from "./vite";
 import { calculateMatchScore, sortBusinessesByMatch } from "./utils/matching";
 import type { InferSelectModel } from "drizzle-orm";
-import type { SessionData } from "express-session";
 
 type Lead = InferSelectModel<typeof leads>;
 type User = InferSelectModel<typeof users>;
 
-declare module "express-session" {
-  interface SessionData {
-    passport?: {
-      user?: number;
-    };
+// Extend Express Request type to include our user property
+declare global {
+  namespace Express {
+    interface Request {
+      user?: User;
+    }
   }
 }
 
@@ -24,7 +24,7 @@ export function registerRoutes(app: Express): Server {
   // Setup auth first, before any route middleware
   setupAuth(app);
 
-  // Authentication middleware with detailed logging
+  // Authentication middleware
   app.use('/api', (req, res, next) => {
     // Skip auth check for public routes and OPTIONS
     if (req.path.endsWith('/login') || 
@@ -34,25 +34,7 @@ export function registerRoutes(app: Express): Server {
       return next();
     }
 
-    log(`Session verification - Path: ${req.method} ${req.path}`);
-    log(`Session ID: ${req.sessionID}`);
-    log(`Session Data: ${JSON.stringify(req.session)}`);
-    log(`Is Authenticated: ${req.isAuthenticated()}`);
-    log(`User: ${JSON.stringify(req.user)}`);
-
-    // Ensure user is authenticated
-    if (!req.isAuthenticated()) {
-      log(`Not authenticated - Path: ${req.path}, Session ID: ${req.sessionID}`);
-      return res.status(401).json({ message: 'Authentication required' });
-    }
-
-    // Ensure user data is present
-    if (!req.user) {
-      log(`No user in request - Path: ${req.path}`);
-      return res.status(401).json({ message: 'No user found' });
-    }
-
-    next();
+    authenticateToken(req, res, next);
   });
 
   app.get("/api/auth/verify", (req, res) => {
@@ -71,14 +53,11 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/leads", async (req, res) => {
     try {
-      // Additional auth check specific to leads
-      if (!req.isAuthenticated() || !req.user) {
-        log(`Lead creation - Auth failed. User: ${JSON.stringify(req.user)}`);
+      if (!req.user) {
         return res.status(401).json({ message: "Authentication required" });
       }
 
-      log(`Creating lead - User: ${req.user.id}, Session: ${req.sessionID}`);
-      log(`Request body: ${JSON.stringify(req.body)}`);
+      log(`Creating lead - User: ${req.user.id}`);
 
       // Validate user type
       if (req.user.userType !== "free") {
@@ -170,8 +149,11 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.get("/api/leads", async (req, res) => {
-    if(!req.user) return res.sendStatus(401);
     try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
       const allLeads = await db.query.leads.findMany({
         with: {
           user: true,
@@ -187,7 +169,7 @@ export function registerRoutes(app: Express): Server {
         // For business users, sort leads by match score
         const sortedLeads = allLeads.map(lead => ({
           ...lead,
-          matchScore: calculateMatchScore(lead, req.user),
+          matchScore: calculateMatchScore(lead, req.user!),
         }))
           .sort((a, b) => (b.matchScore?.totalScore || 0) - (a.matchScore?.totalScore || 0));
 
@@ -203,53 +185,86 @@ export function registerRoutes(app: Express): Server {
 
   // Products Routes
   app.post("/api/products", async (req, res) => {
-    if (!req.user || req.user.userType !== "vendor" || !req.user.subscriptionActive) {
-      return res.sendStatus(401);
+    try {
+      if (!req.user || req.user.userType !== "vendor" || !req.user.subscriptionActive) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const product = await db.insert(products).values({
+        ...req.body,
+        vendorId: req.user.id,
+      }).returning();
+
+      res.json(product[0]);
+    } catch (error) {
+      log(`Product creation error: ${error}`);
+      res.status(500).json({ message: "Failed to create product" });
     }
-    const product = await db.insert(products).values({
-      ...req.body,
-      vendorId: req.user.id,
-    }).returning();
-    res.json(product[0]);
   });
 
   app.get("/api/products", async (req, res) => {
-    const allProducts = await db.query.products.findMany({
-      with: {
-        vendor: true,
-      },
-    });
-    res.json(allProducts);
+    try {
+      const allProducts = await db.query.products.findMany({
+        with: {
+          vendor: true,
+        },
+      });
+      res.json(allProducts);
+    } catch (error) {
+      log(`Products retrieval error: ${error}`);
+      res.status(500).json({ message: "Failed to retrieve products" });
+    }
   });
 
   // Lead Responses Routes
   app.post("/api/leads/:leadId/responses", async (req, res) => {
+    try {
       if (!req.user || req.user.userType !== "business" || !req.user.subscriptionActive) {
-          return res.sendStatus(401);
+        return res.status(401).json({ message: "Unauthorized" });
       }
-    const response = await db.insert(leadResponses).values({
-      ...req.body,
-      leadId: parseInt(req.params.leadId),
-      businessId: req.user.id,
-    }).returning();
-    res.json(response[0]);
+
+      const response = await db.insert(leadResponses).values({
+        ...req.body,
+        leadId: parseInt(req.params.leadId),
+        businessId: req.user.id,
+      }).returning();
+
+      res.json(response[0]);
+    } catch (error) {
+      log(`Lead response creation error: ${error}`);
+      res.status(500).json({ message: "Failed to create lead response" });
+    }
   });
 
   app.patch("/api/leads/:leadId/responses/:responseId", async (req, res) => {
-      if(!req.user) return res.sendStatus(401);
-    const [lead] = await db.select().from(leads).where(eq(leads.id, parseInt(req.params.leadId)));
-    if (!lead || lead.userId !== req.user.id) return res.sendStatus(403);
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
 
-    const [response] = await db.update(leadResponses)
-      .set({ status: req.body.status })
-      .where(
-        and(
-          eq(leadResponses.id, parseInt(req.params.responseId)),
-          eq(leadResponses.leadId, parseInt(req.params.leadId))
+      const [lead] = await db.select()
+        .from(leads)
+        .where(eq(leads.id, parseInt(req.params.leadId)));
+
+      if (!lead || lead.userId !== req.user.id) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const [response] = await db.update(leadResponses)
+        .set({ status: req.body.status })
+        .where(
+          and(
+            eq(leadResponses.id, parseInt(req.params.responseId)),
+            eq(leadResponses.leadId, parseInt(req.params.leadId))
+          )
         )
-      )
-      .returning();
-    res.json(response);
+        .returning();
+
+      res.json(response);
+    } catch (error) {
+      log(`Lead response update error: ${error}`);
+      res.status(500).json({ message: "Failed to update lead response" });
+    }
   });
 
   // Add route for businesses to update their matching preferences
