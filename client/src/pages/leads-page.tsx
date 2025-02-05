@@ -83,10 +83,10 @@ export default function LeadsPage() {
       const res = await apiRequest("PATCH", "/api/user/profile", {
         profile: {
           ...user?.profile,
-          name: data.name,
-          description: data.description,
-          categories: data.categories?.split(",").map(c => c.trim()),
-          location: data.location,
+          name: data.name?.trim(),
+          description: data.description?.trim(),
+          categories: data.categories?.split(",").map(c => c.trim()).filter(Boolean),
+          location: data.location?.trim(),
         },
       });
       return res.json();
