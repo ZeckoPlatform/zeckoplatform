@@ -89,12 +89,23 @@ export default function LeadsPage() {
           location: data.location?.trim(),
         },
       });
-      return res.json();
+      const updatedUser = await res.json();
+      return updatedUser;
     },
     onSuccess: (updatedUser: SelectUser) => {
-      // Update both the user and leads queries
+      // Update user data in cache
       queryClient.setQueryData(["/api/user"], updatedUser);
+      // Force a refetch to ensure we have the latest data
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+
+      // Reset form with new values
+      profileForm.reset({
+        name: updatedUser.profile?.name || "",
+        description: updatedUser.profile?.description || "",
+        categories: updatedUser.profile?.categories?.join(", ") || "",
+        location: updatedUser.profile?.location || "",
+      });
+
       toast({
         title: "Profile Updated",
         description: "Your profile has been updated successfully.",
@@ -260,7 +271,12 @@ export default function LeadsPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <div>
+            <h1 className="text-3xl font-bold">Dashboard</h1>
+            {user?.profile?.name && (
+              <p className="text-muted-foreground">Welcome, {user.profile.name}</p>
+            )}
+          </div>
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" className="flex items-center gap-2">

@@ -381,6 +381,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       log(`Updating profile for user ${req.user.id}`);
+      log(`Profile update data: ${JSON.stringify(req.body.profile)}`);
 
       const [updatedUser] = await db.update(users)
         .set({
@@ -390,6 +391,8 @@ export function registerRoutes(app: Express): Server {
         .returning();
 
       log(`Profile updated successfully for user ${req.user.id}`);
+      log(`Updated user data: ${JSON.stringify(updatedUser)}`);
+
       res.json(updatedUser);
     } catch (error) {
       log(`Profile update error: ${error instanceof Error ? error.message : String(error)}`);
