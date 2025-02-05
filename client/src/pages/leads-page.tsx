@@ -13,11 +13,20 @@ import { queryClient } from "@/lib/queryClient";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Settings } from "lucide-react";
+import type { SelectLead } from "@db/schema";
+
+interface LeadFormData {
+  title: string;
+  description: string;
+  category: string;
+  budget: string;
+  location: string;
+}
 
 export default function LeadsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const form = useForm({
+  const form = useForm<LeadFormData>({
     defaultValues: {
       title: "",
       description: "",
@@ -27,26 +36,13 @@ export default function LeadsPage() {
     },
   });
 
-  const { data: leads, isLoading: isLoadingLeads, error: leadsError } = useQuery<any[]>({
+  const { data: leads = [], isLoading: isLoadingLeads } = useQuery<SelectLead[]>({
     queryKey: ["/api/leads"],
     enabled: !!user,
-    retry: (failureCount, error: any) => {
-      if (error?.name === "AuthenticationError") return false;
-      return failureCount < 3;
-    },
-    onError: (error: any) => {
-      if (error?.name !== "AuthenticationError") {
-        toast({
-          title: "Error loading leads",
-          description: error.message || "Failed to load leads",
-          variant: "destructive",
-        });
-      }
-    }
   });
 
   const createLeadMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: LeadFormData) => {
       if (!user) {
         throw new Error("You must be logged in to create a lead");
       }
@@ -55,19 +51,12 @@ export default function LeadsPage() {
         throw new Error("Only free users can create leads");
       }
 
-      try {
-        const res = await apiRequest("POST", "/api/leads", {
-          ...data,
-          budget: parseInt(data.budget),
-        });
+      const res = await apiRequest("POST", "/api/leads", {
+        ...data,
+        budget: parseInt(data.budget),
+      });
 
-        return res.json();
-      } catch (error: any) {
-        if (error.name === "AuthenticationError") {
-          throw new Error("Please log in again to create a lead");
-        }
-        throw error;
-      }
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
@@ -78,7 +67,6 @@ export default function LeadsPage() {
       form.reset();
     },
     onError: (error: Error) => {
-      console.error("Lead mutation error:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to create lead. Please try again.",
@@ -95,11 +83,9 @@ export default function LeadsPage() {
     );
   }
 
-  const userLeads = leads?.filter(lead =>
-    user?.userType === "free"
-      ? lead.userId === user.id
-      : true
-  );
+  const userLeads = user?.userType === "free"
+    ? leads.filter(lead => lead.user_id === user.id)
+    : leads;
 
   const CreateLeadForm = () => (
     <form
@@ -178,7 +164,7 @@ export default function LeadsPage() {
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold">
-                {userLeads?.filter(lead => !lead.isCompleted)?.length || 0}
+                {userLeads?.filter(lead => lead.status === "open")?.length || 0}
               </p>
             </CardContent>
           </Card>
@@ -187,9 +173,7 @@ export default function LeadsPage() {
               <CardTitle className="text-lg">Total Responses</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">
-                {userLeads?.reduce((acc, lead) => acc + (lead.responses?.length || 0), 0) || 0}
-              </p>
+              <p className="text-3xl font-bold">0</p>
             </CardContent>
           </Card>
         </div>
@@ -219,20 +203,6 @@ export default function LeadsPage() {
                         <span className="font-medium">Location:</span> {lead.location}
                       </div>
                     </div>
-                    {lead.responses?.length > 0 && (
-                      <div className="mt-4">
-                        <h4 className="font-medium mb-2">Responses ({lead.responses.length})</h4>
-                        {lead.responses.map((response: any) => (
-                          <Card key={response.id} className="mb-2">
-                            <CardContent className="py-4">
-                              <p className="font-medium">From: {response.business.username}</p>
-                              <p className="text-muted-foreground">{response.proposal}</p>
-                              <p className="font-medium mt-2">Offered Price: ${response.price}</p>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
               ))}
