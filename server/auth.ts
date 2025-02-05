@@ -9,13 +9,15 @@ import { eq } from "drizzle-orm";
 import { fromZodError } from "zod-validation-error";
 import { log } from "./vite";
 
-declare global {
-  namespace Express {
-    interface User extends SelectUser {}
+const scryptAsync = promisify(scrypt);
+
+declare module "express-session" {
+  interface SessionData {
+    passport: {
+      user?: number;
+    };
   }
 }
-
-const scryptAsync = promisify(scrypt);
 
 async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
@@ -43,7 +45,7 @@ export function setupAuth(app: Express) {
 
         if (!user || !(await comparePasswords(password, user.password))) {
           log(`Authentication failed for username: ${username}`);
-          return done(null, false);
+          return done(null, false, { message: "Invalid credentials" });
         }
 
         log(`Authentication successful for user: ${user.id}`);
@@ -55,7 +57,7 @@ export function setupAuth(app: Express) {
     })
   );
 
-  passport.serializeUser((user, done) => {
+  passport.serializeUser((user: SelectUser, done) => {
     log(`Serializing user: ${user.id}`);
     done(null, user.id);
   });
@@ -64,10 +66,13 @@ export function setupAuth(app: Express) {
     try {
       log(`Deserializing user: ${id}`);
       const [user] = await db.select().from(users).where(eq(users.id, id));
+
       if (!user) {
         log(`Deserialization failed - user not found: ${id}`);
         return done(null, false);
       }
+
+      log(`User deserialized successfully: ${user.id}`);
       done(null, user);
     } catch (error) {
       log(`Deserialization error: ${error}`);
@@ -79,14 +84,14 @@ export function setupAuth(app: Express) {
     log(`Login attempt for username: ${req.body.username}`);
     log(`Session before login: ${JSON.stringify(req.session)}`);
 
-    passport.authenticate("local", (err, user: SelectUser | false, info) => {
+    passport.authenticate("local", (err: any, user: SelectUser | false) => {
       if (err) {
         log(`Login error: ${err}`);
         return next(err);
       }
 
       if (!user) {
-        log(`Login failed: ${info?.message || "Invalid credentials"}`);
+        log(`Login failed for username: ${req.body.username}`);
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
@@ -96,23 +101,27 @@ export function setupAuth(app: Express) {
           return next(err);
         }
 
-        log(`Login successful for user: ${user.id}`);
-        log(`Session after login: ${JSON.stringify(req.session)}`);
-        res.json({ user });
+        // Force session save
+        req.session.save((err) => {
+          if (err) {
+            log(`Session save error: ${err}`);
+            return next(err);
+          }
+
+          log(`Login successful for user: ${user.id}`);
+          log(`Session after login: ${JSON.stringify(req.session)}`);
+
+          // Send session cookie in response
+          res.cookie('session', req.sessionID, {
+            httpOnly: true,
+            secure: false,
+            sameSite: 'none'
+          });
+
+          res.json({ user });
+        });
       });
     })(req, res, next);
-  });
-
-  app.get("/api/user", (req, res) => {
-    log(`User request - Session ID: ${req.sessionID}`);
-    log(`Session data: ${JSON.stringify(req.session)}`);
-
-    if (!req.isAuthenticated() || !req.user) {
-      log(`User request failed - not authenticated`);
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-
-    res.json(req.user);
   });
 
   app.post("/api/register", async (req, res, next) => {
@@ -137,7 +146,14 @@ export function setupAuth(app: Express) {
 
       req.logIn(user, (err) => {
         if (err) return next(err);
-        res.status(201).json({ user });
+
+        // Force session save after registration
+        req.session.save((err) => {
+          if (err) return next(err);
+
+          log(`Registration successful for user: ${user.id}`);
+          res.status(201).json({ user });
+        });
       });
     } catch (error) {
       next(error);
@@ -164,6 +180,7 @@ export function setupAuth(app: Express) {
           return next(err);
         }
 
+        res.clearCookie('session');
         log(`Logout successful for user: ${userId}`);
         res.sendStatus(200);
       });
@@ -181,5 +198,12 @@ export function setupAuth(app: Express) {
       log(`Auth verification failed - Session: ${req.sessionID}`);
       res.status(401).json({ authenticated: false });
     }
+  });
+
+  app.get("/api/user", (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    res.json(req.user);
   });
 }

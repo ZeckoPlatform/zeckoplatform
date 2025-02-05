@@ -1,0 +1,120 @@
+It looks like your login flow is failing authentication, causing the system to instantly log out users. The key issue is that all authentication-related API requests (/api/user, /api/leads, /api/login) are returning 401 Unauthorized, which typically means:
+
+Invalid Credentials – The username or password is incorrect.
+Session Issues – The authentication token is not being stored or sent correctly.
+Backend Authentication Handling – The passport authentication setup may not be correctly verifying users.
+🔍 Debugging Steps
+1️⃣ Check if the Login API Works
+
+Run the following test in Postman or cURL to manually check if login works:
+
+curl -X POST https://yourbackend.com/api/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "your_username", "password": "your_password"}' \
+  -c cookies.txt
+If the response status is 401, then your authentication logic might be rejecting valid credentials.
+
+✅ If it works manually but not in your frontend, then it’s a session handling issue.
+
+❌ If it fails manually too, then the issue is in the backend authentication (e.g., incorrect password verification, wrong user lookup).
+
+2️⃣ Check If Cookies or Tokens Are Stored
+
+Your frontend uses:
+
+fetch("/api/login", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify(credentials),
+  credentials: "include",  // Important for cookies
+});
+Check the browser developer console (F12 > Application > Cookies) to see if a session token or authentication cookie is being set.
+If no token/cookie appears, ensure your backend sends the correct Set-Cookie header.
+3️⃣ Ensure the Backend Sends a Valid Session Cookie
+
+In passport setup, make sure your authentication strategy sends a session:
+
+app.use(require("cookie-parser")());
+app.use(
+  require("express-session")({
+    secret: "your-secret-key",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",  // Important for production
+      sameSite: "lax",
+    },
+  })
+);
+app.use(passport.initialize());
+app.use(passport.session());
+If secure: true is set in cookie, it only works over HTTPS.
+Try removing secure: true temporarily if testing on localhost.
+4️⃣ Check Password Hashing & Verification
+
+Your comparePasswords function uses:
+
+async function comparePasswords(supplied: string, stored: string) {
+  const [hashed, salt] = stored.split(".");
+  const hashedBuf = Buffer.from(hashed, "hex");
+  const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+  return timingSafeEqual(hashedBuf, suppliedBuf);
+}
+🔹 If password verification fails, try logging:
+
+console.log("Stored Password:", stored);
+console.log("Supplied Password:", supplied);
+console.log("Password Match:", await comparePasswords(supplied, stored));
+🔹 Ensure that passwords are being hashed the same way during registration and login.
+
+5️⃣ Fix User Session Handling in Frontend
+
+Your useAuthState hook tries to fetch the user with:
+
+const {
+  data: user,
+  error,
+} = useQuery<SelectUser | null>({
+  queryKey: ["/api/user"],
+  retry: false,
+  refetchOnWindowFocus: true,
+});
+Since /api/user returns 401, it likely means:
+
+The session is not persisting, or
+The user object is empty.
+🔹 Try forcing a re-fetch after login:
+
+const loginMutation = useMutation({
+  mutationFn: async (credentials: LoginData) => {
+    const res = await fetch("/api/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(credentials),
+      credentials: "include",
+    });
+
+    if (!res.ok) {
+      throw new Error("Login failed");
+    }
+
+    await queryClient.invalidateQueries(["/api/user"]);  // Force re-fetch
+  },
+});
+Final Fixes to Try
+✅ 1. Test login manually in Postman – Check if it returns 401.
+
+✅ 2. Debug if cookies/tokens are set – Inspect browser storage (F12 > Application > Cookies).
+
+✅ 3. Ensure express-session is set up correctly – Remove secure: true for local testing.
+
+✅ 4. Re-fetch /api/user after login – Use queryClient.invalidateQueries(["/api/user"]).
+
+✅ 5. Debug password hashing issues – Check if comparePasswords fails.
+
+Try these and let me know the results! 🚀

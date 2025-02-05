@@ -27,33 +27,39 @@ store.on('error', function(error) {
 });
 
 // Session middleware
-app.use(session({
-  secret: process.env.REPL_ID!,
+const sessionMiddleware = session({
   store,
-  name: 'sid',
-  resave: false,
-  saveUninitialized: false,
+  secret: process.env.REPL_ID!,
+  name: 'session',
+  resave: true,
+  saveUninitialized: true,
+  proxy: true,
   cookie: {
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     httpOnly: true,
     secure: false,
-    sameSite: 'lax',
+    sameSite: 'none',
   }
-}));
+});
+
+app.use(sessionMiddleware);
 
 // Initialize passport after session
 app.use(passport.initialize());
 app.use(passport.session());
 
-// CORS configuration after session/passport
+// CORS middleware - after session
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  if (!origin) {
+    return next();
   }
+
+  res.header('Access-Control-Allow-Origin', origin);
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization, Cookie, X-Requested-With');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Expose-Headers', 'Set-Cookie');
 
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);

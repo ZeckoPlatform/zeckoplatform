@@ -1,9 +1,6 @@
 import { ReactNode, createContext, useContext, useEffect } from "react";
-import {
-  useQuery,
-  useMutation,
-} from "@tanstack/react-query";
-import { queryClient, apiRequest } from "../lib/queryClient";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import type { SelectUser, InsertUser } from "@db/schema";
@@ -31,25 +28,9 @@ function useAuthState() {
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
-      const res = await fetch("/api/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(credentials),
-        credentials: "include",
-      });
-
-      console.log("Login response status:", res.status);
-      console.log("Login response headers:", res.headers);
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text);
-      }
-
-      const { user } = await res.json();
-      return user;
+      const res = await apiRequest("POST", "/api/login", credentials);
+      const data = await res.json();
+      return data.user;
     },
     onSuccess: async (user: SelectUser) => {
       // Force immediate refetch and update cache
@@ -83,31 +64,11 @@ function useAuthState() {
     },
   });
 
-  const logoutMutation = useMutation({
-    mutationFn: async () => {
-      await apiRequest("POST", "/api/logout");
-    },
-    onSuccess: () => {
-      queryClient.setQueryData(["/api/user"], null);
-      setLocation("/");
-      toast({
-        title: "Logged out",
-        description: "You have been logged out successfully.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Logout failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
   const registerMutation = useMutation({
     mutationFn: async (newUser: InsertUser) => {
       const res = await apiRequest("POST", "/api/register", newUser);
-      return res.json();
+      const data = await res.json();
+      return data.user;
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
@@ -131,7 +92,28 @@ function useAuthState() {
     },
   });
 
-  // Verify session immediately and periodically
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/logout");
+      queryClient.setQueryData(["/api/user"], null);
+    },
+    onSuccess: () => {
+      setLocation("/");
+      toast({
+        title: "Logged out",
+        description: "You have been logged out successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Logout failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Verify session periodically
   useEffect(() => {
     const verifySession = async () => {
       try {
@@ -139,32 +121,29 @@ function useAuthState() {
           credentials: "include",
           headers: {
             "Accept": "application/json",
+            "Content-Type": "application/json",
           },
         });
 
-        console.log("Session verification response:", res.status);
-        console.log("Session verification headers:", res.headers);
-
         if (!res.ok) {
-          if (res.status === 401) {
-            console.log("Session verification failed, clearing user state");
-            queryClient.setQueryData(["/api/user"], null);
-          }
+          console.log("Session verification failed, clearing user state");
+          queryClient.setQueryData(["/api/user"], null);
           return;
         }
 
         const data = await res.json();
         if (data.authenticated && data.user) {
-          console.log("Session verified, updating user state");
           queryClient.setQueryData(["/api/user"], data.user);
         }
       } catch (error) {
         console.error("Session verification error:", error);
+        queryClient.setQueryData(["/api/user"], null);
       }
     };
 
+    // Check session immediately and then every 30 seconds
     verifySession();
-    const interval = setInterval(verifySession, 5000); // Check more frequently
+    const interval = setInterval(verifySession, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -180,12 +159,7 @@ function useAuthState() {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const auth = useAuthState();
-
-  return (
-    <AuthContext.Provider value={auth}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={auth}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

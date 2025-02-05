@@ -6,11 +6,11 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     try {
-      console.log(`Query request - ${queryKey[0]}`);
       const res = await fetch(queryKey[0] as string, {
         credentials: "include",
         headers: {
           "Accept": "application/json",
+          "Content-Type": "application/json",
         },
       });
 
@@ -39,8 +39,7 @@ export const getQueryFn: <T>(options: {
         throw new Error(errorMessage);
       }
 
-      const data = await res.json();
-      return data;
+      return res.json();
     } catch (error) {
       console.error("Query error:", error);
       throw error;
@@ -82,6 +81,7 @@ export async function apiRequest(
 
     console.log(`Response status: ${res.status}`);
     console.log(`Response headers:`, res.headers);
+    console.log(`Response cookies:`, document.cookie);
 
     if (!res.ok) {
       const text = await res.text();
