@@ -65,7 +65,7 @@ export function setupAuth(app: Express) {
   passport.deserializeUser(async (id: number, done) => {
     try {
       log(`Deserializing user: ${id}`);
-      const [user] = await db.select().from(users).where(eq(users.id, id));
+      const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
 
       if (!user) {
         log(`Deserialization failed - user not found: ${id}`);
@@ -83,8 +83,9 @@ export function setupAuth(app: Express) {
   app.post("/api/login", (req, res, next) => {
     log(`Login attempt for username: ${req.body.username}`);
     log(`Session before login: ${JSON.stringify(req.session)}`);
+    log(`Request cookies: ${JSON.stringify(req.headers.cookie)}`);
 
-    passport.authenticate("local", (err: any, user: SelectUser | false) => {
+    passport.authenticate("local", (err: any, user: SelectUser | false, info: any) => {
       if (err) {
         log(`Login error: ${err}`);
         return next(err);
@@ -92,7 +93,7 @@ export function setupAuth(app: Express) {
 
       if (!user) {
         log(`Login failed for username: ${req.body.username}`);
-        return res.status(401).json({ message: "Invalid credentials" });
+        return res.status(401).json({ message: info?.message || "Invalid credentials" });
       }
 
       req.logIn(user, (err) => {
@@ -101,7 +102,7 @@ export function setupAuth(app: Express) {
           return next(err);
         }
 
-        // Force session save
+        // Force session save and wait for completion
         req.session.save((err) => {
           if (err) {
             log(`Session save error: ${err}`);
@@ -110,12 +111,15 @@ export function setupAuth(app: Express) {
 
           log(`Login successful for user: ${user.id}`);
           log(`Session after login: ${JSON.stringify(req.session)}`);
+          log(`Response cookies to be set: ${JSON.stringify(res.getHeader('set-cookie'))}`);
 
-          // Send session cookie in response
-          res.cookie('session', req.sessionID, {
+          // Set session cookie explicitly
+          res.cookie('sid', req.sessionID, {
             httpOnly: true,
             secure: false,
-            sameSite: 'none'
+            sameSite: 'lax',
+            path: '/',
+            maxAge: 24 * 60 * 60 * 1000 // 24 hours
           });
 
           res.json({ user });
@@ -138,9 +142,8 @@ export function setupAuth(app: Express) {
 
       const [user] = await db.insert(users)
         .values({
-          username: result.data.username,
+          ...result.data,
           password: await hashPassword(result.data.password),
-          userType: result.data.userType,
         })
         .returning();
 
@@ -180,7 +183,6 @@ export function setupAuth(app: Express) {
           return next(err);
         }
 
-        res.clearCookie('session');
         log(`Logout successful for user: ${userId}`);
         res.sendStatus(200);
       });
@@ -190,6 +192,8 @@ export function setupAuth(app: Express) {
   app.get("/api/auth/verify", (req, res) => {
     log(`Auth verification request - Session ID: ${req.sessionID}`);
     log(`Session data: ${JSON.stringify(req.session)}`);
+    log(`Is Authenticated: ${req.isAuthenticated()}`);
+    log(`User: ${JSON.stringify(req.user)}`);
 
     if (req.isAuthenticated() && req.user) {
       log(`Auth verified for user: ${req.user.id}`);
@@ -201,9 +205,16 @@ export function setupAuth(app: Express) {
   });
 
   app.get("/api/user", (req, res) => {
+    log(`User info request - Session ID: ${req.sessionID}`);
+    log(`Session data: ${JSON.stringify(req.session)}`);
+    log(`Is Authenticated: ${req.isAuthenticated()}`);
+
     if (!req.isAuthenticated() || !req.user) {
+      log(`User info request failed - not authenticated`);
       return res.status(401).json({ message: "Not authenticated" });
     }
+
+    log(`User info request successful - User: ${req.user.id}`);
     res.json(req.user);
   });
 }

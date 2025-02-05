@@ -26,20 +26,35 @@ store.on('error', function(error) {
   log(`Session store error: ${error}`);
 });
 
-// Session middleware
+// Session middleware with detailed logging
 const sessionMiddleware = session({
   store,
   secret: process.env.REPL_ID!,
-  name: 'session',
-  resave: true,
-  saveUninitialized: true,
+  name: 'sid',
+  resave: false,
+  saveUninitialized: false,
   cookie: {
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     httpOnly: true,
-    secure: false, // Set to false for development
+    secure: isProd, // Only use secure in production
     sameSite: 'lax',
-    path: '/',
+    path: '/'
   }
+});
+
+// Debug response headers
+app.use((req, res, next) => {
+  const oldEnd = res.end;
+  // @ts-ignore
+  res.end = function () {
+    if (req.path.startsWith('/api')) {
+      log(`Response Headers for ${req.path}: ${JSON.stringify(res.getHeaders())}`);
+      log(`Cookies Set: ${res.getHeader('set-cookie')}`);
+    }
+    // @ts-ignore
+    return oldEnd.apply(this, arguments);
+  };
+  next();
 });
 
 app.use(sessionMiddleware);
@@ -55,6 +70,7 @@ app.use((req, res, next) => {
     return next();
   }
 
+  // Allow the specific origin instead of wildcard
   res.header('Access-Control-Allow-Origin', origin);
   res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Cookie, Set-Cookie');
@@ -76,7 +92,7 @@ app.use((req, res, next) => {
     log(`Cookie Header: ${req.headers.cookie}`);
     log(`Session Data: ${JSON.stringify(req.session)}`);
     log(`Is Authenticated: ${req.isAuthenticated()}`);
-    log(`Passport Session: ${JSON.stringify(req.session?.passport)}`);
+    log(`User: ${JSON.stringify(req.user)}`);
     log('=== End Debug Info ===');
   }
   next();
@@ -100,8 +116,8 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
       serveStatic(app);
     }
 
-    const PORT = 5000;
-    server.listen(PORT, "0.0.0.0", () => {
+    const PORT = process.env.PORT || 5000;
+    server.listen(PORT, () => {
       log(`Server running on port ${PORT}`);
     });
   } catch (error) {

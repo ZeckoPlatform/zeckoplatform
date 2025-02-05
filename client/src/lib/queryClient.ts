@@ -16,6 +16,7 @@ export const getQueryFn: <T>(options: {
 
       console.log(`Query response status: ${res.status}`);
       console.log(`Query response headers:`, res.headers);
+      console.log(`Request cookies:`, document.cookie);
 
       if (res.status === 401) {
         console.log("Authentication failed, clearing user state");

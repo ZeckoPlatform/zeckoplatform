@@ -1,0 +1,101 @@
+nicolaepetre@Nicolaes-MacBook-Air zeckov2 % heroku logs --tail --app zeckov2
+2025-02-05T18:20:08.273692+00:00 app[web.1]: }
+2025-02-05T18:20:08.273780+00:00 app[web.1]: userController.register type: function
+2025-02-05T18:20:08.273925+00:00 app[web.1]: userController.login type: function
+2025-02-05T18:20:08.274073+00:00 app[web.1]: RateLimitService methods: [
+2025-02-05T18:20:08.274073+00:00 app[web.1]: 'apiLimiter',
+2025-02-05T18:20:08.274073+00:00 app[web.1]: 'authLimiter',
+2025-02-05T18:20:08.274074+00:00 app[web.1]: 'passwordResetLimiter',
+2025-02-05T18:20:08.274074+00:00 app[web.1]: 'registrationLimiter'
+2025-02-05T18:20:08.274074+00:00 app[web.1]: ]
+2025-02-05T18:20:08.274162+00:00 app[web.1]: authenticateToken type: function
+2025-02-05T18:20:08.274190+00:00 app[web.1]: Auth middleware: { protect: 'function', exists: true }
+2025-02-05T18:20:08.274974+00:00 app[web.1]: Setting up routes with controller methods: [
+2025-02-05T18:20:08.274975+00:00 app[web.1]: 'register',
+2025-02-05T18:20:08.274975+00:00 app[web.1]: 'login',
+2025-02-05T18:20:08.274975+00:00 app[web.1]: 'refreshToken',
+2025-02-05T18:20:08.274975+00:00 app[web.1]: 'logout',
+2025-02-05T18:20:08.274975+00:00 app[web.1]: 'getProfile',
+2025-02-05T18:20:08.274976+00:00 app[web.1]: 'updateProfile',
+2025-02-05T18:20:08.274976+00:00 app[web.1]: 'changePassword',
+2025-02-05T18:20:08.274976+00:00 app[web.1]: 'forgotPassword',
+2025-02-05T18:20:08.274976+00:00 app[web.1]: 'resetPassword',
+2025-02-05T18:20:08.274977+00:00 app[web.1]: 'verifyToken',
+2025-02-05T18:20:08.274977+00:00 app[web.1]: 'getSecuritySettings',
+2025-02-05T18:20:08.274977+00:00 app[web.1]: 'updateSecuritySettings',
+2025-02-05T18:20:08.274978+00:00 app[web.1]: 'setup2FA',
+2025-02-05T18:20:08.274978+00:00 app[web.1]: 'verify2FA'
+2025-02-05T18:20:08.274978+00:00 app[web.1]: ]
+2025-02-05T18:20:08.276022+00:00 app[web.1]: Route configured: /register [post]
+2025-02-05T18:20:08.276056+00:00 app[web.1]: Route configured: /login [post]
+2025-02-05T18:20:08.276115+00:00 app[web.1]: Route configured: /logout [post]
+2025-02-05T18:20:08.276197+00:00 app[web.1]: Route configured: /refresh-token [post]
+2025-02-05T18:20:08.276285+00:00 app[web.1]: Route configured: /change-password [post]
+2025-02-05T18:20:08.276285+00:00 app[web.1]: Route configured: /forgot-password [post]
+2025-02-05T18:20:08.276285+00:00 app[web.1]: Route configured: /reset-password/:token [post]
+2025-02-05T18:20:08.276285+00:00 app[web.1]: Route configured: /profile [get]
+2025-02-05T18:20:08.276286+00:00 app[web.1]: Route configured: /verify [get]
+2025-02-05T18:20:08.276369+00:00 app[web.1]: Route configured: /profile [put]
+2025-02-05T18:20:08.276462+00:00 app[web.1]: Rate limiters configured: {
+2025-02-05T18:20:08.276462+00:00 app[web.1]: registration: true,
+2025-02-05T18:20:08.276462+00:00 app[web.1]: auth: true,
+2025-02-05T18:20:08.276462+00:00 app[web.1]: refreshToken: false,
+2025-02-05T18:20:08.276462+00:00 app[web.1]: passwordReset: true
+2025-02-05T18:20:08.276463+00:00 app[web.1]: }
+2025-02-05T18:20:08.276712+00:00 app[web.1]: RateLimitService status: {
+2025-02-05T18:20:08.276712+00:00 app[web.1]: exists: true,
+2025-02-05T18:20:08.276713+00:00 app[web.1]: registrationLimiter: 'function',
+2025-02-05T18:20:08.276713+00:00 app[web.1]: authLimiter: 'function',
+2025-02-05T18:20:08.276713+00:00 app[web.1]: passwordResetLimiter: 'function'
+2025-02-05T18:20:08.276713+00:00 app[web.1]: }
+2025-02-05T18:20:08.276714+00:00 app[web.1]: userController logout method: { exists: true, type: 'function' }
+2025-02-05T18:20:08.276714+00:00 app[web.1]: Auth middleware check: { authenticateToken: 'function', userControllerLogout: 'function' }
+2025-02-05T18:20:08.286962+00:00 app[web.1]: Setting up lead routes
+2025-02-05T18:20:08.286963+00:00 app[web.1]: authenticateToken exists: true
+2025-02-05T18:20:08.286964+00:00 app[web.1]: createLead exists: true
+2025-02-05T18:20:08.397300+00:00 app[web.1]: Product controller methods: [
+2025-02-05T18:20:08.397301+00:00 app[web.1]: 'getProducts',
+2025-02-05T18:20:08.397302+00:00 app[web.1]: 'getProduct',
+2025-02-05T18:20:08.397302+00:00 app[web.1]: 'getSellerProducts',
+2025-02-05T18:20:08.397302+00:00 app[web.1]: 'createProduct',
+2025-02-05T18:20:08.397302+00:00 app[web.1]: 'updateProduct',
+2025-02-05T18:20:08.397303+00:00 app[web.1]: 'deleteProduct',
+2025-02-05T18:20:08.397303+00:00 app[web.1]: 'updateStock',
+2025-02-05T18:20:08.397303+00:00 app[web.1]: 'constructor'
+2025-02-05T18:20:08.397304+00:00 app[web.1]: ]
+2025-02-05T18:20:08.397304+00:00 app[web.1]: Product controller: {
+2025-02-05T18:20:08.397304+00:00 app[web.1]: type: 'object',
+2025-02-05T18:20:08.397304+00:00 app[web.1]: methods: [
+2025-02-05T18:20:08.397305+00:00 app[web.1]: 'getProducts',
+2025-02-05T18:20:08.397305+00:00 app[web.1]: 'getProduct',
+2025-02-05T18:20:08.397305+00:00 app[web.1]: 'getSellerProducts',
+2025-02-05T18:20:08.397305+00:00 app[web.1]: 'createProduct',
+2025-02-05T18:20:08.397305+00:00 app[web.1]: 'updateProduct',
+2025-02-05T18:20:08.397305+00:00 app[web.1]: 'deleteProduct',
+2025-02-05T18:20:08.397305+00:00 app[web.1]: 'updateStock',
+2025-02-05T18:20:08.397306+00:00 app[web.1]: 'constructor'
+2025-02-05T18:20:08.397306+00:00 app[web.1]: ],
+2025-02-05T18:20:08.397306+00:00 app[web.1]: createProduct: 'function'
+2025-02-05T18:20:08.397306+00:00 app[web.1]: }
+2025-02-05T18:20:08.504052+00:00 app[web.1]: /app/node_modules/express/lib/router/route.js:216
+2025-02-05T18:20:08.504066+00:00 app[web.1]: throw new Error(msg);
+2025-02-05T18:20:08.504067+00:00 app[web.1]: ^
+2025-02-05T18:20:08.504067+00:00 app[web.1]: 
+2025-02-05T18:20:08.504068+00:00 app[web.1]: Error: Route.get() requires a callback function but got a [object Undefined]
+2025-02-05T18:20:08.504069+00:00 app[web.1]: at Route.<computed> [as get] (/app/node_modules/express/lib/router/route.js:216:15)
+2025-02-05T18:20:08.504070+00:00 app[web.1]: at proto.<computed> [as get] (/app/node_modules/express/lib/router/index.js:521:19)
+2025-02-05T18:20:08.504070+00:00 app[web.1]: at Object.<anonymous> (/app/server/routes/dashboardRoutes.js:13:8)
+2025-02-05T18:20:08.504070+00:00 app[web.1]: at Module._compile (node:internal/modules/cjs/loader:1364:14)
+2025-02-05T18:20:08.504070+00:00 app[web.1]: at Module._extensions..js (node:internal/modules/cjs/loader:1422:10)
+2025-02-05T18:20:08.504071+00:00 app[web.1]: at Module.load (node:internal/modules/cjs/loader:1203:32)
+2025-02-05T18:20:08.504071+00:00 app[web.1]: at Module._load (node:internal/modules/cjs/loader:1019:12)
+2025-02-05T18:20:08.504071+00:00 app[web.1]: at Module.require (node:internal/modules/cjs/loader:1231:19)
+2025-02-05T18:20:08.504071+00:00 app[web.1]: at require (node:internal/modules/helpers:177:18)
+2025-02-05T18:20:08.504072+00:00 app[web.1]: at Object.<anonymous> (/app/server/server.js:47:25)
+2025-02-05T18:20:08.504072+00:00 app[web.1]: 
+2025-02-05T18:20:08.504073+00:00 app[web.1]: Node.js v18.20.5
+2025-02-05T18:20:08.573066+00:00 heroku[web.1]: Process exited with status 1
+2025-02-05T18:20:08.600372+00:00 heroku[web.1]: State changed from starting to crashed
+2025-02-05T18:21:27.209086+00:00 heroku[router]: at=error code=H10 desc="App crashed" method=GET path="/" host=zeckov2-deceb43992ac.herokuapp.com request_id=9b6134fe-ac7f-46ae-9a9d-7c3046d68592 fwd="82.132.237.222" dyno= connect= service= status=503 bytes= protocol=https
+2025-02-05T18:21:28.841340+00:00 heroku[router]: at=error code=H10 desc="App crashed" method=GET path="/" host=zeckov2-deceb43992ac.herokuapp.com request_id=f1f41a9d-2e50-437f-9a49-2ec1a17da84b fwd="82.132.237.222" dyno= connect= service= status=503 bytes= protocol=https
+2025-02-05T18:21:30.004208+00:00 heroku[router]: at=error code=H10 desc="App crashed" method=GET path="/" host=zeckov2-deceb43992ac.herokuapp.com request_id=68b08cf3-bf30-4c0e-b24f-384be9db510a fwd="82.132.237.222" dyno= connect= service= status=503 bytes= protocol=https
