@@ -284,25 +284,26 @@ export function registerRoutes(app: Express): Server {
     res.json(subscription || null);
   });
 
+  // Update the product creation endpoint to handle decimal prices correctly
   app.post("/api/products", async (req, res) => {
     try {
       if (!req.user || req.user.userType !== "vendor" || !req.user.subscriptionActive) {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      // Convert price from decimal to cents
+      // Convert price from decimal string to cents
       const priceInCents = Math.round(parseFloat(req.body.price) * 100);
       if (isNaN(priceInCents)) {
         return res.status(400).json({ message: "Invalid price format" });
       }
 
       const product = await db.insert(products).values({
+        vendorId: req.user.id,
         title: req.body.title,
         description: req.body.description,
         price: priceInCents,
         category: req.body.category,
         imageUrl: req.body.imageUrl,
-        vendorId: req.user.id,
       }).returning();
 
       // Convert price back to decimal for response

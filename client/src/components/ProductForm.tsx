@@ -40,8 +40,7 @@ export function ProductForm() {
       const reader = new FileReader();
 
       reader.onloadend = async () => {
-        const base64String = reader.result as string;
-        const base64Data = base64String.split(',')[1]; // Remove data URL prefix
+        const base64Data = (reader.result as string).split(',')[1]; // Remove data URL prefix
 
         try {
           const response = await apiRequest("POST", "/api/upload", {
@@ -82,8 +81,8 @@ export function ProductForm() {
     mutationFn: async (data: ProductFormData) => {
       // Clean and validate price
       const cleanPrice = data.price
-        .replace(/[^\d,.-]/g, '') // Remove any non-numeric characters except . , -
-        .replace(',', '.') // Replace comma with dot
+        .replace(/[^\d.,]/g, '') // Remove any non-numeric characters except . ,
+        .replace(',', '.') // Replace comma with dot for decimal
         .trim();
 
       const price = parseFloat(cleanPrice);
@@ -136,6 +135,7 @@ export function ProductForm() {
           inputMode="decimal"
           placeholder="0.00"
           {...form.register("price")}
+          pattern="^\d*\.?\d*$"
           required
         />
       </div>
