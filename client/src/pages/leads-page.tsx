@@ -13,7 +13,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Settings, Edit, Trash2 } from "lucide-react";
+import { Loader2, Settings, Edit, Trash2, Send } from "lucide-react";
 import type { SelectLead, SelectUser } from "@db/schema";
 import { format } from "date-fns";
 
@@ -284,9 +284,204 @@ export default function LeadsPage() {
     );
   }
 
-  const userLeads = user?.userType === "free"
-    ? leads.filter(lead => lead.user_id === user.id)
-    : leads;
+  const userLeads = user?.userType === "business"
+    ? leads // For business users, show all leads (will be filtered by relevance on the server)
+    : leads.filter(lead => lead.user_id === user?.id); // For free users, show only their own leads
+
+  const BusinessLeadsView = () => (
+    <div className="grid gap-6">
+      {leads.map((lead) => (
+        <Card key={lead.id}>
+          <CardHeader>
+            <div className="flex justify-between items-start">
+              <CardTitle>{lead.title}</CardTitle>
+              <Button variant="outline" size="sm">
+                <Send className="h-4 w-4 mr-2" />
+                Send Proposal
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground mb-4">{lead.description}</p>
+            <div className="grid grid-cols-3 gap-4 text-sm">
+              <div>
+                <span className="font-medium">Category:</span> {lead.category}
+              </div>
+              <div>
+                <span className="font-medium">Budget:</span> ${lead.budget}
+              </div>
+              <div>
+                <span className="font-medium">Location:</span> {lead.location}
+              </div>
+            </div>
+          </CardContent>
+          <CardFooter className="flex justify-between items-center">
+            <p className="text-sm text-muted-foreground">
+              Posted {lead.created_at ? format(new Date(lead.created_at), 'PPp') : 'Recently'}
+            </p>
+            <div className="flex items-center gap-2">
+              <Progress value={75} className="w-[100px]" />
+              <span className="text-sm text-muted-foreground">75% Match</span>
+            </div>
+          </CardFooter>
+        </Card>
+      ))}
+      {(!leads || leads.length === 0) && (
+        <p className="text-muted-foreground text-center py-8">
+          No matching leads found. Update your business profile to see more relevant leads.
+        </p>
+      )}
+    </div>
+  );
+
+  const FreeUserLeadsView = () => (
+    <Tabs defaultValue="my-leads">
+      <TabsList>
+        <TabsTrigger value="my-leads">My Posted Leads</TabsTrigger>
+        <TabsTrigger value="post">Post New Lead</TabsTrigger>
+      </TabsList>
+      <TabsContent value="my-leads" className="mt-4">
+        <div className="grid gap-6">
+          {userLeads?.map((lead) => (
+            <Card key={lead.id}>
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <CardTitle>{lead.title}</CardTitle>
+                  {lead.user_id === user?.id && (
+                    <div className="flex gap-2">
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => setEditingLead(lead)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Edit Lead</DialogTitle>
+                          </DialogHeader>
+                          <form
+                            onSubmit={editForm.handleSubmit((data) =>
+                              updateLeadMutation.mutate({ id: lead.id, data })
+                            )}
+                            className="space-y-4"
+                          >
+                            <div>
+                              <Label htmlFor="edit-title">Title</Label>
+                              <Input
+                                id="edit-title"
+                                {...editForm.register("title")}
+                                required
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="edit-description">Description</Label>
+                              <Textarea
+                                id="edit-description"
+                                {...editForm.register("description")}
+                                required
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="edit-category">Category</Label>
+                              <Input
+                                id="edit-category"
+                                {...editForm.register("category")}
+                                required
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="edit-budget">Budget ($)</Label>
+                              <Input
+                                id="edit-budget"
+                                type="number"
+                                {...editForm.register("budget")}
+                                required
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="edit-location">Location</Label>
+                              <Input
+                                id="edit-location"
+                                {...editForm.register("location")}
+                                required
+                              />
+                            </div>
+                            <Button
+                              type="submit"
+                              className="w-full"
+                              disabled={updateLeadMutation.isPending}
+                            >
+                              {updateLeadMutation.isPending ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Saving...
+                                </>
+                              ) : (
+                                'Save Changes'
+                              )}
+                            </Button>
+                          </form>
+                        </DialogContent>
+                      </Dialog>
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        onClick={() => {
+                          if (confirm('Are you sure you want to delete this lead?')) {
+                            deleteLeadMutation.mutate(lead.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground mb-4">{lead.description}</p>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium">Category:</span> {lead.category}
+                  </div>
+                  <div>
+                    <span className="font-medium">Budget:</span> ${lead.budget}
+                  </div>
+                  <div>
+                    <span className="font-medium">Location:</span> {lead.location}
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter>
+                <p className="text-sm text-muted-foreground">
+                  Posted {lead.created_at ? format(new Date(lead.created_at), 'PPp') : 'Recently'}
+                </p>
+              </CardFooter>
+            </Card>
+          ))}
+          {(!userLeads || userLeads.length === 0) && (
+            <p className="text-muted-foreground text-center py-8">
+              You haven't posted any leads yet. Create your first lead to get started!
+            </p>
+          )}
+        </div>
+      </TabsContent>
+      <TabsContent value="post" className="mt-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Post a New Lead</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CreateLeadForm />
+          </CardContent>
+        </Card>
+      </TabsContent>
+    </Tabs>
+  );
 
   const CreateLeadForm = () => (
     <form
@@ -466,7 +661,9 @@ export default function LeadsPage() {
         <div className="grid md:grid-cols-3 gap-6 mb-8">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Total Leads</CardTitle>
+              <CardTitle className="text-lg">
+                {user?.userType === "business" ? "Available Leads" : "Total Leads"}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold">{userLeads?.length || 0}</p>
@@ -474,7 +671,9 @@ export default function LeadsPage() {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Active Leads</CardTitle>
+              <CardTitle className="text-lg">
+                {user?.userType === "business" ? "Matching Leads" : "Active Leads"}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold">
@@ -484,7 +683,9 @@ export default function LeadsPage() {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Total Responses</CardTitle>
+              <CardTitle className="text-lg">
+                {user?.userType === "business" ? "Proposals Sent" : "Total Responses"}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold">0</p>
@@ -492,152 +693,7 @@ export default function LeadsPage() {
           </Card>
         </div>
 
-        <Tabs defaultValue="my-leads">
-          <TabsList>
-            <TabsTrigger value="my-leads">My Posted Leads</TabsTrigger>
-            <TabsTrigger value="post">Post New Lead</TabsTrigger>
-          </TabsList>
-          <TabsContent value="my-leads" className="mt-4">
-            <div className="grid gap-6">
-              {userLeads?.map((lead) => (
-                <Card key={lead.id}>
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <CardTitle>{lead.title}</CardTitle>
-                      {lead.user_id === user?.id && (
-                        <div className="flex gap-2">
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                onClick={() => setEditingLead(lead)}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>Edit Lead</DialogTitle>
-                              </DialogHeader>
-                              <form
-                                onSubmit={editForm.handleSubmit((data) =>
-                                  updateLeadMutation.mutate({ id: lead.id, data })
-                                )}
-                                className="space-y-4"
-                              >
-                                <div>
-                                  <Label htmlFor="edit-title">Title</Label>
-                                  <Input
-                                    id="edit-title"
-                                    {...editForm.register("title")}
-                                    required
-                                  />
-                                </div>
-                                <div>
-                                  <Label htmlFor="edit-description">Description</Label>
-                                  <Textarea
-                                    id="edit-description"
-                                    {...editForm.register("description")}
-                                    required
-                                  />
-                                </div>
-                                <div>
-                                  <Label htmlFor="edit-category">Category</Label>
-                                  <Input
-                                    id="edit-category"
-                                    {...editForm.register("category")}
-                                    required
-                                  />
-                                </div>
-                                <div>
-                                  <Label htmlFor="edit-budget">Budget ($)</Label>
-                                  <Input
-                                    id="edit-budget"
-                                    type="number"
-                                    {...editForm.register("budget")}
-                                    required
-                                  />
-                                </div>
-                                <div>
-                                  <Label htmlFor="edit-location">Location</Label>
-                                  <Input
-                                    id="edit-location"
-                                    {...editForm.register("location")}
-                                    required
-                                  />
-                                </div>
-                                <Button
-                                  type="submit"
-                                  className="w-full"
-                                  disabled={updateLeadMutation.isPending}
-                                >
-                                  {updateLeadMutation.isPending ? (
-                                    <>
-                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                      Saving...
-                                    </>
-                                  ) : (
-                                    'Save Changes'
-                                  )}
-                                </Button>
-                              </form>
-                            </DialogContent>
-                          </Dialog>
-                          <Button
-                            variant="destructive"
-                            size="icon"
-                            onClick={() => {
-                              if (confirm('Are you sure you want to delete this lead?')) {
-                                deleteLeadMutation.mutate(lead.id);
-                              }
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-muted-foreground mb-4">{lead.description}</p>
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                      <div>
-                        <span className="font-medium">Category:</span> {lead.category}
-                      </div>
-                      <div>
-                        <span className="font-medium">Budget:</span> ${lead.budget}
-                      </div>
-                      <div>
-                        <span className="font-medium">Location:</span> {lead.location}
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter>
-                    <p className="text-sm text-muted-foreground">
-                      Posted {lead.created_at ? format(new Date(lead.created_at), 'PPp') : 'Recently'}
-                    </p>
-                  </CardFooter>
-                </Card>
-              ))}
-              {(!userLeads || userLeads.length === 0) && (
-                <p className="text-muted-foreground text-center py-8">
-                  You haven't posted any leads yet. Create your first lead to get started!
-                </p>
-              )}
-            </div>
-          </TabsContent>
-          <TabsContent value="post" className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Post a New Lead</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CreateLeadForm />
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+        {user?.userType === "business" ? <BusinessLeadsView /> : <FreeUserLeadsView />}
       </div>
     </div>
   );

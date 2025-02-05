@@ -7,7 +7,6 @@ import { eq, and, or, gt, not } from "drizzle-orm";
 import { log } from "./vite";
 import { comparePasswords, hashPassword } from './auth'; // Assuming these functions exist
 
-
 declare global {
   namespace Express {
     interface Request {
@@ -165,12 +164,25 @@ export function registerRoutes(app: Express): Server {
         );
 
       // If user is "free", only show their own leads
-      // For business users, show all leads
+      // For business users, show all active leads
       if (req.user.userType === "free") {
         query = query.where(eq(leads.user_id, req.user.id));
+      } else if (req.user.userType === "business") {
+        // For business users, only show open leads
+        query = query.where(eq(leads.status, "open"));
       }
 
-      const fetchedLeads = await query;
+      let fetchedLeads = await query;
+
+      // For business users, sort leads by match score
+      if (req.user.userType === "business" && req.user.profile?.matchPreferences) {
+        const { calculateMatchScore } = await import("./utils/matching");
+        fetchedLeads = fetchedLeads.map(lead => ({
+          ...lead,
+          matchScore: calculateMatchScore(lead, req.user),
+        })).sort((a, b) => b.matchScore.totalScore - a.matchScore.totalScore);
+      }
+
       log(`Successfully fetched ${fetchedLeads.length} leads`);
 
       res.json(fetchedLeads);
