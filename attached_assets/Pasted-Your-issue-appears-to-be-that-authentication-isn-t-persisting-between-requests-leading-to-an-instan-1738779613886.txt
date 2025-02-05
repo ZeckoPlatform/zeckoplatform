@@ -1,0 +1,102 @@
+Your issue appears to be that authentication isn't persisting between requests, leading to an instant logout when you try to post a lead. The 401 Unauthorized error on /api/leads means that your backend does not recognize the user as authenticated.
+
+🔍 Key Causes & Fixes
+1️⃣ Check if Login Persists (Session/Cookie Issue)
+
+If login works but posting a lead fails due to 401, then:
+
+Your session is not persisting after login.
+The authentication token (JWT or session cookie) is missing or not being sent.
+🔹 Try This in Browser DevTools:
+
+Login to your app.
+Open Developer Tools (F12) > Application > Storage > Cookies.
+Check if a session token or authentication cookie is stored.
+If no cookie is set, the issue is on the backend.
+If the cookie exists but isn’t being sent, check the frontend fetch requests.
+✅ Fix: Ensure Credentials Are Sent Make sure every request includes credentials: "include":
+
+fetch("/api/leads", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify(leadData),
+  credentials: "include", // Ensures cookies are sent
+});
+2️⃣ Debug Your Express Session Setup
+
+If authentication fails on POST /api/leads, your backend might not be maintaining sessions properly.
+
+🔹 Ensure Express Session is Configured Correctly In server.js (or app.js), add:
+
+app.use(require("cookie-parser")());
+app.use(
+  require("express-session")({
+    secret: "your-secret-key",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production", // Only in production
+      sameSite: "lax",
+    },
+  })
+);
+app.use(passport.initialize());
+app.use(passport.session());
+🔹 Try Removing secure: true Temporarily If testing on localhost, remove secure: true to allow cookies over HTTP.
+
+3️⃣ Check If User Authentication Works Before Posting a Lead
+
+Since useAuthState calls /api/user on page load, check if it succeeds:
+
+const { data: user, error } = useQuery<SelectUser | null>({
+  queryKey: ["/api/user"],
+  retry: false,
+  refetchOnWindowFocus: true,
+});
+
+console.log("User:", user);
+console.log("Error:", error);
+✅ If user is null before posting a lead, login isn’t persisting.
+
+4️⃣ Ensure Backend Uses req.isAuthenticated()
+
+If you’re using Passport.js, ensure your /api/leads route verifies authentication before posting:
+
+app.post("/api/leads", (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: "Please log in again to post a lead" });
+  }
+  // Proceed with saving the lead
+});
+5️⃣ Force a Re-Fetch of User Data After Login
+
+If login is successful, but posting a lead logs the user out, re-fetch user data after login:
+
+const loginMutation = useMutation({
+  mutationFn: async (credentials) => {
+    const res = await fetch("/api/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(credentials),
+      credentials: "include",
+    });
+
+    if (!res.ok) throw new Error("Login failed");
+
+    await queryClient.invalidateQueries(["/api/user"]); // Re-fetch user data
+  },
+});
+Final Fixes to Try
+
+✅ 1. Test if login persists (check cookies in DevTools).
+✅ 2. Ensure credentials: "include" is used in fetch requests.
+✅ 3. Debug backend session (express-session should persist login).
+✅ 4. Check /api/user returns data after login (if null, session fails).
+✅ 5. Add req.isAuthenticated() check in /api/leads.
+
+Try these steps and let me know what happens! 🚀

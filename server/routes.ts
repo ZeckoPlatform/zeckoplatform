@@ -34,18 +34,19 @@ export function registerRoutes(app: Express): Server {
       return next();
     }
 
-    log(`Session verification - Path: ${req.path}`);
+    log(`Session verification - Path: ${req.method} ${req.path}`);
     log(`Session ID: ${req.sessionID}`);
     log(`Session Data: ${JSON.stringify(req.session)}`);
     log(`Is Authenticated: ${req.isAuthenticated()}`);
     log(`User: ${JSON.stringify(req.user)}`);
-    log(`Passport Session: ${JSON.stringify(req.session?.passport)}`);
 
+    // Ensure user is authenticated
     if (!req.isAuthenticated()) {
       log(`Not authenticated - Path: ${req.path}, Session ID: ${req.sessionID}`);
       return res.status(401).json({ message: 'Authentication required' });
     }
 
+    // Ensure user data is present
     if (!req.user) {
       log(`No user in request - Path: ${req.path}`);
       return res.status(401).json({ message: 'No user found' });
@@ -70,12 +71,19 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/leads", async (req, res) => {
     try {
-      if (!req.user) {
+      // Additional auth check specific to leads
+      if (!req.isAuthenticated() || !req.user) {
+        log(`Lead creation - Auth failed. User: ${JSON.stringify(req.user)}`);
         return res.status(401).json({ message: "Authentication required" });
       }
 
       log(`Creating lead - User: ${req.user.id}, Session: ${req.sessionID}`);
       log(`Request body: ${JSON.stringify(req.body)}`);
+
+      // Validate user type
+      if (req.user.userType !== "free") {
+        return res.status(403).json({ message: "Only free users can create leads" });
+      }
 
       const lead = await db.insert(leads).values({
         ...req.body,

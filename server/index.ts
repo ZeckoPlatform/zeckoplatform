@@ -33,12 +33,12 @@ const sessionMiddleware = session({
   name: 'session',
   resave: true,
   saveUninitialized: true,
-  proxy: true,
   cookie: {
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     httpOnly: true,
-    secure: false,
-    sameSite: 'none',
+    secure: false, // Set to false for development
+    sameSite: 'lax',
+    path: '/',
   }
 });
 
@@ -48,7 +48,7 @@ app.use(sessionMiddleware);
 app.use(passport.initialize());
 app.use(passport.session());
 
-// CORS middleware - after session
+// CORS middleware - Must be after session and passport
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (!origin) {
@@ -57,7 +57,7 @@ app.use((req, res, next) => {
 
   res.header('Access-Control-Allow-Origin', origin);
   res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization, Cookie, X-Requested-With');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Cookie, Set-Cookie');
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Expose-Headers', 'Set-Cookie');
 
