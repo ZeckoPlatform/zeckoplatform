@@ -212,7 +212,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-
   app.post("/api/subscriptions", async (req, res) => {
     if (!req.user || !["business", "vendor"].includes(req.user.userType)) {
       return res.status(403).json({ message: "Invalid user type for subscription" });
@@ -220,12 +219,12 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const subscription = await db.insert(subscriptions).values({
-        userId: req.user.id,
+        user_id: req.user.id,
         tier: req.user.userType as "business" | "vendor",
         status: "active",
-        startDate: new Date(),
-        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-        autoRenew: true,
+        start_date: new Date(),
+        end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+        auto_renew: true,
         price: req.user.userType === "business" ? 2999 : 4999, // prices in cents
       }).returning();
 
@@ -233,55 +232,83 @@ export function registerRoutes(app: Express): Server {
         .set({
           subscriptionActive: true,
           subscriptionTier: req.user.userType as "business" | "vendor",
-          subscriptionEndsAt: subscription[0].endDate,
+          subscriptionEndsAt: subscription[0].end_date,
         })
         .where(eq(users.id, req.user.id));
 
       res.json(subscription[0]);
     } catch (error) {
-      log(`Subscription creation error: ${error}`);
-      res.status(500).json({ message: "Failed to create subscription" });
+      log(`Subscription creation error: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('Full error:', error);
+      res.status(500).json({ 
+        message: "Failed to create subscription",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 
   app.get("/api/subscriptions/current", async (req, res) => {
-    if (!req.user) return res.sendStatus(401)
-    const [subscription] = await db.select()
-      .from(subscriptions)
-      .where(
-        and(
-          eq(subscriptions.userId, req.user.id),
-          eq(subscriptions.status, "active")
-        )
-      )
-      .orderBy(subscriptions.startDate)
-      .limit(1);
+    if (!req.user) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
 
-    res.json(subscription || null);
+    try {
+      const [subscription] = await db.select()
+        .from(subscriptions)
+        .where(
+          and(
+            eq(subscriptions.user_id, req.user.id),
+            eq(subscriptions.status, "active")
+          )
+        )
+        .orderBy({ columns: [{ column: subscriptions.start_date, order: 'desc' }] })
+        .limit(1);
+
+      res.json(subscription || null);
+    } catch (error) {
+      log(`Subscription fetch error: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('Full error:', error);
+      res.status(500).json({ 
+        message: "Failed to fetch subscription",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
   });
 
   app.post("/api/subscriptions/cancel", async (req, res) => {
-    if(!req.user) return res.sendStatus(401);
-    const [subscription] = await db.update(subscriptions)
-      .set({ status: "cancelled" })
-      .where(
-        and(
-          eq(subscriptions.userId, req.user.id),
-          eq(subscriptions.status, "active")
-        )
-      )
-      .returning();
-
-    if (subscription) {
-      await db.update(users)
-        .set({
-          subscriptionActive: false,
-          subscriptionTier: "none",
-        })
-        .where(eq(users.id, req.user.id));
+    if(!req.user) {
+      return res.status(401).json({ message: "Authentication required" });
     }
 
-    res.json(subscription || null);
+    try {
+      const [subscription] = await db.update(subscriptions)
+        .set({ status: "cancelled" })
+        .where(
+          and(
+            eq(subscriptions.user_id, req.user.id),
+            eq(subscriptions.status, "active")
+          )
+        )
+        .returning();
+
+      if (subscription) {
+        await db.update(users)
+          .set({
+            subscriptionActive: false,
+            subscriptionTier: "none",
+          })
+          .where(eq(users.id, req.user.id));
+      }
+
+      res.json(subscription || null);
+    } catch (error) {
+      log(`Subscription cancellation error: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('Full error:', error);
+      res.status(500).json({ 
+        message: "Failed to cancel subscription",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
   });
 
   // Update the product creation endpoint to handle decimal prices correctly
