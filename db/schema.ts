@@ -88,7 +88,7 @@ export const products = pgTable("products", {
   vendorId: integer("vendor_id").references(() => users.id).notNull(),
   title: text("title").notNull(),
   description: text("description").notNull(),
-  price: integer("price").notNull(),
+  price: integer("price").notNull(), // Store price in cents
   category: text("category").notNull(),
   imageUrl: text("image_url"),
   createdAt: timestamp("created_at").defaultNow(),

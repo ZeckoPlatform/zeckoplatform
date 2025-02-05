@@ -288,12 +288,28 @@ export function registerRoutes(app: Express): Server {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
+      // Convert price from decimal to cents
+      const priceInCents = Math.round(parseFloat(req.body.price) * 100);
+      if (isNaN(priceInCents)) {
+        return res.status(400).json({ message: "Invalid price format" });
+      }
+
       const product = await db.insert(products).values({
-        ...req.body,
+        title: req.body.title,
+        description: req.body.description,
+        price: priceInCents,
+        category: req.body.category,
+        imageUrl: req.body.imageUrl,
         vendorId: req.user.id,
       }).returning();
 
-      res.json(product[0]);
+      // Convert price back to decimal for response
+      const productWithDecimalPrice = {
+        ...product[0],
+        price: (product[0].price / 100).toFixed(2),
+      };
+
+      res.json(productWithDecimalPrice);
     } catch (error) {
       log(`Product creation error: ${error}`);
       res.status(500).json({ message: "Failed to create product" });
@@ -483,6 +499,35 @@ export function registerRoutes(app: Express): Server {
         message: "Failed to update profile",
         error: error instanceof Error ? error.message : "Unknown error"
       });
+    }
+  });
+
+  // Add file upload endpoint
+  app.post("/api/upload", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      // TODO: Implement file upload handling
+      // For now, we'll assume the file is being sent as a base64 string
+      const { file, fileName } = req.body;
+      if (!file || !fileName) {
+        return res.status(400).json({ message: "File and filename are required" });
+      }
+
+      // Generate a unique filename
+      const uniqueFileName = `${Date.now()}-${fileName}`;
+      const filePath = `uploads/${uniqueFileName}`;
+
+      // Save the file (implementation depends on your storage solution)
+      // For now, we'll just return a mock URL
+      const fileUrl = `/api/uploads/${uniqueFileName}`;
+
+      res.json({ url: fileUrl });
+    } catch (error) {
+      log(`File upload error: ${error}`);
+      res.status(500).json({ message: "Failed to upload file" });
     }
   });
 
