@@ -13,7 +13,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Settings, Edit, Trash2, Send } from "lucide-react";
+import { Loader2, Settings, Edit, Trash2, Send, AlertTriangle } from "lucide-react";
 import type { SelectLead, SelectUser } from "@db/schema";
 import { format } from "date-fns";
 
@@ -285,54 +285,96 @@ export default function LeadsPage() {
   }
 
   const userLeads = user?.userType === "business"
-    ? leads // For business users, show all leads (will be filtered by relevance on the server)
-    : leads.filter(lead => lead.user_id === user?.id); // For free users, show only their own leads
+    ? leads 
+    : leads.filter(lead => lead.user_id === user?.id); 
 
-  const BusinessLeadsView = () => (
-    <div className="grid gap-6">
-      {leads.map((lead) => (
-        <Card key={lead.id}>
+  const BusinessLeadsView = () => {
+    // Check for subscription requirement error in the leads query
+    if (isLoadingLeads) {
+      return (
+        <div className="flex items-center justify-center min-h-[200px]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      );
+    }
+
+    // If no subscription, show subscription requirement message
+    if (!user?.subscriptionActive) {
+      return (
+        <Card>
           <CardHeader>
-            <div className="flex justify-between items-start">
-              <CardTitle>{lead.title}</CardTitle>
-              <Button variant="outline" size="sm">
-                <Send className="h-4 w-4 mr-2" />
-                Send Proposal
-              </Button>
-            </div>
+            <CardTitle>Subscription Required</CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground mb-4">{lead.description}</p>
-            <div className="grid grid-cols-3 gap-4 text-sm">
+          <CardContent className="space-y-6">
+            <div className="flex items-center gap-4 p-4 bg-muted rounded-lg">
+              <AlertTriangle className="h-6 w-6 text-primary" />
               <div>
-                <span className="font-medium">Category:</span> {lead.category}
-              </div>
-              <div>
-                <span className="font-medium">Budget:</span> ${lead.budget}
-              </div>
-              <div>
-                <span className="font-medium">Location:</span> {lead.location}
+                <p className="font-medium">No Active Subscription</p>
+                <p className="text-sm text-muted-foreground">
+                  An active business subscription is required to:
+                </p>
+                <ul className="text-sm text-muted-foreground list-disc list-inside mt-2">
+                  <li>View and access leads</li>
+                  <li>Get matched with relevant opportunities</li>
+                  <li>Send proposals to potential clients</li>
+                </ul>
               </div>
             </div>
+            <Button asChild className="w-full">
+              <a href="/subscription">Subscribe Now</a>
+            </Button>
           </CardContent>
-          <CardFooter className="flex justify-between items-center">
-            <p className="text-sm text-muted-foreground">
-              Posted {lead.created_at ? format(new Date(lead.created_at), 'PPp') : 'Recently'}
-            </p>
-            <div className="flex items-center gap-2">
-              <Progress value={75} className="w-[100px]" />
-              <span className="text-sm text-muted-foreground">75% Match</span>
-            </div>
-          </CardFooter>
         </Card>
-      ))}
-      {(!leads || leads.length === 0) && (
-        <p className="text-muted-foreground text-center py-8">
-          No matching leads found. Update your business profile to see more relevant leads.
-        </p>
-      )}
-    </div>
-  );
+      );
+    }
+
+    // Show leads for subscribed users
+    return (
+      <div className="grid gap-6">
+        {leads.map((lead) => (
+          <Card key={lead.id}>
+            <CardHeader>
+              <div className="flex justify-between items-start">
+                <CardTitle>{lead.title}</CardTitle>
+                <Button variant="outline" size="sm">
+                  <Send className="h-4 w-4 mr-2" />
+                  Send Proposal
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground mb-4">{lead.description}</p>
+              <div className="grid grid-cols-3 gap-4 text-sm">
+                <div>
+                  <span className="font-medium">Category:</span> {lead.category}
+                </div>
+                <div>
+                  <span className="font-medium">Budget:</span> ${lead.budget}
+                </div>
+                <div>
+                  <span className="font-medium">Location:</span> {lead.location}
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-between items-center">
+              <p className="text-sm text-muted-foreground">
+                Posted {lead.created_at ? format(new Date(lead.created_at), 'PPp') : 'Recently'}
+              </p>
+              <div className="flex items-center gap-2">
+                <Progress value={75} className="w-[100px]" />
+                <span className="text-sm text-muted-foreground">75% Match</span>
+              </div>
+            </CardFooter>
+          </Card>
+        ))}
+        {(!leads || leads.length === 0) && (
+          <p className="text-muted-foreground text-center py-8">
+            No matching leads found. Update your business profile to see more relevant leads.
+          </p>
+        )}
+      </div>
+    );
+  };
 
   const FreeUserLeadsView = () => (
     <Tabs defaultValue="my-leads">

@@ -146,11 +146,19 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // GET /api/leads - Get all leads (with expiration filter)
+  // GET /api/leads - Get all leads (with subscription and expiration filter)
   app.get("/api/leads", async (req, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ message: "Authentication required" });
+      }
+
+      // For business users, check subscription
+      if (req.user.userType === "business" && !req.user.subscriptionActive) {
+        return res.status(403).json({ 
+          message: "Active subscription required to view leads",
+          subscriptionRequired: true 
+        });
       }
 
       log(`Fetching leads for user ${req.user.id} (${req.user.userType})`);
@@ -408,16 +416,29 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // POST /api/leads/:leadId/responses - Add subscription check
   app.post("/api/leads/:leadId/responses", async (req, res) => {
     try {
-      if (!req.user || req.user.userType !== "business" || !req.user.subscriptionActive) {
-        return res.status(401).json({ message: "Unauthorized" });
+      if (!req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      // Check for business user type and active subscription
+      if (req.user.userType !== "business") {
+        return res.status(403).json({ message: "Only business accounts can respond to leads" });
+      }
+
+      if (!req.user.subscriptionActive) {
+        return res.status(403).json({ 
+          message: "Active subscription required to respond to leads",
+          subscriptionRequired: true
+        });
       }
 
       const response = await db.insert(leadResponses).values({
         ...req.body,
-        leadId: parseInt(req.params.leadId),
-        businessId: req.user.id,
+        lead_id: parseInt(req.params.leadId),
+        business_id: req.user.id,
       }).returning();
 
       res.json(response[0]);
