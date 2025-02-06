@@ -316,7 +316,8 @@ export default function LeadsPage() {
   const sendProposalMutation = useMutation({
     mutationFn: async ({ leadId, proposal }: { leadId: number; proposal: string }) => {
       const res = await apiRequest("POST", `/api/leads/${leadId}/responses`, {
-        message: proposal,
+        proposal, 
+        price: null, 
         status: "pending"
       });
       return res.json();
@@ -327,7 +328,9 @@ export default function LeadsPage() {
         title: "Success",
         description: "Your proposal has been sent successfully.",
       });
-      
+      proposalForm.reset();
+      setSelectedLead(null);
+      setProposalDialogOpen(false);
     },
     onError: (error: Error) => {
       toast({
