@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -118,9 +118,12 @@ export default function VendorDashboard() {
               <DialogTrigger asChild>
                 <Button>Add Product</Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent aria-describedby="dialog-description">
                 <DialogHeader>
                   <DialogTitle>Add New Product</DialogTitle>
+                  <DialogDescription id="dialog-description">
+                    Fill in the details below to add a new product to your store.
+                  </DialogDescription>
                 </DialogHeader>
                 <form
                   onSubmit={productForm.handleSubmit((data) =>
@@ -145,6 +148,8 @@ export default function VendorDashboard() {
                     <Input
                       id="price"
                       type="number"
+                      step="0.01"
+                      min="0"
                       {...productForm.register("price")}
                       required
                     />
