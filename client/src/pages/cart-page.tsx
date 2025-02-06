@@ -11,6 +11,7 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { calculateShippingCost } from "@/lib/shipping-calculator";
 
 interface CheckoutFormData {
   fullName: string;
@@ -23,9 +24,17 @@ interface CheckoutFormData {
 
 export default function CartPage() {
   const cart = useCart();
-  const total = cart.getTotal();
+  const subtotal = cart.getTotal();
   const { toast } = useToast();
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+
+  // Calculate shipping cost based on items in cart
+  const shippingCost = calculateShippingCost(
+    cart.items.reduce((total, item) => total + (item.weight || 0), 0),
+    cart.items.map(item => item.dimensions || { length: 0, width: 0, height: 0 })
+  );
+
+  const total = subtotal + shippingCost;
 
   const form = useForm<CheckoutFormData>({
     defaultValues: {
@@ -149,17 +158,23 @@ export default function CartPage() {
               <div className="space-y-4">
                 <div className="flex justify-between">
                   <span>Subtotal</span>
-                  <span>£{formatPrice(total)}</span>
+                  <span>£{formatPrice(subtotal)}</span>
                 </div>
-                <div className="flex justify-between font-medium">
-                  <span>Total</span>
-                  <span>£{formatPrice(total)}</span>
+                <div className="flex justify-between">
+                  <span>Shipping</span>
+                  <span>£{formatPrice(shippingCost)}</span>
+                </div>
+                <div className="border-t pt-4">
+                  <div className="flex justify-between font-medium">
+                    <span>Total</span>
+                    <span>£{formatPrice(total)}</span>
+                  </div>
                 </div>
               </div>
             </CardContent>
             <CardFooter>
-              <Button 
-                className="w-full" 
+              <Button
+                className="w-full"
                 onClick={() => setCheckoutOpen(true)}
               >
                 Proceed to Checkout
@@ -177,56 +192,56 @@ export default function CartPage() {
           <form onSubmit={form.handleSubmit((data) => checkoutMutation.mutate(data))} className="space-y-4">
             <div>
               <Label htmlFor="fullName">Full Name</Label>
-              <Input 
-                id="fullName" 
-                {...form.register("fullName")} 
-                required 
+              <Input
+                id="fullName"
+                {...form.register("fullName")}
+                required
               />
             </div>
             <div>
               <Label htmlFor="email">Email</Label>
-              <Input 
-                id="email" 
-                type="email" 
-                {...form.register("email")} 
-                required 
+              <Input
+                id="email"
+                type="email"
+                {...form.register("email")}
+                required
               />
             </div>
             <div>
               <Label htmlFor="phone">Phone</Label>
-              <Input 
-                id="phone" 
-                type="tel" 
-                {...form.register("phone")} 
-                required 
+              <Input
+                id="phone"
+                type="tel"
+                {...form.register("phone")}
+                required
               />
             </div>
             <div>
               <Label htmlFor="address">Delivery Address</Label>
-              <Input 
-                id="address" 
-                {...form.register("address")} 
-                required 
+              <Input
+                id="address"
+                {...form.register("address")}
+                required
               />
             </div>
             <div>
               <Label htmlFor="city">City</Label>
-              <Input 
-                id="city" 
-                {...form.register("city")} 
-                required 
+              <Input
+                id="city"
+                {...form.register("city")}
+                required
               />
             </div>
             <div>
               <Label htmlFor="postcode">Postcode</Label>
-              <Input 
-                id="postcode" 
-                {...form.register("postcode")} 
-                required 
+              <Input
+                id="postcode"
+                {...form.register("postcode")}
+                required
               />
             </div>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="w-full"
               disabled={checkoutMutation.isPending}
             >

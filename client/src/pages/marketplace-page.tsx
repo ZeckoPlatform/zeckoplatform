@@ -21,18 +21,24 @@ interface Product {
   price: number;
   category: string;
   imageUrl: string;
+  weight?: number; // in grams
+  dimensions?: {
+    length: number; // in cm
+    width: number;
+    height: number;
+  };
   vendor: {
     name: string;
     email: string;
     phone?: string;
-    id: number; // Added vendor ID
+    id: number;
   };
 }
 
 export default function MarketplacePage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const cart = useCart(); // Initialize useCart hook
+  const cart = useCart(); 
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const form = useForm({
     defaultValues: {
@@ -41,6 +47,10 @@ export default function MarketplacePage() {
       price: "",
       category: "",
       imageUrl: "",
+      weight: "",
+      length: "",
+      width: "",
+      height: "",
     },
   });
 
@@ -53,6 +63,12 @@ export default function MarketplacePage() {
       const res = await apiRequest("POST", "/api/products", {
         ...data,
         price: parseFloat(data.price),
+        weight: parseFloat(data.weight),
+        dimensions: {
+          length: parseFloat(data.length),
+          width: parseFloat(data.width),
+          height: parseFloat(data.height),
+        },
       });
       return res.json();
     },
@@ -156,6 +172,50 @@ export default function MarketplacePage() {
                           {...form.register("imageUrl")}
                           placeholder="https://example.com/image.jpg"
                         />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="weight">Weight (grams)</Label>
+                          <Input
+                            id="weight"
+                            type="number"
+                            {...form.register("weight")}
+                            placeholder="e.g., 500"
+                            required
+                          />
+                        </div>
+                        <div className="grid grid-cols-3 gap-4">
+                          <div>
+                            <Label htmlFor="length">Length (cm)</Label>
+                            <Input
+                              id="length"
+                              type="number"
+                              {...form.register("length")}
+                              placeholder="e.g., 20"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="width">Width (cm)</Label>
+                            <Input
+                              id="width"
+                              type="number"
+                              {...form.register("width")}
+                              placeholder="e.g., 15"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="height">Height (cm)</Label>
+                            <Input
+                              id="height"
+                              type="number"
+                              {...form.register("height")}
+                              placeholder="e.g., 10"
+                              required
+                            />
+                          </div>
+                        </div>
                       </div>
                       <Button 
                         type="submit" 
