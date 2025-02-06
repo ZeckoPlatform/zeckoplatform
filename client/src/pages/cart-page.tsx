@@ -28,11 +28,12 @@ export default function CartPage() {
   const { toast } = useToast();
   const [checkoutOpen, setCheckoutOpen] = useState(false);
 
-  // Calculate shipping cost based on items in cart
-  const shippingCost = calculateShippingCost(
-    cart.items.reduce((total, item) => total + (item.weight || 0), 0),
-    cart.items.map(item => item.dimensions || { length: 0, width: 0, height: 0 })
-  );
+  // Calculate shipping details
+  const totalWeight = cart.items.reduce((total, item) => total + (item.weight || 0), 0);
+  const dimensions = cart.items.map(item => item.dimensions || { length: 0, width: 0, height: 0 });
+  const totalSize = dimensions.reduce((acc, dim) => acc + dim.length + dim.width + dim.height, 0);
+
+  const shippingCost = calculateShippingCost(totalWeight, dimensions);
 
   const total = subtotal + shippingCost;
 
@@ -160,9 +161,16 @@ export default function CartPage() {
                   <span>Subtotal</span>
                   <span>£{formatPrice(subtotal)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Shipping</span>
-                  <span>£{formatPrice(shippingCost)}</span>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span>Shipping</span>
+                    <span>£{formatPrice(shippingCost)}</span>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    <p>Package Details:</p>
+                    <p>Total Weight: {(totalWeight/1000).toFixed(2)}kg</p>
+                    <p>Total Size: {totalSize}cm</p>
+                  </div>
                 </div>
                 <div className="border-t pt-4">
                   <div className="flex justify-between font-medium">

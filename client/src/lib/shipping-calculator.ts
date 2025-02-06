@@ -27,10 +27,22 @@ export function calculateShippingCost(
     return acc + dim.length + dim.width + dim.height;
   }, 0);
 
+  console.log(`Calculating shipping for:
+    Total Weight: ${totalWeight}g
+    Total Size: ${totalSize}cm (sum of all dimensions)`);
+
   // Find applicable rate based on weight and size
   const applicableRate = UK_SHIPPING_RATES.find(
     (rate) => totalWeight <= rate.maxWeight && totalSize <= rate.maxSize
   );
+
+  if (applicableRate) {
+    console.log(`Selected rate: £${applicableRate.price} 
+      (Weight bracket: up to ${applicableRate.maxWeight}g, 
+      Size bracket: up to ${applicableRate.maxSize}cm)`);
+  } else {
+    console.log('Package exceeds standard sizes, using maximum rate');
+  }
 
   return applicableRate?.price || UK_SHIPPING_RATES[UK_SHIPPING_RATES.length - 1].price;
 }
