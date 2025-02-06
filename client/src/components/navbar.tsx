@@ -7,7 +7,7 @@ import {
   NavigationMenuList,
 } from "@/components/ui/navigation-menu";
 import { Button } from "@/components/ui/button";
-import { UserCircle } from "lucide-react";
+import { UserCircle, ShoppingCart } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 
 export default function Navbar() {
   const { user, logoutMutation } = useAuth();
@@ -31,6 +32,9 @@ export default function Navbar() {
         return "/";
     }
   };
+
+  // TODO: Replace with actual cart count from cart state
+  const cartItemCount = 0;
 
   return (
     <nav className="border-b">
@@ -72,6 +76,19 @@ export default function Navbar() {
             </NavigationMenu>
           </div>
           <div className="flex items-center gap-4">
+            <Link href="/cart">
+              <Button variant="ghost" size="icon" className="relative">
+                <ShoppingCart className="h-5 w-5" />
+                {cartItemCount > 0 && (
+                  <Badge 
+                    variant="destructive" 
+                    className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
+                  >
+                    {cartItemCount}
+                  </Badge>
+                )}
+              </Button>
+            </Link>
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

@@ -11,6 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Search, Mail, Phone, Loader2 } from "lucide-react";
+import { useCart } from "@/hooks/use-cart";
+import { Heart, ShoppingCart } from "lucide-react";
 
 interface Product {
   id: number;
@@ -23,12 +25,14 @@ interface Product {
     name: string;
     email: string;
     phone?: string;
+    id: number; // Added vendor ID
   };
 }
 
 export default function MarketplacePage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const cart = useCart(); // Initialize useCart hook
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const form = useForm({
     defaultValues: {
@@ -204,10 +208,10 @@ export default function MarketplacePage() {
                   </span>
                 </div>
               </CardContent>
-              <CardFooter>
+              <CardFooter className="grid grid-cols-2 gap-2">
                 <Dialog>
                   <DialogTrigger asChild>
-                    <Button className="w-full" variant="secondary" onClick={() => setSelectedProduct(product)}>
+                    <Button variant="outline" onClick={() => setSelectedProduct(product)}>
                       View Details
                     </Button>
                   </DialogTrigger>
@@ -270,11 +274,51 @@ export default function MarketplacePage() {
                             )}
                           </div>
                         </div>
-                        <Button className="w-full">Contact Vendor</Button>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button className="w-full" variant="outline">
+                            Contact Vendor
+                          </Button>
+                          <Button 
+                            className="w-full"
+                            onClick={() => {
+                              cart.addItem({
+                                id: selectedProduct!.id,
+                                title: selectedProduct!.title,
+                                price: selectedProduct!.price,
+                                imageUrl: selectedProduct!.imageUrl,
+                                vendorId: selectedProduct!.vendor.id
+                              });
+                              toast({
+                                title: "Added to Cart",
+                                description: "Product has been added to your cart.",
+                              });
+                            }}
+                          >
+                            Add to Cart
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </DialogContent>
                 </Dialog>
+                <Button
+                  onClick={() => {
+                    cart.addItem({
+                      id: product.id,
+                      title: product.title,
+                      price: product.price,
+                      imageUrl: product.imageUrl,
+                      vendorId: product.vendor.id
+                    });
+                    toast({
+                      title: "Added to Cart",
+                      description: "Product has been added to your cart.",
+                    });
+                  }}
+                >
+                  <ShoppingCart className="h-4 w-4 mr-2" />
+                  Add to Cart
+                </Button>
               </CardFooter>
             </Card>
           ))}
