@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Upload } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { queryClient } from "@/lib/queryClient";
 
 interface ProductFormData {
   title: string;
@@ -18,33 +19,16 @@ interface ProductFormData {
   imageUrl?: string;
 }
 
-export function ProductForm() {
+interface ProductFormProps {
+  onSuccess?: () => void;
+}
+
+export function ProductForm({ onSuccess }: ProductFormProps) {
   const { toast } = useToast();
   const { user } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string>();
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const { data: subscription } = useQuery({
-    queryKey: ["/api/subscriptions/current"],
-    enabled: !!user && user.userType === "vendor",
-  });
-
-  const canCreateProducts = user?.userType === "vendor" && user?.subscriptionActive;
-
-  if (!canCreateProducts) {
-    return (
-      <div className="text-center p-6 bg-muted rounded-lg">
-        <h3 className="text-lg font-semibold mb-2">Subscription Required</h3>
-        <p className="text-sm text-muted-foreground mb-4">
-          You need an active vendor subscription to create and manage products.
-        </p>
-        <Button asChild variant="outline">
-          <a href="/subscription">Upgrade to Vendor Plan</a>
-        </Button>
-      </div>
-    );
-  }
 
   const form = useForm<ProductFormData>({
     defaultValues: {
@@ -81,7 +65,6 @@ export function ProductForm() {
             fileName: file.name,
           });
           const data = await response.json();
-          console.log("Upload Response:", data);
 
           if (!data.url) {
             throw new Error("Image upload failed");
@@ -124,15 +107,17 @@ export function ProductForm() {
 
       const res = await apiRequest("POST", "/api/products", {
         ...data,
-        price: price.toFixed(2),
+        price: price.toFixed(2), // Send price as dollars with 2 decimal places
       });
 
       return res.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       toast({ title: "Success", description: "Product created successfully" });
       form.reset();
       setPreviewUrl(undefined);
+      onSuccess?.();
     },
     onError: (error: Error) => {
       toast({
@@ -142,6 +127,22 @@ export function ProductForm() {
       });
     },
   });
+
+  const canCreateProducts = user?.userType === "vendor" && user?.subscriptionActive;
+
+  if (!canCreateProducts) {
+    return (
+      <div className="text-center p-6 bg-muted rounded-lg">
+        <h3 className="text-lg font-semibold mb-2">Subscription Required</h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          You need an active vendor subscription to create and manage products.
+        </p>
+        <Button asChild variant="outline">
+          <a href="/subscription">Upgrade to Vendor Plan</a>
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={form.handleSubmit((data) => createProductMutation.mutate(data))} className="space-y-6">

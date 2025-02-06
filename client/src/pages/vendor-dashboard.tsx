@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Store, Package, Settings, Edit, Trash2 } from "lucide-react";
+import { Store, Package, Settings, Edit, Trash2, Upload, Loader2 } from "lucide-react";
+import { ProductForm } from "@/components/ProductForm";
 
 export default function VendorDashboard() {
   const { user } = useAuth();
@@ -21,17 +22,7 @@ export default function VendorDashboard() {
 
   const { data: products } = useQuery({
     queryKey: ["/api/products"],
-    select: (data) => data.filter((product) => product.vendorId === user?.id),
-  });
-
-  const productForm = useForm({
-    defaultValues: {
-      title: "",
-      description: "",
-      price: "",
-      category: "",
-      imageUrl: "",
-    },
+    select: (data) => data?.filter((product) => product.vendorId === user?.id),
   });
 
   const editForm = useForm({
@@ -43,6 +34,18 @@ export default function VendorDashboard() {
       imageUrl: "",
     },
   });
+
+  useEffect(() => {
+    if (editingProduct) {
+      editForm.reset({
+        title: editingProduct.title,
+        description: editingProduct.description,
+        price: parseFloat(editingProduct.price).toFixed(2),
+        category: editingProduct.category,
+        imageUrl: editingProduct.imageUrl,
+      });
+    }
+  }, [editingProduct, editForm]);
 
   const profileForm = useForm({
     defaultValues: {
@@ -80,37 +83,6 @@ export default function VendorDashboard() {
     },
   });
 
-  const createProductMutation = useMutation({
-    mutationFn: async (data) => {
-      const price = parseFloat(data.price);
-      if (isNaN(price) || price <= 0) {
-        throw new Error("Please enter a valid positive number for the price.");
-      }
-
-      const res = await apiRequest("POST", "/api/products", {
-        ...data,
-        price: price.toFixed(2),
-      });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
-      toast({
-        title: "Success",
-        description: "Product created successfully",
-      });
-      productForm.reset();
-      setDialogOpen(false);
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create product",
-        variant: "destructive",
-      });
-    },
-  });
-
   const updateProductMutation = useMutation({
     mutationFn: async ({ id, data }) => {
       const price = parseFloat(data.price);
@@ -120,7 +92,7 @@ export default function VendorDashboard() {
 
       const res = await apiRequest("PATCH", `/api/products/${id}`, {
         ...data,
-        price: price.toFixed(2),
+        price: (price / 100).toFixed(2), // Convert cents to dollars
       });
       return res.json();
     },
@@ -131,6 +103,13 @@ export default function VendorDashboard() {
         description: "Product updated successfully",
       });
       setEditingProduct(null);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update product",
+        variant: "destructive",
+      });
     },
   });
 
@@ -143,6 +122,13 @@ export default function VendorDashboard() {
       toast({
         title: "Success",
         description: "Product deleted successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete product",
+        variant: "destructive",
       });
     },
   });
@@ -198,55 +184,7 @@ export default function VendorDashboard() {
                     Fill in the details below to add a new product to your store.
                   </DialogDescription>
                 </DialogHeader>
-                <form
-                  onSubmit={productForm.handleSubmit((data) =>
-                    createProductMutation.mutate(data)
-                  )}
-                  className="space-y-4"
-                >
-                  <div>
-                    <Label htmlFor="title">Title</Label>
-                    <Input id="title" {...productForm.register("title")} required />
-                  </div>
-                  <div>
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      {...productForm.register("description")}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="price">Price ($)</Label>
-                    <Input
-                      id="price"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      {...productForm.register("price")}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="category">Category</Label>
-                    <Input
-                      id="category"
-                      {...productForm.register("category")}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="imageUrl">Image URL</Label>
-                    <Input
-                      id="imageUrl"
-                      {...productForm.register("imageUrl")}
-                      placeholder="https://example.com/image.jpg"
-                    />
-                  </div>
-                  <Button type="submit" className="w-full">
-                    List Product
-                  </Button>
-                </form>
+                <ProductForm onSuccess={() => setDialogOpen(false)} />
               </DialogContent>
             </Dialog>
 
@@ -305,8 +243,19 @@ export default function VendorDashboard() {
                         placeholder="https://example.com/image.jpg"
                       />
                     </div>
-                    <Button type="submit" className="w-full">
-                      Save Changes
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      disabled={updateProductMutation.isPending}
+                    >
+                      {updateProductMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving Changes...
+                        </>
+                      ) : (
+                        'Save Changes'
+                      )}
                     </Button>
                   </form>
                 )}
@@ -345,7 +294,13 @@ export default function VendorDashboard() {
                     variant="outline"
                     className="flex-1"
                     onClick={() => {
-                      editForm.reset(product);
+                      editForm.reset({
+                        title: product.title,
+                        description: product.description,
+                        price: parseFloat(product.price).toFixed(2),
+                        category: product.category,
+                        imageUrl: product.imageUrl,
+                      });
                       setEditingProduct(product);
                     }}
                   >
@@ -412,7 +367,16 @@ export default function VendorDashboard() {
                     required
                   />
                 </div>
-                <Button type="submit">Save Profile</Button>
+                <Button type="submit" disabled={updateProfileMutation.isPending}>
+                  {updateProfileMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Profile'
+                  )}
+                </Button>
               </form>
             </CardContent>
           </Card>
