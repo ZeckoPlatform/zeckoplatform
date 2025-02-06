@@ -719,7 +719,10 @@ export default function LeadsPage() {
                                 <DialogTrigger asChild>
                                   <Button
                                     size="sm"
-                                    onClick={() => setSelectedResponse(response)}
+                                    onClick={() => {
+                                      setSelectedResponse(response);
+                                      setSelectedLead(lead);
+                                    }}
                                   >
                                     Accept
                                   </Button>
@@ -732,10 +735,16 @@ export default function LeadsPage() {
                                     </DialogDescription>
                                   </DialogHeader>
                                   <form onSubmit={acceptProposalForm.handleSubmit((data) => {
-                                    if (selectedResponse) {
+                                    if (selectedResponse && selectedLead) {
                                       acceptProposalMutation.mutate({
                                         responseId: selectedResponse.id,
                                         contactDetails: data.contactDetails
+                                      });
+                                    } else {
+                                      toast({
+                                        title: "Error",
+                                        description: "Missing lead or response information",
+                                        variant: "destructive",
                                       });
                                     }
                                   })}>

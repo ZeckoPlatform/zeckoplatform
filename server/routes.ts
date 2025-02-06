@@ -492,7 +492,7 @@ export function registerRoutes(app: Express): Server {
         .from(leads)
         .where(eq(leads.id, parseInt(req.params.leadId)));
 
-      if (!lead || lead.userId !== req.user.id) {
+      if (!lead || lead.user_id !== req.user.id) {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
@@ -504,7 +504,7 @@ export function registerRoutes(app: Express): Server {
         .where(
           and(
             eq(leadResponses.id, parseInt(req.params.responseId)),
-            eq(leadResponses.leadId, parseInt(req.params.leadId))
+            eq(leadResponses.lead_id, parseInt(req.params.leadId))
           )
         )
         .returning();
