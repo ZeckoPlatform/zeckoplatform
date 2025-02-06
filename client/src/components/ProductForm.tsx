@@ -140,7 +140,7 @@ export function ProductForm({ onSuccess }: ProductFormProps) {
       <div className="text-center p-6 bg-muted rounded-lg">
         <h3 className="text-lg font-semibold mb-2">Subscription Required</h3>
         <p className="text-sm text-muted-foreground mb-4">
-          You need an active vendor subscription to create and manage products.
+          You need an active vendor subscription to create and manage products on Zecko.
         </p>
         <Button asChild variant="outline">
           <a href="/subscription">Upgrade to Vendor Plan</a>
@@ -162,12 +162,12 @@ export function ProductForm({ onSuccess }: ProductFormProps) {
       </div>
 
       <div>
-        <Label htmlFor="price">Price ($)</Label>
+        <Label htmlFor="price">Price (£)</Label>
         <Input
           id="price"
-          type="number"
-          step="0.01"
-          min="0"
+          type="text"
+          pattern="^\d*\.?\d{0,2}$"
+          inputMode="decimal"
           placeholder="0.00"
           {...form.register("price")}
           required

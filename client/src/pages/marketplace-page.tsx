@@ -32,7 +32,7 @@ export default function MarketplacePage() {
     mutationFn: async (data: any) => {
       const res = await apiRequest("POST", "/api/products", {
         ...data,
-        price: parseInt(data.price),
+        price: parseFloat(data.price),
       });
       return res.json();
     },
@@ -52,15 +52,15 @@ export default function MarketplacePage() {
         <div className="absolute inset-0">
           <img
             src="https://images.unsplash.com/photo-1495522097160-b7d527cc67f8"
-            alt="Marketplace items"
+            alt="Zecko marketplace items"
             className="w-full h-64 object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-background/90 to-background/50" />
         </div>
-        
+
         <div className="relative max-w-7xl mx-auto py-16 px-4 sm:px-6 lg:px-8">
           <h1 className="text-4xl font-bold text-foreground mb-4">
-            Marketplace
+            Zecko Marketplace
           </h1>
           <div className="max-w-xl">
             <div className="flex gap-4">
@@ -80,7 +80,7 @@ export default function MarketplacePage() {
                     <DialogHeader>
                       <DialogTitle>Add New Product</DialogTitle>
                       <DialogDescription id="dialog-description">
-                        Fill in the details below to add a new product to the marketplace.
+                        Fill in the details below to add a new product to the Zecko marketplace.
                       </DialogDescription>
                     </DialogHeader>
                     <form
@@ -102,12 +102,13 @@ export default function MarketplacePage() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor="price">Price ($)</Label>
+                        <Label htmlFor="price">Price (£)</Label>
                         <Input
                           id="price"
-                          type="number"
-                          step="0.01"
-                          min="0"
+                          type="text"
+                          pattern="^\d*\.?\d{0,2}$"
+                          inputMode="decimal"
+                          placeholder="0.00"
                           {...form.register("price")}
                           required
                         />
@@ -144,7 +145,7 @@ export default function MarketplacePage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {products?.map((product) => (
-            <Card key={product.id} className="flex flex-col">
+            <Card key={product.id}>
               <div className="aspect-square relative">
                 <img
                   src={product.imageUrl || "https://images.unsplash.com/photo-1518302057166-c990a3585cc3"}
@@ -161,14 +162,14 @@ export default function MarketplacePage() {
                 </p>
                 <div className="flex items-center justify-between">
                   <span className="text-lg font-semibold">
-                    ${product.price}
+                    £{parseFloat(product.price).toFixed(2)}
                   </span>
                   <span className="text-sm text-muted-foreground">
                     {product.category}
                   </span>
                 </div>
               </CardContent>
-              <CardFooter className="mt-auto">
+              <CardFooter>
                 <Button className="w-full" variant="secondary">
                   View Details
                 </Button>

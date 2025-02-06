@@ -198,7 +198,7 @@ export default function VendorDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 className="text-3xl font-bold mb-8">Vendor Dashboard</h1>
+      <h1 className="text-3xl font-bold mb-8">Zecko Vendor Dashboard</h1>
 
       <Tabs defaultValue="products">
         <TabsList className="mb-8">
@@ -225,9 +225,9 @@ export default function VendorDashboard() {
               </DialogTrigger>
               <DialogContent className="max-h-[85vh] overflow-y-auto" aria-describedby="add-product-description">
                 <DialogHeader>
-                  <DialogTitle>Add New Product</DialogTitle>
-                  <DialogDescription id="add-product-description">
-                    Fill in the details below to add a new product to your store.
+                  <DialogTitle>Add New Zecko Product</DialogTitle>
+                  <DialogDescription id="dialog-description">
+                    Fill in the details below to add a new product to your Zecko store.
                   </DialogDescription>
                 </DialogHeader>
                 <ProductForm onSuccess={() => setDialogOpen(false)} />
@@ -270,7 +270,7 @@ export default function VendorDashboard() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="edit-price">Price ($)</Label>
+                    <Label htmlFor="edit-price">Price (£)</Label>
                     <Input
                       id="edit-price"
                       type="text"
@@ -387,7 +387,7 @@ export default function VendorDashboard() {
                   </p>
                   <div className="flex items-center justify-between mt-4">
                     <span className="text-lg font-semibold">
-                      ${parseFloat(product.price).toFixed(2)}
+                      £{parseFloat(product.price).toFixed(2)}
                     </span>
                     <span className="text-sm text-muted-foreground">
                       {product.category}
