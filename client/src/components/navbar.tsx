@@ -17,9 +17,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { useCart } from "@/hooks/use-cart"; // Import useCart hook
 
 export default function Navbar() {
   const { user, logoutMutation } = useAuth();
+  const cart = useCart();
+  const cartItemCount = cart.getItemCount();
 
   const getDashboardLink = () => {
     switch (user?.userType) {
@@ -32,9 +35,6 @@ export default function Navbar() {
         return "/";
     }
   };
-
-  // TODO: Replace with actual cart count from cart state
-  const cartItemCount = 0;
 
   return (
     <nav className="border-b">
@@ -80,8 +80,8 @@ export default function Navbar() {
               <Button variant="ghost" size="icon" className="relative">
                 <ShoppingCart className="h-5 w-5" />
                 {cartItemCount > 0 && (
-                  <Badge 
-                    variant="destructive" 
+                  <Badge
+                    variant="destructive"
                     className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
                   >
                     {cartItemCount}

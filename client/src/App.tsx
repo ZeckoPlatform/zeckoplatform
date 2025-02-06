@@ -11,6 +11,7 @@ import LeadsPage from "@/pages/leads-page";
 import MarketplacePage from "@/pages/marketplace-page";
 import SubscriptionPage from "@/pages/subscription-page";
 import VendorDashboard from "@/pages/vendor-dashboard";
+import CartPage from "@/pages/cart-page";
 import Navbar from "@/components/navbar";
 
 function Router() {
@@ -20,6 +21,7 @@ function Router() {
       <Switch>
         <Route path="/" component={HomePage} />
         <Route path="/auth" component={AuthPage} />
+        <Route path="/cart" component={CartPage} />
         <ProtectedRoute path="/leads" component={LeadsPage} />
         <ProtectedRoute path="/marketplace" component={MarketplacePage} />
         <ProtectedRoute path="/subscription" component={SubscriptionPage} />
