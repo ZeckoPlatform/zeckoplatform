@@ -80,6 +80,10 @@ const calculateMatchScore = (lead: SelectLead, user: SelectUser | null): {
 };
 
 
+interface AcceptProposalData {
+  contactDetails: string;
+}
+
 export default function LeadsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -349,6 +353,42 @@ export default function LeadsPage() {
       proposal: "",
     },
   });
+
+  const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
+  const [selectedResponse, setSelectedResponse] = useState<any>(null);
+
+  const acceptProposalForm = useForm<AcceptProposalData>({
+    defaultValues: {
+      contactDetails: "",
+    },
+  });
+
+  const acceptProposalMutation = useMutation({
+    mutationFn: async ({ responseId, contactDetails }: { responseId: number; contactDetails: string }) => {
+      const res = await apiRequest("PATCH", `/api/leads/${selectedLead?.id}/responses/${responseId}`, {
+        status: "accepted",
+        contactDetails
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      toast({
+        title: "Success",
+        description: "Proposal accepted successfully.",
+      });
+      setAcceptDialogOpen(false);
+      acceptProposalForm.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to accept proposal",
+        variant: "destructive",
+      });
+    },
+  });
+
 
   if (isLoadingLeads) {
     return (
@@ -640,7 +680,6 @@ export default function LeadsPage() {
                   </div>
                 </div>
 
-                {/* Add Proposals Section */}
                 <div className="border-t pt-4">
                   <h3 className="text-lg font-semibold mb-3">Received Proposals</h3>
                   {lead.responses && lead.responses.length > 0 ? (
@@ -665,17 +704,70 @@ export default function LeadsPage() {
                             </Badge>
                           </div>
                           <p className="text-sm mt-2">{response.proposal}</p>
+
+                          {/* Show contact details if proposal is accepted */}
+                          {response.status === "accepted" && response.contactDetails && (
+                            <div className="mt-4 p-4 bg-background rounded-lg border">
+                              <h4 className="font-medium mb-2">Contact Information</h4>
+                              <p className="text-sm whitespace-pre-wrap">{response.contactDetails}</p>
+                            </div>
+                          )}
+
                           {response.status === "pending" && (
                             <div className="flex gap-2 mt-4">
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  // TODO: Implement accept proposal
-                                  console.log('Accept proposal:', response.id);
-                                }}
-                              >
-                                Accept
-                              </Button>
+                              <Dialog open={acceptDialogOpen} onOpenChange={setAcceptDialogOpen}>
+                                <DialogTrigger asChild>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => setSelectedResponse(response)}
+                                  >
+                                    Accept
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                  <DialogHeader>
+                                    <DialogTitle>Accept Proposal</DialogTitle>
+                                    <DialogDescription>
+                                      Please provide your contact details. This will be shared with the business when you accept their proposal.
+                                    </DialogDescription>
+                                  </DialogHeader>
+                                  <form onSubmit={acceptProposalForm.handleSubmit((data) => {
+                                    if (selectedResponse) {
+                                      acceptProposalMutation.mutate({
+                                        responseId: selectedResponse.id,
+                                        contactDetails: data.contactDetails
+                                      });
+                                    }
+                                  })}>
+                                    <div className="space-y-4">
+                                      <div>
+                                        <Label htmlFor="contactDetails">Contact Details</Label>
+                                        <Textarea
+                                          id="contactDetails"
+                                          placeholder="Please provide your preferred contact method (email, phone) and any additional information for the business to reach you."
+                                          {...acceptProposalForm.register("contactDetails")}
+                                          className="min-h-[100px]"
+                                          required
+                                        />
+                                      </div>
+                                      <Button
+                                        type="submit"
+                                        className="w-full"
+                                        disabled={acceptProposalMutation.isPending}
+                                      >
+                                        {acceptProposalMutation.isPending ? (
+                                          <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Accepting...
+                                          </>
+                                        ) : (
+                                          'Accept Proposal'
+                                        )}
+                                      </Button>
+                                    </div>
+                                  </form>
+                                </DialogContent>
+                              </Dialog>
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -900,8 +992,7 @@ export default function LeadsPage() {
 
         <div className="grid md:grid-cols-3 gap-6 mb-8">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">
+            <CardHeader><CardTitle className="text-lg">
                 {user?.userType === "business" ? "Available Leads" : "Total Leads"}
               </CardTitle>
             </CardHeader>

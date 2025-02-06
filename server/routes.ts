@@ -497,7 +497,10 @@ export function registerRoutes(app: Express): Server {
       }
 
       const [response] = await db.update(leadResponses)
-        .set({ status: req.body.status })
+        .set({ 
+          status: req.body.status,
+          contactDetails: req.body.contactDetails 
+        })
         .where(
           and(
             eq(leadResponses.id, parseInt(req.params.responseId)),
