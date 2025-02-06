@@ -38,7 +38,7 @@ export default function Navbar() {
         <div className="flex justify-between h-16">
           <div className="flex">
             <div className="flex items-center font-bold text-xl">
-              <Link href="/">LeadMarket</Link>
+              <Link href="/">Zecko</Link>
             </div>
             <NavigationMenu className="ml-8">
               <NavigationMenuList>

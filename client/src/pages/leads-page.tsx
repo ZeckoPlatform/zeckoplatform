@@ -285,8 +285,8 @@ export default function LeadsPage() {
   }
 
   const userLeads = user?.userType === "business"
-    ? leads 
-    : leads.filter(lead => lead.user_id === user?.id); 
+    ? leads
+    : leads.filter(lead => lead.user_id === user?.id);
 
   const BusinessLeadsView = () => {
     // Check for subscription requirement error in the leads query
@@ -349,7 +349,7 @@ export default function LeadsPage() {
                   <span className="font-medium">Category:</span> {lead.category}
                 </div>
                 <div>
-                  <span className="font-medium">Budget:</span> ${lead.budget}
+                  <span className="font-medium">Budget:</span> £{lead.budget}
                 </div>
                 <div>
                   <span className="font-medium">Location:</span> {lead.location}
@@ -436,7 +436,7 @@ export default function LeadsPage() {
                               />
                             </div>
                             <div>
-                              <Label htmlFor="edit-budget">Budget ($)</Label>
+                              <Label htmlFor="edit-budget">Budget (£)</Label>
                               <Input
                                 id="edit-budget"
                                 type="number"
@@ -491,7 +491,7 @@ export default function LeadsPage() {
                     <span className="font-medium">Category:</span> {lead.category}
                   </div>
                   <div>
-                    <span className="font-medium">Budget:</span> ${lead.budget}
+                    <span className="font-medium">Budget:</span> £{lead.budget}
                   </div>
                   <div>
                     <span className="font-medium">Location:</span> {lead.location}
@@ -547,7 +547,7 @@ export default function LeadsPage() {
         <Input id="category" {...form.register("category")} required />
       </div>
       <div>
-        <Label htmlFor="budget">Budget ($)</Label>
+        <Label htmlFor="budget">Budget (£)</Label>
         <Input
           id="budget"
           type="number"
