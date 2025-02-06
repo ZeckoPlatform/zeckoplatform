@@ -118,6 +118,8 @@ export default function CartPage() {
       });
       cart.clearCart();
       setCheckoutOpen(false);
+      // Redirect to a success page or order confirmation
+      window.location.href = "/marketplace";
     },
     onError: (error: Error) => {
       toast({
@@ -148,7 +150,15 @@ export default function CartPage() {
       return;
     }
 
-    checkoutMutation.mutate(data);
+    try {
+      checkoutMutation.mutate(data);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to process your order. Please try again.",
+        variant: "destructive",
+      });
+    }
   });
 
   if (cart.items.length === 0) {
