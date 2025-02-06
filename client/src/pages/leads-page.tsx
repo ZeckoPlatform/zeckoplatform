@@ -42,6 +42,10 @@ interface UsernameFormData {
   username: string;
 }
 
+interface ProposalFormData {
+  proposal: string;
+}
+
 //Helper function (needs implementation based on your data model)
 const calculateMatchScore = (lead: SelectLead, user: SelectUser | null): {
   totalScore: number;
@@ -323,9 +327,7 @@ export default function LeadsPage() {
         title: "Success",
         description: "Your proposal has been sent successfully.",
       });
-      setProposalContent("");
-      setSelectedLead(null);
-      setProposalDialogOpen(false);
+      
     },
     onError: (error: Error) => {
       toast({
@@ -337,8 +339,12 @@ export default function LeadsPage() {
   });
 
   const [selectedLead, setSelectedLead] = useState<SelectLead | null>(null);
-  const [proposalContent, setProposalContent] = useState("");
   const [proposalDialogOpen, setProposalDialogOpen] = useState(false);
+  const proposalForm = useForm<ProposalFormData>({
+    defaultValues: {
+      proposal: "",
+    },
+  });
 
   if (isLoadingLeads) {
     return (
@@ -399,14 +405,23 @@ export default function LeadsPage() {
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <CardTitle>{lead.title}</CardTitle>
-                  <Dialog open={proposalDialogOpen} onOpenChange={setProposalDialogOpen}>
+                  <Dialog 
+                    open={proposalDialogOpen} 
+                    onOpenChange={(open) => {
+                      setProposalDialogOpen(open);
+                      if (!open) {
+                        proposalForm.reset();
+                        setSelectedLead(null);
+                      }
+                    }}
+                  >
                     <DialogTrigger asChild>
                       <Button 
                         variant="outline" 
                         size="sm"
                         onClick={() => {
                           setSelectedLead(lead);
-                          setProposalDialogOpen(true);
+                          proposalForm.reset();
                         }}
                       >
                         <Send className="h-4 w-4 mr-2" />
@@ -420,24 +435,22 @@ export default function LeadsPage() {
                           Write your proposal message to the lead owner. Be specific about how you can help.
                         </DialogDescription>
                       </DialogHeader>
-                      <form onSubmit={(e) => {
-                        e.preventDefault();
+                      <form onSubmit={proposalForm.handleSubmit((data) => {
                         if (selectedLead) {
                           sendProposalMutation.mutate({
                             leadId: selectedLead.id,
-                            proposal: proposalContent
+                            proposal: data.proposal
                           });
                         }
-                      }}>
+                      })}>
                         <div className="space-y-4">
                           <div>
                             <Label htmlFor="proposal">Your Proposal</Label>
                             <Textarea
                               id="proposal"
-                              value={proposalContent}
-                              onChange={(e) => setProposalContent(e.target.value)}
-                              rows={6}
                               placeholder="Describe how you can help with this project..."
+                              {...proposalForm.register("proposal")}
+                              className="min-h-[150px]"
                               required
                             />
                           </div>
