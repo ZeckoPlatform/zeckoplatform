@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,13 +11,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Store, Package, Settings } from "lucide-react";
+import { Store, Package, Settings, Edit, Trash2 } from "lucide-react";
 
 export default function VendorDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
 
-  const { data: products } = useQuery<any[]>({
+  const { data: products } = useQuery({
     queryKey: ["/api/products"],
     select: (data) => data.filter((product) => product.vendorId === user?.id),
   });
@@ -31,45 +34,79 @@ export default function VendorDashboard() {
     },
   });
 
-  const profileForm = useForm({
+  const editForm = useForm({
     defaultValues: {
-      name: user?.profile?.name || "",
-      description: user?.profile?.description || "",
-      categories: user?.profile?.categories?.join(", ") || "",
+      title: "",
+      description: "",
+      price: "",
+      category: "",
+      imageUrl: "",
     },
   });
 
   const createProductMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data) => {
+      const price = parseFloat(data.price);
+      if (isNaN(price) || price <= 0) {
+        throw new Error("Please enter a valid positive number for the price.");
+      }
+
       const res = await apiRequest("POST", "/api/products", {
         ...data,
-        price: parseInt(data.price),
+        price: price.toFixed(2),
       });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       toast({
-        title: "Product Created",
-        description: "Your product has been listed successfully.",
+        title: "Success",
+        description: "Product created successfully",
+      });
+      productForm.reset();
+      setDialogOpen(false);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create product",
+        variant: "destructive",
       });
     },
   });
 
-  const updateProfileMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const res = await apiRequest("PATCH", "/api/users/profile", {
-        name: data.name,
-        description: data.description,
-        categories: data.categories.split(",").map((c: string) => c.trim()),
+  const updateProductMutation = useMutation({
+    mutationFn: async ({ id, data }) => {
+      const price = parseFloat(data.price);
+      if (isNaN(price) || price <= 0) {
+        throw new Error("Please enter a valid positive number for the price.");
+      }
+
+      const res = await apiRequest("PATCH", `/api/products/${id}`, {
+        ...data,
+        price: price.toFixed(2),
       });
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       toast({
-        title: "Profile Updated",
-        description: "Your store profile has been updated successfully.",
+        title: "Success",
+        description: "Product updated successfully",
+      });
+      setEditingProduct(null);
+    },
+  });
+
+  const deleteProductMutation = useMutation({
+    mutationFn: async (id) => {
+      await apiRequest("DELETE", `/api/products/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      toast({
+        title: "Success",
+        description: "Product deleted successfully",
       });
     },
   });
@@ -114,7 +151,7 @@ export default function VendorDashboard() {
         <TabsContent value="products">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-semibold">My Products</h2>
-            <Dialog>
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
                 <Button>Add Product</Button>
               </DialogTrigger>
@@ -176,6 +213,69 @@ export default function VendorDashboard() {
                 </form>
               </DialogContent>
             </Dialog>
+
+            {/* Edit Product Dialog */}
+            <Dialog open={!!editingProduct} onOpenChange={(open) => !open && setEditingProduct(null)}>
+              <DialogContent aria-describedby="edit-dialog-description">
+                <DialogHeader>
+                  <DialogTitle>Edit Product</DialogTitle>
+                  <DialogDescription id="edit-dialog-description">
+                    Update your product details below.
+                  </DialogDescription>
+                </DialogHeader>
+                {editingProduct && (
+                  <form
+                    onSubmit={editForm.handleSubmit((data) =>
+                      updateProductMutation.mutate({ id: editingProduct.id, data })
+                    )}
+                    className="space-y-4"
+                  >
+                    <div>
+                      <Label htmlFor="edit-title">Title</Label>
+                      <Input id="edit-title" {...editForm.register("title")} required />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-description">Description</Label>
+                      <Textarea
+                        id="edit-description"
+                        {...editForm.register("description")}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-price">Price ($)</Label>
+                      <Input
+                        id="edit-price"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        {...editForm.register("price")}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-category">Category</Label>
+                      <Input
+                        id="edit-category"
+                        {...editForm.register("category")}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-imageUrl">Image URL</Label>
+                      <Input
+                        id="edit-imageUrl"
+                        {...editForm.register("imageUrl")}
+                        placeholder="https://example.com/image.jpg"
+                      />
+                    </div>
+                    <Button type="submit" className="w-full">
+                      Save Changes
+                    </Button>
+                  </form>
+                )}
+              </DialogContent>
+            </Dialog>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -197,16 +297,34 @@ export default function VendorDashboard() {
                   </p>
                   <div className="flex items-center justify-between">
                     <span className="text-lg font-semibold">
-                      ${product.price}
+                      ${parseFloat(product.price).toFixed(2)}
                     </span>
                     <span className="text-sm text-muted-foreground">
                       {product.category}
                     </span>
                   </div>
                 </CardContent>
-                <CardFooter>
-                  <Button variant="outline" className="w-full">
-                    Edit
+                <CardFooter className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    className="flex-1"
+                    onClick={() => {
+                      editForm.reset(product);
+                      setEditingProduct(product);
+                    }}
+                  >
+                    <Edit className="h-4 w-4 mr-2" /> Edit
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    size="icon"
+                    onClick={() => {
+                      if (confirm('Are you sure you want to delete this product?')) {
+                        deleteProductMutation.mutate(product.id);
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </CardFooter>
               </Card>
