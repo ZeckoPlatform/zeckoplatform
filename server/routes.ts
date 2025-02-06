@@ -254,21 +254,33 @@ export function registerRoutes(app: Express): Server {
 
     try {
       // First get the user's current subscription status
-      const [currentUser] = await db.select()
-        .from(users)
-        .where(eq(users.id, req.user.id));
+      const [currentUser] = await db.select({
+        subscriptionActive: users.subscriptionActive,
+        subscriptionTier: users.subscriptionTier,
+        subscriptionEndsAt: users.subscriptionEndsAt,
+      })
+      .from(users)
+      .where(eq(users.id, req.user.id));
 
-      // Then get the actual subscription record
-      const [subscription] = await db.select()
-        .from(subscriptions)
-        .where(
-          and(
-            eq(subscriptions.user_id, req.user.id),
-            eq(subscriptions.status, "active")
-          )
+      // Then get the actual subscription record if it exists
+      const [subscription] = await db.select({
+        id: subscriptions.id,
+        tier: subscriptions.tier,
+        status: subscriptions.status,
+        start_date: subscriptions.start_date,
+        end_date: subscriptions.end_date,
+        auto_renew: subscriptions.auto_renew,
+        price: subscriptions.price,
+      })
+      .from(subscriptions)
+      .where(
+        and(
+          eq(subscriptions.user_id, req.user.id),
+          eq(subscriptions.status, "active")
         )
-        .orderBy({ columns: [{ column: subscriptions.start_date, order: 'desc' }] })
-        .limit(1);
+      )
+      .orderBy(subscriptions.start_date, 'desc')
+      .limit(1);
 
       // Return both user subscription status and subscription details
       res.json({
