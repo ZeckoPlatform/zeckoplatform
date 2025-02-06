@@ -150,33 +150,65 @@ export function ProductForm() {
   });
 
   return (
-    <form onSubmit={form.handleSubmit((data) => createProductMutation.mutate(data))} className="space-y-6">
+    <form 
+      onSubmit={form.handleSubmit((data) => createProductMutation.mutate(data))} 
+      className="space-y-6"
+      aria-label="Create Product Form"
+    >
       <div>
         <Label htmlFor="title">Title</Label>
-        <Input id="title" {...form.register("title")} required />
+        <Input 
+          id="title" 
+          {...form.register("title")} 
+          required 
+          aria-describedby="title-description"
+        />
+        <p id="title-description" className="text-sm text-muted-foreground mt-1">
+          Enter a descriptive title for your product
+        </p>
       </div>
 
       <div>
         <Label htmlFor="description">Description</Label>
-        <Textarea id="description" {...form.register("description")} required />
+        <Textarea 
+          id="description" 
+          {...form.register("description")} 
+          required
+          aria-describedby="description-help"
+        />
+        <p id="description-help" className="text-sm text-muted-foreground mt-1">
+          Provide detailed information about your product
+        </p>
       </div>
 
       <div>
         <Label htmlFor="price">Price ($)</Label>
         <Input
           id="price"
-          type="number"
-          step="0.01"
-          min="0"
+          type="text"
+          inputMode="decimal"
+          pattern="^\d*\.?\d{0,2}$"
           placeholder="0.00"
           {...form.register("price")}
           required
+          aria-describedby="price-help"
         />
+        <p id="price-help" className="text-sm text-muted-foreground mt-1">
+          Enter price with up to 2 decimal places (e.g., 29.99)
+        </p>
       </div>
 
       <div>
         <Label htmlFor="category">Category</Label>
-        <Input id="category" {...form.register("category")} required />
+        <Input 
+          id="category" 
+          {...form.register("category")} 
+          required
+          aria-describedby="category-help"
+        />
+        <p id="category-help" className="text-sm text-muted-foreground mt-1">
+          Choose a category for your product
+        </p>
       </div>
 
       <div className="space-y-4">
@@ -188,6 +220,7 @@ export function ProductForm() {
             className="w-full h-32 flex flex-col items-center justify-center gap-2 border-2 border-dashed"
             onClick={() => document.getElementById('file-upload')?.click()}
             disabled={uploading}
+            aria-describedby="upload-help"
           >
             {uploading ? (
               <>
@@ -202,6 +235,9 @@ export function ProductForm() {
               </>
             )}
           </Button>
+          <p id="upload-help" className="text-sm text-muted-foreground">
+            Upload a high-quality image of your product
+          </p>
 
           <input
             id="file-upload"
@@ -210,6 +246,7 @@ export function ProductForm() {
             onChange={handleFileUpload}
             className="hidden"
             disabled={uploading}
+            aria-label="Upload product image"
           />
 
           {previewUrl && (
