@@ -135,15 +135,22 @@ export default function VendorDashboard() {
         throw new Error("Please enter a valid positive number for the price.");
       }
 
-      const res = await apiRequest("PATCH", `/api/products/${id}`, data);
+      const res = await apiRequest("PATCH", `/api/products/${id}`, {
+        ...data,
+        price: price.toFixed(2), // Send price as string with 2 decimal places
+      });
+
       if (!res.ok) {
         throw new Error("Failed to update product");
       }
 
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+    onSuccess: (updatedProduct) => {
+      queryClient.setQueryData<Product[]>(
+        ["/api/products"],
+        (old = []) => old?.map(p => p.id === updatedProduct.id ? updatedProduct : p) ?? []
+      );
       toast({
         title: "Success",
         description: "Product updated successfully",

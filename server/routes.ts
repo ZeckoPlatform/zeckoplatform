@@ -711,14 +711,14 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ message: "Product not found" });
       }
 
-      // Convert price from decimal string to cents if provided
+      // Convert price from decimal to cents if provided
       let updateData = { ...req.body };
       if (typeof updateData.price !== 'undefined') {
-        const priceInCents = Math.round(parseFloat(updateData.price) * 100);
-        if (isNaN(priceInCents)) {
+        const price = parseFloat(updateData.price);
+        if (isNaN(price)) {
           return res.status(400).json({ message: "Invalid price format" });
         }
-        updateData.price = priceInCents;
+        updateData.price = Math.round(price * 100); // Convert to cents
       }
 
       // Update the product
@@ -728,10 +728,12 @@ export function registerRoutes(app: Express): Server {
         .returning();
 
       // Convert price back to decimal for response
-      res.json({
+      const responseProduct = {
         ...updatedProduct,
-        price: (updatedProduct.price / 100).toFixed(2),
-      });
+        price: (updatedProduct.price / 100).toFixed(2), // Convert back to decimal
+      };
+
+      res.json(responseProduct);
     } catch (error) {
       log(`Product update error: ${error instanceof Error ? error.message : String(error)}`);
       console.error('Full error:', error);
