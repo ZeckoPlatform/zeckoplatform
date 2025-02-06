@@ -38,12 +38,53 @@ export default function VendorDashboard() {
     },
   });
 
+  const profileForm = useForm({
+    defaultValues: {
+      name: user?.profile?.name || "",
+      description: user?.profile?.description || "",
+      categories: user?.profile?.categories?.join(", ") || "",
+    },
+  });
+
+  // Re-add updateProfileMutation
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data) => {
+      const res = await apiRequest("PATCH", "/api/user/profile", {
+        profile: {
+          ...user?.profile,
+          name: data.name?.trim(),
+          description: data.description?.trim(),
+          categories: data.categories?.split(",").map(c => c.trim()).filter(Boolean),
+        },
+      });
+      return res.json();
+    },
+    onSuccess: (updatedUser) => {
+      queryClient.setQueryData(["/api/user"], updatedUser);
+      toast({
+        title: "Success",
+        description: "Store profile updated successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update profile",
+        variant: "destructive",
+      });
+    },
+  });
+
   useEffect(() => {
     if (editingProduct) {
+      const price = typeof editingProduct.price === 'string' 
+        ? parseFloat(editingProduct.price) 
+        : editingProduct.price;
+
       editForm.reset({
         title: editingProduct.title,
         description: editingProduct.description,
-        price: editingProduct.price,
+        price: price.toFixed(2),
         category: editingProduct.category,
         imageUrl: editingProduct.imageUrl,
       });
@@ -110,7 +151,6 @@ export default function VendorDashboard() {
     }
   };
 
-
   const updateProductMutation = useMutation({
     mutationFn: async ({ id, data }) => {
       const price = parseFloat(data.price);
@@ -122,6 +162,10 @@ export default function VendorDashboard() {
         ...data,
         price: price.toFixed(2), // Send price as dollars
       });
+
+      if (!res.ok) {
+        throw new Error("Failed to update product");
+      }
 
       const updatedProduct = await res.json();
       return updatedProduct;
@@ -150,9 +194,16 @@ export default function VendorDashboard() {
       if (!res.ok) {
         throw new Error("Failed to delete product");
       }
+      return id;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+    onSuccess: (deletedId) => {
+      // Optimistically remove the product from the cache
+      const currentProducts = queryClient.getQueryData(["/api/products"]) || [];
+      queryClient.setQueryData(
+        ["/api/products"],
+        currentProducts.filter(p => p.id !== deletedId)
+      );
+
       toast({
         title: "Success",
         description: "Product deleted successfully",
@@ -164,6 +215,8 @@ export default function VendorDashboard() {
         description: error.message || "Failed to delete product",
         variant: "destructive",
       });
+      // Refresh the products list on error to ensure sync
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
     },
   });
 
@@ -452,17 +505,15 @@ export default function VendorDashboard() {
               <CardTitle>Account Settings</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <h3 className="font-medium mb-2">Subscription Status</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Your vendor subscription is {user?.subscriptionActive ? "active" : "inactive"}
-                  </p>
-                </div>
-                <Button variant="outline" asChild>
-                  <a href="/subscription">Manage Subscription</a>
-                </Button>
+              <div>
+                <h3 className="font-medium mb-2">Subscription Status</h3>
+                <p className="text-sm text-muted-foreground">
+                  Your vendor subscription is {user?.subscriptionActive ? "active" : "inactive"}
+                </p>
               </div>
+              <Button variant="outline" asChild className="mt-4">
+                <a href="/subscription">Manage Subscription</a>
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
