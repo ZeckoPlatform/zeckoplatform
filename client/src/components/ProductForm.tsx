@@ -157,7 +157,14 @@ export function ProductForm() {
 
       <div>
         <Label htmlFor="price">Price ($)</Label>
-        <Input id="price" type="number" step="0.01" min="0" {...form.register("price")} required />
+        <Input 
+          id="price" 
+          type="number" 
+          step="0.01" 
+          min="0" 
+          {...form.register("price")} 
+          required 
+        />
       </div>
 
       <div>
@@ -168,60 +175,39 @@ export function ProductForm() {
       <div className="space-y-4">
         <Label>Product Image</Label>
         <div className="flex flex-col gap-4">
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full h-32 flex flex-col items-center justify-center gap-2 border-2 border-dashed"
-            onClick={() => fileInputRef.current?.click()}
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={() => fileInputRef.current?.click()} 
             disabled={uploading}
           >
-            {uploading ? (
-              <>
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <span>Uploading...</span>
-              </>
-            ) : (
-              <>
-                <Upload className="h-8 w-8 text-primary" />
-                <span>Click to upload image</span>
-                <span className="text-xs text-muted-foreground">PNG, JPG, GIF up to 10MB</span>
-              </>
-            )}
+            {uploading ? <Loader2 className="animate-spin" /> : <Upload />} Upload Image
           </Button>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileUpload}
-            className="hidden"
-            disabled={uploading}
+          <input 
+            ref={fileInputRef} 
+            type="file" 
+            accept="image/*" 
+            onChange={handleFileUpload} 
+            className="hidden" 
           />
-
           {previewUrl && (
-            <div className="relative w-full h-48">
-              <img
-                src={previewUrl}
-                alt="Product preview"
-                className="w-full h-full object-contain rounded-lg border"
-              />
-            </div>
+            <img 
+              src={previewUrl} 
+              alt="Product preview" 
+              className="w-full h-48 object-contain" 
+            />
           )}
         </div>
       </div>
 
-      <Button
-        type="submit"
-        className="w-full"
+      <Button 
+        type="submit" 
         disabled={createProductMutation.isPending || uploading}
       >
         {createProductMutation.isPending ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Creating Product...
-          </>
+          <Loader2 className="animate-spin" /> 
         ) : (
-          'Create Product'
+          "Create Product"
         )}
       </Button>
     </form>
