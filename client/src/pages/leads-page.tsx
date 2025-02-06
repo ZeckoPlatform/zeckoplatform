@@ -75,20 +75,6 @@ const calculateMatchScore = (lead: SelectLead, user: SelectUser | null): {
 };
 
 
-// Placeholder components (replace with your actual implementation)
-const HoverCard = ({ children }: { children: React.ReactNode }) => (
-  <div>{children}</div>
-);
-
-const HoverCardTrigger = ({ children }: { children: React.ReactNode }) => (
-  <div>{children}</div>
-);
-
-const HoverCardContent = ({ children }: { children: React.ReactNode }) => (
-  <div className="absolute z-10 bg-white shadow-md rounded-md p-4">{children}</div>
-);
-
-
 export default function LeadsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -482,44 +468,14 @@ export default function LeadsPage() {
                 <p className="text-sm text-muted-foreground">
                   Posted {lead.created_at ? format(new Date(lead.created_at), 'PPp') : 'Recently'}
                 </p>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
                   <Progress
                     value={matchScore.totalScore}
                     className="w-[100px]"
                   />
-                  <HoverCard>
-                    <HoverCardTrigger>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">
-                          {Math.round(matchScore.totalScore)}% Match
-                        </span>
-                        <Info className="h-4 w-4" />
-                      </div>
-                    </HoverCardTrigger>
-                    <HoverCardContent>
-                      <div className="space-y-2">
-                        <h4 className="font-semibold">Match Details</h4>
-                        <div className="text-sm space-y-1">
-                          <p>
-                            <span className="font-medium">Category Match:</span>{' '}
-                            {matchScore.categoryScore > 0 ? '✓' : '✗'}
-                          </p>
-                          <p>
-                            <span className="font-medium">Location Match:</span>{' '}
-                            {matchScore.locationScore > 0 ? '✓' : '✗'}
-                          </p>
-                          <p>
-                            <span className="font-medium">Budget Match:</span>{' '}
-                            {matchScore.budgetScore > 0 ? '✓' : '✗'}
-                          </p>
-                          <p>
-                            <span className="font-medium">Industry Experience:</span>{' '}
-                            {matchScore.industryScore > 0 ? '✓' : '✗'}
-                          </p>
-                        </div>
-                      </div>
-                    </HoverCardContent>
-                  </HoverCard>
+                  <span className="text-sm text-muted-foreground">
+                    {Math.round(matchScore.totalScore)}% Match
+                  </span>
                 </div>
               </CardFooter>
             </Card>
