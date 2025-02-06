@@ -14,12 +14,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Store, Package, Settings, Edit, Trash2, Upload, Loader2 } from "lucide-react";
 import { ProductForm } from "@/components/ProductForm";
 
-// Define the Product type without relying on schema
 interface Product {
   id: number;
   title: string;
   description: string;
-  price: string | number;
+  price: number;
   category: string;
   imageUrl?: string;
   vendorId: number;
@@ -36,19 +35,19 @@ export default function VendorDashboard() {
   const [previewUrl, setPreviewUrl] = useState<string>();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: products = [] } = useQuery<Product[]>({
+  const { data: products = [], refetch: refetchProducts } = useQuery<Product[]>({
     queryKey: ["/api/products"],
-    select: (data) => 
-      Array.isArray(data) 
+    select: (data) =>
+      Array.isArray(data)
         ? data.filter((product) => product.vendorId === user?.id)
         : [],
   });
 
-  const editForm = useForm<Product>({
+  const editForm = useForm<Omit<Product, 'id' | 'vendorId' | 'created_at' | 'updated_at'>>({
     defaultValues: {
       title: "",
       description: "",
-      price: "",
+      price: 0,
       category: "",
       imageUrl: "",
     },
@@ -92,14 +91,10 @@ export default function VendorDashboard() {
 
   useEffect(() => {
     if (editingProduct) {
-      const price = typeof editingProduct.price === 'string'
-        ? parseFloat(editingProduct.price)
-        : editingProduct.price;
-
       editForm.reset({
         title: editingProduct.title,
         description: editingProduct.description,
-        price: price.toFixed(2),
+        price: editingProduct.price,
         category: editingProduct.category,
         imageUrl: editingProduct.imageUrl,
       });
@@ -167,30 +162,25 @@ export default function VendorDashboard() {
   };
 
   const updateProductMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: Partial<Product> }) => {
-      const price = parseFloat(data.price as string);
+    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+      const price = parseFloat(data.price);
       if (isNaN(price) || price <= 0) {
         throw new Error("Please enter a valid positive number for the price.");
       }
 
       const res = await apiRequest("PATCH", `/api/products/${id}`, {
         ...data,
-        price: price.toString(),
+        price,
       });
 
       if (!res.ok) {
         throw new Error("Failed to update product");
       }
 
-      const updatedProduct = await res.json();
-      return updatedProduct;
+      return res.json();
     },
-    onSuccess: (updatedProduct) => {
-      queryClient.setQueryData<Product[]>(
-        ["/api/products"],
-        (old = []) => old.map(p => p.id === updatedProduct.id ? updatedProduct : p)
-      );
-
+    onSuccess: () => {
+      refetchProducts();
       toast({
         title: "Success",
         description: "Product updated successfully",
@@ -216,12 +206,8 @@ export default function VendorDashboard() {
       }
       return id;
     },
-    onSuccess: (deletedId) => {
-      queryClient.setQueryData<Product[]>(
-        ["/api/products"],
-        (old = []) => old.filter((p) => p.id !== deletedId)
-      );
-
+    onSuccess: () => {
+      refetchProducts();
       toast({
         title: "Success",
         description: "Product deleted successfully",
@@ -236,7 +222,6 @@ export default function VendorDashboard() {
     },
   });
 
-  // Rest of the component remains the same, just update DialogContent with aria-describedby
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <h1 className="text-3xl font-bold mb-8">Vendor Dashboard</h1>
@@ -286,8 +271,8 @@ export default function VendorDashboard() {
                 {editingProduct && (
                   <form
                     onSubmit={editForm.handleSubmit((data) =>
-                      updateProductMutation.mutate({ 
-                        id: editingProduct.id, 
+                      updateProductMutation.mutate({
+                        id: editingProduct.id,
                         data: {
                           ...data,
                           imageUrl: editForm.getValues("imageUrl")
@@ -413,7 +398,7 @@ export default function VendorDashboard() {
                   </p>
                   <div className="flex items-center justify-between">
                     <span className="text-lg font-semibold">
-                      ${parseFloat(product.price.toString()).toFixed(2)}
+                      ${typeof product.price === 'number' ? product.price.toFixed(2) : parseFloat(product.price).toFixed(2)}
                     </span>
                     <span className="text-sm text-muted-foreground">
                       {product.category}

@@ -108,7 +108,7 @@ export function ProductForm({ onSuccess }: ProductFormProps) {
 
       const res = await apiRequest("POST", "/api/products", {
         ...data,
-        price: price.toString(), // Send price as is, no conversion needed
+        price: price,
       });
 
       if (!res.ok) {
@@ -117,8 +117,8 @@ export function ProductForm({ onSuccess }: ProductFormProps) {
 
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+    onSuccess: (newProduct) => {
+      queryClient.setQueryData(["/api/products"], (old: any[] = []) => [...old, newProduct]);
       toast({ title: "Success", description: "Product created successfully" });
       form.reset();
       setPreviewUrl(undefined);
