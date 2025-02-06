@@ -11,7 +11,14 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { calculateShippingCost } from "@/lib/shipping-calculator";
+import { calculateShippingOptions, type ShippingOption } from "@/lib/shipping-calculator";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface CheckoutFormData {
   fullName: string;
@@ -27,15 +34,13 @@ export default function CartPage() {
   const subtotal = cart.getTotal();
   const { toast } = useToast();
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [selectedShipping, setSelectedShipping] = useState<ShippingOption>();
+  const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
 
   // Calculate shipping details
   const totalWeight = cart.items.reduce((total, item) => total + (item.weight || 0), 0);
   const dimensions = cart.items.map(item => item.dimensions || { length: 0, width: 0, height: 0 });
   const totalSize = dimensions.reduce((acc, dim) => acc + dim.length + dim.width + dim.height, 0);
-
-  const shippingCost = calculateShippingCost(totalWeight, dimensions);
-
-  const total = subtotal + shippingCost;
 
   const form = useForm<CheckoutFormData>({
     defaultValues: {
@@ -48,11 +53,28 @@ export default function CartPage() {
     },
   });
 
+  // Watch postcode for shipping calculation
+  const postcode = form.watch("postcode");
+
+  // Update shipping options when postcode changes
+  const updateShippingOptions = (postcode: string) => {
+    if (postcode.length >= 2) {
+      const options = calculateShippingOptions(totalWeight, dimensions, postcode);
+      setShippingOptions(options);
+      setSelectedShipping(options[0]); // Select first option by default
+    }
+  };
+
+  const total = subtotal + (selectedShipping?.price || 0);
+
   const checkoutMutation = useMutation({
     mutationFn: async (data: CheckoutFormData) => {
       const res = await apiRequest("POST", "/api/orders", {
         items: cart.items,
-        shippingDetails: data,
+        shippingDetails: {
+          ...data,
+          shippingOption: selectedShipping,
+        },
         total: total,
       });
       return res.json();
@@ -164,7 +186,7 @@ export default function CartPage() {
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span>Shipping</span>
-                    <span>£{formatPrice(shippingCost)}</span>
+                    <span>£{formatPrice(selectedShipping?.price || 0)}</span>
                   </div>
                   <div className="text-sm text-muted-foreground">
                     <p>Package Details:</p>
@@ -246,12 +268,47 @@ export default function CartPage() {
                 id="postcode"
                 {...form.register("postcode")}
                 required
+                onChange={(e) => updateShippingOptions(e.target.value)}
               />
             </div>
+
+            {shippingOptions.length > 0 && (
+              <div>
+                <Label>Shipping Method</Label>
+                <Select
+                  value={selectedShipping?.provider + selectedShipping?.speed}
+                  onValueChange={(value) => {
+                    const [provider, speed] = value.split('|');
+                    setSelectedShipping(
+                      shippingOptions.find(
+                        option => 
+                          option.provider === provider && 
+                          option.speed === speed
+                      )
+                    );
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select shipping method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {shippingOptions.map((option) => (
+                      <SelectItem 
+                        key={option.provider + option.speed} 
+                        value={`${option.provider}|${option.speed}`}
+                      >
+                        {option.provider} - {option.speed} (£{formatPrice(option.price)}) - {option.estimatedDays}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <Button
               type="submit"
               className="w-full"
-              disabled={checkoutMutation.isPending}
+              disabled={checkoutMutation.isPending || !selectedShipping}
             >
               {checkoutMutation.isPending ? (
                 <>

@@ -27,6 +27,7 @@ interface Product {
     width: number;
     height: number;
   };
+  shippingOverride?: number; // Added field for vendor shipping override
   vendor: {
     name: string;
     email: string;
@@ -51,6 +52,7 @@ export default function MarketplacePage() {
       length: "",
       width: "",
       height: "",
+      shippingOverride: "",
     },
   });
 
@@ -69,6 +71,7 @@ export default function MarketplacePage() {
           width: parseFloat(data.width),
           height: parseFloat(data.height),
         },
+        shippingOverride: data.shippingOverride ? parseFloat(data.shippingOverride) : undefined,
       });
       return res.json();
     },
@@ -216,6 +219,19 @@ export default function MarketplacePage() {
                             />
                           </div>
                         </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="shippingOverride">Custom Shipping Price (Optional)</Label>
+                        <Input
+                          id="shippingOverride"
+                          type="number"
+                          step="0.01"
+                          {...form.register("shippingOverride")}
+                          placeholder="Leave empty for calculated shipping"
+                        />
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Set a fixed shipping price or leave empty to use our calculated rates
+                        </p>
                       </div>
                       <Button 
                         type="submit" 
