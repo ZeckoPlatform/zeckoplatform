@@ -36,7 +36,19 @@ export default function SubscriptionPage() {
   const subscribeMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/subscriptions");
-      return res.json();
+      const data = await res.json();
+
+      // If payment setup is required, we'll handle it here in the future
+      if (data.setupRequired) {
+        toast({
+          title: "Payment Required",
+          description: "This feature is coming soon. Currently only available in test mode.",
+          variant: "destructive",
+        });
+        throw new Error("Subscription requires payment setup");
+      }
+
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/subscriptions/current"] });
@@ -103,8 +115,8 @@ export default function SubscriptionPage() {
               <CreditCard className="h-5 w-5 text-primary" />
               <div>
                 <p className="font-medium">
-                  {currentSubscription.tier.charAt(0).toUpperCase() + 
-                   currentSubscription.tier.slice(1)} Plan
+                  {currentSubscription.tier.charAt(0).toUpperCase() +
+                    currentSubscription.tier.slice(1)} Plan
                 </p>
                 <p className="text-sm text-muted-foreground">
                   ${(currentSubscription.price / 100).toFixed(2)}/month

@@ -218,6 +218,18 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
+      // Check if this is a development/test account
+      const isTestAccount = process.env.NODE_ENV === 'development' && req.user.id === 1;
+
+      if (!isTestAccount) {
+        // Regular user flow - should include Stripe payment
+        return res.status(400).json({ 
+          message: "Subscription requires payment processing. Please use the Stripe checkout flow.",
+          setupRequired: true
+        });
+      }
+
+      // Test account flow - direct activation without payment
       const subscription = await db.insert(subscriptions).values({
         user_id: req.user.id,
         tier: req.user.userType as "business" | "vendor",
