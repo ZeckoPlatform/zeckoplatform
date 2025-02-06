@@ -724,7 +724,6 @@ export function registerRoutes(app: Express): Server {
 
       log(`Updating product ${productId} with data:`, updateData);
 
-      // Update the product
       const [updatedProduct] = await db.update(products)
         .set(updateData)
         .where(eq(products.id, productId))

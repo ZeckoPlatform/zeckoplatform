@@ -149,7 +149,10 @@ export default function VendorDashboard() {
     onSuccess: (updatedProduct) => {
       queryClient.setQueryData<Product[]>(
         ["/api/products"],
-        (old = []) => old?.map(p => p.id === updatedProduct.id ? updatedProduct : p) ?? []
+        (old = []) => old?.map(p => p.id === updatedProduct.id ? {
+          ...updatedProduct,
+          price: Number(updatedProduct.price), // Ensure price is stored as number
+        } : p) ?? []
       );
       toast({
         title: "Success",
