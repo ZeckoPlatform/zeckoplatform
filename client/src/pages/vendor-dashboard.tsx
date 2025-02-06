@@ -152,7 +152,7 @@ export default function VendorDashboard() {
   };
 
   const updateProductMutation = useMutation({
-    mutationFn: async ({ id, data }) => {
+    mutationFn: async ({ id, data }: { id: number; data: any }) => {
       const price = parseFloat(data.price);
       if (isNaN(price) || price <= 0) {
         throw new Error("Please enter a valid positive number for the price.");
@@ -184,8 +184,9 @@ export default function VendorDashboard() {
       });
       setEditingProduct(null);
       setPreviewUrl(undefined);
+      editForm.reset(); // Reset form after successful update
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
         description: error.message || "Failed to update product",
@@ -293,7 +294,13 @@ export default function VendorDashboard() {
                 {editingProduct && (
                   <form
                     onSubmit={editForm.handleSubmit((data) =>
-                      updateProductMutation.mutate({ id: editingProduct.id, data })
+                      updateProductMutation.mutate({ 
+                        id: editingProduct.id, 
+                        data: {
+                          ...data,
+                          imageUrl: editForm.getValues("imageUrl") // Ensure image URL is included
+                        }
+                      })
                     )}
                     className="space-y-4"
                   >
