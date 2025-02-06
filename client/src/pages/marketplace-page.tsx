@@ -284,7 +284,7 @@ export default function MarketplacePage() {
                               cart.addItem({
                                 id: selectedProduct!.id,
                                 title: selectedProduct!.title,
-                                price: selectedProduct!.price,
+                                price: Number(selectedProduct!.price),
                                 imageUrl: selectedProduct!.imageUrl,
                                 vendorId: selectedProduct!.vendor.id
                               });
@@ -306,7 +306,7 @@ export default function MarketplacePage() {
                     cart.addItem({
                       id: product.id,
                       title: product.title,
-                      price: product.price,
+                      price: Number(product.price),
                       imageUrl: product.imageUrl,
                       vendorId: product.vendor.id
                     });

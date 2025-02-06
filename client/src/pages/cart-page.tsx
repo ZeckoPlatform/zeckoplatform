@@ -26,6 +26,10 @@ export default function CartPage() {
     );
   }
 
+  const formatPrice = (price: number) => {
+    return Number(price).toFixed(2);
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="grid gap-8 lg:grid-cols-3">
@@ -43,7 +47,7 @@ export default function CartPage() {
                   )}
                   <div className="flex-1">
                     <h3 className="font-medium">{item.title}</h3>
-                    <p className="text-muted-foreground">£{item.price.toFixed(2)}</p>
+                    <p className="text-muted-foreground">£{formatPrice(item.price)}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
@@ -89,11 +93,11 @@ export default function CartPage() {
               <div className="space-y-4">
                 <div className="flex justify-between">
                   <span>Subtotal</span>
-                  <span>£{total.toFixed(2)}</span>
+                  <span>£{formatPrice(total)}</span>
                 </div>
                 <div className="flex justify-between font-medium">
                   <span>Total</span>
-                  <span>£{total.toFixed(2)}</span>
+                  <span>£{formatPrice(total)}</span>
                 </div>
               </div>
             </CardContent>
