@@ -1,0 +1,107 @@
+Issue 1: Price Input Issue (Decimals Not Being Entered Properly)
+The problem might be that your input type is text, but the value needs to be correctly parsed into a float before being stored.
+
+Fix: Ensure the price is handled as a number
+
+Modify the way you handle the price in your useForm setup and mutation function.
+
+const createProductMutation = useMutation({
+  mutationFn: async (data: ProductFormData) => {
+    // Convert price to float
+    let price = parseFloat(data.price);
+
+    if (isNaN(price) || price <= 0) {
+      throw new Error("Please enter a valid positive number for the price.");
+    }
+
+    const res = await apiRequest("POST", "/api/products", {
+      ...data,
+      price: price.toFixed(2), // Ensure two decimal places
+    });
+
+    return res.json();
+  },
+});
+Additionally, update your price input field like this:
+
+<Input
+  id="price"
+  type="number"
+  step="0.01"
+  min="0"
+  placeholder="0.00"
+  {...form.register("price", { required: true })}
+  aria-describedby="price-help"
+/>
+type="number" ensures the browser handles numbers correctly.
+step="0.01" allows decimal values.
+Issue 2: Image Upload Not Triggering Properly
+Your image upload button relies on clicking a hidden file input, but document.getElementById('file-upload') might not be working correctly.
+
+Fix: Use a ref instead of document.getElementById()
+
+Modify the button click event to use useRef instead:
+
+import { useRef } from "react";
+
+// Inside the component:
+const fileInputRef = useRef<HTMLInputElement>(null);
+
+<Button
+  type="button"
+  variant="outline"
+  className="w-full h-32 flex flex-col items-center justify-center gap-2 border-2 border-dashed"
+  onClick={() => fileInputRef.current?.click()}
+  disabled={uploading}
+  aria-describedby="upload-help"
+>
+  {uploading ? (
+    <>
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <span>Uploading...</span>
+    </>
+  ) : (
+    <>
+      <Upload className="h-8 w-8 text-primary" />
+      <span>Click to upload image</span>
+      <span className="text-xs text-muted-foreground">PNG, JPG, GIF up to 10MB</span>
+    </>
+  )}
+</Button>
+
+<input
+  ref={fileInputRef}
+  id="file-upload"
+  type="file"
+  accept="image/*"
+  onChange={handleFileUpload}
+  className="hidden"
+  disabled={uploading}
+  aria-label="Upload product image"
+/>
+This will correctly trigger the file input when clicking the button.
+
+Issue 3: API Request for Image Upload
+Your apiRequest("POST", "/api/upload", { file: base64Data, fileName: file.name }); might not be working as expected.
+
+Debugging Tip: Log the response from /api/upload:
+const response = await apiRequest("POST", "/api/upload", {
+  file: base64Data,
+  fileName: file.name,
+});
+
+const data = await response.json();
+console.log("Upload Response:", data); // Check for errors
+
+if (!data.url) {
+  throw new Error("Image upload failed");
+}
+
+form.setValue("imageUrl", data.url);
+setPreviewUrl(URL.createObjectURL(file));
+If data.url is undefined, your backend might not be returning the expected response.
+
+Expected Outcome After Fixes
+Prices will correctly accept decimal values (e.g., 12.99).
+Image upload button will now open the file picker properly.
+File uploads will work after ensuring a correct response from the backend.

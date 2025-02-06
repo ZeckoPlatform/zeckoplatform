@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,7 @@ export function ProductForm() {
   const { user } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string>();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch current subscription status
   const { data: subscription } = useQuery({
@@ -85,6 +86,10 @@ export function ProductForm() {
           });
 
           const data = await response.json();
+          if (!data.url) {
+            throw new Error("Image upload failed - no URL returned");
+          }
+
           form.setValue("imageUrl", data.url);
           setPreviewUrl(URL.createObjectURL(file));
 
@@ -153,7 +158,6 @@ export function ProductForm() {
     <form 
       onSubmit={form.handleSubmit((data) => createProductMutation.mutate(data))} 
       className="space-y-6"
-      aria-label="Create Product Form"
     >
       <div>
         <Label htmlFor="title">Title</Label>
@@ -161,11 +165,7 @@ export function ProductForm() {
           id="title" 
           {...form.register("title")} 
           required 
-          aria-describedby="title-description"
         />
-        <p id="title-description" className="text-sm text-muted-foreground mt-1">
-          Enter a descriptive title for your product
-        </p>
       </div>
 
       <div>
@@ -174,11 +174,7 @@ export function ProductForm() {
           id="description" 
           {...form.register("description")} 
           required
-          aria-describedby="description-help"
         />
-        <p id="description-help" className="text-sm text-muted-foreground mt-1">
-          Provide detailed information about your product
-        </p>
       </div>
 
       <div>
@@ -191,9 +187,8 @@ export function ProductForm() {
           placeholder="0.00"
           {...form.register("price")}
           required
-          aria-describedby="price-help"
         />
-        <p id="price-help" className="text-sm text-muted-foreground mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Enter price with up to 2 decimal places (e.g., 29.99)
         </p>
       </div>
@@ -204,11 +199,7 @@ export function ProductForm() {
           id="category" 
           {...form.register("category")} 
           required
-          aria-describedby="category-help"
         />
-        <p id="category-help" className="text-sm text-muted-foreground mt-1">
-          Choose a category for your product
-        </p>
       </div>
 
       <div className="space-y-4">
@@ -218,9 +209,8 @@ export function ProductForm() {
             type="button"
             variant="outline"
             className="w-full h-32 flex flex-col items-center justify-center gap-2 border-2 border-dashed"
-            onClick={() => document.getElementById('file-upload')?.click()}
+            onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            aria-describedby="upload-help"
           >
             {uploading ? (
               <>
@@ -235,18 +225,14 @@ export function ProductForm() {
               </>
             )}
           </Button>
-          <p id="upload-help" className="text-sm text-muted-foreground">
-            Upload a high-quality image of your product
-          </p>
 
           <input
-            id="file-upload"
+            ref={fileInputRef}
             type="file"
             accept="image/*"
             onChange={handleFileUpload}
             className="hidden"
             disabled={uploading}
-            aria-label="Upload product image"
           />
 
           {previewUrl && (
