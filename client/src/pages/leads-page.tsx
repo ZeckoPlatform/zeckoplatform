@@ -458,41 +458,46 @@ export default function LeadsPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {Object.entries(myResponses).length > 0 ? (
-                Object.entries(myResponses).map(([leadId, response]) => {
-                  const lead = leads.find(l => l.id === parseInt(leadId));
-                  return (
-                    <div key={leadId} className="border rounded-lg p-4">
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <h3 className="font-medium">{lead?.title}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            Sent: {response.created_at ? format(new Date(response.created_at), 'PPp') : 'Recently'}
-                          </p>
-                        </div>
-                        <Badge variant={
-                          response.status === "accepted" ? "success" :
-                          response.status === "rejected" ? "destructive" :
-                          "secondary"
-                        }>
-                          {response.status.charAt(0).toUpperCase() + response.status.slice(1)}
-                        </Badge>
+              {Object.entries(myResponses).map(([leadId, response]) => {
+                const lead = leads.find(l => l.id === parseInt(leadId));
+                return (
+                  <div key={leadId} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <h3 className="font-medium">{lead?.title}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Sent: {response.created_at ? format(new Date(response.created_at), 'PPp') : 'Recently'}
+                        </p>
                       </div>
-                      <p className="text-sm mt-2">{response.proposal}</p>
-                      {response.status === "accepted" && response.contactDetails && (
-                        <div className="mt-4 p-4 bg-background rounded-lg border">
-                          <h4 className="font-medium mb-2">Contact Information</h4>
-                          <p className="text-sm whitespace-pre-wrap">{response.contactDetails}</p>
-                        </div>
-                      )}
+                      <Badge variant={
+                        response.status === "accepted" ? "success" :
+                        response.status === "rejected" ? "destructive" :
+                        "secondary"
+                      }>
+                        {response.status.charAt(0).toUpperCase() + response.status.slice(1)}
+                      </Badge>
                     </div>
-                  );
-                })
-              ) : (
-                <p className="text-muted-foreground text-center py-4">
-                  You haven't sent any proposals yet.
-                </p>
-              )}
+                    <p className="text-sm mt-2">{response.proposal}</p>
+                    {response.status === "accepted" && (
+                      <div className="mt-4 p-4 bg-muted rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <Info className="h-4 w-4 mt-0.5 text-primary" />
+                          <div>
+                            <h4 className="font-medium text-sm">Lead Contact Information</h4>
+                            {response.contactDetails ? (
+                              <p className="text-sm mt-1 whitespace-pre-wrap">{response.contactDetails}</p>
+                            ) : (
+                              <p className="text-sm text-muted-foreground mt-1">
+                                The lead has accepted your proposal but hasn't provided contact details yet.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>

@@ -191,6 +191,7 @@ export function registerRoutes(app: Express): Server {
             proposal: leadResponses.proposal,
             status: leadResponses.status,
             created_at: leadResponses.created_at,
+            contactDetails: leadResponses.contactDetails, // Added contactDetails
             business: {
               id: users.id,
               username: users.username,
