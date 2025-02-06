@@ -163,57 +163,53 @@ export function registerRoutes(app: Express): Server {
 
       log(`Fetching leads for user ${req.user.id} (${req.user.userType})`);
 
-      // Basic query without relations first
-      let query = db.select()
-        .from(leads)
-        .where(
-          or(
-            eq(leads.status, "closed"),
-            gt(leads.expires_at, new Date())
-          )
-        );
+      let query = db.query.leads.findMany({
+        where: or(
+          eq(leads.status, "closed"),
+          gt(leads.expires_at, new Date())
+        ),
+        with: {
+          responses: {
+            with: {
+              business: {
+                columns: {
+                  id: true,
+                  username: true,
+                  profile: true
+                }
+              }
+            }
+          }
+        }
+      });
 
       // Add user-specific filters
       if (req.user.userType === "free") {
-        query = query.where(eq(leads.user_id, req.user.id));
+        query = {
+          ...query,
+          where: and(
+            query.where,
+            eq(leads.user_id, req.user.id)
+          )
+        };
       } else if (req.user.userType === "business") {
-        query = query.where(eq(leads.status, "open"));
+        query = {
+          ...query,
+          where: and(
+            query.where,
+            eq(leads.status, "open")
+          )
+        };
       }
 
       const fetchedLeads = await query;
       log(`Successfully fetched ${fetchedLeads.length} leads`);
 
-      // Now fetch responses separately for each lead
-      const leadsWithResponses = await Promise.all(
-        fetchedLeads.map(async (lead) => {
-          const responses = await db.select({
-            id: leadResponses.id,
-            proposal: leadResponses.proposal,
-            status: leadResponses.status,
-            created_at: leadResponses.created_at,
-            contactDetails: leadResponses.contactDetails, // Added contactDetails
-            business: {
-              id: users.id,
-              username: users.username,
-              profile: users.profile
-            }
-          })
-          .from(leadResponses)
-          .leftJoin(users, eq(leadResponses.business_id, users.id))
-          .where(eq(leadResponses.lead_id, lead.id));
-
-          return {
-            ...lead,
-            responses
-          };
-        })
-      );
-
       // For business users, sort leads by match score
-      let processedLeads = leadsWithResponses;
+      let processedLeads = fetchedLeads;
       if (req.user.userType === "business" && req.user.profile?.matchPreferences) {
         const { calculateMatchScore } = await import("./utils/matching");
-        processedLeads = leadsWithResponses
+        processedLeads = fetchedLeads
           .map(lead => ({
             ...lead,
             matchScore: calculateMatchScore(lead, req.user)
@@ -221,7 +217,6 @@ export function registerRoutes(app: Express): Server {
           .sort((a, b) => b.matchScore.totalScore - a.matchScore.totalScore);
       }
 
-      log(`Successfully processed ${processedLeads.length} leads with responses`);
       res.json(processedLeads);
     } catch (error) {
       log(`Leads fetch error: ${error instanceof Error ? error.message : String(error)}`);
