@@ -13,19 +13,33 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Store, Package, Settings, Edit, Trash2, Upload, Loader2 } from "lucide-react";
 import { ProductForm } from "@/components/ProductForm";
+import type { SelectProduct } from "@db/schema";
+
+interface Product extends SelectProduct {
+  id: number;
+  title: string;
+  description: string;
+  price: string | number;
+  category: string;
+  imageUrl?: string;
+  vendorId: number;
+}
 
 export default function VendorDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState(null);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string>();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: products = [] } = useQuery({
+  const { data: products = [] } = useQuery<Product[]>({
     queryKey: ["/api/products"],
-    select: (data) => data?.filter((product) => product.vendorId === user?.id),
+    select: (data) => 
+      Array.isArray(data) 
+        ? data.filter((product) => product.vendorId === user?.id)
+        : [],
   });
 
   const editForm = useForm({
@@ -46,7 +60,6 @@ export default function VendorDashboard() {
     },
   });
 
-  // Re-add updateProfileMutation
   const updateProfileMutation = useMutation({
     mutationFn: async (data) => {
       const res = await apiRequest("PATCH", "/api/user/profile", {
@@ -160,7 +173,7 @@ export default function VendorDashboard() {
 
       const res = await apiRequest("PATCH", `/api/products/${id}`, {
         ...data,
-        price: price.toString(), // Send price as is
+        price: price.toString(), 
       });
 
       if (!res.ok) {
@@ -171,7 +184,6 @@ export default function VendorDashboard() {
       return updatedProduct;
     },
     onSuccess: (updatedProduct) => {
-      // Update the cache with the new product data
       const currentProducts = queryClient.getQueryData(["/api/products"]) || [];
       queryClient.setQueryData(
         ["/api/products"],
@@ -184,7 +196,7 @@ export default function VendorDashboard() {
       });
       setEditingProduct(null);
       setPreviewUrl(undefined);
-      editForm.reset(); // Reset form after successful update
+      editForm.reset(); 
     },
     onError: (error: Error) => {
       toast({
@@ -196,7 +208,7 @@ export default function VendorDashboard() {
   });
 
   const deleteProductMutation = useMutation({
-    mutationFn: async (id) => {
+    mutationFn: async (id: number) => {
       const res = await apiRequest("DELETE", `/api/products/${id}`);
       if (!res.ok) {
         throw new Error("Failed to delete product");
@@ -204,11 +216,9 @@ export default function VendorDashboard() {
       return id;
     },
     onSuccess: (deletedId) => {
-      // Optimistically remove the product from the cache
-      const currentProducts = queryClient.getQueryData(["/api/products"]) || [];
-      queryClient.setQueryData(
+      queryClient.setQueryData<Product[]>(
         ["/api/products"],
-        currentProducts.filter(p => p.id !== deletedId)
+        (old) => old?.filter((p) => p.id !== deletedId) ?? []
       );
 
       toast({
@@ -216,13 +226,12 @@ export default function VendorDashboard() {
         description: "Product deleted successfully",
       });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
         description: error.message || "Failed to delete product",
         variant: "destructive",
       });
-      // Refresh the products list on error to ensure sync
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
     },
   });
@@ -282,7 +291,6 @@ export default function VendorDashboard() {
               </DialogContent>
             </Dialog>
 
-            {/* Edit Product Dialog */}
             <Dialog open={!!editingProduct} onOpenChange={(open) => !open && setEditingProduct(null)}>
               <DialogContent className="max-h-[85vh] overflow-y-auto" aria-describedby="edit-dialog-description">
                 <DialogHeader>
@@ -298,7 +306,7 @@ export default function VendorDashboard() {
                         id: editingProduct.id, 
                         data: {
                           ...data,
-                          imageUrl: editForm.getValues("imageUrl") // Ensure image URL is included
+                          imageUrl: editForm.getValues("imageUrl") 
                         }
                       })
                     )}
@@ -421,7 +429,7 @@ export default function VendorDashboard() {
                   </p>
                   <div className="flex items-center justify-between">
                     <span className="text-lg font-semibold">
-                      ${parseFloat(product.price).toFixed(2)}
+                      ${parseFloat(product.price as string).toFixed(2)}
                     </span>
                     <span className="text-sm text-muted-foreground">
                       {product.category}
