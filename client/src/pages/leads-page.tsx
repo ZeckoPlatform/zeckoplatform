@@ -323,8 +323,9 @@ export default function LeadsPage() {
         title: "Success",
         description: "Your proposal has been sent successfully.",
       });
-      setSelectedLead(null);
       setProposalContent("");
+      setSelectedLead(null);
+      setProposalDialogOpen(false);
     },
     onError: (error: Error) => {
       toast({
@@ -337,6 +338,7 @@ export default function LeadsPage() {
 
   const [selectedLead, setSelectedLead] = useState<SelectLead | null>(null);
   const [proposalContent, setProposalContent] = useState("");
+  const [proposalDialogOpen, setProposalDialogOpen] = useState(false);
 
   if (isLoadingLeads) {
     return (
@@ -397,9 +399,16 @@ export default function LeadsPage() {
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <CardTitle>{lead.title}</CardTitle>
-                  <Dialog>
+                  <Dialog open={proposalDialogOpen} onOpenChange={setProposalDialogOpen}>
                     <DialogTrigger asChild>
-                      <Button variant="outline" size="sm">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          setSelectedLead(lead);
+                          setProposalDialogOpen(true);
+                        }}
+                      >
                         <Send className="h-4 w-4 mr-2" />
                         Send Proposal
                       </Button>
