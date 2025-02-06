@@ -83,6 +83,8 @@ export function ProductForm({ onSuccess }: ProductFormProps) {
             description: "Failed to upload image. Please try again.",
             variant: "destructive",
           });
+        } finally {
+          setUploading(false);
         }
       };
 
@@ -93,7 +95,6 @@ export function ProductForm({ onSuccess }: ProductFormProps) {
         description: "Failed to process image. Please try again.",
         variant: "destructive",
       });
-    } finally {
       setUploading(false);
     }
   };

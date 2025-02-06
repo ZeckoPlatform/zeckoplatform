@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Store, Package, Settings, Edit, Trash2, Upload, Loader2 } from "lucide-react";
+import { Store, Package, Settings, Edit, Trash2, Loader2 } from "lucide-react";
 import { ProductForm } from "@/components/ProductForm";
 
 export default function VendorDashboard() {
@@ -20,7 +20,7 @@ export default function VendorDashboard() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
 
-  const { data: products } = useQuery({
+  const { data: products = [] } = useQuery({
     queryKey: ["/api/products"],
     select: (data) => data?.filter((product) => product.vendorId === user?.id),
   });
@@ -40,7 +40,7 @@ export default function VendorDashboard() {
       editForm.reset({
         title: editingProduct.title,
         description: editingProduct.description,
-        price: parseFloat(editingProduct.price).toFixed(2),
+        price: editingProduct.price,
         category: editingProduct.category,
         imageUrl: editingProduct.imageUrl,
       });
@@ -92,7 +92,7 @@ export default function VendorDashboard() {
 
       const res = await apiRequest("PATCH", `/api/products/${id}`, {
         ...data,
-        price: (price / 100).toFixed(2), // Convert cents to dollars
+        price: price.toFixed(2), // Send price as dollars
       });
       return res.json();
     },
@@ -177,7 +177,7 @@ export default function VendorDashboard() {
               <DialogTrigger asChild>
                 <Button>Add Product</Button>
               </DialogTrigger>
-              <DialogContent aria-describedby="dialog-description">
+              <DialogContent className="max-h-[85vh] overflow-y-auto" aria-describedby="dialog-description">
                 <DialogHeader>
                   <DialogTitle>Add New Product</DialogTitle>
                   <DialogDescription id="dialog-description">
@@ -190,7 +190,7 @@ export default function VendorDashboard() {
 
             {/* Edit Product Dialog */}
             <Dialog open={!!editingProduct} onOpenChange={(open) => !open && setEditingProduct(null)}>
-              <DialogContent aria-describedby="edit-dialog-description">
+              <DialogContent className="max-h-[85vh] overflow-y-auto" aria-describedby="edit-dialog-description">
                 <DialogHeader>
                   <DialogTitle>Edit Product</DialogTitle>
                   <DialogDescription id="edit-dialog-description">
@@ -223,6 +223,7 @@ export default function VendorDashboard() {
                         type="number"
                         step="0.01"
                         min="0"
+                        placeholder="0.00"
                         {...editForm.register("price")}
                         required
                       />
@@ -293,16 +294,7 @@ export default function VendorDashboard() {
                   <Button
                     variant="outline"
                     className="flex-1"
-                    onClick={() => {
-                      editForm.reset({
-                        title: product.title,
-                        description: product.description,
-                        price: parseFloat(product.price).toFixed(2),
-                        category: product.category,
-                        imageUrl: product.imageUrl,
-                      });
-                      setEditingProduct(product);
-                    }}
+                    onClick={() => setEditingProduct(product)}
                   >
                     <Edit className="h-4 w-4 mr-2" /> Edit
                   </Button>
@@ -392,7 +384,7 @@ export default function VendorDashboard() {
                 <div>
                   <h3 className="font-medium mb-2">Subscription Status</h3>
                   <p className="text-sm text-muted-foreground">
-                    Your vendor subscription is {user.subscriptionActive ? "active" : "inactive"}
+                    Your vendor subscription is {user?.subscriptionActive ? "active" : "inactive"}
                   </p>
                 </div>
                 <Button variant="outline" asChild>
