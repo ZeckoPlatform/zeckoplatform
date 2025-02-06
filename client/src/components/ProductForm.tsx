@@ -108,8 +108,12 @@ export function ProductForm({ onSuccess }: ProductFormProps) {
 
       const res = await apiRequest("POST", "/api/products", {
         ...data,
-        price: price.toFixed(2), // Send price as dollars with 2 decimal places
+        price: price.toString(), // Send price as is, no conversion needed
       });
+
+      if (!res.ok) {
+        throw new Error("Failed to create product");
+      }
 
       return res.json();
     },

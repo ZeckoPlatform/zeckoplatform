@@ -77,8 +77,8 @@ export default function VendorDashboard() {
 
   useEffect(() => {
     if (editingProduct) {
-      const price = typeof editingProduct.price === 'string' 
-        ? parseFloat(editingProduct.price) 
+      const price = typeof editingProduct.price === 'string'
+        ? parseFloat(editingProduct.price)
         : editingProduct.price;
 
       editForm.reset({
@@ -160,7 +160,7 @@ export default function VendorDashboard() {
 
       const res = await apiRequest("PATCH", `/api/products/${id}`, {
         ...data,
-        price: price.toFixed(2), // Send price as dollars
+        price: price.toString(), // Send price as is
       });
 
       if (!res.ok) {
@@ -170,8 +170,14 @@ export default function VendorDashboard() {
       const updatedProduct = await res.json();
       return updatedProduct;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+    onSuccess: (updatedProduct) => {
+      // Update the cache with the new product data
+      const currentProducts = queryClient.getQueryData(["/api/products"]) || [];
+      queryClient.setQueryData(
+        ["/api/products"],
+        currentProducts.map(p => p.id === updatedProduct.id ? updatedProduct : p)
+      );
+
       toast({
         title: "Success",
         description: "Product updated successfully",
