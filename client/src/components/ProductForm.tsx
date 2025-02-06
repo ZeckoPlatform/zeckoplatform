@@ -86,8 +86,10 @@ export function ProductForm() {
           });
 
           const data = await response.json();
+          console.log("Upload Response:", data); // Debug log
+
           if (!data.url) {
-            throw new Error("Image upload failed - no URL returned");
+            throw new Error("Image upload failed");
           }
 
           form.setValue("imageUrl", data.url);
@@ -98,23 +100,23 @@ export function ProductForm() {
             description: "Image uploaded successfully",
           });
         } catch (error) {
+          console.error('Upload error:', error);
           toast({
             title: "Error",
             description: "Failed to upload image. Please try again.",
             variant: "destructive",
           });
-          console.error('Upload error:', error);
         }
       };
 
       reader.readAsDataURL(file);
     } catch (error) {
+      console.error('File processing error:', error);
       toast({
         title: "Error",
         description: "Failed to process image. Please try again.",
         variant: "destructive",
       });
-      console.error('File processing error:', error);
     } finally {
       setUploading(false);
     }
@@ -122,17 +124,16 @@ export function ProductForm() {
 
   const createProductMutation = useMutation({
     mutationFn: async (data: ProductFormData) => {
-      // Ensure price is properly formatted
-      const cleanPrice = data.price.trim();
-      const price = parseFloat(cleanPrice);
+      // Convert price from decimal string to cents
+      let price = parseFloat(data.price);
 
-      if (isNaN(price) || price < 0) {
-        throw new Error("Please enter a valid positive number for the price");
+      if (isNaN(price) || price <= 0) {
+        throw new Error("Please enter a valid positive number for the price.");
       }
 
       const res = await apiRequest("POST", "/api/products", {
         ...data,
-        price: price.toFixed(2), // Ensure consistent decimal format
+        price: price.toFixed(2), // Ensure two decimal places
       });
 
       return res.json();
@@ -181,14 +182,14 @@ export function ProductForm() {
         <Label htmlFor="price">Price ($)</Label>
         <Input
           id="price"
-          type="text"
-          inputMode="decimal"
-          pattern="^\d*\.?\d{0,2}$"
+          type="number"
+          step="0.01"
+          min="0"
           placeholder="0.00"
-          {...form.register("price")}
-          required
+          {...form.register("price", { required: true })}
+          aria-describedby="price-help"
         />
-        <p className="text-sm text-muted-foreground mt-1">
+        <p id="price-help" className="text-sm text-muted-foreground mt-1">
           Enter price with up to 2 decimal places (e.g., 29.99)
         </p>
       </div>
