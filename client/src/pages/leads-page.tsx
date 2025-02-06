@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Settings, Edit, Trash2, Send, AlertTriangle, Info } from "lucide-react";
 import type { SelectLead, SelectUser } from "@db/schema";
 import { format } from "date-fns";
+import {Badge} from "@/components/ui/badge"
 
 interface LeadFormData {
   title: string;
@@ -316,8 +317,8 @@ export default function LeadsPage() {
   const sendProposalMutation = useMutation({
     mutationFn: async ({ leadId, proposal }: { leadId: number; proposal: string }) => {
       const res = await apiRequest("POST", `/api/leads/${leadId}/responses`, {
-        proposal, 
-        price: null, 
+        proposal,
+        price: null,
         status: "pending"
       });
       return res.json();
@@ -408,8 +409,8 @@ export default function LeadsPage() {
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <CardTitle>{lead.title}</CardTitle>
-                  <Dialog 
-                    open={proposalDialogOpen} 
+                  <Dialog
+                    open={proposalDialogOpen}
                     onOpenChange={(open) => {
                       setProposalDialogOpen(open);
                       if (!open) {
@@ -419,8 +420,8 @@ export default function LeadsPage() {
                     }}
                   >
                     <DialogTrigger asChild>
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={() => {
                           setSelectedLead(lead);
@@ -627,7 +628,7 @@ export default function LeadsPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground mb-4">{lead.description}</p>
-                <div className="grid grid-cols-3 gap-4 text-sm">
+                <div className="grid grid-cols-3 gap-4 text-sm mb-6">
                   <div>
                     <span className="font-medium">Category:</span> {lead.category}
                   </div>
@@ -637,6 +638,62 @@ export default function LeadsPage() {
                   <div>
                     <span className="font-medium">Location:</span> {lead.location}
                   </div>
+                </div>
+
+                {/* Add Proposals Section */}
+                <div className="border-t pt-4">
+                  <h3 className="text-lg font-semibold mb-3">Received Proposals</h3>
+                  {lead.responses && lead.responses.length > 0 ? (
+                    <div className="space-y-4">
+                      {lead.responses.map((response) => (
+                        <div key={response.id} className="bg-muted p-4 rounded-lg">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <p className="font-medium">
+                                From: {response.business?.profile?.name || response.business?.username}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                Sent: {response.created_at ? format(new Date(response.created_at), 'PPp') : 'Recently'}
+                              </p>
+                            </div>
+                            <Badge variant={
+                              response.status === "accepted" ? "success" :
+                              response.status === "rejected" ? "destructive" :
+                              "secondary"
+                            }>
+                              {response.status.charAt(0).toUpperCase() + response.status.slice(1)}
+                            </Badge>
+                          </div>
+                          <p className="text-sm mt-2">{response.proposal}</p>
+                          {response.status === "pending" && (
+                            <div className="flex gap-2 mt-4">
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  // TODO: Implement accept proposal
+                                  console.log('Accept proposal:', response.id);
+                                }}
+                              >
+                                Accept
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  // TODO: Implement reject proposal
+                                  console.log('Reject proposal:', response.id);
+                                }}
+                              >
+                                Reject
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No proposals received yet.</p>
+                  )}
                 </div>
               </CardContent>
               <CardFooter>

@@ -163,23 +163,45 @@ export function registerRoutes(app: Express): Server {
 
       log(`Fetching leads for user ${req.user.id} (${req.user.userType})`);
 
-      let query = db.select()
-        .from(leads)
-        .where(
-          // Only show non-expired leads
-          or(
-            eq(leads.status, "closed"),
-            gt(leads.expires_at, new Date())
-          )
-        );
+      let query = db.query.leads.findMany({
+        where: or(
+          eq(leads.status, "closed"),
+          gt(leads.expires_at, new Date())
+        ),
+        with: {
+          responses: {
+            with: {
+              business: {
+                columns: {
+                  id: true,
+                  username: true,
+                  profile: true
+                }
+              }
+            }
+          }
+        }
+      });
 
       // If user is "free", only show their own leads
       // For business users, show all active leads
       if (req.user.userType === "free") {
-        query = query.where(eq(leads.user_id, req.user.id));
+        query = {
+          ...query,
+          where: and(
+            query.where,
+            eq(leads.user_id, req.user.id)
+          )
+        };
       } else if (req.user.userType === "business") {
         // For business users, only show open leads
-        query = query.where(eq(leads.status, "open"));
+        query = {
+          ...query,
+          where: and(
+            query.where,
+            eq(leads.status, "open")
+          )
+        };
       }
 
       let fetchedLeads = await query;
