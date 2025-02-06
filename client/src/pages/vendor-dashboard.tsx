@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Store, Package, Settings, Edit, Trash2, Loader2 } from "lucide-react";
+import { Store, Package, Settings, Edit, Trash2, Upload, Loader2 } from "lucide-react";
 import { ProductForm } from "@/components/ProductForm";
 
 export default function VendorDashboard() {
@@ -19,6 +19,9 @@ export default function VendorDashboard() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string>();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: products = [] } = useQuery({
     queryKey: ["/api/products"],
@@ -44,44 +47,69 @@ export default function VendorDashboard() {
         category: editingProduct.category,
         imageUrl: editingProduct.imageUrl,
       });
+      setPreviewUrl(editingProduct.imageUrl);
     }
   }, [editingProduct, editForm]);
 
-  const profileForm = useForm({
-    defaultValues: {
-      name: user?.profile?.name || "",
-      description: user?.profile?.description || "",
-      categories: user?.profile?.categories?.join(", ") || "",
-    },
-  });
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-  const updateProfileMutation = useMutation({
-    mutationFn: async (data) => {
-      const res = await apiRequest("PATCH", "/api/user/profile", {
-        profile: {
-          ...user?.profile,
-          name: data.name?.trim(),
-          description: data.description?.trim(),
-          categories: data.categories?.split(",").map(c => c.trim()).filter(Boolean),
-        },
-      });
-      return res.json();
-    },
-    onSuccess: (updatedUser) => {
-      queryClient.setQueryData(["/api/user"], updatedUser);
-      toast({
-        title: "Success",
-        description: "Store profile updated successfully",
-      });
-    },
-    onError: (error) => {
+    if (file.size > 10 * 1024 * 1024) {
       toast({
         title: "Error",
-        description: error.message || "Failed to update profile",
+        description: "File size must be less than 10MB",
         variant: "destructive",
       });
-    },
-  });
+      return;
+    }
+
+    try {
+      setUploading(true);
+      const reader = new FileReader();
+
+      reader.onloadend = async () => {
+        try {
+          const base64Data = (reader.result as string).split(',')[1];
+          const response = await apiRequest("POST", "/api/upload", {
+            file: base64Data,
+            fileName: file.name,
+          });
+          const data = await response.json();
+
+          if (!data.url) {
+            throw new Error("Image upload failed");
+          }
+
+          editForm.setValue("imageUrl", data.url);
+          setPreviewUrl(URL.createObjectURL(file));
+
+          toast({
+            title: "Success",
+            description: "Image uploaded successfully",
+          });
+        } catch (error) {
+          toast({
+            title: "Error",
+            description: "Failed to upload image. Please try again.",
+            variant: "destructive",
+          });
+        } finally {
+          setUploading(false);
+        }
+      };
+
+      reader.readAsDataURL(file);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to process image. Please try again.",
+        variant: "destructive",
+      });
+      setUploading(false);
+    }
+  };
+
 
   const updateProductMutation = useMutation({
     mutationFn: async ({ id, data }) => {
@@ -94,7 +122,9 @@ export default function VendorDashboard() {
         ...data,
         price: price.toFixed(2), // Send price as dollars
       });
-      return res.json();
+
+      const updatedProduct = await res.json();
+      return updatedProduct;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
@@ -103,6 +133,7 @@ export default function VendorDashboard() {
         description: "Product updated successfully",
       });
       setEditingProduct(null);
+      setPreviewUrl(undefined);
     },
     onError: (error) => {
       toast({
@@ -115,7 +146,10 @@ export default function VendorDashboard() {
 
   const deleteProductMutation = useMutation({
     mutationFn: async (id) => {
-      await apiRequest("DELETE", `/api/products/${id}`);
+      const res = await apiRequest("DELETE", `/api/products/${id}`);
+      if (!res.ok) {
+        throw new Error("Failed to delete product");
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
@@ -236,18 +270,56 @@ export default function VendorDashboard() {
                         required
                       />
                     </div>
-                    <div>
-                      <Label htmlFor="edit-imageUrl">Image URL</Label>
-                      <Input
-                        id="edit-imageUrl"
-                        {...editForm.register("imageUrl")}
-                        placeholder="https://example.com/image.jpg"
-                      />
+                    <div className="space-y-4">
+                      <Label>Product Image</Label>
+                      <div className="flex flex-col gap-4">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full h-32 flex flex-col items-center justify-center gap-2 border-2 border-dashed"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={uploading}
+                        >
+                          {uploading ? (
+                            <>
+                              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                              <span>Uploading...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="h-8 w-8 text-primary" />
+                              <span>Click to upload image</span>
+                              <span className="text-xs text-muted-foreground">
+                                PNG, JPG, GIF up to 10MB
+                              </span>
+                            </>
+                          )}
+                        </Button>
+
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileUpload}
+                          className="hidden"
+                          disabled={uploading}
+                        />
+
+                        {previewUrl && (
+                          <div className="relative w-full h-48">
+                            <img
+                              src={previewUrl}
+                              alt="Product preview"
+                              className="w-full h-full object-contain rounded-lg border"
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <Button
                       type="submit"
                       className="w-full"
-                      disabled={updateProductMutation.isPending}
+                      disabled={updateProductMutation.isPending || uploading}
                     >
                       {updateProductMutation.isPending ? (
                         <>
