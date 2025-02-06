@@ -270,7 +270,7 @@ export default function CartPage() {
       </div>
 
       <Dialog open={checkoutOpen} onOpenChange={setCheckoutOpen}>
-        <DialogContent className="max-w-md" aria-describedby="checkout-form-description">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" aria-describedby="checkout-form-description">
           <DialogHeader>
             <DialogTitle>Checkout</DialogTitle>
             <DialogDescription id="checkout-form-description">
