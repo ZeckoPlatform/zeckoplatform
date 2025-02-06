@@ -83,6 +83,7 @@ export default function CartPage() {
 
   const total = subtotal + (selectedShipping?.price || 0);
 
+  // Update the mutation
   const checkoutMutation = useMutation({
     mutationFn: async (data: CheckoutFormData) => {
       if (!selectedShipping) {
@@ -91,17 +92,20 @@ export default function CartPage() {
 
       const res = await apiRequest("POST", "/api/orders", {
         items: cart.items.map(item => ({
-          ...item,
-          price: Number(item.price)
+          productId: item.id,
+          quantity: item.quantity,
+          price: item.price
         })),
         shippingDetails: {
           ...data,
           shippingOption: selectedShipping,
           postcode: formatUKPostcode(data.postcode)
         },
-        subtotal: subtotal,
-        shipping: selectedShipping.price,
-        total: total,
+        orderSummary: {
+          subtotal: subtotal,
+          shippingCost: selectedShipping.price,
+          total: total
+        }
       });
 
       if (!res.ok) {
@@ -113,18 +117,18 @@ export default function CartPage() {
     },
     onSuccess: () => {
       toast({
-        title: "Order Placed Successfully",
-        description: "Your order has been placed and will be processed shortly.",
+        title: "Order Submitted Successfully",
+        description: "Your order has been recorded. Payment processing will be added soon.",
       });
       cart.clearCart();
       setCheckoutOpen(false);
-      // Redirect to a success page or order confirmation
+      // Redirect to marketplace after successful order
       window.location.href = "/marketplace";
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to place order. Please try again.",
+        title: "Order Submission Failed",
+        description: error.message || "Could not submit your order. Please try again.",
         variant: "destructive",
       });
     },
@@ -402,7 +406,7 @@ export default function CartPage() {
                   Processing...
                 </>
               ) : (
-                `Pay £${formatPrice(total)}`
+                `Submit Order`
               )}
             </Button>
             {checkoutMutation.isError && (
