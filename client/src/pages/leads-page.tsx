@@ -440,120 +440,192 @@ export default function LeadsPage() {
       );
     }
 
+    // Group responses by lead ID for quick lookup
+    const myResponses = leads.reduce((acc, lead) => {
+      const response = lead.responses?.find(r => r.business?.id === user.id);
+      if (response) {
+        acc[lead.id] = response;
+      }
+      return acc;
+    }, {} as Record<number, any>);
+
     return (
-      <div className="grid gap-6">
-        {leads.map((lead) => {
-          const matchScore = calculateMatchScore(lead, user);
-          return (
-            <Card key={lead.id}>
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <CardTitle>{lead.title}</CardTitle>
-                  <Dialog
-                    open={proposalDialogOpen}
-                    onOpenChange={(open) => {
-                      setProposalDialogOpen(open);
-                      if (!open) {
-                        proposalForm.reset();
-                        setSelectedLead(null);
-                      }
-                    }}
-                  >
-                    <DialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedLead(lead);
-                          proposalForm.reset();
+      <div className="space-y-8">
+        {/* Your Proposals Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Your Proposals</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {Object.entries(myResponses).length > 0 ? (
+                Object.entries(myResponses).map(([leadId, response]) => {
+                  const lead = leads.find(l => l.id === parseInt(leadId));
+                  return (
+                    <div key={leadId} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <h3 className="font-medium">{lead?.title}</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Sent: {response.created_at ? format(new Date(response.created_at), 'PPp') : 'Recently'}
+                          </p>
+                        </div>
+                        <Badge variant={
+                          response.status === "accepted" ? "success" :
+                          response.status === "rejected" ? "destructive" :
+                          "secondary"
+                        }>
+                          {response.status.charAt(0).toUpperCase() + response.status.slice(1)}
+                        </Badge>
+                      </div>
+                      <p className="text-sm mt-2">{response.proposal}</p>
+                      {response.status === "accepted" && response.contactDetails && (
+                        <div className="mt-4 p-4 bg-background rounded-lg border">
+                          <h4 className="font-medium mb-2">Contact Information</h4>
+                          <p className="text-sm whitespace-pre-wrap">{response.contactDetails}</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-muted-foreground text-center py-4">
+                  You haven't sent any proposals yet.
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Available Leads Section */}
+        <div className="grid gap-6">
+          <h2 className="text-2xl font-bold">Available Leads</h2>
+          {leads.map((lead) => {
+            const matchScore = calculateMatchScore(lead, user);
+            const existingResponse = myResponses[lead.id];
+
+            return (
+              <Card key={lead.id}>
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <CardTitle>{lead.title}</CardTitle>
+                    {!existingResponse && (
+                      <Dialog
+                        open={proposalDialogOpen}
+                        onOpenChange={(open) => {
+                          setProposalDialogOpen(open);
+                          if (!open) {
+                            proposalForm.reset();
+                            setSelectedLead(null);
+                          }
                         }}
                       >
-                        <Send className="h-4 w-4 mr-2" />
-                        Send Proposal
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Send Proposal for "{selectedLead?.title}"</DialogTitle>
-                        <DialogDescription>
-                          Write your proposal message to the lead owner. Be specific about how you can help.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <form onSubmit={proposalForm.handleSubmit((data) => {
-                        if (selectedLead) {
-                          sendProposalMutation.mutate({
-                            leadId: selectedLead.id,
-                            proposal: data.proposal
-                          });
-                        }
-                      })}>
-                        <div className="space-y-4">
-                          <div>
-                            <Label htmlFor="proposal">Your Proposal</Label>
-                            <Textarea
-                              id="proposal"
-                              placeholder="Describe how you can help with this project..."
-                              {...proposalForm.register("proposal")}
-                              className="min-h-[150px]"
-                              required
-                            />
-                          </div>
+                        <DialogTrigger asChild>
                           <Button
-                            type="submit"
-                            className="w-full"
-                            disabled={sendProposalMutation.isPending}
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedLead(lead);
+                              proposalForm.reset();
+                            }}
                           >
-                            {sendProposalMutation.isPending ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Sending...
-                              </>
-                            ) : (
-                              'Send Proposal'
-                            )}
+                            <Send className="h-4 w-4 mr-2" />
+                            Send Proposal
                           </Button>
-                        </div>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground mb-4">{lead.description}</p>
-                <div className="grid grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <span className="font-medium">Category:</span> {lead.category}
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Send Proposal for "{selectedLead?.title}"</DialogTitle>
+                            <DialogDescription>
+                              Write your proposal message to the lead owner. Be specific about how you can help.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <form onSubmit={proposalForm.handleSubmit((data) => {
+                            if (selectedLead) {
+                              sendProposalMutation.mutate({
+                                leadId: selectedLead.id,
+                                proposal: data.proposal
+                              });
+                            }
+                          })}>
+                            <div className="space-y-4">
+                              <div>
+                                <Label htmlFor="proposal">Your Proposal</Label>
+                                <Textarea
+                                  id="proposal"
+                                  placeholder="Describe how you can help with this project..."
+                                  {...proposalForm.register("proposal")}
+                                  className="min-h-[150px]"
+                                  required
+                                />
+                              </div>
+                              <Button
+                                type="submit"
+                                className="w-full"
+                                disabled={sendProposalMutation.isPending}
+                              >
+                                {sendProposalMutation.isPending ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Sending...
+                                  </>
+                                ) : (
+                                  'Send Proposal'
+                                )}
+                              </Button>
+                            </div>
+                          </form>
+                        </DialogContent>
+                      </Dialog>
+                    )}
+                    {existingResponse && (
+                      <Badge variant={
+                        existingResponse.status === "accepted" ? "success" :
+                        existingResponse.status === "rejected" ? "destructive" :
+                        "secondary"
+                      }>
+                        Proposal {existingResponse.status.charAt(0).toUpperCase() + existingResponse.status.slice(1)}
+                      </Badge>
+                    )}
                   </div>
-                  <div>
-                    <span className="font-medium">Budget:</span> £{lead.budget}
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground mb-4">{lead.description}</p>
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium">Category:</span> {lead.category}
+                    </div>
+                    <div>
+                      <span className="font-medium">Budget:</span> £{lead.budget}
+                    </div>
+                    <div>
+                      <span className="font-medium">Location:</span> {lead.location}
+                    </div>
                   </div>
-                  <div>
-                    <span className="font-medium">Location:</span> {lead.location}
+                </CardContent>
+                <CardFooter className="flex justify-between items-center">
+                  <p className="text-sm text-muted-foreground">
+                    Posted {lead.created_at ? format(new Date(lead.created_at), 'PPp') : 'Recently'}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Progress
+                      value={matchScore.totalScore}
+                      className="w-[100px]"
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      {Math.round(matchScore.totalScore)}% Match
+                    </span>
                   </div>
-                </div>
-              </CardContent>
-              <CardFooter className="flex justify-between items-center">
-                <p className="text-sm text-muted-foreground">
-                  Posted {lead.created_at ? format(new Date(lead.created_at), 'PPp') : 'Recently'}
-                </p>
-                <div className="flex items-center gap-2">
-                  <Progress
-                    value={matchScore.totalScore}
-                    className="w-[100px]"
-                  />
-                  <span className="text-sm text-muted-foreground">
-                    {Math.round(matchScore.totalScore)}% Match
-                  </span>
-                </div>
-              </CardFooter>
-            </Card>
-          );
-        })}
-        {(!leads || leads.length === 0) && (
-          <p className="text-muted-foreground text-center py-8">
-            No matching leads found. Update your business profile to see more relevant leads.
-          </p>
-        )}
+                </CardFooter>
+              </Card>
+            );
+          })}
+          {(!leads || leads.length === 0) && (
+            <p className="text-muted-foreground text-center py-8">
+              No matching leads found. Update your business profile to see more relevant leads.
+            </p>
+          )}
+        </div>
       </div>
     );
   };
@@ -903,7 +975,7 @@ export default function LeadsPage() {
                   <TabsTrigger value="password">Password</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="profile">
+                                <TabsContent value="profile">
                   <form onSubmit={profileForm.handleSubmit((data) => updateProfileMutation.mutate(data))} className="space-y-4">
                     <div>
                       <Label htmlFor="name">Display Name</Label>
