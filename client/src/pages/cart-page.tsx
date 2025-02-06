@@ -276,16 +276,16 @@ export default function CartPage() {
               <div>
                 <Label>Shipping Method</Label>
                 <Select
-                  value={selectedShipping?.provider + selectedShipping?.speed}
+                  value={selectedShipping ? `${selectedShipping.provider}|${selectedShipping.speed}` : ''}
                   onValueChange={(value) => {
+                    if (!value) return;
                     const [provider, speed] = value.split('|');
-                    setSelectedShipping(
-                      shippingOptions.find(
-                        option => 
-                          option.provider === provider && 
-                          option.speed === speed
-                      )
+                    const option = shippingOptions.find(
+                      opt => opt.provider === provider && opt.speed === speed
                     );
+                    if (option) {
+                      setSelectedShipping(option);
+                    }
                   }}
                 >
                   <SelectTrigger>
@@ -294,7 +294,7 @@ export default function CartPage() {
                   <SelectContent>
                     {shippingOptions.map((option) => (
                       <SelectItem 
-                        key={option.provider + option.speed} 
+                        key={`${option.provider}|${option.speed}`}
                         value={`${option.provider}|${option.speed}`}
                       >
                         {option.provider} - {option.speed} (£{formatPrice(option.price)}) - {option.estimatedDays}

@@ -8,6 +8,12 @@ interface CartItem {
   quantity: number;
   imageUrl?: string;
   vendorId: number;
+  weight?: number; // in grams
+  dimensions?: {
+    length: number; // in cm
+    width: number;
+    height: number;
+  };
 }
 
 interface CartStore {

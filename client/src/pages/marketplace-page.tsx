@@ -362,7 +362,9 @@ export default function MarketplacePage() {
                                 title: selectedProduct!.title,
                                 price: Number(selectedProduct!.price),
                                 imageUrl: selectedProduct!.imageUrl,
-                                vendorId: selectedProduct!.vendor.id
+                                vendorId: selectedProduct!.vendor.id,
+                                weight: selectedProduct!.weight,
+                                dimensions: selectedProduct!.dimensions
                               });
                               toast({
                                 title: "Added to Cart",
@@ -384,7 +386,9 @@ export default function MarketplacePage() {
                       title: product.title,
                       price: Number(product.price),
                       imageUrl: product.imageUrl,
-                      vendorId: product.vendor.id
+                      vendorId: product.vendor.id,
+                      weight: product.weight,
+                      dimensions: product.dimensions
                     });
                     toast({
                       title: "Added to Cart",
