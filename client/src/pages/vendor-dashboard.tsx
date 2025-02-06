@@ -130,14 +130,14 @@ export default function VendorDashboard() {
 
   const updateProductMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: EditProductFormData }) => {
-      const price = Number(data.price);
+      const price = parseFloat(data.price.toString());
       if (isNaN(price) || price <= 0) {
         throw new Error("Please enter a valid positive number for the price.");
       }
 
       const res = await apiRequest("PATCH", `/api/products/${id}`, {
         ...data,
-        price: price.toFixed(2), // Send price as string with 2 decimal places
+        price: price.toFixed(2), // Ensure price is sent with exactly 2 decimal places
       });
 
       if (!res.ok) {
@@ -151,7 +151,7 @@ export default function VendorDashboard() {
         ["/api/products"],
         (old = []) => old?.map(p => p.id === updatedProduct.id ? {
           ...updatedProduct,
-          price: Number(updatedProduct.price), // Ensure price is stored as number
+          price: parseFloat(updatedProduct.price), // Ensure price is stored as number
         } : p) ?? []
       );
       toast({
@@ -253,7 +253,7 @@ export default function VendorDashboard() {
                       id: editingProduct.id,
                       data: {
                         ...data,
-                        price: Number(data.price).toFixed(2), // Ensure price is sent with 2 decimal places
+                        price: parseFloat(data.price).toFixed(2),
                         imageUrl: editForm.getValues("imageUrl"),
                       },
                     })
@@ -276,13 +276,23 @@ export default function VendorDashboard() {
                     <Label htmlFor="edit-price">Price ($)</Label>
                     <Input
                       id="edit-price"
-                      type="number"
-                      step="0.01"
-                      min="0"
+                      type="text"
+                      pattern="^\d*\.?\d{0,2}$"
+                      inputMode="decimal"
                       {...editForm.register("price", {
-                        valueAsNumber: true,
+                        setValueAs: (value) => {
+                          const parsed = parseFloat(value);
+                          return isNaN(parsed) ? 0 : parsed;
+                        },
                         validate: (value) => value > 0 || "Price must be greater than 0",
                       })}
+                      onKeyDown={(e) => {
+                        // Prevent up/down arrow keys from modifying the value
+                        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                          e.preventDefault();
+                        }
+                      }}
+                      placeholder="0.00"
                       required
                     />
                   </div>
