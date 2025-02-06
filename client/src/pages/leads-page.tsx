@@ -415,17 +415,19 @@ export default function LeadsPage() {
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
-                        <DialogTitle>Send Proposal for "{lead.title}"</DialogTitle>
+                        <DialogTitle>Send Proposal for "{selectedLead?.title}"</DialogTitle>
                         <DialogDescription>
                           Write your proposal message to the lead owner. Be specific about how you can help.
                         </DialogDescription>
                       </DialogHeader>
                       <form onSubmit={(e) => {
                         e.preventDefault();
-                        sendProposalMutation.mutate({
-                          leadId: lead.id,
-                          proposal: proposalContent
-                        });
+                        if (selectedLead) {
+                          sendProposalMutation.mutate({
+                            leadId: selectedLead.id,
+                            proposal: proposalContent
+                          });
+                        }
                       }}>
                         <div className="space-y-4">
                           <div>
