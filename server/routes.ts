@@ -718,8 +718,11 @@ export function registerRoutes(app: Express): Server {
         if (isNaN(price)) {
           return res.status(400).json({ message: "Invalid price format" });
         }
-        updateData.price = Math.round(price * 100); // Convert to cents
+        // Convert dollars to cents (e.g., 3.90 -> 390)
+        updateData.price = Math.round(price * 100);
       }
+
+      log(`Updating product ${productId} with data:`, updateData);
 
       // Update the product
       const [updatedProduct] = await db.update(products)
@@ -727,10 +730,12 @@ export function registerRoutes(app: Express): Server {
         .where(eq(products.id, productId))
         .returning();
 
+      log(`Updated product:`, updatedProduct);
+
       // Convert price back to decimal for response
       const responseProduct = {
         ...updatedProduct,
-        price: (updatedProduct.price / 100).toFixed(2), // Convert back to decimal
+        price: (updatedProduct.price / 100).toFixed(2), // Convert cents back to dollars
       };
 
       res.json(responseProduct);

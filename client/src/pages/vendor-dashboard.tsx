@@ -250,6 +250,7 @@ export default function VendorDashboard() {
                       id: editingProduct.id,
                       data: {
                         ...data,
+                        price: Number(data.price).toFixed(2), // Ensure price is sent with 2 decimal places
                         imageUrl: editForm.getValues("imageUrl"),
                       },
                     })
