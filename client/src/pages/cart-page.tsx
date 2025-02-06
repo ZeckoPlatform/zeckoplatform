@@ -3,7 +3,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Minus, Plus, Trash2, Loader2 } from "lucide-react";
 import { Link } from "wouter";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
@@ -85,20 +85,36 @@ export default function CartPage() {
 
   const checkoutMutation = useMutation({
     mutationFn: async (data: CheckoutFormData) => {
+      if (!selectedShipping) {
+        throw new Error("Please select a shipping method");
+      }
+
       const res = await apiRequest("POST", "/api/orders", {
-        items: cart.items,
+        items: cart.items.map(item => ({
+          ...item,
+          price: Number(item.price)
+        })),
         shippingDetails: {
           ...data,
           shippingOption: selectedShipping,
+          postcode: formatUKPostcode(data.postcode)
         },
+        subtotal: subtotal,
+        shipping: selectedShipping.price,
         total: total,
       });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to place order");
+      }
+
       return res.json();
     },
     onSuccess: () => {
       toast({
-        title: "Order Placed",
-        description: "Your order has been placed successfully.",
+        title: "Order Placed Successfully",
+        description: "Your order has been placed and will be processed shortly.",
       });
       cart.clearCart();
       setCheckoutOpen(false);
@@ -106,10 +122,33 @@ export default function CartPage() {
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to place order",
+        description: error.message || "Failed to place order. Please try again.",
         variant: "destructive",
       });
     },
+  });
+
+  // Form submission handler
+  const onSubmit = form.handleSubmit((data) => {
+    if (!selectedShipping) {
+      toast({
+        title: "Shipping Method Required",
+        description: "Please select a shipping method to continue",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!isValidUKPostcode(data.postcode)) {
+      toast({
+        title: "Invalid Postcode",
+        description: "Please enter a valid UK postcode",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    checkoutMutation.mutate(data);
   });
 
   if (cart.items.length === 0) {
@@ -231,11 +270,17 @@ export default function CartPage() {
       </div>
 
       <Dialog open={checkoutOpen} onOpenChange={setCheckoutOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md" aria-describedby="checkout-form-description">
           <DialogHeader>
             <DialogTitle>Checkout</DialogTitle>
+            <DialogDescription id="checkout-form-description">
+              Please enter your delivery details to complete your order. UK addresses only.
+            </DialogDescription>
           </DialogHeader>
-          <form onSubmit={form.handleSubmit((data) => checkoutMutation.mutate(data))} className="space-y-4">
+          <form 
+            onSubmit={onSubmit}
+            className="space-y-4"
+          >
             <div>
               <Label htmlFor="fullName">Full Name</Label>
               <Input
@@ -339,7 +384,7 @@ export default function CartPage() {
             <Button
               type="submit"
               className="w-full"
-              disabled={checkoutMutation.isPending || !selectedShipping}
+              disabled={checkoutMutation.isPending || !selectedShipping || form.formState.isSubmitting}
             >
               {checkoutMutation.isPending ? (
                 <>
@@ -350,6 +395,11 @@ export default function CartPage() {
                 `Pay £${formatPrice(total)}`
               )}
             </Button>
+            {checkoutMutation.isError && (
+              <p className="text-sm text-destructive text-center">
+                {checkoutMutation.error.message || "An error occurred while processing your order"}
+              </p>
+            )}
           </form>
         </DialogContent>
       </Dialog>
