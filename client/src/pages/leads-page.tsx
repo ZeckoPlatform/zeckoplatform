@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,7 +13,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Settings, Edit, Trash2, Send, AlertTriangle } from "lucide-react";
+import { Loader2, Settings, Edit, Trash2, Send, AlertTriangle, Info } from "lucide-react";
 import type { SelectLead, SelectUser } from "@db/schema";
 import { format } from "date-fns";
 
@@ -41,6 +41,53 @@ interface PasswordFormData {
 interface UsernameFormData {
   username: string;
 }
+
+//Helper function (needs implementation based on your data model)
+const calculateMatchScore = (lead: SelectLead, user: SelectUser | null): {
+  totalScore: number;
+  categoryScore: number;
+  locationScore: number;
+  budgetScore: number;
+  industryScore: number;
+} => {
+  // Placeholder implementation - replace with your actual logic
+  let totalScore = 0;
+  let categoryScore = 0;
+  let locationScore = 0;
+  let budgetScore = 0;
+  let industryScore = 0;
+
+  if (user && user.profile && lead.category && user.profile.categories?.includes(lead.category)) {
+    categoryScore = 25;
+  }
+  if (user && user.profile && lead.location && user.profile.location === lead.location) {
+    locationScore = 25;
+  }
+  if (user && user.profile && lead.budget && user.profile.budget && Math.abs(lead.budget - user.profile.budget) < 1000) {
+    budgetScore = 25;
+  }
+  if (user && user.profile && lead.industry && user.profile.industries?.includes(lead.industry)){
+    industryScore = 25;
+  }
+
+  totalScore = categoryScore + locationScore + budgetScore + industryScore;
+  return { totalScore, categoryScore, locationScore, budgetScore, industryScore };
+};
+
+
+// Placeholder components (replace with your actual implementation)
+const HoverCard = ({ children }: { children: React.ReactNode }) => (
+  <div>{children}</div>
+);
+
+const HoverCardTrigger = ({ children }: { children: React.ReactNode }) => (
+  <div>{children}</div>
+);
+
+const HoverCardContent = ({ children }: { children: React.ReactNode }) => (
+  <div className="absolute z-10 bg-white shadow-md rounded-md p-4">{children}</div>
+);
+
 
 export default function LeadsPage() {
   const { user } = useAuth();
@@ -276,6 +323,35 @@ export default function LeadsPage() {
     },
   });
 
+  const sendProposalMutation = useMutation({
+    mutationFn: async ({ leadId, proposal }: { leadId: number; proposal: string }) => {
+      const res = await apiRequest("POST", `/api/leads/${leadId}/responses`, {
+        message: proposal,
+        status: "pending"
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      toast({
+        title: "Success",
+        description: "Your proposal has been sent successfully.",
+      });
+      setSelectedLead(null);
+      setProposalContent("");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send proposal",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const [selectedLead, setSelectedLead] = useState<SelectLead | null>(null);
+  const [proposalContent, setProposalContent] = useState("");
+
   if (isLoadingLeads) {
     return (
       <div className="flex items-center justify-center min-h-[200px]">
@@ -289,7 +365,6 @@ export default function LeadsPage() {
     : leads.filter(lead => lead.user_id === user?.id);
 
   const BusinessLeadsView = () => {
-    // Check for subscription requirement error in the leads query
     if (isLoadingLeads) {
       return (
         <div className="flex items-center justify-center min-h-[200px]">
@@ -298,7 +373,6 @@ export default function LeadsPage() {
       );
     }
 
-    // If no subscription, show subscription requirement message
     if (!user?.subscriptionActive) {
       return (
         <Card>
@@ -328,45 +402,129 @@ export default function LeadsPage() {
       );
     }
 
-    // Show leads for subscribed users
     return (
       <div className="grid gap-6">
-        {leads.map((lead) => (
-          <Card key={lead.id}>
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <CardTitle>{lead.title}</CardTitle>
-                <Button variant="outline" size="sm">
-                  <Send className="h-4 w-4 mr-2" />
-                  Send Proposal
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground mb-4">{lead.description}</p>
-              <div className="grid grid-cols-3 gap-4 text-sm">
-                <div>
-                  <span className="font-medium">Category:</span> {lead.category}
+        {leads.map((lead) => {
+          const matchScore = calculateMatchScore(lead, user);
+          return (
+            <Card key={lead.id}>
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <CardTitle>{lead.title}</CardTitle>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <Send className="h-4 w-4 mr-2" />
+                        Send Proposal
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Send Proposal for "{lead.title}"</DialogTitle>
+                        <DialogDescription>
+                          Write your proposal message to the lead owner. Be specific about how you can help.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <form onSubmit={(e) => {
+                        e.preventDefault();
+                        sendProposalMutation.mutate({
+                          leadId: lead.id,
+                          proposal: proposalContent
+                        });
+                      }}>
+                        <div className="space-y-4">
+                          <div>
+                            <Label htmlFor="proposal">Your Proposal</Label>
+                            <Textarea
+                              id="proposal"
+                              value={proposalContent}
+                              onChange={(e) => setProposalContent(e.target.value)}
+                              rows={6}
+                              placeholder="Describe how you can help with this project..."
+                              required
+                            />
+                          </div>
+                          <Button
+                            type="submit"
+                            className="w-full"
+                            disabled={sendProposalMutation.isPending}
+                          >
+                            {sendProposalMutation.isPending ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Sending...
+                              </>
+                            ) : (
+                              'Send Proposal'
+                            )}
+                          </Button>
+                        </div>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
                 </div>
-                <div>
-                  <span className="font-medium">Budget:</span> £{lead.budget}
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground mb-4">{lead.description}</p>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium">Category:</span> {lead.category}
+                  </div>
+                  <div>
+                    <span className="font-medium">Budget:</span> £{lead.budget}
+                  </div>
+                  <div>
+                    <span className="font-medium">Location:</span> {lead.location}
+                  </div>
                 </div>
-                <div>
-                  <span className="font-medium">Location:</span> {lead.location}
+              </CardContent>
+              <CardFooter className="flex justify-between items-center">
+                <p className="text-sm text-muted-foreground">
+                  Posted {lead.created_at ? format(new Date(lead.created_at), 'PPp') : 'Recently'}
+                </p>
+                <div className="flex items-center gap-4">
+                  <Progress
+                    value={matchScore.totalScore}
+                    className="w-[100px]"
+                  />
+                  <HoverCard>
+                    <HoverCardTrigger>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">
+                          {Math.round(matchScore.totalScore)}% Match
+                        </span>
+                        <Info className="h-4 w-4" />
+                      </div>
+                    </HoverCardTrigger>
+                    <HoverCardContent>
+                      <div className="space-y-2">
+                        <h4 className="font-semibold">Match Details</h4>
+                        <div className="text-sm space-y-1">
+                          <p>
+                            <span className="font-medium">Category Match:</span>{' '}
+                            {matchScore.categoryScore > 0 ? '✓' : '✗'}
+                          </p>
+                          <p>
+                            <span className="font-medium">Location Match:</span>{' '}
+                            {matchScore.locationScore > 0 ? '✓' : '✗'}
+                          </p>
+                          <p>
+                            <span className="font-medium">Budget Match:</span>{' '}
+                            {matchScore.budgetScore > 0 ? '✓' : '✗'}
+                          </p>
+                          <p>
+                            <span className="font-medium">Industry Experience:</span>{' '}
+                            {matchScore.industryScore > 0 ? '✓' : '✗'}
+                          </p>
+                        </div>
+                      </div>
+                    </HoverCardContent>
+                  </HoverCard>
                 </div>
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-between items-center">
-              <p className="text-sm text-muted-foreground">
-                Posted {lead.created_at ? format(new Date(lead.created_at), 'PPp') : 'Recently'}
-              </p>
-              <div className="flex items-center gap-2">
-                <Progress value={75} className="w-[100px]" />
-                <span className="text-sm text-muted-foreground">75% Match</span>
-              </div>
-            </CardFooter>
-          </Card>
-        ))}
+              </CardFooter>
+            </Card>
+          );
+        })}
         {(!leads || leads.length === 0) && (
           <p className="text-muted-foreground text-center py-8">
             No matching leads found. Update your business profile to see more relevant leads.

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,11 +10,26 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Search } from "lucide-react";
+import { Search, Mail, Phone, Loader2 } from "lucide-react";
+
+interface Product {
+  id: number;
+  title: string;
+  description: string;
+  price: number;
+  category: string;
+  imageUrl: string;
+  vendor: {
+    name: string;
+    email: string;
+    phone?: string;
+  };
+}
 
 export default function MarketplacePage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const form = useForm({
     defaultValues: {
       title: "",
@@ -24,7 +40,7 @@ export default function MarketplacePage() {
     },
   });
 
-  const { data: products } = useQuery<any[]>({
+  const { data: products } = useQuery<Product[]>({
     queryKey: ["/api/products"],
   });
 
@@ -41,6 +57,14 @@ export default function MarketplacePage() {
       toast({
         title: "Product Created",
         description: "Your product has been listed successfully.",
+      });
+      form.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create product",
+        variant: "destructive",
       });
     },
   });
@@ -76,10 +100,10 @@ export default function MarketplacePage() {
                   <DialogTrigger asChild>
                     <Button>Add Product</Button>
                   </DialogTrigger>
-                  <DialogContent aria-describedby="dialog-description">
+                  <DialogContent>
                     <DialogHeader>
                       <DialogTitle>Add New Product</DialogTitle>
-                      <DialogDescription id="dialog-description">
+                      <DialogDescription>
                         Fill in the details below to add a new product to the Zecko marketplace.
                       </DialogDescription>
                     </DialogHeader>
@@ -129,8 +153,19 @@ export default function MarketplacePage() {
                           placeholder="https://example.com/image.jpg"
                         />
                       </div>
-                      <Button type="submit" className="w-full">
-                        List Product
+                      <Button 
+                        type="submit" 
+                        className="w-full"
+                        disabled={createProductMutation.isPending}
+                      >
+                        {createProductMutation.isPending ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Creating...
+                          </>
+                        ) : (
+                          'List Product'
+                        )}
                       </Button>
                     </form>
                   </DialogContent>
@@ -170,9 +205,76 @@ export default function MarketplacePage() {
                 </div>
               </CardContent>
               <CardFooter>
-                <Button className="w-full" variant="secondary">
-                  View Details
-                </Button>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button className="w-full" variant="secondary" onClick={() => setSelectedProduct(product)}>
+                      View Details
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>{selectedProduct?.title}</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="aspect-square relative rounded-lg overflow-hidden">
+                        <img
+                          src={selectedProduct?.imageUrl || "https://images.unsplash.com/photo-1518302057166-c990a3585cc3"}
+                          alt={selectedProduct?.title}
+                          className="absolute inset-0 w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="font-medium mb-2">Description</h4>
+                          <p className="text-muted-foreground">
+                            {selectedProduct?.description}
+                          </p>
+                        </div>
+                        <div>
+                          <h4 className="font-medium mb-2">Price</h4>
+                          <p className="text-2xl font-bold">
+                            £{parseFloat(selectedProduct?.price || "0").toFixed(2)}
+                          </p>
+                        </div>
+                        <div>
+                          <h4 className="font-medium mb-2">Category</h4>
+                          <p className="text-muted-foreground">
+                            {selectedProduct?.category}
+                          </p>
+                        </div>
+                        <div>
+                          <h4 className="font-medium mb-2">Vendor Details</h4>
+                          <div className="space-y-2">
+                            <p className="text-muted-foreground">
+                              {selectedProduct?.vendor.name}
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <Mail className="h-4 w-4" />
+                              <a
+                                href={`mailto:${selectedProduct?.vendor.email}`}
+                                className="text-primary hover:underline"
+                              >
+                                {selectedProduct?.vendor.email}
+                              </a>
+                            </div>
+                            {selectedProduct?.vendor.phone && (
+                              <div className="flex items-center gap-2">
+                                <Phone className="h-4 w-4" />
+                                <a
+                                  href={`tel:${selectedProduct?.vendor.phone}`}
+                                  className="text-primary hover:underline"
+                                >
+                                  {selectedProduct?.vendor.phone}
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <Button className="w-full">Contact Vendor</Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </CardFooter>
             </Card>
           ))}

@@ -9,55 +9,110 @@ interface MatchScore {
   categoryScore: number;
   locationScore: number;
   budgetScore: number;
+  industryScore: number;
   totalScore: number;
+  details: {
+    categoryMatch: string[];
+    locationMatch: boolean;
+    budgetWithinRange: boolean;
+    industryExperience: boolean;
+  };
+}
+
+function calculateLocationScore(leadLocation: string | null, businessLocations: string[]): number {
+  if (!leadLocation || !businessLocations?.length) return 0;
+  return businessLocations.some(loc => 
+    leadLocation.toLowerCase().includes(loc.toLowerCase()) || 
+    loc.toLowerCase().includes(leadLocation.toLowerCase())
+  ) ? 1 : 0;
+}
+
+function calculateBudgetScore(leadBudget: number | null, budgetRange: { min: number; max: number; } | undefined): number {
+  if (!leadBudget || !budgetRange) return 0;
+  return (leadBudget >= budgetRange.min && leadBudget <= budgetRange.max) ? 1 : 0;
+}
+
+function calculateIndustryScore(leadCategory: string, businessProfile: any): number {
+  if (!businessProfile?.categories?.length) return 0;
+
+  const businessCategories = Array.isArray(businessProfile.categories) 
+    ? businessProfile.categories 
+    : [];
+
+  return businessCategories.some(cat => 
+    leadCategory.toLowerCase().includes(cat.toLowerCase()) ||
+    cat.toLowerCase().includes(leadCategory.toLowerCase())
+  ) ? 1 : 0;
 }
 
 export function calculateMatchScore(lead: Lead, business: SelectUser): MatchScore {
-  const scores = {
+  const businessPrefs = business.profile?.matchPreferences;
+  const defaultScore = {
     categoryScore: 0,
     locationScore: 0,
     budgetScore: 0,
+    industryScore: 0,
     totalScore: 0,
+    details: {
+      categoryMatch: [],
+      locationMatch: false,
+      budgetWithinRange: false,
+      industryExperience: false,
+    }
   };
 
-  const businessPrefs = business.profile?.matchPreferences;
-  if (!businessPrefs) return scores;
+  if (!businessPrefs || !business.profile) return defaultScore;
 
-  // Category matching (40% weight)
-  if (businessPrefs.preferredCategories?.includes(lead.category)) {
-    scores.categoryScore = 1;
-  }
+  // Category matching (30% weight)
+  const categoryScore = businessPrefs.preferredCategories?.includes(lead.category) ? 1 : 0;
 
-  // Location matching (30% weight)
-  if (lead.location && businessPrefs.locationPreference?.includes(lead.location)) {
-    scores.locationScore = 1;
-  }
+  // Location matching (25% weight)
+  const locationScore = calculateLocationScore(
+    lead.location, 
+    businessPrefs.locationPreference || []
+  );
 
-  // Budget matching (30% weight)
-  if (lead.budget && businessPrefs.budgetRange) {
-    if (
-      lead.budget >= businessPrefs.budgetRange.min &&
-      lead.budget <= businessPrefs.budgetRange.max
-    ) {
-      scores.budgetScore = 1;
-    }
-  }
+  // Budget matching (25% weight)
+  const budgetScore = calculateBudgetScore(
+    lead.budget,
+    businessPrefs.budgetRange
+  );
+
+  // Industry experience (20% weight)
+  const industryScore = calculateIndustryScore(
+    lead.category,
+    business.profile
+  );
 
   // Calculate weighted total score
-  scores.totalScore =
-    scores.categoryScore * 0.4 +
-    scores.locationScore * 0.3 +
-    scores.budgetScore * 0.3;
+  const totalScore = (
+    (categoryScore * 0.30) +
+    (locationScore * 0.25) +
+    (budgetScore * 0.25) +
+    (industryScore * 0.20)
+  ) * 100;
 
-  return scores;
+  return {
+    categoryScore,
+    locationScore,
+    budgetScore,
+    industryScore,
+    totalScore,
+    details: {
+      categoryMatch: businessPrefs.preferredCategories || [],
+      locationMatch: locationScore > 0,
+      budgetWithinRange: budgetScore > 0,
+      industryExperience: industryScore > 0,
+    }
+  };
 }
 
 export function sortBusinessesByMatch(lead: Lead, businesses: SelectUser[]): SelectUser[] {
   return businesses
     .map(business => ({
       business,
-      score: calculateMatchScore(lead, business).totalScore,
+      score: calculateMatchScore(lead, business),
     }))
-    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => b.score.totalScore - a.score.totalScore)
     .map(item => item.business);
 }
