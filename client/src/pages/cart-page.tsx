@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { isValidUKPostcode, formatUKPostcode } from "@/lib/utils";
 
 interface CheckoutFormData {
   fullName: string;
@@ -51,6 +52,13 @@ export default function CartPage() {
       postcode: "",
       phone: "",
     },
+    onChange: (data) => {
+      // Format postcode as user types
+      if (data.name === 'postcode') {
+        const formattedPostcode = formatUKPostcode(data.value);
+        form.setValue('postcode', formattedPostcode);
+      }
+    },
   });
 
   // Watch postcode for shipping calculation
@@ -59,6 +67,14 @@ export default function CartPage() {
   // Update shipping options when postcode changes
   const updateShippingOptions = (postcode: string) => {
     if (postcode.length >= 2) {
+      if (!isValidUKPostcode(postcode)) {
+        toast({
+          title: "Invalid Postcode",
+          description: "Please enter a valid UK postcode",
+          variant: "destructive",
+        });
+        return;
+      }
       const options = calculateShippingOptions(totalWeight, dimensions, postcode);
       setShippingOptions(options);
       setSelectedShipping(options[0]); // Select first option by default
@@ -263,13 +279,28 @@ export default function CartPage() {
               />
             </div>
             <div>
-              <Label htmlFor="postcode">Postcode</Label>
+              <Label htmlFor="postcode">Postcode (UK only)</Label>
               <Input
                 id="postcode"
-                {...form.register("postcode")}
-                required
-                onChange={(e) => updateShippingOptions(e.target.value)}
+                {...form.register("postcode", {
+                  required: "Postcode is required",
+                  validate: {
+                    ukOnly: (value) =>
+                      isValidUKPostcode(value) || "Please enter a valid UK postcode",
+                  },
+                })}
+                placeholder="e.g. SW1A 1AA"
+                onChange={(e) => {
+                  const formattedPostcode = formatUKPostcode(e.target.value);
+                  e.target.value = formattedPostcode;
+                  updateShippingOptions(formattedPostcode);
+                }}
               />
+              {form.formState.errors.postcode && (
+                <p className="text-sm text-destructive mt-1">
+                  {form.formState.errors.postcode.message}
+                </p>
+              )}
             </div>
 
             {shippingOptions.length > 0 && (
@@ -293,7 +324,7 @@ export default function CartPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {shippingOptions.map((option) => (
-                      <SelectItem 
+                      <SelectItem
                         key={`${option.provider}|${option.speed}`}
                         value={`${option.provider}|${option.speed}`}
                       >
