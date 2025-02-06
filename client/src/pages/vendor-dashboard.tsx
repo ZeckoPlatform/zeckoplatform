@@ -117,7 +117,7 @@ export default function VendorDashboard() {
       editForm.reset({
         title: editingProduct.title,
         description: editingProduct.description,
-        price: Number(editingProduct.price),
+        price: parseFloat(editingProduct.price).toFixed(2),
         category: editingProduct.category,
         imageUrl: editingProduct.imageUrl,
       });
@@ -149,10 +149,7 @@ export default function VendorDashboard() {
     onSuccess: (updatedProduct) => {
       queryClient.setQueryData<Product[]>(
         ["/api/products"],
-        (old = []) => old?.map(p => p.id === updatedProduct.id ? {
-          ...updatedProduct,
-          price: parseFloat(updatedProduct.price), // Ensure price is stored as number
-        } : p) ?? []
+        (old = []) => old?.map(p => p.id === updatedProduct.id ? updatedProduct : p) ?? []
       );
       toast({
         title: "Success",
@@ -390,7 +387,7 @@ export default function VendorDashboard() {
                   </p>
                   <div className="flex items-center justify-between mt-4">
                     <span className="text-lg font-semibold">
-                      ${Number(product.price).toFixed(2)}
+                      ${parseFloat(product.price).toFixed(2)}
                     </span>
                     <span className="text-sm text-muted-foreground">
                       {product.category}

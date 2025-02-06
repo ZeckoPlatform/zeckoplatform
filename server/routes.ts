@@ -409,7 +409,15 @@ export function registerRoutes(app: Express): Server {
           vendor: true,
         },
       });
-      res.json(allProducts);
+
+      // Convert all prices from cents to dollars
+      const productsWithDecimalPrices = allProducts.map(product => ({
+        ...product,
+        price: (product.price / 100).toFixed(2), // Convert cents to dollars
+      }));
+
+      log(`Fetched ${allProducts.length} products, converting prices from cents to dollars`);
+      res.json(productsWithDecimalPrices);
     } catch (error) {
       log(`Products retrieval error: ${error}`);
       res.status(500).json({ message: "Failed to retrieve products" });
@@ -689,6 +697,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Update the product update endpoint to properly handle decimal prices
   app.patch("/api/products/:id", async (req, res) => {
     try {
       if (!req.user) {
@@ -714,29 +723,27 @@ export function registerRoutes(app: Express): Server {
       // Convert price from decimal to cents if provided
       let updateData = { ...req.body };
       if (typeof updateData.price !== 'undefined') {
-        const price = parseFloat(updateData.price);
-        if (isNaN(price)) {
+        const priceInDollars = parseFloat(updateData.price);
+        if (isNaN(priceInDollars)) {
           return res.status(400).json({ message: "Invalid price format" });
         }
         // Convert dollars to cents (e.g., 3.90 -> 390)
-        updateData.price = Math.round(price * 100);
+        updateData.price = Math.round(priceInDollars * 100);
+        log(`Converting price from ${priceInDollars} dollars to ${updateData.price} cents`);
       }
-
-      log(`Updating product ${productId} with data:`, updateData);
 
       const [updatedProduct] = await db.update(products)
         .set(updateData)
         .where(eq(products.id, productId))
         .returning();
 
-      log(`Updated product:`, updatedProduct);
-
       // Convert price back to decimal for response
       const responseProduct = {
         ...updatedProduct,
-        price: (updatedProduct.price / 100).toFixed(2), // Convert cents back to dollars
+        price: (updatedProduct.price / 100).toFixed(2), // Convert cents back to dollars with 2 decimal places
       };
 
+      log(`Updated product price: ${responseProduct.price} (converted from ${updatedProduct.price} cents)`);
       res.json(responseProduct);
     } catch (error) {
       log(`Product update error: ${error instanceof Error ? error.message : String(error)}`);
