@@ -145,70 +145,27 @@ export function ProductForm() {
 
   return (
     <form onSubmit={form.handleSubmit((data) => createProductMutation.mutate(data))} className="space-y-6">
-      <div>
-        <Label htmlFor="title">Title</Label>
-        <Input id="title" {...form.register("title")} required />
-      </div>
+      <Label htmlFor="title">Title</Label>
+      <Input id="title" {...form.register("title")} required />
 
-      <div>
-        <Label htmlFor="description">Description</Label>
-        <Textarea id="description" {...form.register("description")} required />
-      </div>
+      <Label htmlFor="description">Description</Label>
+      <Textarea id="description" {...form.register("description")} required />
 
-      <div>
-        <Label htmlFor="price">Price ($)</Label>
-        <Input 
-          id="price" 
-          type="number" 
-          step="0.01" 
-          min="0" 
-          {...form.register("price")} 
-          required 
-        />
-      </div>
+      <Label htmlFor="price">Price ($)</Label>
+      <Input id="price" type="number" step="0.01" min="0" {...form.register("price")} required />
 
-      <div>
-        <Label htmlFor="category">Category</Label>
-        <Input id="category" {...form.register("category")} required />
-      </div>
+      <Label htmlFor="category">Category</Label>
+      <Input id="category" {...form.register("category")} required />
 
-      <div className="space-y-4">
-        <Label>Product Image</Label>
-        <div className="flex flex-col gap-4">
-          <Button 
-            type="button" 
-            variant="outline" 
-            onClick={() => fileInputRef.current?.click()} 
-            disabled={uploading}
-          >
-            {uploading ? <Loader2 className="animate-spin" /> : <Upload />} Upload Image
-          </Button>
-          <input 
-            ref={fileInputRef} 
-            type="file" 
-            accept="image/*" 
-            onChange={handleFileUpload} 
-            className="hidden" 
-          />
-          {previewUrl && (
-            <img 
-              src={previewUrl} 
-              alt="Product preview" 
-              className="w-full h-48 object-contain" 
-            />
-          )}
-        </div>
-      </div>
+      <Label>Product Image</Label>
+      <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+        {uploading ? <Loader2 className="animate-spin" /> : <Upload />} Upload Image
+      </Button>
+      <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+      {previewUrl && <img src={previewUrl} alt="Product preview" className="w-full h-48 object-contain" />}
 
-      <Button 
-        type="submit" 
-        disabled={createProductMutation.isPending || uploading}
-      >
-        {createProductMutation.isPending ? (
-          <Loader2 className="animate-spin" /> 
-        ) : (
-          "Create Product"
-        )}
+      <Button type="submit" disabled={createProductMutation.isPending || uploading}>
+        {createProductMutation.isPending ? <Loader2 className="animate-spin" /> : "Create Product"}
       </Button>
     </form>
   );
