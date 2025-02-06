@@ -44,6 +44,42 @@ export default function VendorDashboard() {
     },
   });
 
+  const profileForm = useForm({
+    defaultValues: {
+      name: user?.profile?.name || "",
+      description: user?.profile?.description || "",
+      categories: user?.profile?.categories?.join(", ") || "",
+    },
+  });
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data) => {
+      const res = await apiRequest("PATCH", "/api/user/profile", {
+        profile: {
+          ...user?.profile,
+          name: data.name?.trim(),
+          description: data.description?.trim(),
+          categories: data.categories?.split(",").map(c => c.trim()).filter(Boolean),
+        },
+      });
+      return res.json();
+    },
+    onSuccess: (updatedUser) => {
+      queryClient.setQueryData(["/api/user"], updatedUser);
+      toast({
+        title: "Success",
+        description: "Store profile updated successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update profile",
+        variant: "destructive",
+      });
+    },
+  });
+
   const createProductMutation = useMutation({
     mutationFn: async (data) => {
       const price = parseFloat(data.price);
@@ -305,8 +341,8 @@ export default function VendorDashboard() {
                   </div>
                 </CardContent>
                 <CardFooter className="flex gap-2">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="flex-1"
                     onClick={() => {
                       editForm.reset(product);
@@ -315,8 +351,8 @@ export default function VendorDashboard() {
                   >
                     <Edit className="h-4 w-4 mr-2" /> Edit
                   </Button>
-                  <Button 
-                    variant="destructive" 
+                  <Button
+                    variant="destructive"
                     size="icon"
                     onClick={() => {
                       if (confirm('Are you sure you want to delete this product?')) {
