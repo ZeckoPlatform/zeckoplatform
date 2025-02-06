@@ -652,6 +652,96 @@ export function registerRoutes(app: Express): Server {
   // Ensure uploaded files are served statically
   app.use('/uploads', express.static('uploads'));
 
+  app.delete("/api/products/:id", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const productId = parseInt(req.params.id);
+
+      // First check if product exists and belongs to vendor
+      const [product] = await db.select()
+        .from(products)
+        .where(
+          and(
+            eq(products.id, productId),
+            eq(products.vendorId, req.user.id)
+          )
+        );
+
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      // Delete the product
+      await db.delete(products)
+        .where(eq(products.id, productId));
+
+      res.json({ message: "Product deleted successfully" });
+    } catch (error) {
+      log(`Product deletion error: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('Full error:', error);
+      res.status(500).json({ 
+        message: "Failed to delete product",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  app.patch("/api/products/:id", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const productId = parseInt(req.params.id);
+
+      // First check if product exists and belongs to vendor
+      const [product] = await db.select()
+        .from(products)
+        .where(
+          and(
+            eq(products.id, productId),
+            eq(products.vendorId, req.user.id)
+          )
+        );
+
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      // Convert price from decimal string to cents if provided
+      let updateData = { ...req.body };
+      if (typeof updateData.price !== 'undefined') {
+        const priceInCents = Math.round(parseFloat(updateData.price) * 100);
+        if (isNaN(priceInCents)) {
+          return res.status(400).json({ message: "Invalid price format" });
+        }
+        updateData.price = priceInCents;
+      }
+
+      // Update the product
+      const [updatedProduct] = await db.update(products)
+        .set(updateData)
+        .where(eq(products.id, productId))
+        .returning();
+
+      // Convert price back to decimal for response
+      res.json({
+        ...updatedProduct,
+        price: (updatedProduct.price / 100).toFixed(2),
+      });
+    } catch (error) {
+      log(`Product update error: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('Full error:', error);
+      res.status(500).json({ 
+        message: "Failed to update product",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

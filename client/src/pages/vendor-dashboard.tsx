@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { apiRequest } from "@/lib/queryClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Store, Package, Settings, Edit, Trash2, Loader2 } from "lucide-react";
+import { Store, Package, Settings, Edit, Trash2, Loader2, Upload } from "lucide-react";
 import { ProductForm } from "@/components/ProductForm";
 
 interface Product {
@@ -38,11 +38,14 @@ export default function VendorDashboard() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string>();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ["/api/products"],
-    select: (data) => 
-      Array.isArray(data) 
+    select: (data) =>
+      Array.isArray(data)
         ? data.filter((product) => product.vendorId === user?.id)
         : [],
     enabled: !!user?.id,
@@ -50,15 +53,78 @@ export default function VendorDashboard() {
 
   const editForm = useForm<EditProductFormData>();
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: "Error",
+        description: "File size must be less than 10MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setUploading(true);
+      const reader = new FileReader();
+
+      reader.onloadend = async () => {
+        try {
+          const base64Data = (reader.result as string).split(',')[1];
+          const response = await apiRequest("POST", "/api/upload", {
+            file: base64Data,
+            fileName: file.name,
+          });
+          const data = await response.json();
+
+          if (!data.url) {
+            throw new Error("Image upload failed");
+          }
+
+          editForm.setValue("imageUrl", data.url);
+          setPreviewUrl(URL.createObjectURL(file));
+
+          toast({
+            title: "Success",
+            description: "Image uploaded successfully",
+          });
+        } catch (error) {
+          toast({
+            title: "Error",
+            description: "Failed to upload image. Please try again.",
+            variant: "destructive",
+          });
+        } finally {
+          setUploading(false);
+        }
+      };
+
+      reader.readAsDataURL(file);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to process image. Please try again.",
+        variant: "destructive",
+      });
+      setUploading(false);
+    }
+  };
+
   useEffect(() => {
     if (editingProduct) {
       editForm.reset({
         title: editingProduct.title,
         description: editingProduct.description,
-        price: editingProduct.price,
+        price: Number(editingProduct.price),
         category: editingProduct.category,
         imageUrl: editingProduct.imageUrl,
       });
+      setPreviewUrl(editingProduct.imageUrl);
+    } else {
+      editForm.reset();
+      setPreviewUrl(undefined);
     }
   }, [editingProduct, editForm]);
 
@@ -69,11 +135,7 @@ export default function VendorDashboard() {
         throw new Error("Please enter a valid positive number for the price.");
       }
 
-      const res = await apiRequest("PATCH", `/api/products/${id}`, {
-        ...data,
-        price,
-      });
-
+      const res = await apiRequest("PATCH", `/api/products/${id}`, data);
       if (!res.ok) {
         throw new Error("Failed to update product");
       }
@@ -87,6 +149,7 @@ export default function VendorDashboard() {
         description: "Product updated successfully",
       });
       setEditingProduct(null);
+      setPreviewUrl(undefined);
       editForm.reset();
     },
     onError: (error: Error) => {
@@ -107,12 +170,10 @@ export default function VendorDashboard() {
       return id;
     },
     onSuccess: (deletedId) => {
-      // Immediately update the cache
       queryClient.setQueryData<Product[]>(
         ["/api/products"],
-        (old = []) => old.filter(p => p.id !== deletedId)
+        (old = []) => old.filter((p) => p.id !== deletedId)
       );
-
       toast({
         title: "Success",
         description: "Product deleted successfully",
@@ -124,7 +185,6 @@ export default function VendorDashboard() {
         description: error.message || "Failed to delete product",
         variant: "destructive",
       });
-      // On error, refresh the products list
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
     },
   });
@@ -183,8 +243,8 @@ export default function VendorDashboard() {
                       id: editingProduct.id,
                       data: {
                         ...data,
-                        price: Number(data.price),
-                      }
+                        imageUrl: editForm.getValues("imageUrl"),
+                      },
                     })
                   )}
                   className="space-y-4"
@@ -210,7 +270,7 @@ export default function VendorDashboard() {
                       min="0"
                       {...editForm.register("price", {
                         valueAsNumber: true,
-                        validate: (value) => value > 0 || "Price must be greater than 0"
+                        validate: (value) => value > 0 || "Price must be greater than 0",
                       })}
                       required
                     />
@@ -223,10 +283,58 @@ export default function VendorDashboard() {
                       required
                     />
                   </div>
+
+                  <div className="space-y-4">
+                    <Label>Product Image</Label>
+                    <div className="flex flex-col gap-4">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full h-32 flex flex-col items-center justify-center gap-2 border-2 border-dashed"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
+                      >
+                        {uploading ? (
+                          <>
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                            <span>Uploading...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-8 w-8 text-primary" />
+                            <span>Click to upload image</span>
+                            <span className="text-xs text-muted-foreground">
+                              PNG, JPG, GIF up to 10MB
+                            </span>
+                          </>
+                        )}
+                      </Button>
+
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                        disabled={uploading}
+                      />
+
+                      {previewUrl && (
+                        <div className="relative w-full h-48">
+                          <img
+                            src={previewUrl}
+                            alt="Product preview"
+                            className="w-full h-full object-contain rounded-lg border"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   <Button
                     type="submit"
                     className="w-full"
-                    disabled={updateProductMutation.isPending}
+                    disabled={updateProductMutation.isPending || uploading}
                   >
                     {updateProductMutation.isPending ? (
                       <>
