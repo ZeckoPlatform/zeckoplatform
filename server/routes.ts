@@ -886,6 +886,7 @@ export function registerRoutes(app: Express): Server {
           and(
             eq(products.id, productId),
             eq(products.vendorId, req.user.id)
+          )
         );
 
       if (!product) {
