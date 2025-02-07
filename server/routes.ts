@@ -163,68 +163,38 @@ export function registerRoutes(app: Express): Server {
 
       log(`Fetching leads for user ${req.user.id} (${req.user.userType})`);
 
-      // First get the leads
-      let leadsQuery = db.select({
-        id: leads.id,
-        user_id: leads.user_id,
-        title: leads.title,
-        description: leads.description,
-        category: leads.category,
-        budget: leads.budget,
-        location: leads.location,
-        status: leads.status,
-        created_at: leads.created_at,
-        expires_at: leads.expires_at
-      }).from(leads);
-
-      // Add filters based on user type
-      if (req.user.userType === "free") {
-        leadsQuery = leadsQuery.where(eq(leads.user_id, req.user.id));
-      } else if (req.user.userType === "business") {
-        leadsQuery = leadsQuery.where(eq(leads.status, "open"));
-      }
-
-      const fetchedLeads = await leadsQuery;
-
-      // Then get responses for these leads
-      const leadsWithResponses = await Promise.all(
-        fetchedLeads.map(async (lead) => {
-          const responses = await db.select({
-            id: leadResponses.id,
-            proposal: leadResponses.proposal,
-            status: leadResponses.status,
-            created_at: leadResponses.created_at,
-            contactDetails: leadResponses.contactDetails,
-            business: {
-              id: users.id,
-              username: users.username,
-              profile: users.profile
+      // Use Drizzle's query builder with relations
+      let baseQuery = {
+        where: req.user.userType === "free" 
+          ? eq(leads.user_id, req.user.id)
+          : req.user.userType === "business" 
+            ? eq(leads.status, "open")
+            : undefined,
+        with: {
+          responses: {
+            with: {
+              business: true
             }
-          })
-          .from(leadResponses)
-          .leftJoin(users, eq(leadResponses.business_id, users.id))
-          .where(eq(leadResponses.lead_id, lead.id));
+          }
+        }
+      };
 
-          return {
-            ...lead,
-            responses
-          };
-        })
-      );
+      const fetchedLeads = await db.query.leads.findMany(baseQuery);
+
+      log(`Successfully fetched ${fetchedLeads.length} leads with responses`);
 
       // For business users, sort leads by match score
-      let processedLeads = leadsWithResponses;
+      let processedLeads = fetchedLeads;
       if (req.user.userType === "business" && req.user.profile?.matchPreferences) {
         const { calculateMatchScore } = await import("./utils/matching");
-        processedLeads = leadsWithResponses
+        processedLeads = fetchedLeads
           .map(lead => ({
             ...lead,
             matchScore: calculateMatchScore(lead, req.user)
           }))
-          .sort((a, b) => b.matchScore.totalScore - a.matchScore.totalScore);
+          .sort((a, b) => (b.matchScore?.totalScore || 0) - (a.matchScore?.totalScore || 0));
       }
 
-      log(`Successfully processed ${processedLeads.length} leads with responses`);
       res.json(processedLeads);
     } catch (error) {
       log(`Leads fetch error: ${error instanceof Error ? error.message : String(error)}`);
