@@ -72,6 +72,16 @@ export const leadResponses = pgTable("lead_responses", {
   created_at: timestamp("created_at").defaultNow(),
 });
 
+export const messages = pgTable("messages", {
+  id: serial("id").primaryKey(),
+  lead_id: integer("lead_id").references(() => leads.id).notNull(),
+  sender_id: integer("sender_id").references(() => users.id).notNull(),
+  receiver_id: integer("receiver_id").references(() => users.id).notNull(),
+  content: text("content").notNull(),
+  created_at: timestamp("created_at").defaultNow(),
+  read: boolean("read").default(false),
+});
+
 export const subscriptions = pgTable("subscriptions", {
   id: serial("id").primaryKey(),
   user_id: integer("user_id").references(() => users.id).notNull(),
@@ -99,6 +109,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   products: many(products),
   leadResponses: many(leadResponses),
   subscriptions: many(subscriptions),
+  sentMessages: many(messages, { relationName: "sentMessages" }),
+  receivedMessages: many(messages, { relationName: "receivedMessages" }),
 }));
 
 export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
@@ -114,6 +126,7 @@ export const leadsRelations = relations(leads, ({ one, many }) => ({
     references: [users.id],
   }),
   responses: many(leadResponses),
+  messages: many(messages),
 }));
 
 export const productsRelations = relations(products, ({ one }) => ({
@@ -134,12 +147,31 @@ export const leadResponsesRelations = relations(leadResponses, ({ one }) => ({
   }),
 }));
 
+export const messagesRelations = relations(messages, ({ one }) => ({
+  lead: one(leads, {
+    fields: [messages.lead_id],
+    references: [leads.id],
+  }),
+  sender: one(users, {
+    fields: [messages.sender_id],
+    references: [users.id],
+    relationName: "sentMessages",
+  }),
+  receiver: one(users, {
+    fields: [messages.receiver_id],
+    references: [users.id],
+    relationName: "receivedMessages",
+  }),
+}));
+
 export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
 export const insertSubscriptionSchema = createInsertSchema(subscriptions);
 export const selectSubscriptionSchema = createSelectSchema(subscriptions);
 export const insertLeadSchema = createInsertSchema(leads);
 export const selectLeadSchema = createSelectSchema(leads);
+export const insertMessageSchema = createInsertSchema(messages);
+export const selectMessageSchema = createSelectSchema(messages);
 
 export type InsertUser = typeof users.$inferInsert;
 export type SelectUser = typeof users.$inferSelect;
@@ -147,3 +179,5 @@ export type InsertSubscription = typeof subscriptions.$inferInsert;
 export type SelectSubscription = typeof subscriptions.$inferSelect;
 export type InsertLead = typeof leads.$inferInsert;
 export type SelectLead = typeof leads.$inferSelect;
+export type InsertMessage = typeof messages.$inferInsert;
+export type SelectMessage = typeof messages.$inferSelect;

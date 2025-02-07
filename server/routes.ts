@@ -2,7 +2,7 @@ import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth, authenticateToken } from "./auth";
 import { db } from "@db";
-import { leads, users, subscriptions, products, leadResponses } from "@db/schema";
+import { leads, users, subscriptions, products, leadResponses, messages } from "@db/schema";
 import { eq, and, or, gt, not } from "drizzle-orm";
 import { log } from "./vite";
 import { comparePasswords, hashPassword } from './auth'; // Assuming these functions exist
@@ -513,7 +513,120 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add these new routes in the registerRoutes function before the return statement
+  app.post("/api/leads/:leadId/messages", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const leadId = parseInt(req.params.leadId);
+      const { receiverId, content } = req.body;
+
+      // Verify this is a valid lead
+      const [lead] = await db.select()
+        .from(leads)
+        .where(eq(leads.id, leadId));
+
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      // Check if user has permission to send messages
+      // User must be either the lead owner or the business with an accepted proposal
+      const [response] = await db.select()
+        .from(leadResponses)
+        .where(
+          and(
+            eq(leadResponses.lead_id, leadId),
+            eq(leadResponses.status, "accepted"),
+            or(
+              eq(leadResponses.business_id, req.user.id),
+              eq(leads.user_id, req.user.id)
+            )
+          )
+        );
+
+      if (!response) {
+        return res.status(403).json({ message: "You don't have permission to send messages for this lead" });
+      }
+
+      // Create the message
+      const [message] = await db.insert(messages)
+        .values({
+          lead_id: leadId,
+          sender_id: req.user.id,
+          receiver_id: receiverId,
+          content: content.trim(),
+        })
+        .returning();
+
+      res.json(message);
+    } catch (error) {
+      log(`Message creation error: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('Full error:', error);
+      res.status(500).json({ 
+        message: "Failed to send message",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  app.get("/api/leads/:leadId/messages", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const leadId = parseInt(req.params.leadId);
+
+      // Verify this is a valid lead
+      const [lead] = await db.select()
+        .from(leads)
+        .where(eq(leads.id, leadId));
+
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      // Check if user has permission to view messages
+      const [response] = await db.select()
+        .from(leadResponses)
+        .where(
+          and(
+            eq(leadResponses.lead_id, leadId),
+            eq(leadResponses.status, "accepted"),
+            or(
+              eq(leadResponses.business_id, req.user.id),
+              eq(leads.user_id, req.user.id)
+            )
+          )
+        );
+
+      if (!response) {
+        return res.status(403).json({ message: "You don't have permission to view messages for this lead" });
+      }
+
+      // Get all messages for this lead
+      const messagesList = await db.query.messages.findMany({
+        where: eq(messages.lead_id, leadId),
+        with: {
+          sender: true,
+          receiver: true,
+        },
+        orderBy: (messages, { asc }) => [asc(messages.created_at)],
+      });
+
+      res.json(messagesList);
+    } catch (error) {
+      log(`Messages fetch error: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('Full error:', error);
+      res.status(500).json({ 
+        message: "Failed to fetch messages",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
   app.patch("/api/user/password", async (req, res) => {
     try {
       if (!req.user) {

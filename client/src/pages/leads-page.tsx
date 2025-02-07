@@ -14,9 +14,9 @@ import { queryClient } from "@/lib/queryClient";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Settings, Edit, Trash2, Send, AlertTriangle, Info } from "lucide-react";
-import type { SelectLead, SelectUser } from "@db/schema";
+import type { SelectLead, SelectUser, SelectMessage } from "@db/schema";
 import { format } from "date-fns";
-import {Badge} from "@/components/ui/badge"
+import {Badge} from "@/components/ui/badge";
 
 interface LeadFormData {
   title: string;
@@ -47,7 +47,10 @@ interface ProposalFormData {
   proposal: string;
 }
 
-//Helper function (needs implementation based on your data model)
+interface MessageFormData {
+  content: string;
+}
+
 const calculateMatchScore = (lead: SelectLead, user: SelectUser | null): {
   totalScore: number;
   categoryScore: number;
@@ -55,7 +58,6 @@ const calculateMatchScore = (lead: SelectLead, user: SelectUser | null): {
   budgetScore: number;
   industryScore: number;
 } => {
-  // Placeholder implementation - replace with your actual logic
   let totalScore = 0;
   let categoryScore = 0;
   let locationScore = 0;
@@ -389,6 +391,30 @@ export default function LeadsPage() {
     },
   });
 
+  const sendMessageMutation = useMutation({
+    mutationFn: async ({ leadId, receiverId, content }: { leadId: number; receiverId: number; content: string }) => {
+      const res = await apiRequest("POST", `/api/leads/${leadId}/messages`, {
+        receiverId,
+        content,
+      });
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [`/api/leads/${variables.leadId}/messages`] });
+      toast({
+        title: "Message sent",
+        description: "Your message has been sent successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send message",
+        variant: "destructive",
+      });
+    },
+  });
+
 
   if (isLoadingLeads) {
     return (
@@ -440,7 +466,6 @@ export default function LeadsPage() {
       );
     }
 
-    // Group responses by lead ID for quick lookup
     const myResponses = leads.reduce((acc, lead) => {
       const response = lead.responses?.find(r => r.business?.id === user.id);
       if (response) {
@@ -451,7 +476,6 @@ export default function LeadsPage() {
 
     return (
       <div className="space-y-8">
-        {/* Your Proposals Section */}
         <Card>
           <CardHeader>
             <CardTitle>Your Proposals</CardTitle>
@@ -479,15 +503,82 @@ export default function LeadsPage() {
                     </div>
                     <p className="text-sm mt-2">{response.proposal}</p>
                     {response.status === "accepted" && (
-                      <div className="mt-4 p-4 bg-muted rounded-lg">
-                        <div className="flex items-start gap-2">
-                          <Info className="h-4 w-4 mt-0.5 text-primary" />
-                          <div>
-                            <h4 className="font-medium text-sm">Lead Contact Information</h4>
-                            <p className="text-sm mt-1 whitespace-pre-wrap">
-                              {response.contactDetails || "No contact details provided yet."}
-                            </p>
+                      <div className="mt-4 space-y-4">
+                        <div className="p-4 bg-background rounded-lg border">
+                          <h4 className="font-medium mb-2">Contact Information</h4>
+                          <p className="text-sm whitespace-pre-wrap">
+                            {response.contactDetails || "No contact details provided yet."}
+                          </p>
+                        </div>
+
+                        <div className="p-4 bg-background rounded-lg border">
+                          <h4 className="font-medium mb-4">Messages</h4>
+
+                          <div className="space-y-4 mb-4 max-h-[300px] overflow-y-auto">
+                            {useQuery<SelectMessage[]>({
+                              queryKey: [`/api/leads/${lead.id}/messages`],
+                              enabled: response.status === "accepted",
+                            }).data?.map((message) => (
+                              <div
+                                key={message.id}
+                                className={`p-3 rounded-lg ${
+                                  message.sender_id === user?.id
+                                    ? "bg-primary text-primary-foreground ml-8"
+                                    : "bg-muted mr-8"
+                                }`}
+                              >
+                                <p className="text-sm font-medium mb-1">
+                                  {message.sender_id === user?.id ? "You" : "Other Party"}
+                                </p>
+                                <p className="text-sm">{message.content}</p>
+                                <p className="text-xs mt-1 opacity-70">
+                                  {format(new Date(message.created_at), "PPp")}
+                                </p>
+                              </div>
+                            ))}
                           </div>
+
+                          <form
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              const form = e.target as HTMLFormElement;
+                              const content = (form.elements.namedItem("content") as HTMLTextAreaElement).value;
+
+                              if (content.trim()) {
+                                sendMessageMutation.mutate({
+                                  leadId: lead.id,
+                                  receiverId: user?.id === lead.user_id ? response.business_id : lead.user_id,
+                                  content: content.trim(),
+                                });
+                                form.reset();
+                              }
+                            }}
+                            className="flex gap-2"
+                          >
+                            <Textarea
+                              name="content"
+                              placeholder="Type your message..."
+                              className="min-h-[80px]"
+                              required
+                            />
+                            <Button
+                              type="submit"
+                              className="self-end"
+                              disabled={sendMessageMutation.isPending}
+                            >
+                              {sendMessageMutation.isPending ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Sending...
+                                </>
+                              ) : (
+                                <>
+                                  <Send className="mr-2 h-4 w-4" />
+                                  Send
+                                </>
+                              )}
+                            </Button>
+                          </form>
                         </div>
                       </div>
                     )}
@@ -498,7 +589,6 @@ export default function LeadsPage() {
           </CardContent>
         </Card>
 
-        {/* Available Leads Section */}
         <div className="grid gap-6">
           <h2 className="text-2xl font-bold">Available Leads</h2>
           {leads.map((lead) => {
@@ -778,13 +868,84 @@ export default function LeadsPage() {
                           </div>
                           <p className="text-sm mt-2">{response.proposal}</p>
 
-                          {/* Show contact details if proposal is accepted */}
                           {response.status === "accepted" && (
-                            <div className="mt-4 p-4 bg-background rounded-lg border">
-                              <h4 className="font-medium mb-2">Contact Information</h4>
-                              <p className="text-sm whitespace-pre-wrap">
-                                {response.contactDetails || "No contact details provided yet."}
-                              </p>
+                            <div className="mt-4 space-y-4">
+                              <div className="p-4 bg-background rounded-lg border">
+                                <h4 className="font-medium mb-2">Contact Information</h4>
+                                <p className="text-sm whitespace-pre-wrap">
+                                  {response.contactDetails || "No contact details provided yet."}
+                                </p>
+                              </div>
+
+                              <div className="p-4 bg-background rounded-lg border">
+                                <h4 className="font-medium mb-4">Messages</h4>
+
+                                <div className="space-y-4 mb-4 max-h-[300px] overflow-y-auto">
+                                  {useQuery<SelectMessage[]>({
+                                    queryKey: [`/api/leads/${lead.id}/messages`],
+                                    enabled: response.status === "accepted",
+                                  }).data?.map((message) => (
+                                    <div
+                                      key={message.id}
+                                      className={`p-3 rounded-lg ${
+                                        message.sender_id === user?.id
+                                          ? "bg-primary text-primary-foreground ml-8"
+                                          : "bg-muted mr-8"
+                                      }`}
+                                    >
+                                      <p className="text-sm font-medium mb-1">
+                                        {message.sender_id === user?.id ? "You" : "Other Party"}
+                                      </p>
+                                      <p className="text-sm">{message.content}</p>
+                                      <p className="text-xs mt-1 opacity-70">
+                                        {format(new Date(message.created_at), "PPp")}
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                <form
+                                  onSubmit={(e) => {
+                                    e.preventDefault();
+                                    const form = e.target as HTMLFormElement;
+                                    const content = (form.elements.namedItem("content") as HTMLTextAreaElement).value;
+
+                                    if (content.trim()) {
+                                      sendMessageMutation.mutate({
+                                        leadId: lead.id,
+                                        receiverId: user?.id === lead.user_id ? response.business_id : lead.user_id,
+                                        content: content.trim(),
+                                      });
+                                      form.reset();
+                                    }
+                                  }}
+                                  className="flex gap-2"
+                                >
+                                  <Textarea
+                                    name="content"
+                                    placeholder="Type your message..."
+                                    className="min-h-[80px]"
+                                    required
+                                  />
+                                  <Button
+                                    type="submit"
+                                    className="self-end"
+                                    disabled={sendMessageMutation.isPending}
+                                  >
+                                    {sendMessageMutation.isPending ? (
+                                      <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Sending...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Send className="mr-2 h-4 w-4" />
+                                        Send
+                                      </>
+                                    )}
+                                  </Button>
+                                </form>
+                              </div>
                             </div>
                           )}
 
@@ -856,7 +1017,6 @@ export default function LeadsPage() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => {
-                                  // TODO: Implement reject proposal
                                   console.log('Reject proposal:', response.id);
                                 }}
                               >
