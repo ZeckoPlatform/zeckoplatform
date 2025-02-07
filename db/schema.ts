@@ -59,7 +59,7 @@ export const leads = pgTable("leads", {
   location: text("location"),
   status: text("status", { enum: ["open", "closed", "in_progress"] }).default("open"),
   created_at: timestamp("created_at").defaultNow(),
-  expires_at: timestamp("expires_at"), // Add this field for 30-day expiration
+  expires_at: timestamp("expires_at"), 
 });
 
 export const leadResponses = pgTable("lead_responses", {
@@ -79,7 +79,7 @@ export const messages = pgTable("messages", {
   receiver_id: integer("receiver_id").references(() => users.id).notNull(),
   content: text("content").notNull(),
   created_at: timestamp("created_at").defaultNow(),
-  read: boolean("read").default(false),
+  updated_at: timestamp("updated_at").defaultNow(),
 });
 
 export const subscriptions = pgTable("subscriptions", {
@@ -98,7 +98,7 @@ export const products = pgTable("products", {
   vendorId: integer("vendor_id").references(() => users.id).notNull(),
   title: text("title").notNull(),
   description: text("description").notNull(),
-  price: integer("price").notNull(), // Store price in cents
+  price: integer("price").notNull(), 
   category: text("category").notNull(),
   imageUrl: text("image_url"),
   createdAt: timestamp("created_at").defaultNow(),

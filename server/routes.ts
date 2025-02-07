@@ -608,7 +608,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).json({ message: "You don't have permission to view messages for this lead" });
       }
 
-      // Get all messages for this lead
+      // Get all messages for this lead ordered by creation time
       const messagesList = await db.query.messages.findMany({
         where: eq(messages.lead_id, leadId),
         with: {
