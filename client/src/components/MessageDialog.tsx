@@ -34,7 +34,7 @@ export function MessageDialog({ leadId, receiverId, isOpen, onOpenChange }: Mess
   // Use a consistent query key format
   const messagesQueryKey = [`/api/leads/${leadId}/messages`];
 
-  const { data: messages, isLoading, error } = useQuery<Message[]>({
+  const { data: messages = [], isLoading, error } = useQuery<Message[]>({
     queryKey: messagesQueryKey,
     enabled: isOpen,
     refetchInterval: 5000, // Poll every 5 seconds when dialog is open
@@ -49,9 +49,19 @@ export function MessageDialog({ leadId, receiverId, isOpen, onOpenChange }: Mess
       const data = await response.json();
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (newMessage) => {
       setNewMessage("");
-      // Immediately invalidate the messages query to show the new message
+      // Optimistically update the messages list
+      queryClient.setQueryData(messagesQueryKey, (old: Message[] = []) => {
+        return [...old, {
+          ...newMessage,
+          sender: {
+            id: user?.id || 0,
+            username: user?.username || 'You'
+          }
+        }];
+      });
+      // Also invalidate to ensure we get the latest from the server
       queryClient.invalidateQueries({ queryKey: messagesQueryKey });
     },
     onError: (error: Error) => {
@@ -85,7 +95,7 @@ export function MessageDialog({ leadId, receiverId, isOpen, onOpenChange }: Mess
             </div>
           ) : (
             <div className="space-y-4">
-              {messages?.map((message) => (
+              {messages.map((message) => (
                 <div
                   key={message.id}
                   className={`flex flex-col ${
