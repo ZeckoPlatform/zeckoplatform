@@ -1,0 +1,38 @@
+Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+Query request - /api/leads
+Query response status: 200
+undefined is not an object (evaluating 'message.sender.username')
+undefined is not an object (evaluating 'message.sender.username')
+The above error occurred in the <MessageDialog> component:
+
+MessageDialog@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/MessageDialog.tsx:27:39
+DialogProvider@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-R2T6YHTW.js:43:13
+Dialog@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-dialog.js:61:27
+div
+div
+div
+div
+div
+div
+_c9@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/ui/card.tsx:106:10
+div
+_c@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/ui/card.tsx:20:9
+div
+BusinessLeadsView
+div
+div
+LeadsPage@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/pages/leads-page.tsx:60:27
+ProtectedRoute@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/lib/protected-route.tsx:25:5
+Switch@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js:380:27
+div
+Router
+AuthProvider@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/hooks/use-auth.tsx:144:6
+QueryClientProvider@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js:2805:9
+App
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+t@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:12639
+value@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:32772
+@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:34410
+undefined is not an object (evaluating 'message.sender.username')

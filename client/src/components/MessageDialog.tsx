@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -53,55 +53,56 @@ export function MessageDialog({ leadId, receiverId, isOpen, onOpenChange }: Mess
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Messages</DialogTitle>
-        </DialogHeader>
-        <div className="flex flex-col h-[400px]">
-          <ScrollArea className="flex-1 p-4">
-            <div className="space-y-4">
-              {messages?.map((message) => (
+    <DialogContent className="max-w-md">
+      <DialogHeader>
+        <DialogTitle>Messages</DialogTitle>
+        <DialogDescription>
+          Send and receive messages about this lead
+        </DialogDescription>
+      </DialogHeader>
+      <div className="flex flex-col h-[400px]">
+        <ScrollArea className="flex-1 p-4">
+          <div className="space-y-4">
+            {messages?.map((message) => (
+              <div
+                key={message.id}
+                className={`flex flex-col ${
+                  message.sender.username === user?.username
+                    ? "items-end"
+                    : "items-start"
+                }`}
+              >
                 <div
-                  key={message.id}
-                  className={`flex flex-col ${
+                  className={`max-w-[80%] rounded-lg p-3 ${
                     message.sender.username === user?.username
-                      ? "items-end"
-                      : "items-start"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted"
                   }`}
                 >
-                  <div
-                    className={`max-w-[80%] rounded-lg p-3 ${
-                      message.sender.username === user?.username
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted"
-                    }`}
-                  >
-                    <p className="text-sm">{message.content}</p>
-                  </div>
-                  <span className="text-xs text-muted-foreground mt-1">
-                    {message.sender.username} • {format(new Date(message.created_at), "MMM d, h:mm a")}
-                  </span>
+                  <p className="text-sm">{message.content}</p>
                 </div>
-              ))}
-            </div>
-          </ScrollArea>
-          <form onSubmit={handleSend} className="flex gap-2 p-4 border-t">
-            <Input
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Type your message..."
-              className="flex-1"
-            />
-            <Button 
-              type="submit" 
-              disabled={sendMessageMutation.isPending}
-            >
-              Send
-            </Button>
-          </form>
-        </div>
-      </DialogContent>
-    </Dialog>
+                <span className="text-xs text-muted-foreground mt-1">
+                  {message.sender.username} • {format(new Date(message.created_at), "MMM d, h:mm a")}
+                </span>
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
+        <form onSubmit={handleSend} className="flex gap-2 p-4 border-t">
+          <Input
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            placeholder="Type your message..."
+            className="flex-1"
+          />
+          <Button 
+            type="submit" 
+            disabled={sendMessageMutation.isPending}
+          >
+            Send
+          </Button>
+        </form>
+      </div>
+    </DialogContent>
   );
 }

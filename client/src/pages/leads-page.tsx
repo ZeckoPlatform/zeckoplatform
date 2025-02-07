@@ -525,7 +525,7 @@ export default function LeadsPage() {
                               <MessageDialog 
                                 leadId={lead.id}
                                 receiverId={user?.id === lead.user_id ? response.business_id : lead.user_id}
-                                isOpen={true}
+                                isOpen={false}
                                 onOpenChange={() => {}}
                               />
                             </Dialog>
@@ -831,7 +831,7 @@ export default function LeadsPage() {
                                 <MessageDialog 
                                   leadId={lead.id}
                                   receiverId={response.business_id}
-                                  isOpen={true}
+                                  isOpen={false}
                                   onOpenChange={() => {}}
                                 />
                               </Dialog>
@@ -996,8 +996,7 @@ export default function LeadsPage() {
           'Post Lead'
         )}
       </Button>
-    </form>
-  );
+    </form>);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
