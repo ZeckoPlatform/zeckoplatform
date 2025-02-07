@@ -31,22 +31,31 @@ export function MessageDialog({ leadId, receiverId, isOpen, onOpenChange }: Mess
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
+  // Use a consistent query key format
+  const messagesQueryKey = [`/api/leads/${leadId}/messages`];
+
   const { data: messages, isLoading, error } = useQuery<Message[]>({
-    queryKey: [`/api/leads/${leadId}/messages`],
+    queryKey: messagesQueryKey,
     enabled: isOpen,
+    refetchInterval: 5000, // Poll every 5 seconds when dialog is open
   });
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
-      await apiRequest("POST", `/api/leads/${leadId}/messages`, {
+      const response = await apiRequest("POST", `/api/leads/${leadId}/messages`, {
         receiverId,
         content,
       });
+      const data = await response.json();
+      return data;
     },
     onSuccess: () => {
       setNewMessage("");
-      // Invalidate and refetch messages
-      queryClient.invalidateQueries({ queryKey: [`/api/leads/${leadId}/messages`] });
+      // Immediately invalidate the messages query to show the new message
+      queryClient.invalidateQueries({ queryKey: messagesQueryKey });
+    },
+    onError: (error: Error) => {
+      console.error("Failed to send message:", error);
     },
   });
 
