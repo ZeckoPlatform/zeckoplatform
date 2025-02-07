@@ -532,8 +532,11 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Check if user has permission to send messages
-      const [response] = await db.select()
+      // Either the user is the lead owner or has an accepted response
+      const [leadResponse] = await db
+        .select()
         .from(leadResponses)
+        .leftJoin(leads, eq(leads.id, leadResponses.lead_id)) // Corrected Join
         .where(
           and(
             eq(leadResponses.lead_id, leadId),
@@ -545,21 +548,22 @@ export function registerRoutes(app: Express): Server {
           )
         );
 
-      if (!response) {
+      if (!leadResponse) {
         return res.status(403).json({ message: "You don't have permission to send messages for this lead" });
       }
 
       // Create the message
       const [message] = await db.insert(messages)
         .values({
-          lead_id: leadId,
-          sender_id: req.user.id,
-          receiver_id: receiverId,
+          leadId,
+          senderId: req.user.id,
+          receiverId,
           content: content.trim(),
           read: false,
         })
         .returning();
 
+      // Get the full message details with sender and receiver info
       const fullMessage = await db.query.messages.findFirst({
         where: eq(messages.id, message.id),
         with: {
