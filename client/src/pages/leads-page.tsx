@@ -16,8 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Settings, Edit, Trash2, Send, AlertTriangle, Info } from "lucide-react";
 import type { SelectLead, SelectUser, SelectMessage } from "@db/schema";
 import { format } from "date-fns";
-import {Badge} from "@/components/ui/badge";
-import { MessageDialog } from "@/components/MessageDialog";
+import { Badge } from "@/components/ui/badge";
 import { useNotificationSound } from "@/lib/useNotificationSound";
 
 interface LeadFormData {
@@ -52,6 +51,120 @@ interface ProposalFormData {
 interface MessageFormData {
   content: string;
 }
+
+const MessageDialogContent = ({ 
+  leadId, 
+  receiverId,
+  onClose 
+}: { 
+  leadId: number;
+  receiverId: number;
+  onClose?: () => void;
+}) => {
+  const { user } = useAuth();
+  const messageForm = useForm<MessageFormData>();
+  const [messages, setMessages] = useState<SelectMessage[]>([]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Fetch messages
+  const { data: fetchedMessages = [], isLoading: isLoadingMessages } = useQuery<SelectMessage[]>({
+    queryKey: [`/api/leads/${leadId}/messages`],
+    refetchInterval: 5000, // Poll every 5 seconds
+  });
+
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
+
+  // Mark messages as read when dialog opens
+  useEffect(() => {
+    if (leadId) {
+      apiRequest("POST", `/api/leads/${leadId}/messages/read`, {})
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+        })
+        .catch(console.error);
+    }
+  }, [leadId]);
+
+  const sendMessageMutation = useMutation({
+    mutationFn: async ({ content }: MessageFormData) => {
+      const res = await apiRequest("POST", `/api/leads/${leadId}/messages`, {
+        receiverId,
+        content,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/leads/${leadId}/messages`] });
+      messageForm.reset();
+    },
+  });
+
+  return (
+    <DialogContent className="sm:max-w-[500px]">
+      <DialogHeader>
+        <DialogTitle>Messages</DialogTitle>
+      </DialogHeader>
+      <div className="max-h-[400px] overflow-y-auto space-y-4 p-4">
+        {isLoadingMessages ? (
+          <div className="flex justify-center">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+        ) : (
+          fetchedMessages.map((message) => (
+            <div
+              key={message.id}
+              className={`flex ${
+                message.sender_id === user?.id ? "justify-end" : "justify-start"
+              }`}
+            >
+              <div
+                className={`max-w-[80%] rounded-lg p-3 ${
+                  message.sender_id === user?.id
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted"
+                }`}
+              >
+                <p className="text-sm">{message.content}</p>
+                <p className="text-xs opacity-70 mt-1">
+                  {format(new Date(message.created_at), "PPp")}
+                </p>
+              </div>
+            </div>
+          ))
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+      <form
+        onSubmit={messageForm.handleSubmit((data) => {
+          sendMessageMutation.mutate(data);
+        })}
+        className="flex gap-2 mt-4"
+      >
+        <Input
+          {...messageForm.register("content", { required: true })}
+          placeholder="Type your message..."
+          className="flex-1"
+        />
+        <Button
+          type="submit"
+          size="icon"
+          disabled={sendMessageMutation.isPending}
+        >
+          {sendMessageMutation.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Send className="h-4 w-4" />
+          )}
+        </Button>
+      </form>
+    </DialogContent>
+  );
+};
 
 const calculateMatchScore = (lead: SelectLead, user: SelectUser | null): {
   totalScore: number;
@@ -412,30 +525,6 @@ export default function LeadsPage() {
     },
   });
 
-  const sendMessageMutation = useMutation({
-    mutationFn: async ({ leadId, receiverId, content }: { leadId: number; receiverId: number; content: string }) => {
-      const res = await apiRequest("POST", `/api/leads/${leadId}/messages`, {
-        receiverId,
-        content,
-      });
-      return res.json();
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: [`/api/leads/${variables.leadId}/messages`] });
-      toast({
-        title: "Message sent",
-        description: "Your message has been sent successfully.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to send message",
-        variant: "destructive",
-      });
-    },
-  });
-
 
   if (isLoadingLeads) {
     return (
@@ -558,19 +647,10 @@ export default function LeadsPage() {
                                   )}
                                 </Button>
                               </DialogTrigger>
-                              <MessageDialog
+                              <MessageDialogContent
                                 leadId={lead.id}
                                 receiverId={user?.id === lead.user_id ? response.business_id : lead.user_id}
-                                isOpen={false}
-                                onOpenChange={(open) => {
-                                  if (!open) {
-                                    queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-                                  }
-                                }}
-                                onMessagesRead={() => {
-                                  apiRequest("POST", `/api/leads/${lead.id}/messages/read`, {});
-                                  queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-                                }}
+                                onClose={() => queryClient.invalidateQueries({ queryKey: ["/api/leads"] })}
                               />
                             </Dialog>
                           </div>
@@ -875,25 +955,15 @@ export default function LeadsPage() {
                                     )}
                                   </Button>
                                 </DialogTrigger>
-                                <MessageDialog
+                                <MessageDialogContent
                                   leadId={lead.id}
                                   receiverId={response.business_id}
-                                  isOpen={false}
-                                  onOpenChange={(open) => {
-                                    if (!open) {
-                                      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-                                    }
-                                  }}
-                                  onMessagesRead={() => {
-                                    apiRequest("POST", `/api/leads/${lead.id}/messages/read`, {});
-                                    queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-                                  }}
-                                />
-                              </Dialog>
+                                  onClose={() => queryClient.invalidateQueries({ queryKey: ["/api/leads"] })}
+                                />                              </Dialog>
                             </div>
                           )}
 
-                          {response.status === "pending" && (
+                          {response.status === "pending"&& (
                             <div className="flex gap-2 mt-4">
                               <Dialog open={acceptDialogOpen} onOpenChange={setAcceptDialogOpen}>
                                 <DialogTrigger asChild>
@@ -901,7 +971,7 @@ export default function LeadsPage() {
                                     size="sm"
                                     onClick={() => {
                                       setSelectedResponse(response);
-                                      setSelectedLead(lead);
+                                                                     setSelectedLead(lead);
                                     }}
                                   >
                                     Accept
@@ -967,7 +1037,8 @@ export default function LeadsPage() {
                                 Reject
                               </Button>
                             </div>
-                                                    )}
+                          )}
+
                         </div>
                       ))}
                     </div>

@@ -146,7 +146,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // GET /api/leads - Get all leads (with subscription and expiration filter)
+  // Update the GET /api/leads endpoint to properly handle unread messages
   app.get("/api/leads", async (req, res) => {
     try {
       if (!req.user) {
@@ -681,6 +681,41 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Update the messages/read endpoint
+  app.post("/api/leads/:leadId/messages/read", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const leadId = parseInt(req.params.leadId);
+      log(`Marking messages as read for lead ${leadId} and user ${req.user.id}`);
+
+      // Update all unread messages for this user in this lead to read
+      const result = await db.update(messages)
+        .set({ read: true })
+        .where(
+          and(
+            eq(messages.lead_id, leadId),
+            eq(messages.receiver_id, req.user.id),
+            eq(messages.read, false)
+          )
+        )
+        .returning();
+
+      log(`Marked ${result.length} messages as read`);
+      res.json({ success: true, updatedCount: result.length });
+    } catch (error) {
+      log(`Mark messages read error: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('Full error:', error);
+      res.status(500).json({ 
+        message: "Failed to mark messages as read",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+
   app.patch("/api/user/password", async (req, res) => {
     try {
       if (!req.user) {
@@ -858,7 +893,7 @@ export function registerRoutes(app: Express): Server {
 
       res.json({ message: "Product deleted successfully" });
     } catch (error) {
-      log(`Product deletion error: ${error instanceof Error ? error.message : String(error)}`);
+      log(`Product deletion error: ${error instanceof Error ? errormessage : String(error)}`);
       console.error('Full error:', error);
       res.status(500).json({ 
         message: "Failed to delete product",
