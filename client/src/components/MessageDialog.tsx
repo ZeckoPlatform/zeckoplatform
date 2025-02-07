@@ -55,7 +55,7 @@ export function MessageDialog({
     if (messages.length > previousMessagesLengthRef.current && isOpen) {
       const lastMessage = messages[messages.length - 1];
       if (lastMessage?.sender?.id !== user?.id) {
-        playNotification();
+        playNotification('receive');
       }
     }
     previousMessagesLengthRef.current = messages.length;
@@ -79,6 +79,7 @@ export function MessageDialog({
     },
     onSuccess: (newMessage) => {
       setNewMessage("");
+      playNotification('send');
       // Optimistically update the messages list
       queryClient.setQueryData(messagesQueryKey, (old: Message[] = []) => {
         return [...old, {
@@ -112,6 +113,9 @@ export function MessageDialog({
         </DialogDescription>
       </DialogHeader>
       <div className="flex flex-col h-[400px]">
+        <div className="bg-muted/50 px-4 py-2 text-xs text-muted-foreground">
+          Message history is retained for 30 days or until the lead is closed
+        </div>
         <ScrollArea className="flex-1 p-4">
           {isLoading ? (
             <div className="flex items-center justify-center h-full">

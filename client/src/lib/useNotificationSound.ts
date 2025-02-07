@@ -1,11 +1,13 @@
 import { useCallback, useRef } from 'react';
 
+type SoundType = 'send' | 'receive';
+
 export function useNotificationSound() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const lastPlayedRef = useRef<number>(0);
   const cooldownMs = 2000; // Minimum time between sounds (2 seconds)
 
-  const playNotification = useCallback(() => {
+  const playNotification = useCallback((type: SoundType = 'receive') => {
     const now = Date.now();
     if (now - lastPlayedRef.current < cooldownMs) {
       return; // Still in cooldown
@@ -20,15 +22,26 @@ export function useNotificationSound() {
     const oscillator = context.createOscillator();
     const gainNode = context.createGain();
 
-    // Configure sound
-    oscillator.type = 'sine';
-    oscillator.frequency.setValueAtTime(1000, context.currentTime); // Start at 1000 Hz
-    oscillator.frequency.exponentialRampToValueAtTime(500, context.currentTime + 0.1); // Slide down to 500 Hz
+    // Configure sound based on type
+    if (type === 'send') {
+      // Higher pitched, shorter "ping" for sending
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(1200, context.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(800, context.currentTime + 0.05);
 
-    // Configure volume envelope
-    gainNode.gain.setValueAtTime(0, context.currentTime);
-    gainNode.gain.linearRampToValueAtTime(0.05, context.currentTime + 0.01); // Quick fade in, low volume
-    gainNode.gain.linearRampToValueAtTime(0, context.currentTime + 0.1); // Fade out
+      gainNode.gain.setValueAtTime(0, context.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.03, context.currentTime + 0.01);
+      gainNode.gain.linearRampToValueAtTime(0, context.currentTime + 0.05);
+    } else {
+      // Lower pitched, slightly longer "clink" for receiving
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(1000, context.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(500, context.currentTime + 0.1);
+
+      gainNode.gain.setValueAtTime(0, context.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.05, context.currentTime + 0.01);
+      gainNode.gain.linearRampToValueAtTime(0, context.currentTime + 0.1);
+    }
 
     // Connect nodes
     oscillator.connect(gainNode);
@@ -36,7 +49,7 @@ export function useNotificationSound() {
 
     // Play sound
     oscillator.start();
-    oscillator.stop(context.currentTime + 0.1);
+    oscillator.stop(context.currentTime + (type === 'send' ? 0.05 : 0.1));
 
     lastPlayedRef.current = now;
   }, []);
