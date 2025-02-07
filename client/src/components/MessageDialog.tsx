@@ -14,7 +14,12 @@ interface Message {
   id: number;
   content: string;
   created_at: string;
+  read: boolean;
   sender: {
+    id: number;
+    username: string;
+  };
+  receiver: {
     id: number;
     username: string;
   };
@@ -40,6 +45,7 @@ export function MessageDialog({
   const queryClient = useQueryClient();
   const playNotification = useNotificationSound();
   const previousMessagesLengthRef = useRef(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   // Use a consistent query key format
   const messagesQueryKey = [`/api/leads/${leadId}/messages`];
@@ -47,7 +53,7 @@ export function MessageDialog({
   const { data: messages = [], isLoading, error } = useQuery<Message[]>({
     queryKey: messagesQueryKey,
     enabled: isOpen,
-    refetchInterval: 5000, // Poll every 5 seconds when dialog is open
+    refetchInterval: isOpen ? 3000 : false, // Poll every 3 seconds when dialog is open
   });
 
   // Play notification sound when new messages arrive
@@ -61,12 +67,24 @@ export function MessageDialog({
     previousMessagesLengthRef.current = messages.length;
   }, [messages.length, isOpen, user?.id, playNotification]);
 
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (scrollRef.current && messages.length > 0) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages.length]);
+
   // Mark messages as read when dialog opens
   useEffect(() => {
     if (isOpen && messages.length > 0 && onMessagesRead) {
-      onMessagesRead();
+      const hasUnreadMessages = messages.some(m => 
+        m.sender.id !== user?.id && !m.read
+      );
+      if (hasUnreadMessages) {
+        onMessagesRead();
+      }
     }
-  }, [isOpen, messages.length, onMessagesRead]);
+  }, [isOpen, messages, onMessagesRead, user?.id]);
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
@@ -82,13 +100,7 @@ export function MessageDialog({
       playNotification('send');
       // Optimistically update the messages list
       queryClient.setQueryData(messagesQueryKey, (old: Message[] = []) => {
-        return [...old, {
-          ...newMessage,
-          sender: {
-            id: user?.id || 0,
-            username: user?.username || 'You'
-          }
-        }];
+        return [...old, newMessage];
       });
       // Also invalidate to ensure we get the latest from the server
       queryClient.invalidateQueries({ queryKey: messagesQueryKey });
@@ -116,7 +128,7 @@ export function MessageDialog({
         <div className="bg-muted/50 px-4 py-2 text-xs text-muted-foreground">
           Message history is retained for 30 days or until the lead is closed
         </div>
-        <ScrollArea className="flex-1 p-4">
+        <ScrollArea className="flex-1 p-4" ref={scrollRef}>
           {isLoading ? (
             <div className="flex items-center justify-center h-full">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -131,14 +143,14 @@ export function MessageDialog({
                 <div
                   key={message.id}
                   className={`flex flex-col ${
-                    message.sender?.id === user?.id
+                    message.sender.id === user?.id
                       ? "items-end"
                       : "items-start"
                   }`}
                 >
                   <div
                     className={`max-w-[80%] rounded-lg p-3 ${
-                      message.sender?.id === user?.id
+                      message.sender.id === user?.id
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted"
                     }`}
@@ -146,7 +158,7 @@ export function MessageDialog({
                     <p className="text-sm">{message.content}</p>
                   </div>
                   <span className="text-xs text-muted-foreground mt-1">
-                    {message.sender?.username || 'Unknown'} • {format(new Date(message.created_at), "MMM d, h:mm a")}
+                    {message.sender.username} • {format(new Date(message.created_at), "MMM d, h:mm a")}
                   </span>
                 </div>
               ))}

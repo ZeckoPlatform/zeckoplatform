@@ -532,10 +532,8 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Check if user has permission to send messages
-      // User must be either the lead owner or the business with an accepted proposal
       const [response] = await db.select()
         .from(leadResponses)
-        .leftJoin(leads, eq(leads.id, leadResponses.lead_id))
         .where(
           and(
             eq(leadResponses.lead_id, leadId),
@@ -558,10 +556,19 @@ export function registerRoutes(app: Express): Server {
           sender_id: req.user.id,
           receiver_id: receiverId,
           content: content.trim(),
+          read: false,
         })
         .returning();
 
-      res.json(message);
+      const fullMessage = await db.query.messages.findFirst({
+        where: eq(messages.id, message.id),
+        with: {
+          sender: true,
+          receiver: true,
+        }
+      });
+
+      res.json(fullMessage);
     } catch (error) {
       log(`Message creation error: ${error instanceof Error ? error.message : String(error)}`);
       console.error('Full error:', error);
