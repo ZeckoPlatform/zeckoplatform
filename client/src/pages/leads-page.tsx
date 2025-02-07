@@ -484,13 +484,9 @@ export default function LeadsPage() {
                           <Info className="h-4 w-4 mt-0.5 text-primary" />
                           <div>
                             <h4 className="font-medium text-sm">Lead Contact Information</h4>
-                            {response.contactDetails ? (
-                              <p className="text-sm mt-1 whitespace-pre-wrap">{response.contactDetails}</p>
-                            ) : (
-                              <p className="text-sm text-muted-foreground mt-1">
-                                The lead has accepted your proposal but hasn't provided contact details yet.
-                              </p>
-                            )}
+                            <p className="text-sm mt-1 whitespace-pre-wrap">
+                              {response.contactDetails || "No contact details provided yet."}
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -783,10 +779,12 @@ export default function LeadsPage() {
                           <p className="text-sm mt-2">{response.proposal}</p>
 
                           {/* Show contact details if proposal is accepted */}
-                          {response.status === "accepted" && response.contactDetails && (
+                          {response.status === "accepted" && (
                             <div className="mt-4 p-4 bg-background rounded-lg border">
                               <h4 className="font-medium mb-2">Contact Information</h4>
-                              <p className="text-sm whitespace-pre-wrap">{response.contactDetails}</p>
+                              <p className="text-sm whitespace-pre-wrap">
+                                {response.contactDetails || "No contact details provided yet."}
+                              </p>
                             </div>
                           )}
 
@@ -980,7 +978,7 @@ export default function LeadsPage() {
                   <TabsTrigger value="password">Password</TabsTrigger>
                 </TabsList>
 
-                                <TabsContent value="profile">
+                <TabsContent value="profile">
                   <form onSubmit={profileForm.handleSubmit((data) => updateProfileMutation.mutate(data))} className="space-y-4">
                     <div>
                       <Label htmlFor="name">Display Name</Label>
