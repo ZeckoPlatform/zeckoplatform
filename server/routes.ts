@@ -535,6 +535,7 @@ export function registerRoutes(app: Express): Server {
       // User must be either the lead owner or the business with an accepted proposal
       const [response] = await db.select()
         .from(leadResponses)
+        .leftJoin(leads, eq(leads.id, leadResponses.lead_id))
         .where(
           and(
             eq(leadResponses.lead_id, leadId),
@@ -591,6 +592,7 @@ export function registerRoutes(app: Express): Server {
       // Check if user has permission to view messages
       const [response] = await db.select()
         .from(leadResponses)
+        .leftJoin(leads, eq(leads.id, leadResponses.lead_id))
         .where(
           and(
             eq(leadResponses.lead_id, leadId),
