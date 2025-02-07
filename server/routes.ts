@@ -163,13 +163,15 @@ export function registerRoutes(app: Express): Server {
 
       log(`Fetching leads for user ${req.user.id} (${req.user.userType})`);
 
+      const baseQuery = req.user.userType === "free" 
+        ? eq(leads.user_id, req.user.id)
+        : req.user.userType === "business" 
+          ? eq(leads.status, "open")
+          : undefined;
+
       // Use Drizzle's query builder with relations
-      let baseQuery = {
-        where: req.user.userType === "free" 
-          ? eq(leads.user_id, req.user.id)
-          : req.user.userType === "business" 
-            ? eq(leads.status, "open")
-            : undefined,
+      const fetchedLeads = await db.query.leads.findMany({
+        where: baseQuery,
         with: {
           responses: {
             with: {
@@ -177,25 +179,20 @@ export function registerRoutes(app: Express): Server {
             }
           },
           messages: {
-            where: and(
-              eq(messages.receiver_id, req.user.id),
-              eq(messages.read, false)
-            ),
+            where: eq(messages.receiver_id, req.user.id),
             with: {
               sender: true
             }
           }
         }
-      };
-
-      const fetchedLeads = await db.query.leads.findMany(baseQuery);
+      });
 
       log(`Successfully fetched ${fetchedLeads.length} leads with responses and messages`);
 
       // Process leads to include unread message counts
       const processedLeads = fetchedLeads.map(lead => ({
         ...lead,
-        unreadMessages: lead.messages?.length || 0,
+        unreadMessages: lead.messages?.filter(m => !m.read).length || 0,
         // Remove messages array from response to avoid sending unnecessary data
         messages: undefined
       }));
