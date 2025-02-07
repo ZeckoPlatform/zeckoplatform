@@ -52,11 +52,11 @@ interface MessageFormData {
   content: string;
 }
 
-const MessageDialogContent = ({ 
-  leadId, 
+const MessageDialogContent = ({
+  leadId,
   receiverId,
-  onClose 
-}: { 
+  onClose
+}: {
   leadId: number;
   receiverId: number;
   onClose?: () => void;
@@ -65,29 +65,35 @@ const MessageDialogContent = ({
   const messageForm = useForm<MessageFormData>();
   const [messages, setMessages] = useState<SelectMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const previousMessagesLength = useRef(0);
 
   // Fetch messages
-  const { data: fetchedMessages = [], isLoading: isLoadingMessages } = useQuery<SelectMessage[]>({
+  const { data: fetchedMessages = [] } = useQuery<SelectMessage[]>({
     queryKey: [`/api/leads/${leadId}/messages`],
-    refetchInterval: 5000, // Poll every 5 seconds
+    refetchInterval: 5000,
   });
 
-  // Scroll to bottom when new messages arrive
+  // Update messages state when fetchedMessages changes
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    setMessages(fetchedMessages);
+    // Check if new messages arrived and scroll if needed
+    if (fetchedMessages.length > previousMessagesLength.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages]);
+    previousMessagesLength.current = fetchedMessages.length;
+  }, [fetchedMessages]);
 
   // Mark messages as read when dialog opens
   useEffect(() => {
-    if (leadId) {
-      apiRequest("POST", `/api/leads/${leadId}/messages/read`, {})
-        .then(() => {
-          queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-        })
-        .catch(console.error);
-    }
+    const markMessagesAsRead = async () => {
+      try {
+        await apiRequest("POST", `/api/leads/${leadId}/messages/read`, {});
+        queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      } catch (error) {
+        console.error('Error marking messages as read:', error);
+      }
+    };
+    markMessagesAsRead();
   }, [leadId]);
 
   const sendMessageMutation = useMutation({
@@ -101,6 +107,8 @@ const MessageDialogContent = ({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/leads/${leadId}/messages`] });
       messageForm.reset();
+      // Play send notification sound
+      playNotification('send');
     },
   });
 
@@ -108,35 +116,32 @@ const MessageDialogContent = ({
     <DialogContent className="sm:max-w-[500px]">
       <DialogHeader>
         <DialogTitle>Messages</DialogTitle>
+        <DialogDescription>
+          Chat with your lead contact
+        </DialogDescription>
       </DialogHeader>
       <div className="max-h-[400px] overflow-y-auto space-y-4 p-4">
-        {isLoadingMessages ? (
-          <div className="flex justify-center">
-            <Loader2 className="h-6 w-6 animate-spin" />
-          </div>
-        ) : (
-          fetchedMessages.map((message) => (
+        {messages.map((message) => (
+          <div
+            key={message.id}
+            className={`flex ${
+              message.sender_id === user?.id ? "justify-end" : "justify-start"
+            }`}
+          >
             <div
-              key={message.id}
-              className={`flex ${
-                message.sender_id === user?.id ? "justify-end" : "justify-start"
+              className={`max-w-[80%] rounded-lg p-3 ${
+                message.sender_id === user?.id
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted"
               }`}
             >
-              <div
-                className={`max-w-[80%] rounded-lg p-3 ${
-                  message.sender_id === user?.id
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted"
-                }`}
-              >
-                <p className="text-sm">{message.content}</p>
-                <p className="text-xs opacity-70 mt-1">
-                  {format(new Date(message.created_at), "PPp")}
-                </p>
-              </div>
+              <p className="text-sm">{message.content}</p>
+              <p className="text-xs opacity-70 mt-1">
+                {message.created_at && format(new Date(message.created_at), "PPp")}
+              </p>
             </div>
-          ))
-        )}
+          </div>
+        ))}
         <div ref={messagesEndRef} />
       </div>
       <form
@@ -188,7 +193,7 @@ const calculateMatchScore = (lead: SelectLead, user: SelectUser | null): {
   if (user && user.profile && lead.budget && user.profile.budget && Math.abs(lead.budget - user.profile.budget) < 1000) {
     budgetScore = 25;
   }
-  if (user && user.profile && lead.industry && user.profile.industries?.includes(lead.industry)){
+  if (user && user.profile && lead.industry && user.profile.industries?.includes(lead.industry)) {
     industryScore = 25;
   }
 
@@ -211,6 +216,7 @@ export default function LeadsPage() {
   const [editingLead, setEditingLead] = useState<LeadWithUnreadCount | null>(null);
   const playNotification = useNotificationSound();
   const initialLoadRef = useRef(true);
+  const previousUnreadCountRef = useRef<Record<number, number>>({});
 
   const form = useForm<LeadFormData>({
     defaultValues: {
@@ -357,21 +363,33 @@ export default function LeadsPage() {
     },
   });
 
+  // Update the leads query to handle notifications properly
   const { data: leads = [], isLoading: isLoadingLeads } = useQuery<LeadWithUnreadCount[]>({
     queryKey: ["/api/leads"],
     enabled: !!user,
     onSuccess: (data) => {
-      if (initialLoadRef.current) {
-        const hasUnreadMessages = data.some(lead => lead.unreadMessages > 0);
-        if (hasUnreadMessages) {
-          playNotification('receive');
-          toast({
-            title: "Unread Messages",
-            description: "You have new unread messages in your leads.",
-          });
-        }
-        initialLoadRef.current = false;
+      // Check for new messages across all leads
+      const hasNewMessages = data.some(lead => {
+        const previousCount = previousUnreadCountRef.current[lead.id] || 0;
+        const currentCount = lead.unreadMessages || 0;
+        return currentCount > previousCount;
+      });
+
+      // Update the previous counts
+      data.forEach(lead => {
+        previousUnreadCountRef.current[lead.id] = lead.unreadMessages || 0;
+      });
+
+      // Play notification sound if there are new messages
+      if (hasNewMessages && !initialLoadRef.current) {
+        playNotification('receive');
+        toast({
+          title: "New Messages",
+          description: "You have received new messages.",
+        });
       }
+
+      initialLoadRef.current = false;
     }
   });
 
@@ -618,8 +636,8 @@ export default function LeadsPage() {
                       </div>
                       <Badge variant={
                         response.status === "accepted" ? "success" :
-                        response.status === "rejected" ? "destructive" :
-                        "secondary"
+                          response.status === "rejected" ? "destructive" :
+                            "secondary"
                       }>
                         {response.status.charAt(0).toUpperCase() + response.status.slice(1)}
                       </Badge>
@@ -747,8 +765,8 @@ export default function LeadsPage() {
                     {existingResponse && (
                       <Badge variant={
                         existingResponse.status === "accepted" ? "success" :
-                        existingResponse.status === "rejected" ? "destructive" :
-                        "secondary"
+                          existingResponse.status === "rejected" ? "destructive" :
+                            "secondary"
                       }>
                         Proposal {existingResponse.status.charAt(0).toUpperCase() + existingResponse.status.slice(1)}
                       </Badge>
@@ -935,8 +953,8 @@ export default function LeadsPage() {
                             </div>
                             <Badge variant={
                               response.status === "accepted" ? "success" :
-                              response.status === "rejected" ? "destructive" :
-                              "secondary"
+                                response.status === "rejected" ? "destructive" :
+                                  "secondary"
                             }>
                               {response.status.charAt(0).toUpperCase() + response.status.slice(1)}
                             </Badge>
@@ -963,7 +981,7 @@ export default function LeadsPage() {
                             </div>
                           )}
 
-                          {response.status === "pending"&& (
+                          {response.status === "pending" && (
                             <div className="flex gap-2 mt-4">
                               <Dialog open={acceptDialogOpen} onOpenChange={setAcceptDialogOpen}>
                                 <DialogTrigger asChild>
@@ -971,7 +989,7 @@ export default function LeadsPage() {
                                     size="sm"
                                     onClick={() => {
                                       setSelectedResponse(response);
-                                                                     setSelectedLead(lead);
+                                      setSelectedLead(lead);
                                     }}
                                   >
                                     Accept
