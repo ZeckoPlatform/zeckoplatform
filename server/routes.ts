@@ -533,46 +533,72 @@ export function registerRoutes(app: Express): Server {
 
       // Check if user has permission to send messages
       // Either the user is the lead owner or has an accepted response
-      const [leadResponse] = await db
-        .select()
-        .from(leadResponses)
-        .leftJoin(leads, eq(leads.id, leadResponses.lead_id)) // Corrected Join
-        .where(
-          and(
-            eq(leadResponses.lead_id, leadId),
-            eq(leadResponses.status, "accepted"),
-            or(
+      log(`Attempting to send message for lead ${leadId}`);
+      log(`Current user: ${req.user.id}, Receiver: ${receiverId}`);
+      log(`Lead owner: ${lead.user_id}`);
+
+      if (lead.user_id === req.user.id || receiverId === lead.user_id) {
+        log(`Permission granted: User is lead owner or sending to lead owner`);
+        // User is the lead owner or is sending to lead owner
+        const [message] = await db.insert(messages)
+          .values({
+            lead_id: leadId,
+            sender_id: req.user.id,
+            receiver_id: receiverId,
+            content: content.trim(),
+            read: false,
+          })
+          .returning();
+
+        // Get the full message details with sender and receiver info
+        const fullMessage = await db.query.messages.findFirst({
+          where: eq(messages.id, message.id),
+          with: {
+            sender: true,
+            receiver: true,
+          }
+        });
+
+        res.json(fullMessage);
+      } else {
+        log(`Checking for accepted response...`);
+        // Check if user has an accepted response for this lead
+        const [response] = await db.select()
+          .from(leadResponses)
+          .where(
+            and(
+              eq(leadResponses.lead_id, leadId),
               eq(leadResponses.business_id, req.user.id),
-              eq(leads.user_id, req.user.id)
+              eq(leadResponses.status, "accepted")
             )
-          )
-        );
+          );
 
-      if (!leadResponse) {
-        return res.status(403).json({ message: "You don't have permission to send messages for this lead" });
-      }
-
-      // Create the message
-      const [message] = await db.insert(messages)
-        .values({
-          leadId,
-          senderId: req.user.id,
-          receiverId,
-          content: content.trim(),
-          read: false,
-        })
-        .returning();
-
-      // Get the full message details with sender and receiver info
-      const fullMessage = await db.query.messages.findFirst({
-        where: eq(messages.id, message.id),
-        with: {
-          sender: true,
-          receiver: true,
+        if (!response) {
+          return res.status(403).json({ message: "You don't have permission to send messages for this lead" });
         }
-      });
 
-      res.json(fullMessage);
+        // Create and return message
+        const [message] = await db.insert(messages)
+          .values({
+            lead_id: leadId,
+            sender_id: req.user.id,
+            receiver_id: receiverId,
+            content: content.trim(),
+            read: false,
+          })
+          .returning();
+
+        // Get the full message details with sender and receiver info
+        const fullMessage = await db.query.messages.findFirst({
+          where: eq(messages.id, message.id),
+          with: {
+            sender: true,
+            receiver: true,
+          }
+        });
+
+        res.json(fullMessage);
+      }
     } catch (error) {
       log(`Message creation error: ${error instanceof Error ? error.message : String(error)}`);
       console.error('Full error:', error);
@@ -861,7 +887,7 @@ export function registerRoutes(app: Express): Server {
         log(`Converting price from ${priceInDollars} dollars to ${updateData.price} cents`);
       }
 
-      const [updatedProduct] = await db.update(products)
+      const [updatedProduct] = awaitdb.update(products)
         .set(updateData)
         .where(eq(products.id, productId))
         .returning();
