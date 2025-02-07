@@ -175,27 +175,45 @@ export function registerRoutes(app: Express): Server {
             with: {
               business: true
             }
+          },
+          messages: {
+            where: and(
+              eq(messages.receiver_id, req.user.id),
+              eq(messages.read, false)
+            ),
+            with: {
+              sender: true
+            }
           }
         }
       };
 
       const fetchedLeads = await db.query.leads.findMany(baseQuery);
 
-      log(`Successfully fetched ${fetchedLeads.length} leads with responses`);
+      log(`Successfully fetched ${fetchedLeads.length} leads with responses and messages`);
+
+      // Process leads to include unread message counts
+      const processedLeads = fetchedLeads.map(lead => ({
+        ...lead,
+        unreadMessages: lead.messages?.length || 0,
+        // Remove messages array from response to avoid sending unnecessary data
+        messages: undefined
+      }));
 
       // For business users, sort leads by match score
-      let processedLeads = fetchedLeads;
       if (req.user.userType === "business" && req.user.profile?.matchPreferences) {
         const { calculateMatchScore } = await import("./utils/matching");
-        processedLeads = fetchedLeads
+        const scoredLeads = processedLeads
           .map(lead => ({
             ...lead,
             matchScore: calculateMatchScore(lead, req.user)
           }))
           .sort((a, b) => (b.matchScore?.totalScore || 0) - (a.matchScore?.totalScore || 0));
-      }
 
-      res.json(processedLeads);
+        res.json(scoredLeads);
+      } else {
+        res.json(processedLeads);
+      }
     } catch (error) {
       log(`Leads fetch error: ${error instanceof Error ? error.message : String(error)}`);
       console.error('Full error:', error);
@@ -868,7 +886,6 @@ export function registerRoutes(app: Express): Server {
           and(
             eq(products.id, productId),
             eq(products.vendorId, req.user.id)
-          )
         );
 
       if (!product) {
@@ -887,7 +904,7 @@ export function registerRoutes(app: Express): Server {
         log(`Converting price from ${priceInDollars} dollars to ${updateData.price} cents`);
       }
 
-      const [updatedProduct] = awaitdb.update(products)
+      const [updatedProduct] = await db.update(products)
         .set(updateData)
         .where(eq(products.id, productId))
         .returning();

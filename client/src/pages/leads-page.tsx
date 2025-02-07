@@ -88,10 +88,14 @@ interface AcceptProposalData {
   contactDetails: string;
 }
 
+interface LeadWithUnreadCount extends SelectLead {
+  unreadMessages: number;
+}
+
 export default function LeadsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [editingLead, setEditingLead] = useState<SelectLead | null>(null);
+  const [editingLead, setEditingLead] = useState<LeadWithUnreadCount | null>(null);
   const playNotification = useNotificationSound();
   const initialLoadRef = useRef(true);
 
@@ -240,17 +244,12 @@ export default function LeadsPage() {
     },
   });
 
-  const { data: leads = [], isLoading: isLoadingLeads } = useQuery<SelectLead[]>({
+  const { data: leads = [], isLoading: isLoadingLeads } = useQuery<LeadWithUnreadCount[]>({
     queryKey: ["/api/leads"],
     enabled: !!user,
     onSuccess: (data) => {
       if (initialLoadRef.current) {
-        const hasUnreadMessages = data.some(lead =>
-          lead.messages?.some(m =>
-            m.sender_id !== user?.id &&
-            !m.read
-          )
-        );
+        const hasUnreadMessages = data.some(lead => lead.unreadMessages > 0);
         if (hasUnreadMessages) {
           playNotification('receive');
           toast({
@@ -506,7 +505,7 @@ export default function LeadsPage() {
     return (
       <div className="space-y-8">
         {hasUnreadMessages && (
-          <div className="bg-muted/50 p-4 rounded-lg flex items-center gap-2">
+          <div className="bg-muted/50 p-4 rounded-lg flex items-center gap-2 mb-4">
             <Info className="h-5 w-5 text-primary" />
             <p className="text-sm">You have unread messages in your leads</p>
           </div>
@@ -554,10 +553,7 @@ export default function LeadsPage() {
                                 <Button variant="outline" size="sm" className="relative">
                                   <Send className="h-4 w-4 mr-2" />
                                   Open Messages
-                                  {lead.messages?.some(m =>
-                                    m.sender_id !== user?.id &&
-                                    !m.read
-                                  ) && (
+                                  {lead.unreadMessages > 0 && (
                                     <span className="absolute -top-1 -right-1 h-3 w-3 bg-destructive rounded-full" />
                                   )}
                                 </Button>
@@ -874,10 +870,7 @@ export default function LeadsPage() {
                                   <Button variant="outline" size="sm" className="relative">
                                     <Send className="h-4 w-4 mr-2" />
                                     Open Messages
-                                    {lead.messages?.some(m =>
-                                      m.sender_id !== user?.id &&
-                                      !m.read
-                                    ) && (
+                                    {lead.unreadMessages > 0 && (
                                       <span className="absolute -top-1 -right-1 h-3 w-3 bg-destructive rounded-full" />
                                     )}
                                   </Button>
@@ -974,7 +967,7 @@ export default function LeadsPage() {
                                 Reject
                               </Button>
                             </div>
-                          )}
+                                                    )}
                         </div>
                       ))}
                     </div>
