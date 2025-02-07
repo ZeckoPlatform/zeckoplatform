@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import type { SelectLead, SelectUser, SelectMessage } from "@db/schema";
 import { format } from "date-fns";
 import {Badge} from "@/components/ui/badge";
 import { MessageDialog } from "@/components/MessageDialog";
+import { useNotificationSound } from "@/lib/useNotificationSound";
 
 interface LeadFormData {
   title: string;
@@ -91,6 +92,8 @@ export default function LeadsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [editingLead, setEditingLead] = useState<SelectLead | null>(null);
+  const playNotification = useNotificationSound();
+  const initialLoadRef = useRef(true);
 
   const form = useForm<LeadFormData>({
     defaultValues: {
@@ -240,6 +243,24 @@ export default function LeadsPage() {
   const { data: leads = [], isLoading: isLoadingLeads } = useQuery<SelectLead[]>({
     queryKey: ["/api/leads"],
     enabled: !!user,
+    onSuccess: (data) => {
+      if (initialLoadRef.current) {
+        const hasUnreadMessages = data.some(lead =>
+          lead.messages?.some(m =>
+            m.sender_id !== user?.id &&
+            !m.read
+          )
+        );
+        if (hasUnreadMessages) {
+          playNotification('receive');
+          toast({
+            title: "Unread Messages",
+            description: "You have new unread messages in your leads.",
+          });
+        }
+        initialLoadRef.current = false;
+      }
+    }
   });
 
   const createLeadMutation = useMutation({
@@ -475,8 +496,21 @@ export default function LeadsPage() {
       return acc;
     }, {} as Record<number, any>);
 
+    const hasUnreadMessages = leads.some(lead =>
+      lead.messages?.some(m =>
+        m.sender_id !== user?.id &&
+        !m.read
+      )
+    );
+
     return (
       <div className="space-y-8">
+        {hasUnreadMessages && (
+          <div className="bg-muted/50 p-4 rounded-lg flex items-center gap-2">
+            <Info className="h-5 w-5 text-primary" />
+            <p className="text-sm">You have unread messages in your leads</p>
+          </div>
+        )}
         <Card>
           <CardHeader>
             <CardTitle>Your Proposals</CardTitle>
@@ -520,15 +554,15 @@ export default function LeadsPage() {
                                 <Button variant="outline" size="sm" className="relative">
                                   <Send className="h-4 w-4 mr-2" />
                                   Open Messages
-                                  {lead.messages?.some(m => 
-                                    m.sender_id !== user?.id && 
+                                  {lead.messages?.some(m =>
+                                    m.sender_id !== user?.id &&
                                     !m.read
                                   ) && (
                                     <span className="absolute -top-1 -right-1 h-3 w-3 bg-destructive rounded-full" />
                                   )}
                                 </Button>
                               </DialogTrigger>
-                              <MessageDialog 
+                              <MessageDialog
                                 leadId={lead.id}
                                 receiverId={user?.id === lead.user_id ? response.business_id : lead.user_id}
                                 isOpen={false}
@@ -538,7 +572,6 @@ export default function LeadsPage() {
                                   }
                                 }}
                                 onMessagesRead={() => {
-                                  // Mark messages as read when dialog opens
                                   apiRequest("POST", `/api/leads/${lead.id}/messages/read`, {});
                                   queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
                                 }}
@@ -841,15 +874,15 @@ export default function LeadsPage() {
                                   <Button variant="outline" size="sm" className="relative">
                                     <Send className="h-4 w-4 mr-2" />
                                     Open Messages
-                                    {lead.messages?.some(m => 
-                                      m.sender_id !== user?.id && 
+                                    {lead.messages?.some(m =>
+                                      m.sender_id !== user?.id &&
                                       !m.read
                                     ) && (
                                       <span className="absolute -top-1 -right-1 h-3 w-3 bg-destructive rounded-full" />
                                     )}
                                   </Button>
                                 </DialogTrigger>
-                                <MessageDialog 
+                                <MessageDialog
                                   leadId={lead.id}
                                   receiverId={response.business_id}
                                   isOpen={false}
@@ -859,7 +892,6 @@ export default function LeadsPage() {
                                     }
                                   }}
                                   onMessagesRead={() => {
-                                    // Mark messages as read when dialog opens
                                     apiRequest("POST", `/api/leads/${lead.id}/messages/read`, {});
                                     queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
                                   }}
@@ -1014,7 +1046,8 @@ export default function LeadsPage() {
       </div>
       <Button
         type="submit"
-        className="w-full"        disabled={createLeadMutation.isPending}
+        className="w-full"
+        disabled={createLeadMutation.isPending}
       >
         {createLeadMutation.isPending ? (
           <>
