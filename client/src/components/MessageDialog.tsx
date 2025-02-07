@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
+import { useNotificationSound } from "@/lib/useNotificationSound";
 
 interface Message {
   id: number;
@@ -24,12 +25,21 @@ interface MessageDialogProps {
   receiverId: number;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
+  onMessagesRead?: () => void;
 }
 
-export function MessageDialog({ leadId, receiverId, isOpen, onOpenChange }: MessageDialogProps) {
+export function MessageDialog({ 
+  leadId, 
+  receiverId, 
+  isOpen, 
+  onOpenChange,
+  onMessagesRead 
+}: MessageDialogProps) {
   const [newMessage, setNewMessage] = useState("");
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const playNotification = useNotificationSound();
+  const previousMessagesLengthRef = useRef(0);
 
   // Use a consistent query key format
   const messagesQueryKey = [`/api/leads/${leadId}/messages`];
@@ -39,6 +49,24 @@ export function MessageDialog({ leadId, receiverId, isOpen, onOpenChange }: Mess
     enabled: isOpen,
     refetchInterval: 5000, // Poll every 5 seconds when dialog is open
   });
+
+  // Play notification sound when new messages arrive
+  useEffect(() => {
+    if (messages.length > previousMessagesLengthRef.current && isOpen) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage?.sender?.id !== user?.id) {
+        playNotification();
+      }
+    }
+    previousMessagesLengthRef.current = messages.length;
+  }, [messages.length, isOpen, user?.id, playNotification]);
+
+  // Mark messages as read when dialog opens
+  useEffect(() => {
+    if (isOpen && messages.length > 0 && onMessagesRead) {
+      onMessagesRead();
+    }
+  }, [isOpen, messages.length, onMessagesRead]);
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {

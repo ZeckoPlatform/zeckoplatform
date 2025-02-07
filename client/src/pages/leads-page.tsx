@@ -517,9 +517,15 @@ export default function LeadsPage() {
                             <h4 className="font-medium">Messages</h4>
                             <Dialog>
                               <DialogTrigger asChild>
-                                <Button variant="outline" size="sm">
+                                <Button variant="outline" size="sm" className="relative">
                                   <Send className="h-4 w-4 mr-2" />
                                   Open Messages
+                                  {lead.messages?.some(m => 
+                                    m.sender_id !== user?.id && 
+                                    !m.read
+                                  ) && (
+                                    <span className="absolute -top-1 -right-1 h-3 w-3 bg-destructive rounded-full" />
+                                  )}
                                 </Button>
                               </DialogTrigger>
                               <MessageDialog 
@@ -530,6 +536,11 @@ export default function LeadsPage() {
                                   if (!open) {
                                     queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
                                   }
+                                }}
+                                onMessagesRead={() => {
+                                  // Mark messages as read when dialog opens
+                                  apiRequest("POST", `/api/leads/${lead.id}/messages/read`, {});
+                                  queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
                                 }}
                               />
                             </Dialog>
@@ -827,9 +838,15 @@ export default function LeadsPage() {
                             <div className="mt-4">
                               <Dialog>
                                 <DialogTrigger asChild>
-                                  <Button variant="outline" size="sm">
+                                  <Button variant="outline" size="sm" className="relative">
                                     <Send className="h-4 w-4 mr-2" />
                                     Open Messages
+                                    {lead.messages?.some(m => 
+                                      m.sender_id !== user?.id && 
+                                      !m.read
+                                    ) && (
+                                      <span className="absolute -top-1 -right-1 h-3 w-3 bg-destructive rounded-full" />
+                                    )}
                                   </Button>
                                 </DialogTrigger>
                                 <MessageDialog 
@@ -840,6 +857,11 @@ export default function LeadsPage() {
                                     if (!open) {
                                       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
                                     }
+                                  }}
+                                  onMessagesRead={() => {
+                                    // Mark messages as read when dialog opens
+                                    apiRequest("POST", `/api/leads/${lead.id}/messages/read`, {});
+                                    queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
                                   }}
                                 />
                               </Dialog>
