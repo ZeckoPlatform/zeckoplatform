@@ -17,6 +17,7 @@ import { Loader2, Settings, Edit, Trash2, Send, AlertTriangle, Info } from "luci
 import type { SelectLead, SelectUser, SelectMessage } from "@db/schema";
 import { format } from "date-fns";
 import {Badge} from "@/components/ui/badge";
+import { MessageDialog } from "@/components/MessageDialog";
 
 interface LeadFormData {
   title: string;
@@ -512,73 +513,23 @@ export default function LeadsPage() {
                         </div>
 
                         <div className="p-4 bg-background rounded-lg border">
-                          <h4 className="font-medium mb-4">Messages</h4>
-
-                          <div className="space-y-4 mb-4 max-h-[300px] overflow-y-auto">
-                            {useQuery<SelectMessage[]>({
-                              queryKey: [`/api/leads/${lead.id}/messages`],
-                              enabled: response.status === "accepted",
-                            }).data?.map((message) => (
-                              <div
-                                key={message.id}
-                                className={`p-3 rounded-lg ${
-                                  message.sender_id === user?.id
-                                    ? "bg-primary text-primary-foreground ml-8"
-                                    : "bg-muted mr-8"
-                                }`}
-                              >
-                                <p className="text-sm font-medium mb-1">
-                                  {message.sender_id === user?.id ? "You" : "Other Party"}
-                                </p>
-                                <p className="text-sm">{message.content}</p>
-                                <p className="text-xs mt-1 opacity-70">
-                                  {format(new Date(message.created_at), "PPp")}
-                                </p>
-                              </div>
-                            ))}
+                          <div className="flex justify-between items-center mb-4">
+                            <h4 className="font-medium">Messages</h4>
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                  <Send className="h-4 w-4 mr-2" />
+                                  Open Messages
+                                </Button>
+                              </DialogTrigger>
+                              <MessageDialog 
+                                leadId={lead.id}
+                                receiverId={user?.id === lead.user_id ? response.business_id : lead.user_id}
+                                isOpen={true}
+                                onOpenChange={() => {}}
+                              />
+                            </Dialog>
                           </div>
-
-                          <form
-                            onSubmit={(e) => {
-                              e.preventDefault();
-                              const form = e.target as HTMLFormElement;
-                              const content = (form.elements.namedItem("content") as HTMLTextAreaElement).value;
-
-                              if (content.trim()) {
-                                sendMessageMutation.mutate({
-                                  leadId: lead.id,
-                                  receiverId: user?.id === lead.user_id ? response.business_id : lead.user_id,
-                                  content: content.trim(),
-                                });
-                                form.reset();
-                              }
-                            }}
-                            className="flex gap-2"
-                          >
-                            <Textarea
-                              name="content"
-                              placeholder="Type your message..."
-                              className="min-h-[80px]"
-                              required
-                            />
-                            <Button
-                              type="submit"
-                              className="self-end"
-                              disabled={sendMessageMutation.isPending}
-                            >
-                              {sendMessageMutation.isPending ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Sending...
-                                </>
-                              ) : (
-                                <>
-                                  <Send className="mr-2 h-4 w-4" />
-                                  Send
-                                </>
-                              )}
-                            </Button>
-                          </form>
                         </div>
                       </div>
                     )}
@@ -869,83 +820,21 @@ export default function LeadsPage() {
                           <p className="text-sm mt-2">{response.proposal}</p>
 
                           {response.status === "accepted" && (
-                            <div className="mt-4 space-y-4">
-                              <div className="p-4 bg-background rounded-lg border">
-                                <h4 className="font-medium mb-2">Contact Information</h4>
-                                <p className="text-sm whitespace-pre-wrap">
-                                  {response.contactDetails || "No contact details provided yet."}
-                                </p>
-                              </div>
-
-                              <div className="p-4 bg-background rounded-lg border">
-                                <h4 className="font-medium mb-4">Messages</h4>
-
-                                <div className="space-y-4 mb-4 max-h-[300px] overflow-y-auto">
-                                  {useQuery<SelectMessage[]>({
-                                    queryKey: [`/api/leads/${lead.id}/messages`],
-                                    enabled: response.status === "accepted",
-                                  }).data?.map((message) => (
-                                    <div
-                                      key={message.id}
-                                      className={`p-3 rounded-lg ${
-                                        message.sender_id === user?.id
-                                          ? "bg-primary text-primary-foreground ml-8"
-                                          : "bg-muted mr-8"
-                                      }`}
-                                    >
-                                      <p className="text-sm font-medium mb-1">
-                                        {message.sender_id === user?.id ? "You" : "Other Party"}
-                                      </p>
-                                      <p className="text-sm">{message.content}</p>
-                                      <p className="text-xs mt-1 opacity-70">
-                                        {format(new Date(message.created_at), "PPp")}
-                                      </p>
-                                    </div>
-                                  ))}
-                                </div>
-
-                                <form
-                                  onSubmit={(e) => {
-                                    e.preventDefault();
-                                    const form = e.target as HTMLFormElement;
-                                    const content = (form.elements.namedItem("content") as HTMLTextAreaElement).value;
-
-                                    if (content.trim()) {
-                                      sendMessageMutation.mutate({
-                                        leadId: lead.id,
-                                        receiverId: user?.id === lead.user_id ? response.business_id : lead.user_id,
-                                        content: content.trim(),
-                                      });
-                                      form.reset();
-                                    }
-                                  }}
-                                  className="flex gap-2"
-                                >
-                                  <Textarea
-                                    name="content"
-                                    placeholder="Type your message..."
-                                    className="min-h-[80px]"
-                                    required
-                                  />
-                                  <Button
-                                    type="submit"
-                                    className="self-end"
-                                    disabled={sendMessageMutation.isPending}
-                                  >
-                                    {sendMessageMutation.isPending ? (
-                                      <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        Sending...
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Send className="mr-2 h-4 w-4" />
-                                        Send
-                                      </>
-                                    )}
+                            <div className="mt-4">
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button variant="outline" size="sm">
+                                    <Send className="h-4 w-4 mr-2" />
+                                    Open Messages
                                   </Button>
-                                </form>
-                              </div>
+                                </DialogTrigger>
+                                <MessageDialog 
+                                  leadId={lead.id}
+                                  receiverId={response.business_id}
+                                  isOpen={true}
+                                  onOpenChange={() => {}}
+                                />
+                              </Dialog>
                             </div>
                           )}
 
