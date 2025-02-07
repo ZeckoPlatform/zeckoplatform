@@ -526,7 +526,11 @@ export default function LeadsPage() {
                                 leadId={lead.id}
                                 receiverId={user?.id === lead.user_id ? response.business_id : lead.user_id}
                                 isOpen={false}
-                                onOpenChange={() => {}}
+                                onOpenChange={(open) => {
+                                  if (!open) {
+                                    queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+                                  }
+                                }}
                               />
                             </Dialog>
                           </div>
@@ -832,7 +836,11 @@ export default function LeadsPage() {
                                   leadId={lead.id}
                                   receiverId={response.business_id}
                                   isOpen={false}
-                                  onOpenChange={() => {}}
+                                  onOpenChange={(open) => {
+                                    if (!open) {
+                                      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+                                    }
+                                  }}
                                 />
                               </Dialog>
                             </div>
@@ -984,8 +992,7 @@ export default function LeadsPage() {
       </div>
       <Button
         type="submit"
-        className="w-full"
-        disabled={createLeadMutation.isPending}
+        className="w-full"        disabled={createLeadMutation.isPending}
       >
         {createLeadMutation.isPending ? (
           <>
