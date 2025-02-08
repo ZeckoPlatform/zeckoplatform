@@ -18,159 +18,58 @@ import type { SelectLead, SelectUser, SelectMessage } from "@db/schema";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { useNotificationSound } from "@/lib/useNotificationSound";
+import { MessageDialog } from "@/components/MessageDialog";
 
-// interfaces remain unchanged
 
-const MessageDialogContent = ({
+// Add this component
+function MessageDialogContent({
   leadId,
   receiverId,
-  onClose
+  onClose,
 }: {
   leadId: number;
   receiverId: number;
   onClose?: () => void;
-}) => {
-  const { user } = useAuth();
-  const messageForm = useForm<MessageFormData>();
-  const [messages, setMessages] = useState<SelectMessage[]>([]);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const playNotification = useNotificationSound();
-  const isFirstLoadRef = useRef(true);
+}) {
+  const [open, setOpen] = useState(false);
 
-  // Fetch messages
-  const { data: fetchedMessages = [] } = useQuery<SelectMessage[]>({
-    queryKey: [`/api/leads/${leadId}/messages`],
-    refetchInterval: 5000,
-  });
-
-  // Update messages state and handle scrolling
-  useEffect(() => {
-    setMessages(fetchedMessages);
-
-    // Scroll to bottom on initial load or new message
-    if (messagesEndRef.current && (isFirstLoadRef.current || messages.length < fetchedMessages.length)) {
-      messagesEndRef.current.scrollIntoView({ behavior: isFirstLoadRef.current ? "auto" : "smooth" });
-      isFirstLoadRef.current = false;
+  // Handle dialog state changes
+  const handleOpenChange = (newOpen: boolean) => {
+    setOpen(newOpen);
+    if (!newOpen && onClose) {
+      onClose();
     }
-  }, [fetchedMessages, messages.length]);
-
-  // Mark messages as read when dialog opens
-  useEffect(() => {
-    const markMessagesAsRead = async () => {
-      try {
-        await apiRequest("POST", `/api/leads/${leadId}/messages/read`, {});
-        await queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-      } catch (error) {
-        console.error('Error marking messages as read:', error);
-      }
-    };
-    markMessagesAsRead();
-  }, [leadId]);
-
-  const sendMessageMutation = useMutation({
-    mutationFn: async ({ content }: MessageFormData) => {
-      const res = await apiRequest("POST", `/api/leads/${leadId}/messages`, {
-        receiverId,
-        content,
-      });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/leads/${leadId}/messages`] });
-      messageForm.reset();
-      playNotification('send');
-    },
-  });
+  };
 
   return (
-    <DialogContent className="sm:max-w-[500px]">
-      <DialogHeader>
-        <DialogTitle>Messages</DialogTitle>
-        <DialogDescription>
-          Chat with your lead contact
-        </DialogDescription>
-      </DialogHeader>
-      <div className="max-h-[400px] overflow-y-auto space-y-4 p-4">
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${
-              message.sender_id === user?.id ? "justify-end" : "justify-start"
-            }`}
-          >
-            <div
-              className={`max-w-[80%] rounded-lg p-3 ${
-                message.sender_id === user?.id
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted"
-              }`}
-            >
-              <p className="text-sm">{message.content}</p>
-              <p className="text-xs opacity-70 mt-1">
-                {message.created_at && format(new Date(message.created_at), "PPp")}
-              </p>
-            </div>
-          </div>
-        ))}
-        <div ref={messagesEndRef} />
-      </div>
-      <form
-        onSubmit={messageForm.handleSubmit((data) => {
-          sendMessageMutation.mutate(data);
-        })}
-        className="flex gap-2 mt-4"
-      >
-        <Input
-          {...messageForm.register("content", { required: true })}
-          placeholder="Type your message..."
-          className="flex-1"
-        />
-        <Button
-          type="submit"
-          size="icon"
-          disabled={sendMessageMutation.isPending}
-        >
-          {sendMessageMutation.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Send className="h-4 w-4" />
-          )}
-        </Button>
-      </form>
-    </DialogContent>
+    <MessageDialog
+      leadId={leadId}
+      receiverId={receiverId}
+      isOpen={open}
+      onOpenChange={handleOpenChange}
+      onMessagesRead={onClose}
+    />
   );
-};
+}
 
-const calculateMatchScore = (lead: SelectLead, user: SelectUser | null): {
-  totalScore: number;
-  categoryScore: number;
-  locationScore: number;
-  budgetScore: number;
-  industryScore: number;
-} => {
-  let totalScore = 0;
-  let categoryScore = 0;
-  let locationScore = 0;
-  let budgetScore = 0;
-  let industryScore = 0;
+// Add this hook to the main component to handle initial unread message notification
+function useUnreadMessageNotification(leads: any[] | undefined) {
+  const playNotification = useNotificationSound();
+  const hasCheckedRef = useRef(false);
 
-  if (user && user.profile && lead.category && user.profile.categories?.includes(lead.category)) {
-    categoryScore = 25;
-  }
-  if (user && user.profile && lead.location && user.profile.location === lead.location) {
-    locationScore = 25;
-  }
-  if (user && user.profile && lead.budget && user.profile.budget && Math.abs(lead.budget - user.profile.budget) < 1000) {
-    budgetScore = 25;
-  }
-  if (user && user.profile && lead.industry && user.profile.industries?.includes(lead.industry)) {
-    industryScore = 25;
-  }
+  useEffect(() => {
+    if (leads && !hasCheckedRef.current) {
+      const hasUnreadMessages = leads.some(lead => 
+        lead.unreadMessages > 0
+      );
 
-  totalScore = categoryScore + locationScore + budgetScore + industryScore;
-  return { totalScore, categoryScore, locationScore, budgetScore, industryScore };
-};
-
+      if (hasUnreadMessages) {
+        playNotification('receive');
+      }
+      hasCheckedRef.current = true;
+    }
+  }, [leads, playNotification]);
+}
 
 interface AcceptProposalData {
   contactDetails: string;
@@ -334,8 +233,19 @@ export default function LeadsPage() {
   });
 
   // Update the leads query to handle notifications properly
-  const { data: leads = [], isLoading: isLoadingLeads } = useQuery<LeadWithUnreadCount[]>({
+  const {
+    data: leads = [],
+    isLoading: isLoadingLeads,
+  } = useQuery({
     queryKey: ["/api/leads"],
+    queryFn: async () => {
+      const response = await fetch("/api/leads");
+      if (!response.ok) {
+        throw new Error("Failed to fetch leads");
+      }
+      const data = await response.json();
+      return data;
+    },
     enabled: !!user,
     onSuccess: (data) => {
       const totalUnreadCount = data.reduce((sum, lead) => sum + (lead.unreadMessages || 0), 0);
@@ -366,6 +276,9 @@ export default function LeadsPage() {
       initialLoadRef.current = false;
     }
   });
+
+  useUnreadMessageNotification(leads);
+
 
   const createLeadMutation = useMutation({
     mutationFn: async (data: LeadFormData) => {
@@ -526,7 +439,7 @@ export default function LeadsPage() {
     );
   }
 
-  const userLeads = user?.userType === "business"
+  const userLeadsFiltered = user?.userType === "business"
     ? leads
     : leads.filter(lead => lead.user_id === user?.id);
 
@@ -796,7 +709,7 @@ export default function LeadsPage() {
       </TabsList>
       <TabsContent value="my-leads" className="mt-4">
         <div className="grid gap-6">
-          {userLeads?.map((lead) => (
+          {userLeadsFiltered?.map((lead) => (
             <Card key={lead.id}>
               <CardHeader>
                 <div className="flex justify-between items-start">
@@ -1046,7 +959,7 @@ export default function LeadsPage() {
               </CardFooter>
             </Card>
           ))}
-          {(!userLeads || userLeads.length === 0) && (
+          {(!userLeadsFiltered || userLeadsFiltered.length === 0) && (
             <p className="text-muted-foreground text-center py-8">
               You haven't posted any leads yet. Create your first lead to get started!
             </p>
@@ -1247,7 +1160,7 @@ export default function LeadsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">{userLeads?.length || 0}</p>
+              <p className="text-3xl font-bold">{userLeadsFiltered?.length || 0}</p>
             </CardContent>
           </Card>
           <Card>
@@ -1258,7 +1171,7 @@ export default function LeadsPage() {
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold">
-                {userLeads?.filter(lead => lead.status === "open")?.length || 0}
+                {userLeadsFiltered?.filter(lead => lead.status === "open")?.length || 0}
               </p>
             </CardContent>
           </Card>

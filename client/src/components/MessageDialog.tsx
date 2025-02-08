@@ -46,6 +46,7 @@ export function MessageDialog({
   const playNotification = useNotificationSound();
   const previousMessagesLengthRef = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isFirstLoadRef = useRef(true);
 
   // Use a consistent query key format
   const messagesQueryKey = [`/api/leads/${leadId}/messages`];
@@ -67,24 +68,40 @@ export function MessageDialog({
     previousMessagesLengthRef.current = messages.length;
   }, [messages.length, isOpen, user?.id, playNotification]);
 
-  // Scroll to bottom when new messages arrive
+  // Scroll to bottom when new messages arrive or on initial load
   useEffect(() => {
-    if (scrollRef.current && messages.length > 0) {
+    if (scrollRef.current && (messages.length > 0 || isFirstLoadRef.current)) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      isFirstLoadRef.current = false;
     }
   }, [messages.length]);
 
   // Mark messages as read when dialog opens
   useEffect(() => {
-    if (isOpen && messages.length > 0 && onMessagesRead) {
-      const hasUnreadMessages = messages.some(m => 
-        m.sender.id !== user?.id && !m.read
-      );
-      if (hasUnreadMessages) {
-        onMessagesRead();
+    const markMessagesAsRead = async () => {
+      if (isOpen && messages.length > 0) {
+        const hasUnreadMessages = messages.some(m => 
+          m.sender.id !== user?.id && !m.read
+        );
+
+        if (hasUnreadMessages) {
+          try {
+            await apiRequest("POST", `/api/leads/${leadId}/messages/read`, {});
+            // Invalidate both messages and leads queries to update unread status
+            await queryClient.invalidateQueries({ queryKey: messagesQueryKey });
+            await queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+            if (onMessagesRead) {
+              onMessagesRead();
+            }
+          } catch (error) {
+            console.error("Error marking messages as read:", error);
+          }
+        }
       }
-    }
-  }, [isOpen, messages, onMessagesRead, user?.id]);
+    };
+
+    markMessagesAsRead();
+  }, [isOpen, messages, leadId, user?.id, queryClient, onMessagesRead]);
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {

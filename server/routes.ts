@@ -693,7 +693,7 @@ export function registerRoutes(app: Express): Server {
 
       // Update all unread messages for this user in this lead
       const result = await db.transaction(async (tx) => {
-        return await tx
+        const updated = await tx
           .update(messages)
           .set({ read: true })
           .where(
@@ -704,12 +704,10 @@ export function registerRoutes(app: Express): Server {
             )
           )
           .returning();
+        return updated;
       });
 
       log(`Marked ${result.length} messages as read`);
-
-      // Invalidate the leads cache to update unread counts
-      await queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
 
       res.json({ success: true, updatedCount: result.length });
     } catch (error) {
@@ -891,7 +889,7 @@ export function registerRoutes(app: Express): Server {
         );
 
       if (!product) {
-        return res.status(404).json({ message: "Product not found" });
+        return res.status(404).json({ message: "Product notfound" });
       }
 
       // Delete the product
