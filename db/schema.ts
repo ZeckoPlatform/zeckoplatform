@@ -1,10 +1,11 @@
 import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
+import { z } from "zod";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
-  username: text("username").unique().notNull(),
+  email: text("email").unique().notNull(),
   password: text("password").notNull(),
   userType: text("user_type", { enum: ["free", "business", "vendor"] }).notNull().default("free"),
   subscriptionActive: boolean("subscription_active").default(false),
@@ -163,7 +164,11 @@ export const messagesRelations = relations(messages, ({ one }) => ({
   }),
 }));
 
-export const insertUserSchema = createInsertSchema(users);
+export const insertUserSchema = createInsertSchema(users, {
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  userType: z.enum(["free", "business", "vendor"]),
+});
 export const selectUserSchema = createSelectSchema(users);
 export const insertSubscriptionSchema = createInsertSchema(subscriptions);
 export const selectSubscriptionSchema = createSelectSchema(subscriptions);

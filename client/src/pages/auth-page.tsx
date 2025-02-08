@@ -10,6 +10,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { startTrialSubscription } from "@/lib/subscription";
 import { useToast } from "@/hooks/use-toast";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 const SUBSCRIPTION_PRICES = {
   business: {
@@ -22,32 +24,49 @@ const SUBSCRIPTION_PRICES = {
   }
 };
 
+const loginSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+const registerSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  userType: z.enum(["free", "business", "vendor"]),
+  businessType: z.string().optional(),
+  companyNumber: z.string().optional(),
+  vatNumber: z.string().optional(),
+  utrNumber: z.string().optional(),
+  paymentFrequency: z.enum(["monthly", "annual"]),
+});
+
+type LoginFormData = z.infer<typeof loginSchema>;
+type RegisterFormData = z.infer<typeof registerSchema>;
+
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
 
-  const loginForm = useForm({
+  const loginForm = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
     defaultValues: {
-      username: "",
+      email: "",
       password: "",
     },
   });
 
-  const registerForm = useForm({
+  const registerForm = useForm<RegisterFormData>({
+    resolver: zodResolver(registerSchema),
     defaultValues: {
-      username: "",
+      email: "",
       password: "",
-      userType: "free" as const,
+      userType: "free",
       businessType: "",
       companyNumber: "",
       vatNumber: "",
       utrNumber: "",
-      paymentMethod: "stripe" as "stripe" | "direct_debit",
-      paymentFrequency: "monthly" as "monthly" | "annual",
-      bankAccountHolder: "",
-      bankSortCode: "",
-      bankAccountNumber: "",
+      paymentFrequency: "monthly",
     },
   });
 
@@ -73,13 +92,7 @@ export default function AuthPage() {
         await startTrialSubscription({
           userId: data.id,
           tier: data.userType,
-          paymentMethod: data.paymentMethod,
           paymentFrequency: data.paymentFrequency,
-          bankDetails: data.paymentMethod === "direct_debit" ? {
-            accountHolder: data.bankAccountHolder,
-            sortCode: data.bankSortCode,
-            accountNumber: data.bankAccountNumber,
-          } : undefined,
         });
         setLocation("/subscription");
       } catch (error: any) {
@@ -129,7 +142,7 @@ export default function AuthPage() {
       <div className="flex items-center justify-center p-8">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle>Welcome to LeadMarket</CardTitle>
+            <CardTitle>Welcome to Zecko</CardTitle>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="login">
@@ -148,11 +161,17 @@ export default function AuthPage() {
                   className="space-y-4"
                 >
                   <div>
-                    <Label htmlFor="username">Username</Label>
+                    <Label htmlFor="email">Email</Label>
                     <Input
-                      id="username"
-                      {...loginForm.register("username")}
+                      id="email"
+                      type="email"
+                      {...loginForm.register("email")}
                     />
+                    {loginForm.formState.errors.email && (
+                      <p className="text-sm text-destructive mt-1">
+                        {loginForm.formState.errors.email.message}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="password">Password</Label>
@@ -161,6 +180,11 @@ export default function AuthPage() {
                       type="password"
                       {...loginForm.register("password")}
                     />
+                    {loginForm.formState.errors.password && (
+                      <p className="text-sm text-destructive mt-1">
+                        {loginForm.formState.errors.password.message}
+                      </p>
+                    )}
                   </div>
                   <Button
                     type="submit"
@@ -182,11 +206,17 @@ export default function AuthPage() {
                   className="space-y-4"
                 >
                   <div>
-                    <Label htmlFor="reg-username">Username</Label>
+                    <Label htmlFor="reg-email">Email</Label>
                     <Input
-                      id="reg-username"
-                      {...registerForm.register("username")}
+                      id="reg-email"
+                      type="email"
+                      {...registerForm.register("email")}
                     />
+                    {registerForm.formState.errors.email && (
+                      <p className="text-sm text-destructive mt-1">
+                        {registerForm.formState.errors.email.message}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="reg-password">Password</Label>
@@ -195,6 +225,11 @@ export default function AuthPage() {
                       type="password"
                       {...registerForm.register("password")}
                     />
+                    {registerForm.formState.errors.password && (
+                      <p className="text-sm text-destructive mt-1">
+                        {registerForm.formState.errors.password.message}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <Label>Account Type</Label>
@@ -321,15 +356,9 @@ export default function AuthPage() {
                             )}
                           </div>
                         )}
-                    </>
-                  )}
 
-                  {(registerForm.watch("userType") === "business" ||
-                    registerForm.watch("userType") === "vendor") && (
-                    <>
                       <div className="space-y-4 mt-4">
                         <Label>Payment Preferences</Label>
-
                         <div>
                           <Label>Billing Frequency</Label>
                           <RadioGroup
@@ -352,79 +381,6 @@ export default function AuthPage() {
                             </div>
                           </RadioGroup>
                         </div>
-
-                        <div>
-                          <Label>Payment Method</Label>
-                          <RadioGroup
-                            defaultValue="stripe"
-                            onValueChange={(value) => {
-                              registerForm.setValue("paymentMethod", value as "stripe" | "direct_debit");
-                              if (value === "stripe") {
-                                registerForm.setValue("bankAccountHolder", "");
-                                registerForm.setValue("bankSortCode", "");
-                                registerForm.setValue("bankAccountNumber", "");
-                              }
-                            }}
-                          >
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="stripe" id="stripe" />
-                              <Label htmlFor="stripe">
-                                Credit/Debit Card (Secure payment via Stripe)
-                              </Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="direct_debit" id="direct_debit" />
-                              <Label htmlFor="direct_debit">Direct Debit</Label>
-                            </div>
-                          </RadioGroup>
-                          {registerForm.watch("paymentMethod") === "stripe" && (
-                            <p className="text-sm text-muted-foreground mt-2">
-                              You'll be redirected to our secure payment provider after registration to set up your card details.
-                            </p>
-                          )}
-                        </div>
-
-                        {registerForm.watch("paymentMethod") === "direct_debit" && (
-                          <div className="space-y-4">
-                            <div>
-                              <Label htmlFor="bankAccountHolder">Account Holder Name</Label>
-                              <Input
-                                id="bankAccountHolder"
-                                {...registerForm.register("bankAccountHolder", {
-                                  required: "Account holder name is required for direct debit",
-                                })}
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="bankSortCode">Sort Code</Label>
-                              <Input
-                                id="bankSortCode"
-                                {...registerForm.register("bankSortCode", {
-                                  required: "Sort code is required for direct debit",
-                                  pattern: {
-                                    value: /^\d{6}$/,
-                                    message: "Please enter a valid 6-digit sort code",
-                                  },
-                                })}
-                                placeholder="123456"
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="bankAccountNumber">Account Number</Label>
-                              <Input
-                                id="bankAccountNumber"
-                                {...registerForm.register("bankAccountNumber", {
-                                  required: "Account number is required for direct debit",
-                                  pattern: {
-                                    value: /^\d{8}$/,
-                                    message: "Please enter a valid 8-digit account number",
-                                  },
-                                })}
-                                placeholder="12345678"
-                              />
-                            </div>
-                          </div>
-                        )}
                       </div>
                     </>
                   )}

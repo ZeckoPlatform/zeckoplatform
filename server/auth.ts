@@ -32,14 +32,14 @@ export async function comparePasswords(supplied: string, stored: string) {
   return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
-async function getUserByUsername(username: string): Promise<SelectUser[]> {
+async function getUserByEmail(email: string): Promise<SelectUser[]> {
   try {
-    log(`Fetching user with username: ${username}`);
-    const result = await db.select().from(users).where(eq(users.username, username));
-    log(`Found ${result.length} users matching username: ${username}`);
+    log(`Fetching user with email: ${email}`);
+    const result = await db.select().from(users).where(eq(users.email, email));
+    log(`Found ${result.length} users matching email: ${email}`);
     return result;
   } catch (error) {
-    log(`Database error in getUserByUsername: ${error instanceof Error ? error.message : String(error)}`);
+    log(`Database error in getUserByEmail: ${error instanceof Error ? error.message : String(error)}`);
     throw new Error('Database error occurred');
   }
 }
@@ -48,7 +48,7 @@ function generateToken(user: SelectUser) {
   return jwt.sign(
     { 
       id: user.id, 
-      username: user.username,
+      email: user.email,
       userType: user.userType,
       subscriptionActive: user.subscriptionActive,
       subscriptionTier: user.subscriptionTier
@@ -98,19 +98,19 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
 export function setupAuth(app: Express) {
   app.post("/api/register", async (req, res) => {
     try {
-      log(`Registration attempt - Username: ${req.body.username}, Type: ${req.body.userType}`);
+      log(`Registration attempt - Email: ${req.body.email}, Type: ${req.body.userType}`);
       const result = insertUserSchema.safeParse(req.body);
       if (!result.success) {
         return res.status(400).json({ message: fromZodError(result.error).toString() });
       }
 
-      const [existingUser] = await getUserByUsername(result.data.username);
+      const [existingUser] = await getUserByEmail(result.data.email);
       if (existingUser) {
-        return res.status(400).json({ message: "Username already exists" });
+        return res.status(400).json({ message: "Email already registered" });
       }
 
       const profileData = {
-        name: result.data.username,
+        name: result.data.email.split('@')[0],
         description: "",
         categories: [],
         location: "",
@@ -118,7 +118,7 @@ export function setupAuth(app: Express) {
 
       const [user] = await db.insert(users)
         .values({
-          username: result.data.username,
+          email: result.data.email,
           password: await hashPassword(result.data.password),
           userType: result.data.userType,
           subscriptionActive: false,
@@ -142,17 +142,17 @@ export function setupAuth(app: Express) {
 
   app.post("/api/login", async (req, res) => {
     try {
-      log(`Login attempt for username: ${req.body.username}`);
-      const [user] = await getUserByUsername(req.body.username);
+      log(`Login attempt for email: ${req.body.email}`);
+      const [user] = await getUserByEmail(req.body.email);
 
       if (!user) {
-        log(`User not found: ${req.body.username}`);
+        log(`User not found: ${req.body.email}`);
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
       const isValidPassword = await comparePasswords(req.body.password, user.password);
       if (!isValidPassword) {
-        log(`Invalid password for user: ${req.body.username}`);
+        log(`Invalid password for user: ${req.body.email}`);
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
