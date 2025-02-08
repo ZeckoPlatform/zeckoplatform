@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
-import { Loader2 } from "lucide-react";
+import { Loader2, MessageCircle } from "lucide-react";
 import { useNotificationSound } from "@/lib/useNotificationSound";
 import { useToast } from "@/hooks/use-toast";
 
@@ -46,48 +46,78 @@ export function MessageDialog({
   const playNotification = useNotificationSound();
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const observerRef = useRef<MutationObserver | null>(null);
-  const isFirstLoadRef = useRef(true);
-  const previousMessagesLengthRef = useRef(0);
+  const lastMessageRef = useRef<HTMLDivElement>(null);
+  const isFirstMount = useRef(true);
+  const previousMessagesCount = useRef(0);
 
   const messagesQueryKey = [`/api/leads/${leadId}/messages`];
 
+  // Background query for messages
   const { data: messages = [], isLoading } = useQuery<Message[]>({
     queryKey: messagesQueryKey,
-    enabled: isOpen || user?.id != null,
-    refetchInterval: isOpen ? 3000 : 10000, // Check less frequently when closed
+    enabled: !!user?.id,
+    refetchInterval: 3000,
     onSuccess: (newMessages) => {
-      const unreadMessages = newMessages.filter(m => !m.read && m.sender.id !== user?.id);
-      console.log("Messages loaded, unread count:", unreadMessages.length);
+      const unreadCount = newMessages.filter(m => !m.read && m.sender.id !== user?.id).length;
 
-      if (unreadMessages.length > 0 && !isOpen) {
+      // Show notification only if not first mount and dialog is closed
+      if (!isFirstMount.current && !isOpen && unreadCount > 0) {
         toast({
           title: "New Messages",
-          description: `You have ${unreadMessages.length} unread message${unreadMessages.length > 1 ? 's' : ''}`,
-          variant: "default",
+          description: `You have ${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`,
           duration: 5000,
         });
         playNotification('receive');
       }
-    },
+
+      // Check for new messages during active chat
+      if (isOpen && newMessages.length > previousMessagesCount.current) {
+        const lastMessage = newMessages[newMessages.length - 1];
+        if (lastMessage?.sender.id !== user?.id) {
+          playNotification('receive');
+        }
+      }
+
+      previousMessagesCount.current = newMessages.length;
+      isFirstMount.current = false;
+    }
   });
+
+  // Set up Intersection Observer for auto-scroll
+  useEffect(() => {
+    if (!lastMessageRef.current) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) {
+          lastMessageRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
+      },
+      { threshold: 1.0 }
+    );
+
+    observer.observe(lastMessageRef.current);
+    return () => observer.disconnect();
+  }, [messages.length]);
+
+  // Handle dialog open/close
+  useEffect(() => {
+    if (isOpen && messages.length > 0) {
+      // Scroll to bottom when opening
+      lastMessageRef.current?.scrollIntoView({ behavior: 'auto' });
+
+      // Mark messages as read
+      const hasUnread = messages.some(m => !m.read && m.sender.id !== user?.id);
+      if (hasUnread) {
+        markAsReadMutation.mutate();
+      }
+    }
+  }, [isOpen, messages.length]);
 
   const markAsReadMutation = useMutation({
     mutationFn: async () => {
-      if (!user?.id || !leadId) {
-        throw new Error("Missing required parameters");
-      }
-
-      const response = await apiRequest("POST", `/api/leads/${leadId}/messages/read`, {
-        receiver_id: user.id
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error || "Failed to mark messages as read");
-      }
-
+      const response = await apiRequest("POST", `/api/leads/${leadId}/messages/read`);
+      if (!response.ok) throw new Error("Failed to mark messages as read");
       return response.json();
     },
     onSuccess: () => {
@@ -98,93 +128,9 @@ export function MessageDialog({
         }))
       );
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-      if (onMessagesRead) {
-        onMessagesRead();
-      }
-    },
-    onError: (error: Error) => {
-      console.error("Error marking messages as read:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to mark messages as read",
-        variant: "destructive"
-      });
+      if (onMessagesRead) onMessagesRead();
     }
   });
-
-  const forceScrollToBottom = () => {
-    if (messagesContainerRef.current) {
-      const container = messagesContainerRef.current;
-      // Force layout recalculation
-      container.style.display = 'none';
-      container.offsetHeight; // Force reflow
-      container.style.display = '';
-
-      container.scrollTop = container.scrollHeight;
-      console.log("Forced scroll to bottom:", container.scrollTop, container.scrollHeight);
-    }
-  };
-
-  // Setup mutation observer for new messages
-  useEffect(() => {
-    if (messagesContainerRef.current && isOpen) {
-      observerRef.current = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-          if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-            requestAnimationFrame(() => {
-              forceScrollToBottom();
-            });
-          }
-        });
-      });
-
-      observerRef.current.observe(messagesContainerRef.current, {
-        childList: true,
-        subtree: true
-      });
-
-      return () => {
-        if (observerRef.current) {
-          observerRef.current.disconnect();
-        }
-      };
-    }
-  }, [isOpen]);
-
-  // Initial scroll and mark as read when dialog opens
-  useEffect(() => {
-    if (isOpen && messages.length > 0) {
-      console.log("Dialog opened with messages:", messages.length);
-
-      // Ensure DOM is ready and force scroll
-      setTimeout(() => {
-        forceScrollToBottom();
-        isFirstLoadRef.current = false;
-      }, 50);
-
-      const hasUnreadMessages = messages.some(m => 
-        m.sender.id !== user?.id && !m.read
-      );
-
-      if (hasUnreadMessages && user?.id) {
-        markAsReadMutation.mutate();
-      }
-    }
-  }, [isOpen, messages, user?.id]);
-
-  // Handle new messages
-  useEffect(() => {
-    if (messages.length > previousMessagesLengthRef.current && !isFirstLoadRef.current) {
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage?.sender?.id !== user?.id) {
-        playNotification('receive');
-      }
-      requestAnimationFrame(() => {
-        forceScrollToBottom();
-      });
-    }
-    previousMessagesLengthRef.current = messages.length;
-  }, [messages, user?.id]);
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
@@ -192,29 +138,22 @@ export function MessageDialog({
         receiverId,
         content,
       });
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error || "Failed to send message");
-      }
+      if (!response.ok) throw new Error("Failed to send message");
       return response.json();
     },
     onSuccess: (newMessage) => {
       setNewMessage("");
       playNotification('send');
-      queryClient.setQueryData<Message[]>(messagesQueryKey, (old = []) => [...old, newMessage]);
-      queryClient.invalidateQueries({ queryKey: messagesQueryKey });
-      requestAnimationFrame(() => {
-        forceScrollToBottom();
-      });
+      queryClient.setQueryData<Message[]>(messagesQueryKey, old => [...(old || []), newMessage]);
+      lastMessageRef.current?.scrollIntoView({ behavior: 'smooth' });
     },
     onError: (error: Error) => {
-      console.error("Failed to send message:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to send message",
         variant: "destructive"
       });
-    },
+    }
   });
 
   const handleSend = async (e: React.FormEvent) => {
@@ -223,17 +162,26 @@ export function MessageDialog({
     await sendMessageMutation.mutateAsync(newMessage);
   };
 
+  // Calculate unread count for visual indicator
+  const unreadCount = messages.filter(m => !m.read && m.sender.id !== user?.id).length;
+
   return (
     <DialogContent className="max-w-md">
       <DialogHeader>
-        <DialogTitle>Messages</DialogTitle>
+        <DialogTitle className="flex items-center gap-2">
+          Messages
+          {unreadCount > 0 && (
+            <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full">
+              {unreadCount}
+            </span>
+          )}
+        </DialogTitle>
         <DialogDescription>
           Send and receive messages about this lead
         </DialogDescription>
       </DialogHeader>
       <div className="flex flex-col h-[400px]">
         <div 
-          ref={messagesContainerRef}
           className="flex-1 overflow-y-auto p-4 space-y-4"
         >
           {isLoading ? (
@@ -242,9 +190,10 @@ export function MessageDialog({
             </div>
           ) : (
             <div className="space-y-4">
-              {messages.map((message) => (
+              {messages.map((message, index) => (
                 <div
                   key={message.id}
+                  ref={index === messages.length - 1 ? lastMessageRef : null}
                   className={`flex flex-col ${
                     message.sender.id === user?.id
                       ? "items-end"
