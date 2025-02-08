@@ -3,9 +3,9 @@ import { createServer, type Server } from "http";
 import { setupAuth, authenticateToken } from "./auth";
 import { db } from "@db";
 import { leads, users, subscriptions, products, leadResponses, messages } from "@db/schema";
-import { eq, and, or, gt, not } from "drizzle-orm";
+import { eq, and, or, gt, not, sql } from "drizzle-orm";
 import { log } from "./vite";
-import { comparePasswords, hashPassword } from './auth'; // Assuming these functions exist
+import { comparePasswords, hashPassword } from './auth';
 import fs from 'fs';
 import express from 'express';
 
@@ -681,7 +681,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Update the messages/read endpoint with proper SQL syntax
+  // Update the messages/read endpoint with transaction support and detailed logging
   app.post("/api/leads/:leadId/messages/read", async (req, res) => {
     try {
       if (!req.user) {
@@ -689,28 +689,85 @@ export function registerRoutes(app: Express): Server {
       }
 
       const leadId = parseInt(req.params.leadId);
+      if (isNaN(leadId)) {
+        return res.status(400).json({ message: "Invalid lead ID" });
+      }
+
       log(`Marking messages as read for lead ${leadId} and user ${req.user.id}`);
 
-      // Using raw SQL for the update to ensure proper syntax
-      const result = await db.execute(
-        sql`UPDATE messages 
-            SET read = true 
-            WHERE lead_id = ${leadId} 
-            AND receiver_id = ${req.user.id} 
-            AND read = false 
-            RETURNING *`
-      );
+      // Check if the lead exists
+      const [lead] = await db.select()
+        .from(leads)
+        .where(eq(leads.id, leadId));
 
-      const updatedCount = Array.isArray(result) ? result.length : 0;
-      log(`Marked ${updatedCount} messages as read`);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
 
-      res.json({ success: true, updatedCount });
+      // First check how many unread messages we have
+      const [{ count: unreadCount }] = await db.select({ count: sql<number>`count(*)` })
+        .from(messages)
+        .where(
+          and(
+            eq(messages.lead_id, leadId),
+            eq(messages.receiver_id, req.user.id),
+            eq(messages.read, false)
+          )
+        );
+
+      log(`Found ${unreadCount} unread messages`);
+
+      // Update messages using raw SQL with transaction
+      const updateQuery = sql`
+        WITH updated AS (
+          UPDATE messages 
+          SET read = true, 
+              updated_at = NOW() 
+          WHERE lead_id = ${leadId} 
+          AND receiver_id = ${req.user.id} 
+          AND read = false 
+          RETURNING id, read, updated_at, content, sender_id
+        )
+        SELECT 
+          u.id,
+          u.read,
+          u.updated_at,
+          u.content,
+          u.sender_id
+        FROM updated u;`;
+
+      const result = await db.execute(updateQuery);
+      const updatedMessages = Array.isArray(result) ? result : [];
+
+      log(`Successfully marked ${updatedMessages.length} messages as read`);
+
+      // Query again to verify the update
+      const [{ count: verifyCount }] = await db.select({ count: sql<number>`count(*)` })
+        .from(messages)
+        .where(
+          and(
+            eq(messages.lead_id, leadId),
+            eq(messages.receiver_id, req.user.id),
+            eq(messages.read, true)
+          )
+        );
+
+      log(`Verification: ${verifyCount} read messages after update`);
+
+      res.json({ 
+        success: true, 
+        updatedCount: updatedMessages.length,
+        messages: updatedMessages,
+        verificationCount: verifyCount
+      });
+
     } catch (error) {
-      log(`Mark messages read error: ${error instanceof Error ? error.message : String(error)}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log(`Mark messages read error: ${errorMessage}`);
       console.error('Full error:', error);
       res.status(500).json({ 
         message: "Failed to mark messages as read",
-        error: error instanceof Error ? error.message : "Unknown error"
+        error: errorMessage
       });
     }
   });
@@ -839,8 +896,7 @@ export function registerRoutes(app: Express): Server {
       const uniqueFileName = `${Date.now()}-${fileName}`;
       const filePath = `${uploadDir}/${uniqueFileName}`;
 
-      try {
-        // Decode and save the base64 file
+      try {        // Decode and save the base64 file
         const buffer = Buffer.from(file, 'base64');
         await fs.promises.writeFile(filePath, buffer);
 
@@ -884,7 +940,7 @@ export function registerRoutes(app: Express): Server {
         );
 
       if (!product) {
-        return res.status(404).json({ message:"Product notfound" });
+        return res.status(404).json({ message: "Product not found" });
       }
 
       // Delete the product

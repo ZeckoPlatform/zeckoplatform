@@ -1,3 +1,4 @@
+<replit_final_file>
 import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
@@ -59,7 +60,7 @@ export const leads = pgTable("leads", {
   location: text("location"),
   status: text("status", { enum: ["open", "closed", "in_progress"] }).default("open"),
   created_at: timestamp("created_at").defaultNow(),
-  expires_at: timestamp("expires_at"), 
+  expires_at: timestamp("expires_at"),
 });
 
 export const leadResponses = pgTable("lead_responses", {
@@ -78,6 +79,7 @@ export const messages = pgTable("messages", {
   sender_id: integer("sender_id").references(() => users.id).notNull(),
   receiver_id: integer("receiver_id").references(() => users.id).notNull(),
   content: text("content").notNull(),
+  read: boolean("read").default(false),
   created_at: timestamp("created_at").defaultNow(),
   updated_at: timestamp("updated_at").defaultNow(),
 });
@@ -98,7 +100,7 @@ export const products = pgTable("products", {
   vendorId: integer("vendor_id").references(() => users.id).notNull(),
   title: text("title").notNull(),
   description: text("description").notNull(),
-  price: integer("price").notNull(), 
+  price: integer("price").notNull(),
   category: text("category").notNull(),
   imageUrl: text("image_url"),
   createdAt: timestamp("created_at").defaultNow(),
