@@ -33,7 +33,13 @@ export async function comparePasswords(supplied: string, stored: string) {
 }
 
 async function getUserByUsername(username: string) {
-  return db.select().from(users).where(eq(users.username, username)).limit(1);
+  try {
+    const users = await db.select().from(users).where(eq(users.username, username)).limit(1);
+    return users;
+  } catch (error) {
+    log(`Database error in getUserByUsername: ${error}`);
+    throw new Error('Database error occurred');
+  }
 }
 
 function generateToken(user: SelectUser) {
@@ -62,7 +68,7 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
 
     jwt.verify(token, JWT_SECRET, async (err: any, decoded: any) => {
       if (err) {
-        log('Token verification failed:', err.message);
+        log(`Token verification failed: ${err.message}`);
         return res.status(401).json({ message: 'Invalid or expired token' });
       }
 
@@ -79,13 +85,13 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
         req.user = user;
         next();
       } catch (dbError) {
-        log('Database error during authentication:', String(dbError));
-        return res.status(500).json({ message: 'Internal server error' });
+        log(`Database error during authentication: ${dbError}`);
+        return res.status(500).json({ message: 'Internal server error during authentication' });
       }
     });
   } catch (error) {
-    log('Authentication middleware error:', String(error));
-    return res.status(500).json({ message: 'Internal server error' });
+    log(`Authentication middleware error: ${error}`);
+    return res.status(500).json({ message: 'Internal server error in auth middleware' });
   }
 }
 
@@ -103,7 +109,6 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ message: "Username already exists" });
       }
 
-      // Initialize profile based on user type
       const profileData = {
         name: result.data.username,
         description: "",
@@ -150,7 +155,7 @@ export function setupAuth(app: Express) {
       res.json({ user, token });
     } catch (error) {
       log(`Login error: ${error instanceof Error ? error.message : String(error)}`);
-      res.status(500).json({ message: "Internal server error" });
+      res.status(500).json({ message: "Internal server error during login" });
     }
   });
 

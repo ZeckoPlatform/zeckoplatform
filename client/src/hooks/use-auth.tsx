@@ -19,6 +19,26 @@ function useAuthState() {
     isLoading,
   } = useQuery<SelectUser | null>({
     queryKey: ["/api/user"],
+    queryFn: async () => {
+      const token = localStorage.getItem("token");
+      if (!token) return null;
+
+      const res = await fetch("/api/user", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        if (res.status === 401) {
+          localStorage.removeItem("token");
+          return null;
+        }
+        throw new Error("Failed to fetch user data");
+      }
+
+      return res.json();
+    },
     retry: false,
     retryOnMount: false,
     refetchOnWindowFocus: true,
@@ -119,6 +139,7 @@ function useAuthState() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       });
       localStorage.removeItem("token");
