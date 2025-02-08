@@ -61,7 +61,10 @@ export function MessageDialog({
   const scrollToBottom = () => {
     if (messagesContainerRef.current) {
       const container = messagesContainerRef.current;
-      container.scrollTop = container.scrollHeight;
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: "smooth"
+      });
     }
   };
 
@@ -80,10 +83,11 @@ export function MessageDialog({
   // Effect for initial load and dialog open
   useEffect(() => {
     if (isOpen) {
-      // Delay scroll to ensure DOM is ready
-      const timer = setTimeout(() => {
+      // Initial scroll when dialog opens
+      const scrollTimer = setTimeout(() => {
         scrollToBottom();
-      }, 100);
+        isFirstLoadRef.current = false;
+      }, 300);
 
       // Mark messages as read when dialog opens
       const markMessagesAsRead = async () => {
@@ -94,7 +98,11 @@ export function MessageDialog({
 
           if (hasUnreadMessages) {
             try {
-              const res = await apiRequest("POST", `/api/leads/${leadId}/messages/read`, {});
+              const res = await apiRequest("POST", `/api/leads/${leadId}/messages/read`, {
+                leadId,
+                userId: user?.id
+              });
+
               if (res.ok) {
                 // Update message read status in cache
                 queryClient.setQueryData<Message[]>(messagesQueryKey, oldMessages => 
@@ -119,7 +127,7 @@ export function MessageDialog({
       };
 
       markMessagesAsRead();
-      return () => clearTimeout(timer);
+      return () => clearTimeout(scrollTimer);
     }
   }, [isOpen, messages, leadId, user?.id, queryClient, onMessagesRead]);
 
