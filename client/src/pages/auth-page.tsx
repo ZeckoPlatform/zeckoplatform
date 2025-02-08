@@ -204,7 +204,10 @@ export default function AuthPage() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="registered">Registered Company</SelectItem>
-                            <SelectItem value="selfEmployed">Self-employed</SelectItem>
+                            {/* Only show self-employed option for business accounts */}
+                            {registerForm.watch("userType") === "business" && (
+                              <SelectItem value="selfEmployed">Self-employed</SelectItem>
+                            )}
                           </SelectContent>
                         </Select>
                       </div>
@@ -251,7 +254,8 @@ export default function AuthPage() {
                         </>
                       )}
 
-                      {registerForm.watch("businessType") === "selfEmployed" && (
+                      {registerForm.watch("businessType") === "selfEmployed" && 
+                       registerForm.watch("userType") === "business" && (
                         <div>
                           <Label htmlFor="utrNumber">UTR Number (Required)</Label>
                           <Input
