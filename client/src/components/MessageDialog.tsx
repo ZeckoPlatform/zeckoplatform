@@ -54,11 +54,14 @@ export function MessageDialog({
     queryKey: messagesQueryKey,
     enabled: isOpen,
     refetchInterval: isOpen ? 3000 : false,
+    staleTime: 0,
+    gcTime: Infinity, // Keep messages in cache indefinitely (renamed from cacheTime in v5)
   });
 
   const scrollToBottom = () => {
     if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+      const container = messagesContainerRef.current;
+      container.scrollTop = container.scrollHeight;
     }
   };
 
@@ -77,11 +80,15 @@ export function MessageDialog({
   // Effect for initial load and dialog open
   useEffect(() => {
     if (isOpen && messages.length > 0) {
-      // Force scroll after a delay to ensure DOM is ready
-      const timer = setTimeout(scrollToBottom, 100);
+      // Delay scroll to ensure DOM is ready
+      const timer = setTimeout(() => {
+        scrollToBottom();
+      }, 300);
+
       if (isFirstLoadRef.current) {
         isFirstLoadRef.current = false;
       }
+
       return () => clearTimeout(timer);
     }
   }, [isOpen, messages]);
@@ -98,8 +105,17 @@ export function MessageDialog({
           try {
             const res = await apiRequest("POST", `/api/leads/${leadId}/messages/read`, {});
             if (res.ok) {
-              await queryClient.invalidateQueries({ queryKey: messagesQueryKey });
+              // Update message read status in cache
+              queryClient.setQueryData<Message[]>(messagesQueryKey, oldMessages => 
+                oldMessages?.map(m => ({
+                  ...m,
+                  read: m.sender.id !== user?.id ? true : m.read
+                }))
+              );
+
+              // Invalidate queries to refresh unread counts
               await queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+
               if (onMessagesRead) {
                 onMessagesRead();
               }
@@ -155,7 +171,7 @@ export function MessageDialog({
       <div className="flex flex-col h-[400px]">
         <div 
           ref={messagesContainerRef}
-          className="flex-1 overflow-y-auto p-4"
+          className="flex-1 overflow-y-auto p-4 scroll-smooth"
         >
           {isLoading ? (
             <div className="flex items-center justify-center h-full">

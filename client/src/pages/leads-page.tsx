@@ -318,6 +318,8 @@ export default function LeadsPage() {
       initialLoadRef.current = false;
     },
     refetchInterval: 5000, // Poll every 5 seconds for new messages
+    staleTime: 0,
+    gcTime: Infinity, // Keep messages in cache indefinitely
   });
 
 
@@ -485,6 +487,41 @@ export default function LeadsPage() {
     : leads.filter(lead => lead.user_id === user?.id);
 
   const BusinessLeadsView = () => {
+    const isFirstLoadRef = useRef(true);
+    const previousMessagesLengthRef = useRef(0);
+
+    const scrollToBottom = () => {
+      const messageContainer = document.getElementById('message-container');
+      if (messageContainer) {
+        messageContainer.scrollTop = messageContainer.scrollHeight;
+      }
+    };
+
+    const { data: messages = [] } = useQuery({
+      queryKey: ['/api/messages', selectedLead?.id],
+      queryFn: async () => {
+        const response = await apiRequest('GET', `/api/leads/${selectedLead?.id}/messages`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch messages');
+        }
+        return response.json();
+      },
+      enabled: !!selectedLead
+    });
+  
+    useEffect(() => {
+      if (messages.length > previousMessagesLengthRef.current && !isFirstLoadRef.current) {
+        const lastMessage = messages[messages.length - 1];
+        if (lastMessage?.sender?.id !== user?.id) {
+          playNotification('receive');
+        }
+        scrollToBottom();
+      }
+      previousMessagesLengthRef.current = messages.length;
+      isFirstLoadRef.current = false;
+    }, [messages, user?.id, playNotification]);
+
+
     if (isLoadingLeads) {
       return (
         <div className="flex items-center justify-center min-h-[200px]">
@@ -942,8 +979,7 @@ export default function LeadsPage() {
                                         title: "Error",
                                         description: "Missing lead or response information",
                                         variant: "destructive",
-                                      });
-                                    }
+                                      });                                    }
                                   })}>
                                     <div className="space-y-4">
                                       <div>
