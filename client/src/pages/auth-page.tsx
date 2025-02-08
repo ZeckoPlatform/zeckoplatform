@@ -8,6 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useForm } from "react-hook-form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { startTrialSubscription } from "@/lib/subscription";
+import { toast } from "@/components/ui/toast";
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
@@ -29,6 +31,11 @@ export default function AuthPage() {
       companyNumber: "",
       vatNumber: "",
       utrNumber: "",
+      paymentMethod: "stripe" as "stripe" | "direct_debit",
+      paymentFrequency: "monthly" as "monthly" | "annual",
+      bankAccountHolder: "",
+      bankSortCode: "",
+      bankAccountNumber: "",
     },
   });
 
@@ -48,9 +55,28 @@ export default function AuthPage() {
     }
   };
 
-  const onRegisterSuccess = (data: any) => {
+  const onRegisterSuccess = async (data: any) => {
     if (data.userType !== "free") {
-      setLocation("/subscription");
+      try {
+        await startTrialSubscription({
+          userId: data.id,
+          tier: data.userType,
+          paymentMethod: data.paymentMethod,
+          paymentFrequency: data.paymentFrequency,
+          bankDetails: data.paymentMethod === "direct_debit" ? {
+            accountHolder: data.bankAccountHolder,
+            sortCode: data.bankSortCode,
+            accountNumber: data.bankAccountNumber,
+          } : undefined,
+        });
+        setLocation("/subscription");
+      } catch (error) {
+        toast({
+          title: "Subscription setup failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     } else {
       setLocation("/leads");
     }
@@ -157,7 +183,6 @@ export default function AuthPage() {
                       defaultValue="free"
                       onValueChange={(value) => {
                         registerForm.setValue("userType", value as any);
-                        // Reset business-specific fields when switching to free
                         if (value === "free") {
                           registerForm.setValue("businessType", "");
                           registerForm.setValue("companyNumber", "");
@@ -181,7 +206,6 @@ export default function AuthPage() {
                     </RadioGroup>
                   </div>
 
-                  {/* Business/Vendor specific fields */}
                   {(registerForm.watch("userType") === "business" ||
                     registerForm.watch("userType") === "vendor") && (
                     <>
@@ -190,7 +214,6 @@ export default function AuthPage() {
                         <Select
                           onValueChange={(value) => {
                             registerForm.setValue("businessType", value);
-                            // Reset fields when changing business type
                             if (value === "registered") {
                               registerForm.setValue("utrNumber", "");
                             } else if (value === "selfEmployed") {
@@ -204,7 +227,6 @@ export default function AuthPage() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="registered">Registered Company</SelectItem>
-                            {/* Only show self-employed option for business accounts */}
                             {registerForm.watch("userType") === "business" && (
                               <SelectItem value="selfEmployed">Self-employed</SelectItem>
                             )}
@@ -254,28 +276,122 @@ export default function AuthPage() {
                         </>
                       )}
 
-                      {registerForm.watch("businessType") === "selfEmployed" && 
-                       registerForm.watch("userType") === "business" && (
+                      {registerForm.watch("businessType") === "selfEmployed" &&
+                        registerForm.watch("userType") === "business" && (
+                          <div>
+                            <Label htmlFor="utrNumber">UTR Number (Required)</Label>
+                            <Input
+                              id="utrNumber"
+                              {...registerForm.register("utrNumber", {
+                                required: "UTR number is required for self-employed registration",
+                                pattern: {
+                                  value: /^[0-9]{10}$/,
+                                  message: "Please enter a valid 10-digit UTR number"
+                                }
+                              })}
+                              placeholder="10 digit UTR"
+                            />
+                            {registerForm.formState.errors.utrNumber && (
+                              <p className="text-sm text-destructive mt-1">
+                                {registerForm.formState.errors.utrNumber.message}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                    </>
+                  )}
+
+                  {(registerForm.watch("userType") === "business" ||
+                    registerForm.watch("userType") === "vendor") && (
+                    <>
+                      <div className="space-y-4 mt-4">
+                        <Label>Payment Preferences</Label>
+
                         <div>
-                          <Label htmlFor="utrNumber">UTR Number (Required)</Label>
-                          <Input
-                            id="utrNumber"
-                            {...registerForm.register("utrNumber", {
-                              required: "UTR number is required for self-employed registration",
-                              pattern: {
-                                value: /^[0-9]{10}$/,
-                                message: "Please enter a valid 10-digit UTR number"
-                              }
-                            })}
-                            placeholder="10 digit UTR"
-                          />
-                          {registerForm.formState.errors.utrNumber && (
-                            <p className="text-sm text-destructive mt-1">
-                              {registerForm.formState.errors.utrNumber.message}
-                            </p>
-                          )}
+                          <Label>Billing Frequency</Label>
+                          <RadioGroup
+                            defaultValue="monthly"
+                            onValueChange={(value) =>
+                              registerForm.setValue("paymentFrequency", value as "monthly" | "annual")
+                            }
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="monthly" id="monthly" />
+                              <Label htmlFor="monthly">Monthly</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="annual" id="annual" />
+                              <Label htmlFor="annual">Annual (10% discount)</Label>
+                            </div>
+                          </RadioGroup>
                         </div>
-                      )}
+
+                        <div>
+                          <Label>Payment Method</Label>
+                          <RadioGroup
+                            defaultValue="stripe"
+                            onValueChange={(value) => {
+                              registerForm.setValue("paymentMethod", value as "stripe" | "direct_debit");
+                              if (value === "stripe") {
+                                registerForm.setValue("bankAccountHolder", "");
+                                registerForm.setValue("bankSortCode", "");
+                                registerForm.setValue("bankAccountNumber", "");
+                              }
+                            }}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="stripe" id="stripe" />
+                              <Label htmlFor="stripe">Credit/Debit Card</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="direct_debit" id="direct_debit" />
+                              <Label htmlFor="direct_debit">Direct Debit</Label>
+                            </div>
+                          </RadioGroup>
+                        </div>
+
+                        {registerForm.watch("paymentMethod") === "direct_debit" && (
+                          <div className="space-y-4">
+                            <div>
+                              <Label htmlFor="bankAccountHolder">Account Holder Name</Label>
+                              <Input
+                                id="bankAccountHolder"
+                                {...registerForm.register("bankAccountHolder", {
+                                  required: "Account holder name is required for direct debit",
+                                })}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="bankSortCode">Sort Code</Label>
+                              <Input
+                                id="bankSortCode"
+                                {...registerForm.register("bankSortCode", {
+                                  required: "Sort code is required for direct debit",
+                                  pattern: {
+                                    value: /^\d{6}$/,
+                                    message: "Please enter a valid 6-digit sort code",
+                                  },
+                                })}
+                                placeholder="123456"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="bankAccountNumber">Account Number</Label>
+                              <Input
+                                id="bankAccountNumber"
+                                {...registerForm.register("bankAccountNumber", {
+                                  required: "Account number is required for direct debit",
+                                  pattern: {
+                                    value: /^\d{8}$/,
+                                    message: "Please enter a valid 8-digit account number",
+                                  },
+                                })}
+                                placeholder="12345678"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </>
                   )}
 
