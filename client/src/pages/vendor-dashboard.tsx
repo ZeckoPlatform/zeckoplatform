@@ -255,6 +255,10 @@ export default function VendorDashboard() {
             <Store className="h-4 w-4" />
             Payments
           </TabsTrigger>
+          <TabsTrigger value="store" className="flex items-center gap-2">
+            <Store className="h-4 w-4" />
+            Store Profile
+          </TabsTrigger>
           <TabsTrigger value="settings" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             Settings
@@ -542,11 +546,47 @@ export default function VendorDashboard() {
           <Card>
             <CardHeader>
               <CardTitle>Store Profile</CardTitle>
+              <CardDescription>
+                Manage your store details and preferences
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">
-                Store profile management features coming soon.
-              </p>
+              <form className="space-y-4">
+                <div>
+                  <Label htmlFor="store-name">Store Name</Label>
+                  <Input
+                    id="store-name"
+                    placeholder="Enter your store name"
+                    defaultValue={user?.storeName}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="store-description">Store Description</Label>
+                  <Textarea
+                    id="store-description"
+                    placeholder="Describe your store"
+                    defaultValue={user?.storeDescription}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="contact-email">Contact Email</Label>
+                  <Input
+                    id="contact-email"
+                    type="email"
+                    placeholder="contact@example.com"
+                    defaultValue={user?.contactEmail}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="business-address">Business Address</Label>
+                  <Textarea
+                    id="business-address"
+                    placeholder="Enter your business address"
+                    defaultValue={user?.businessAddress}
+                  />
+                </div>
+                <Button type="submit">Save Changes</Button>
+              </form>
             </CardContent>
           </Card>
         </TabsContent>
