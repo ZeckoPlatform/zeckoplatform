@@ -30,7 +30,15 @@ export async function startSubscription({
   stripePaymentMethodId,
   bankDetails,
 }: CreateSubscriptionParams) {
-  // Trial period is now mandatory
+  // Validate required payment method
+  if (paymentMethod === "stripe" && !stripePaymentMethodId) {
+    throw new Error("Stripe payment method ID is required");
+  }
+  if (paymentMethod === "direct_debit" && !bankDetails) {
+    throw new Error("Bank details are required for direct debit");
+  }
+
+  // Trial period is mandatory
   const trialEndDate = addDays(new Date(), 30);
   const subscriptionEndDate = paymentFrequency === "annual"
     ? addYears(trialEndDate, 1)
@@ -79,15 +87,6 @@ export async function startSubscription({
       auto_renew: true,
     });
 
-    // Update user's subscription status
-    await db.update(users)
-      .set({
-        subscriptionActive: true,
-        subscriptionTier: tier,
-        subscriptionEndsAt: subscriptionEndDate
-      })
-      .where(eq(users.id, userId));
-
   } else if (paymentMethod === "direct_debit" && bankDetails) {
     // Create local subscription record for direct debit
     await db.insert(subscriptions).values({
@@ -106,16 +105,16 @@ export async function startSubscription({
       mandate_status: "pending",
       auto_renew: true,
     });
-
-    // Update user's subscription status
-    await db.update(users)
-      .set({
-        subscriptionActive: true,
-        subscriptionTier: tier,
-        subscriptionEndsAt: subscriptionEndDate
-      })
-      .where(eq(users.id, userId));
   }
+
+  // Update user's subscription status
+  await db.update(users)
+    .set({
+      subscriptionActive: true,
+      subscriptionTier: tier,
+      subscriptionEndsAt: subscriptionEndDate
+    })
+    .where(eq(users.id, userId));
 
   return true;
 }
