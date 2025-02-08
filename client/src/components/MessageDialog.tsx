@@ -62,8 +62,12 @@ export function MessageDialog({
 
   const markAsReadMutation = useMutation({
     mutationFn: async () => {
+      if (!user?.id || !leadId) {
+        throw new Error("Missing required parameters");
+      }
+
       const response = await apiRequest("POST", `/api/leads/${leadId}/messages/read`, {
-        receiver_id: user?.id,
+        receiver_id: user.id
       });
 
       if (!response.ok) {
@@ -133,13 +137,13 @@ export function MessageDialog({
         m.sender.id !== user?.id && !m.read
       );
 
-      if (hasUnreadMessages && user) {
+      if (hasUnreadMessages && user?.id) {
         markAsReadMutation.mutate();
       }
 
       return () => clearTimeout(scrollTimer);
     }
-  }, [isOpen, messages, user]);
+  }, [isOpen, messages, user?.id, leadId]);
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
