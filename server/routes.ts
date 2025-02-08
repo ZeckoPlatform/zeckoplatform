@@ -681,7 +681,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Update the messages/read endpoint
+  // Update the messages/read endpoint with proper SQL syntax
   app.post("/api/leads/:leadId/messages/read", async (req, res) => {
     try {
       if (!req.user) {
@@ -691,20 +691,20 @@ export function registerRoutes(app: Express): Server {
       const leadId = parseInt(req.params.leadId);
       log(`Marking messages as read for lead ${leadId} and user ${req.user.id}`);
 
-      // Update all unread messages for this user in this lead
-      const result = await db.update(messages)
-        .set({ read: true })
-        .where(
-          and(
-            eq(messages.lead_id, leadId),
-            eq(messages.receiver_id, req.user.id),
-            eq(messages.read, false)
-          )
-        )
-        .returning();
+      // Using raw SQL for the update to ensure proper syntax
+      const result = await db.execute(
+        sql`UPDATE messages 
+            SET read = true 
+            WHERE lead_id = ${leadId} 
+            AND receiver_id = ${req.user.id} 
+            AND read = false 
+            RETURNING *`
+      );
 
-      log(`Marked ${result.length} messages as read`);
-      res.json({ success: true, updatedCount: result.length });
+      const updatedCount = Array.isArray(result) ? result.length : 0;
+      log(`Marked ${updatedCount} messages as read`);
+
+      res.json({ success: true, updatedCount });
     } catch (error) {
       log(`Mark messages read error: ${error instanceof Error ? error.message : String(error)}`);
       console.error('Full error:', error);
@@ -884,7 +884,7 @@ export function registerRoutes(app: Express): Server {
         );
 
       if (!product) {
-        return res.status(404).json({ message: "Product notfound" });
+        return res.status(404).json({ message:"Product notfound" });
       }
 
       // Delete the product
