@@ -75,8 +75,8 @@ const calculateMatchScore = (lead: SelectLead, user: SelectUser | null): {
   if (user?.profile?.location === lead.location) {
     locationScore = 25;
   }
-  if (user?.profile?.budget && lead.budget && 
-      Math.abs(lead.budget - user.profile.budget) < 1000) {
+  if (user?.profile?.budget && lead.budget &&
+    Math.abs(lead.budget - user.profile.budget) < 1000) {
     budgetScore = 25;
   }
   if (user?.profile?.industries?.includes(lead.industry)) {
@@ -125,7 +125,7 @@ function useUnreadMessageNotification(leads: any[] | undefined) {
 
   useEffect(() => {
     if (leads && !hasCheckedRef.current) {
-      const hasUnreadMessages = leads.some(lead => 
+      const hasUnreadMessages = leads.some(lead =>
         lead.unreadMessages > 0
       );
 
@@ -302,7 +302,7 @@ export default function LeadsPage() {
   const {
     data: leads = [],
     isLoading: isLoadingLeads,
-  } = useQuery({
+  } = useQuery<LeadWithUnreadCount[]>({
     queryKey: ["/api/leads"],
     queryFn: async () => {
       const response = await fetch("/api/leads");
@@ -310,7 +310,7 @@ export default function LeadsPage() {
         throw new Error("Failed to fetch leads");
       }
       const data = await response.json();
-      return data;
+      return data as LeadWithUnreadCount[];
     },
     enabled: !!user,
     onSuccess: (data) => {
@@ -930,7 +930,8 @@ export default function LeadsPage() {
                                   leadId={lead.id}
                                   receiverId={response.business_id}
                                   onClose={() => queryClient.invalidateQueries({ queryKey: ["/api/leads"] })}
-                               />                              </Dialog>
+                                />
+                              </Dialog>
                             </div>
                           )}
 
