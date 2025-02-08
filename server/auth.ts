@@ -34,10 +34,12 @@ export async function comparePasswords(supplied: string, stored: string) {
 
 async function getUserByUsername(username: string) {
   try {
-    const users = await db.select().from(users).where(eq(users.username, username)).limit(1);
-    return users;
+    log(`Fetching user with username: ${username}`);
+    const foundUsers = await db.select().from(users).where(eq(users.username, username)).limit(1);
+    log(`Found ${foundUsers.length} users matching username: ${username}`);
+    return foundUsers;
   } catch (error) {
-    log(`Database error in getUserByUsername: ${error}`);
+    log(`Database error in getUserByUsername: ${error instanceof Error ? error.message : String(error)}`);
     throw new Error('Database error occurred');
   }
 }
@@ -145,8 +147,14 @@ export function setupAuth(app: Express) {
       log(`Login attempt for username: ${req.body.username}`);
       const [user] = await getUserByUsername(req.body.username);
 
-      if (!user || !(await comparePasswords(req.body.password, user.password))) {
-        log(`Invalid credentials for username: ${req.body.username}`);
+      if (!user) {
+        log(`User not found: ${req.body.username}`);
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      const isValidPassword = await comparePasswords(req.body.password, user.password);
+      if (!isValidPassword) {
+        log(`Invalid password for user: ${req.body.username}`);
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
@@ -155,7 +163,11 @@ export function setupAuth(app: Express) {
       res.json({ user, token });
     } catch (error) {
       log(`Login error: ${error instanceof Error ? error.message : String(error)}`);
-      res.status(500).json({ message: "Internal server error during login" });
+      console.error('Full error:', error);
+      res.status(500).json({ 
+        message: "Internal server error during login",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 
