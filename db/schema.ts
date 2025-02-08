@@ -26,6 +26,9 @@ export const users = pgTable("users", {
   stripeAccountStatus: text("stripe_account_status", { 
     enum: ["pending", "enabled", "disabled"] 
   }).default("pending"),
+  verificationStatus: text("verification_status", {
+    enum: ["pending", "verified", "rejected"]
+  }).default("pending"),
   profile: jsonb("profile").$type<{
     name?: string;
     description?: string;
@@ -36,6 +39,17 @@ export const users = pgTable("users", {
       locationPreference?: string[];
       budgetRange?: { min: number; max: number };
     };
+    // Business verification fields
+    businessType?: "registered" | "selfEmployed";
+    companyNumber?: string;
+    vatNumber?: string;
+    utrNumber?: string;
+    verificationDocuments?: Array<{
+      type: string;
+      url: string;
+      uploadedAt: string;
+      status: "pending" | "verified" | "rejected";
+    }>;
     // Vendor specific fields
     services?: string[];
     portfolio?: Array<{

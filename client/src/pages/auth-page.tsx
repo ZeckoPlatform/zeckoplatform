@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useForm } from "react-hook-form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
@@ -24,6 +25,10 @@ export default function AuthPage() {
       username: "",
       password: "",
       userType: "free" as const,
+      businessType: "",
+      companyNumber: "",
+      vatNumber: "",
+      utrNumber: "",
     },
   });
 
@@ -150,9 +155,16 @@ export default function AuthPage() {
                     <Label>Account Type</Label>
                     <RadioGroup
                       defaultValue="free"
-                      onValueChange={(value) =>
-                        registerForm.setValue("userType", value as any)
-                      }
+                      onValueChange={(value) => {
+                        registerForm.setValue("userType", value as any);
+                        // Reset business-specific fields when switching to free
+                        if (value === "free") {
+                          registerForm.setValue("businessType", "");
+                          registerForm.setValue("companyNumber", "");
+                          registerForm.setValue("vatNumber", "");
+                          registerForm.setValue("utrNumber", "");
+                        }
+                      }}
                     >
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="free" id="free" />
@@ -168,6 +180,101 @@ export default function AuthPage() {
                       </div>
                     </RadioGroup>
                   </div>
+
+                  {/* Business/Vendor specific fields */}
+                  {(registerForm.watch("userType") === "business" ||
+                    registerForm.watch("userType") === "vendor") && (
+                    <>
+                      <div>
+                        <Label htmlFor="businessType">Business Type</Label>
+                        <Select
+                          onValueChange={(value) => {
+                            registerForm.setValue("businessType", value);
+                            // Reset fields when changing business type
+                            if (value === "registered") {
+                              registerForm.setValue("utrNumber", "");
+                            } else if (value === "selfEmployed") {
+                              registerForm.setValue("companyNumber", "");
+                            }
+                          }}
+                          defaultValue={registerForm.watch("businessType")}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select business type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="registered">Registered Company</SelectItem>
+                            <SelectItem value="selfEmployed">Self-employed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {registerForm.watch("businessType") === "registered" && (
+                        <>
+                          <div>
+                            <Label htmlFor="companyNumber">Companies House Number (Required)</Label>
+                            <Input
+                              id="companyNumber"
+                              {...registerForm.register("companyNumber", {
+                                required: "Companies House number is required for registered businesses",
+                                pattern: {
+                                  value: /^[A-Z0-9]{8}$/i,
+                                  message: "Please enter a valid 8-character Companies House number"
+                                }
+                              })}
+                              placeholder="8 digit number"
+                            />
+                            {registerForm.formState.errors.companyNumber && (
+                              <p className="text-sm text-destructive mt-1">
+                                {registerForm.formState.errors.companyNumber.message}
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <Label htmlFor="vatNumber">VAT Number (Optional)</Label>
+                            <Input
+                              id="vatNumber"
+                              {...registerForm.register("vatNumber", {
+                                pattern: {
+                                  value: /^GB[0-9]{9}$/i,
+                                  message: "Please enter a valid VAT number (e.g., GB123456789)"
+                                }
+                              })}
+                              placeholder="GB123456789"
+                            />
+                            {registerForm.formState.errors.vatNumber && (
+                              <p className="text-sm text-destructive mt-1">
+                                {registerForm.formState.errors.vatNumber.message}
+                              </p>
+                            )}
+                          </div>
+                        </>
+                      )}
+
+                      {registerForm.watch("businessType") === "selfEmployed" && (
+                        <div>
+                          <Label htmlFor="utrNumber">UTR Number (Required)</Label>
+                          <Input
+                            id="utrNumber"
+                            {...registerForm.register("utrNumber", {
+                              required: "UTR number is required for self-employed registration",
+                              pattern: {
+                                value: /^[0-9]{10}$/,
+                                message: "Please enter a valid 10-digit UTR number"
+                              }
+                            })}
+                            placeholder="10 digit UTR"
+                          />
+                          {registerForm.formState.errors.utrNumber && (
+                            <p className="text-sm text-destructive mt-1">
+                              {registerForm.formState.errors.utrNumber.message}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+
                   <Button
                     type="submit"
                     className="w-full"
