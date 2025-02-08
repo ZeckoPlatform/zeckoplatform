@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
 import { useNotificationSound } from "@/lib/useNotificationSound";
+import { useToast } from "@/hooks/use-toast";
 
 interface Message {
   id: number;
@@ -43,6 +44,7 @@ export function MessageDialog({
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const playNotification = useNotificationSound();
+  const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const isFirstLoadRef = useRef(true);
@@ -60,14 +62,17 @@ export function MessageDialog({
 
   const markAsReadMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/leads/${leadId}/messages/read`, {
-        leadId,
-        userId: user?.id
+      const response = await apiRequest("POST", `/api/leads/${leadId}/messages/read`, {
+        receiverId: user?.id,
+        leadId
       });
-      if (!res.ok) {
-        throw new Error("Failed to mark messages as read");
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || "Failed to mark messages as read");
       }
-      return res.json();
+
+      return response.json();
     },
     onSuccess: () => {
       // Update message read status in cache
@@ -83,17 +88,22 @@ export function MessageDialog({
         onMessagesRead();
       }
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       console.error("Error marking messages as read:", error);
+      toast({
+        title: "Error",
+        description: "Failed to mark messages as read. Please try again.",
+        variant: "destructive"
+      });
     }
   });
 
-  const scrollToBottom = () => {
+  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
     if (messagesContainerRef.current) {
       const container = messagesContainerRef.current;
       container.scrollTo({
         top: container.scrollHeight,
-        behavior: "smooth"
+        behavior
       });
     }
   };
@@ -115,9 +125,9 @@ export function MessageDialog({
     if (isOpen) {
       // Initial scroll when dialog opens
       const scrollTimer = setTimeout(() => {
-        scrollToBottom();
+        scrollToBottom("instant");
         isFirstLoadRef.current = false;
-      }, 300);
+      }, 100);
 
       // Mark messages as read when dialog opens
       const hasUnreadMessages = messages.some(m => 
@@ -138,6 +148,10 @@ export function MessageDialog({
         receiverId,
         content,
       });
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || "Failed to send message");
+      }
       return response.json();
     },
     onSuccess: (newMessage) => {
@@ -147,10 +161,15 @@ export function MessageDialog({
       queryClient.setQueryData<Message[]>(messagesQueryKey, (old = []) => [...old, newMessage]);
       // Invalidate to ensure consistency
       queryClient.invalidateQueries({ queryKey: messagesQueryKey });
-      setTimeout(scrollToBottom, 100);
+      setTimeout(() => scrollToBottom(), 100);
     },
     onError: (error: Error) => {
       console.error("Failed to send message:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive"
+      });
     },
   });
 
