@@ -26,7 +26,7 @@ function Router() {
         <ProtectedRoute path="/marketplace" component={MarketplacePage} />
         <ProtectedRoute path="/subscription" component={SubscriptionPage} />
         <ProtectedRoute path="/vendor/dashboard" component={VendorDashboard} />
-        <Route component={NotFound} />
+        <Route path="/:rest*" component={NotFound} />
       </Switch>
     </div>
   );
