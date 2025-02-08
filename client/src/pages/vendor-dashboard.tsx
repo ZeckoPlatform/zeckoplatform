@@ -11,14 +11,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { apiRequest } from "@/lib/queryClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Store, Package, Settings, Edit, Trash2, Loader2, Upload } from "lucide-react";
+import { Store, Package, Settings, Edit, Trash2, Loader2, Upload, AlertCircle, CheckCircle2 } from "lucide-react";
 import { ProductForm } from "@/components/ProductForm";
 
 interface Product {
   id: number;
   title: string;
   description: string;
-  price: number | string; // Updated to allow for string price
+  price: number | string;
   category: string;
   imageUrl?: string;
   vendorId: number;
@@ -27,10 +27,19 @@ interface Product {
 interface EditProductFormData {
   title: string;
   description: string;
-  price: number | string; // Updated to allow for string price
+  price: number | string;
   category: string;
   imageUrl?: string;
 }
+
+interface StripeAccountStatus {
+  status: "enabled" | "pending" | "disabled";
+  details: {
+    chargesEnabled: boolean;
+    payoutsEnabled: boolean;
+  };
+}
+
 
 export default function VendorDashboard() {
   const queryClient = useQueryClient();
@@ -42,8 +51,8 @@ export default function VendorDashboard() {
   const [previewUrl, setPreviewUrl] = useState<string>();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Query for products
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ["/api/products"],
     select: (data) => {
@@ -55,7 +64,6 @@ export default function VendorDashboard() {
     enabled: !!user?.id,
   });
 
-  // Form handling
   const editForm = useForm<EditProductFormData>();
   const accountForm = useForm({
     defaultValues: {
@@ -66,7 +74,6 @@ export default function VendorDashboard() {
     },
   });
 
-  // File upload handler
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -142,7 +149,6 @@ export default function VendorDashboard() {
     }
   }, [editingProduct, editForm]);
 
-  // Account update mutation
   const updateAccountMutation = useMutation({
     mutationFn: async (data: {
       username: string;
@@ -180,7 +186,6 @@ export default function VendorDashboard() {
     },
   });
 
-  // Product mutations
   const updateProductMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: EditProductFormData }) => {
       const res = await apiRequest("PATCH", `/api/products/${id}`, data);
@@ -238,6 +243,43 @@ export default function VendorDashboard() {
     },
   });
 
+  const { data: accountStatus, isLoading: statusLoading } = useQuery<StripeAccountStatus>({
+    queryKey: ["/api/vendor/stripe/account/status"],
+    enabled: user?.stripeAccountId !== undefined,
+  });
+
+  const setupAccountMutation = useMutation({
+    mutationFn: async () => {
+      setIsLoading(true);
+      const response = await apiRequest("POST", "/api/vendor/stripe/account", {
+        email: user?.username,
+      });
+      if (!response.ok) {
+        throw new Error("Failed to create Stripe account");
+      }
+      const data = await response.json();
+      window.location.href = data.onboardingUrl;
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+      setIsLoading(false);
+    },
+  });
+
+  const getStatusBadge = () => {
+    if (statusLoading) return <Loader2 className="h-4 w-4 animate-spin" />;
+    if (!accountStatus) return <AlertCircle className="h-4 w-4 text-yellow-500" />;
+    return accountStatus?.status === "enabled" ? (
+      <CheckCircle2 className="h-4 w-4 text-green-500" />
+    ) : (
+      <AlertCircle className="h-4 w-4 text-yellow-500" />
+    );
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <h1 className="text-3xl font-bold mb-8">Vendor Dashboard</h1>
@@ -252,10 +294,13 @@ export default function VendorDashboard() {
             <Settings className="h-4 w-4" />
             Settings
           </TabsTrigger>
-          {/* Added Store Profile Tab */}
           <TabsTrigger value="store" className="flex items-center gap-2">
             <Store className="h-4 w-4" />
             Store Profile
+          </TabsTrigger>
+          <TabsTrigger value="payments" className="flex items-center gap-2">
+            <Store className="h-4 w-4" />
+            Payments Setup
           </TabsTrigger>
         </TabsList>
 
@@ -450,7 +495,6 @@ export default function VendorDashboard() {
           </Dialog>
         </TabsContent>
 
-        {/* Re-added Store Profile Tab Content */}
         <TabsContent value="store">
           <Card>
             <CardHeader>
@@ -595,6 +639,71 @@ export default function VendorDashboard() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="payments">
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                Payment Account Status {getStatusBadge()}
+              </CardTitle>
+              <CardDescription>
+                Set up your Stripe account to receive payments from customers
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!user?.stripeAccountId ? (
+                <div>
+                  <p className="mb-4">
+                    You haven't set up your payment account yet. Set up Stripe to start
+                    receiving payments for your products.
+                  </p>
+                  <Button
+                    onClick={() => setupAccountMutation.mutate()}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Setting up...
+                      </>
+                    ) : (
+                      "Set up Stripe Account"
+                    )}
+                  </Button>
+                </div>
+              ) : accountStatus?.status === "enabled" ? (
+                <div className="space-y-2">
+                  <p className="text-green-600 font-medium">
+                    Your Stripe account is fully set up and ready to receive payments!
+                  </p>
+                  <dl className="space-y-1">
+                    <div className="flex gap-2">
+                      <dt className="font-medium">Charges Enabled:</dt>
+                      <dd>{accountStatus.details.chargesEnabled ? "Yes" : "No"}</dd>
+                    </div>
+                    <div className="flex gap-2">
+                      <dt className="font-medium">Payouts Enabled:</dt>
+                      <dd>{accountStatus.details.payoutsEnabled ? "Yes" : "No"}</dd>
+                    </div>
+                  </dl>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-yellow-600 mb-4">
+                    Your Stripe account setup is pending. Please complete the
+                    onboarding process to start receiving payments.
+                  </p>
+                  <Button
+                    onClick={() => setupAccountMutation.mutate()}
+                    disabled={isLoading}
+                  >
+                    Complete Stripe Setup
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
