@@ -63,8 +63,7 @@ export function MessageDialog({
   const markAsReadMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", `/api/leads/${leadId}/messages/read`, {
-        receiverId: user?.id,
-        leadId
+        receiver_id: user?.id,
       });
 
       if (!response.ok) {
@@ -92,7 +91,7 @@ export function MessageDialog({
       console.error("Error marking messages as read:", error);
       toast({
         title: "Error",
-        description: "Failed to mark messages as read. Please try again.",
+        description: error.message || "Failed to mark messages as read",
         variant: "destructive"
       });
     }
@@ -134,13 +133,13 @@ export function MessageDialog({
         m.sender.id !== user?.id && !m.read
       );
 
-      if (hasUnreadMessages) {
+      if (hasUnreadMessages && user) {
         markAsReadMutation.mutate();
       }
 
       return () => clearTimeout(scrollTimer);
     }
-  }, [isOpen, messages]);
+  }, [isOpen, messages, user]);
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
@@ -167,7 +166,7 @@ export function MessageDialog({
       console.error("Failed to send message:", error);
       toast({
         title: "Error",
-        description: "Failed to send message. Please try again.",
+        description: error.message || "Failed to send message",
         variant: "destructive"
       });
     },
@@ -190,7 +189,8 @@ export function MessageDialog({
       <div className="flex flex-col h-[400px]">
         <div 
           ref={messagesContainerRef}
-          className="flex-1 overflow-y-auto p-4 scroll-smooth"
+          className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth"
+          id="message-container"
         >
           {isLoading ? (
             <div className="flex items-center justify-center h-full">
