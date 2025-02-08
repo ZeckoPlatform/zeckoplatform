@@ -305,7 +305,7 @@ export default function LeadsPage() {
   } = useQuery<LeadWithUnreadCount[]>({
     queryKey: ["/api/leads"],
     queryFn: async () => {
-      const response = await fetch("/api/leads");
+      const response = await apiRequest("GET", "/api/leads");
       if (!response.ok) {
         throw new Error("Failed to fetch leads");
       }
