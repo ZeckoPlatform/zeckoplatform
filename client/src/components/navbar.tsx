@@ -27,7 +27,7 @@ export default function Navbar() {
   const getDashboardLink = () => {
     switch (user?.userType) {
       case "vendor":
-        return "/vendor";
+        return "/vendor/dashboard";
       case "business":
       case "free":
         return "/leads";
@@ -61,7 +61,7 @@ export default function Navbar() {
                 {user?.userType === "vendor" && (
                   <NavigationMenuItem>
                     <NavigationMenuLink asChild>
-                      <Link href="/vendor">Vendor Dashboard</Link>
+                      <Link href="/vendor/dashboard">Vendor Dashboard</Link>
                     </NavigationMenuLink>
                   </NavigationMenuItem>
                 )}
