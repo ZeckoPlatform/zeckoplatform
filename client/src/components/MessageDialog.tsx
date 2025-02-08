@@ -78,14 +78,12 @@ export function MessageDialog({
       return response.json();
     },
     onSuccess: () => {
-      // Update message read status in cache
       queryClient.setQueryData<Message[]>(messagesQueryKey, oldMessages => 
         oldMessages?.map(m => ({
           ...m,
           read: m.sender.id !== user?.id ? true : m.read
         }))
       );
-      // Invalidate queries to refresh unread counts
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       if (onMessagesRead) {
         onMessagesRead();
@@ -104,10 +102,7 @@ export function MessageDialog({
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
     if (messagesContainerRef.current) {
       const container = messagesContainerRef.current;
-      container.scrollTo({
-        top: container.scrollHeight,
-        behavior
-      });
+      container.scrollTop = container.scrollHeight;
     }
   };
 
@@ -125,12 +120,12 @@ export function MessageDialog({
 
   // Effect for initial load and dialog open
   useEffect(() => {
-    if (isOpen) {
-      // Initial scroll when dialog opens
-      const scrollTimer = setTimeout(() => {
+    if (isOpen && messages.length > 0) {
+      // Use requestAnimationFrame to ensure the DOM is ready
+      requestAnimationFrame(() => {
         scrollToBottom("instant");
         isFirstLoadRef.current = false;
-      }, 100);
+      });
 
       // Mark messages as read when dialog opens
       const hasUnreadMessages = messages.some(m => 
@@ -140,10 +135,19 @@ export function MessageDialog({
       if (hasUnreadMessages && user?.id) {
         markAsReadMutation.mutate();
       }
-
-      return () => clearTimeout(scrollTimer);
     }
   }, [isOpen, messages, user?.id, leadId]);
+
+  // Check for unread messages on mount
+  useEffect(() => {
+    const unreadMessages = messages.filter(m => !m.read && m.sender.id !== user?.id);
+    if (unreadMessages.length > 0 && !isOpen) {
+      toast({
+        title: "New Messages",
+        description: `You have ${unreadMessages.length} unread messages`,
+      });
+    }
+  }, [messages, isOpen, user?.id]);
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
@@ -160,11 +164,10 @@ export function MessageDialog({
     onSuccess: (newMessage) => {
       setNewMessage("");
       playNotification('send');
-      // Update cache with new message
       queryClient.setQueryData<Message[]>(messagesQueryKey, (old = []) => [...old, newMessage]);
-      // Invalidate to ensure consistency
       queryClient.invalidateQueries({ queryKey: messagesQueryKey });
-      setTimeout(() => scrollToBottom(), 100);
+      // Use requestAnimationFrame for smooth scrolling after message is sent
+      requestAnimationFrame(() => scrollToBottom());
     },
     onError: (error: Error) => {
       console.error("Failed to send message:", error);
