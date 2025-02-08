@@ -57,7 +57,7 @@ export function MessageDialog({
     enabled: isOpen,
     refetchInterval: isOpen ? 3000 : false,
     staleTime: 0,
-    gcTime: Infinity, // Keep messages in cache indefinitely
+    gcTime: Infinity,
   });
 
   const markAsReadMutation = useMutation({
@@ -99,35 +99,28 @@ export function MessageDialog({
     }
   });
 
-  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+  const scrollToBottom = () => {
     if (messagesContainerRef.current) {
       const container = messagesContainerRef.current;
-      container.scrollTop = container.scrollHeight;
+      const scrollHeight = container.scrollHeight;
+      const height = container.clientHeight;
+      const maxScrollTop = scrollHeight - height;
+      container.style.scrollBehavior = 'smooth';
+      container.scrollTop = maxScrollTop > 0 ? maxScrollTop : 0;
     }
   };
 
-  // Effect for handling new messages and notifications
-  useEffect(() => {
-    if (messages.length > previousMessagesLengthRef.current && !isFirstLoadRef.current) {
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage?.sender?.id !== user?.id) {
-        playNotification('receive');
-      }
-      scrollToBottom();
-    }
-    previousMessagesLengthRef.current = messages.length;
-  }, [messages, user?.id, playNotification]);
-
-  // Effect for initial load and dialog open
   useEffect(() => {
     if (isOpen && messages.length > 0) {
-      // Use requestAnimationFrame to ensure the DOM is ready
-      requestAnimationFrame(() => {
-        scrollToBottom("instant");
+      const timer = setTimeout(() => {
+        if (messagesContainerRef.current) {
+          messagesContainerRef.current.style.scrollBehavior = 'auto';
+          scrollToBottom();
+          messagesContainerRef.current.style.scrollBehavior = 'smooth';
+        }
         isFirstLoadRef.current = false;
-      });
+      }, 100);
 
-      // Mark messages as read when dialog opens
       const hasUnreadMessages = messages.some(m => 
         m.sender.id !== user?.id && !m.read
       );
@@ -135,18 +128,31 @@ export function MessageDialog({
       if (hasUnreadMessages && user?.id) {
         markAsReadMutation.mutate();
       }
-    }
-  }, [isOpen, messages, user?.id, leadId]);
 
-  // Check for unread messages on mount
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, messages, user?.id]);
+
   useEffect(() => {
     const unreadMessages = messages.filter(m => !m.read && m.sender.id !== user?.id);
+
     if (unreadMessages.length > 0 && !isOpen) {
       toast({
         title: "New Messages",
-        description: `You have ${unreadMessages.length} unread messages`,
+        description: `You have ${unreadMessages.length} new unread message${unreadMessages.length > 1 ? 's' : ''}`,
+        variant: "default",
+        duration: 5000,
       });
+      playNotification('receive');
     }
+
+    if (messages.length > previousMessagesLengthRef.current && !isFirstLoadRef.current) {
+      scrollToBottom();
+      if (messages[messages.length - 1]?.sender?.id !== user?.id) {
+        playNotification('receive');
+      }
+    }
+    previousMessagesLengthRef.current = messages.length;
   }, [messages, isOpen, user?.id]);
 
   const sendMessageMutation = useMutation({
@@ -166,8 +172,7 @@ export function MessageDialog({
       playNotification('send');
       queryClient.setQueryData<Message[]>(messagesQueryKey, (old = []) => [...old, newMessage]);
       queryClient.invalidateQueries({ queryKey: messagesQueryKey });
-      // Use requestAnimationFrame for smooth scrolling after message is sent
-      requestAnimationFrame(() => scrollToBottom());
+      setTimeout(scrollToBottom, 100);
     },
     onError: (error: Error) => {
       console.error("Failed to send message:", error);
@@ -197,7 +202,7 @@ export function MessageDialog({
         <div 
           ref={messagesContainerRef}
           className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth"
-          id="message-container"
+          style={{ scrollBehavior: 'smooth' }}
         >
           {isLoading ? (
             <div className="flex items-center justify-center h-full">
