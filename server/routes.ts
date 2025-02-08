@@ -691,19 +691,26 @@ export function registerRoutes(app: Express): Server {
       const leadId = parseInt(req.params.leadId);
       log(`Marking messages as read for lead ${leadId} and user ${req.user.id}`);
 
-      // Update all unread messages for this user in this lead using correct column names
-      const result = await db
-        .update(messages)
-        .set({ read: true })
-        .where(
-          and(
-            eq(messages.lead_id, leadId),
-            eq(messages.receiver_id, req.user.id)
+      // Update all unread messages for this user in this lead
+      const result = await db.transaction(async (tx) => {
+        return await tx
+          .update(messages)
+          .set({ read: true })
+          .where(
+            and(
+              eq(messages.lead_id, leadId),
+              eq(messages.receiver_id, req.user.id),
+              eq(messages.read, false)
+            )
           )
-        )
-        .returning();
+          .returning();
+      });
 
       log(`Marked ${result.length} messages as read`);
+
+      // Invalidate the leads cache to update unread counts
+      await queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+
       res.json({ success: true, updatedCount: result.length });
     } catch (error) {
       log(`Mark messages read error: ${error instanceof Error ? error.message : String(error)}`);

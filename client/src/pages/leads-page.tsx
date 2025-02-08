@@ -951,7 +951,7 @@ export default function LeadsPage() {
                                   leadId={lead.id}
                                   receiverId={response.business_id}
                                   onClose={() => queryClient.invalidateQueries({ queryKey: ["/api/leads"] })}
-                                />                              </Dialog>
+                               />                              </Dialog>
                             </div>
                           )}
 
