@@ -2,18 +2,6 @@ import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizz
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
 
-export enum UserType {
-  FREE = 'free',
-  BUSINESS = 'business',
-  VENDOR = 'vendor'
-}
-
-export enum SubscriptionTier {
-  NONE = 'none',
-  BUSINESS = 'business',
-  VENDOR = 'vendor'
-}
-
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").unique().notNull(),
@@ -26,9 +14,6 @@ export const users = pgTable("users", {
   stripeAccountStatus: text("stripe_account_status", { 
     enum: ["pending", "enabled", "disabled"] 
   }).default("pending"),
-  verificationStatus: text("verification_status", {
-    enum: ["pending", "verified", "rejected"]
-  }).default("pending"),
   profile: jsonb("profile").$type<{
     name?: string;
     description?: string;
@@ -38,35 +23,6 @@ export const users = pgTable("users", {
       preferredCategories?: string[];
       locationPreference?: string[];
       budgetRange?: { min: number; max: number };
-    };
-    // Business verification fields
-    businessType?: "registered" | "selfEmployed";
-    companyNumber?: string;
-    vatNumber?: string;
-    utrNumber?: string;
-    verificationDocuments?: Array<{
-      type: string;
-      url: string;
-      uploadedAt: string;
-      status: "pending" | "verified" | "rejected";
-    }>;
-    // Vendor specific fields
-    services?: string[];
-    portfolio?: Array<{
-      title: string;
-      description: string;
-      imageUrl?: string;
-      completionDate?: string;
-    }>;
-    ratings?: Array<{
-      rating: number;
-      comment?: string;
-      date: string;
-    }>;
-    averageRating?: number;
-    paymentPreferences?: {
-      defaultMethod: "stripe" | "direct_debit";
-      autoRenew: boolean;
     };
   }>(),
 });
