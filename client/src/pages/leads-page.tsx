@@ -542,14 +542,6 @@ export default function LeadsPage() {
     }, [messages, user?.id, playNotification]);
 
 
-    if (isLoadingLeads) {
-      return (
-        <div className="flex items-center justify-center min-h-[200px]">
-          <Loader className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      );
-    }
-
     if (!user?.subscriptionActive) {
       return (
         <Card>
@@ -989,18 +981,18 @@ export default function LeadsPage() {
                                     </DialogDescription>
                                   </DialogHeader>
                                   <form onSubmit={acceptProposalForm.handleSubmit((data) => {
-                                    if (selectedResponse && selectedLead) {
-                                      acceptProposalMutation.mutate({
-                                        responseId: selectedResponse.id,
-                                        contactDetails: data.contactDetails
-                                      });
-                                    } else {
-                                      toast({
-                                        title: "Error",
-                                        description: "Missing lead or response information",
-                                        variant: "destructive",
-                                      });                                    }
-                                  })}>
+                                      if (selectedResponse && selectedLead) {
+                                        acceptProposalMutation.mutate({
+                                          responseId: selectedResponse.id,
+                                          contactDetails: data.contactDetails
+                                        });
+                                      } else {
+                                        toast({
+                                          title: "Error",
+                                          description: "Missing lead or response information",
+                                          variant: "destructive",
+                                        });                                    }
+                                    })}>
                                     <div className="space-y-4">
                                       <div>
                                         <Label htmlFor="contactDetails">Contact Details</Label>
