@@ -164,7 +164,7 @@ export function registerRoutes(app: Express): Server {
 
       // For free users, only show their own leads
       if (req.user.userType === "free") {
-        const leads = await db.query.leads.findMany({
+        const userLeads = await db.query.leads.findMany({
           where: eq(leads.user_id, req.user.id),
           with: {
             responses: {
@@ -181,7 +181,7 @@ export function registerRoutes(app: Express): Server {
           }
         });
 
-        const processedLeads = leads.map(lead => ({
+        const processedLeads = userLeads.map(lead => ({
           ...lead,
           unreadMessages: lead.messages?.filter(m => !m.read).length || 0,
           messages: undefined
@@ -197,11 +197,11 @@ export function registerRoutes(app: Express): Server {
           return res.status(403).json({ 
             message: "Active subscription required to view leads",
             subscriptionRequired: true,
-            userType: req.user.userType 
+            userType: req.user.userType
           });
         }
 
-        const leads = await db.query.leads.findMany({
+        const businessLeads = await db.query.leads.findMany({
           where: eq(leads.status, "open"),
           with: {
             responses: {
@@ -218,7 +218,7 @@ export function registerRoutes(app: Express): Server {
           }
         });
 
-        const processedLeads = leads.map(lead => ({
+        const processedLeads = businessLeads.map(lead => ({
           ...lead,
           unreadMessages: lead.messages?.filter(m => !m.read).length || 0,
           messages: undefined

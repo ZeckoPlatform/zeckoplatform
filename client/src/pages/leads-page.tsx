@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
 import { Redirect } from "wouter";
 import { Loader2 } from "lucide-react";
@@ -15,7 +15,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2 as Loader, Settings, Edit, Trash2, Send, AlertTriangle, Info } from "lucide-react";
+import { Settings, Edit, Trash2, Send, AlertTriangle, Info } from "lucide-react";
 import type { SelectLead, SelectUser, SelectMessage } from "@db/schema";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -131,19 +131,22 @@ interface LeadWithUnreadCount extends SelectLead {
 
 export default function LeadsPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [editingLead, setEditingLead] = useState<LeadWithUnreadCount | null>(null);
+  const [selectedLead, setSelectedLead] = useState<SelectLead | null>(null);
+  const [proposalDialogOpen, setProposalDialogOpen] = useState(false);
+  const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
+  const [selectedResponse, setSelectedResponse] = useState<any>(null);
+  const playNotification = useNotificationSound();
+  const initialLoadRef = useRef(true);
 
   // If user is not logged in, redirect to auth page
   if (!user) {
     return <Redirect to="/auth" />;
   }
 
-  const { toast } = useToast();
-  const [editingLead, setEditingLead] = useState<LeadWithUnreadCount | null>(null);
-  const playNotification = useNotificationSound();
-  const initialLoadRef = useRef(true);
-
-
+  // Forms setup
   const form = useForm<LeadFormData>({
     defaultValues: {
       title: "",
@@ -289,7 +292,7 @@ export default function LeadsPage() {
     },
   });
 
-  // Update the leads query to handle notifications and subscription errors
+  // Update the leads query to properly handle subscription errors
   const {
     data: leads = [],
     isLoading: isLoadingLeads,
@@ -300,47 +303,24 @@ export default function LeadsPage() {
       try {
         const response = await apiRequest("GET", "/api/leads");
         if (!response.ok) {
+          const errorData = await response.json();
+          if (errorData.subscriptionRequired) {
+            setShowSubscriptionModal(true);
+            throw new Error("Subscription required");
+          }
           throw new Error("Failed to fetch leads");
         }
-        const data = await response.json();
-        return data as LeadWithUnreadCount[];
+        return await response.json();
       } catch (error: any) {
-        if (error?.name === "SubscriptionRequiredError") {
+        if (error.subscriptionRequired ||
+            (error.response && error.response.status === 403 && error.response.data?.subscriptionRequired)) {
           setShowSubscriptionModal(true);
         }
         throw error;
       }
     },
     enabled: !!user,
-    onSuccess: (data) => {
-      const totalUnreadCount = data.reduce((sum, lead) => sum + (lead.unreadMessages || 0), 0);
-
-      // Only show notification and play sound if there are unread messages and it's not the initial load
-      if (totalUnreadCount > 0 && !initialLoadRef.current) {
-        toast({
-          title: "New Message",
-          description: `You have ${totalUnreadCount} new message${totalUnreadCount === 1 ? '' : 's'}`,
-          duration: 5000,
-        });
-        playNotification('receive');
-      } else if (totalUnreadCount > 0 && initialLoadRef.current) {
-        // Show welcome back message with unread count only on initial load
-        toast({
-          title: "Welcome back!",
-          description: `You have ${totalUnreadCount} unread message${totalUnreadCount === 1 ? '' : 's'}`,
-          duration: 5000,
-        });
-      }
-
-      initialLoadRef.current = false;
-    },
-    refetchInterval: 5000, // Poll every 5 seconds for new messages
-    staleTime: 0,
-    gcTime: Infinity, // Keep messages in cache indefinitely
-    retry: (failureCount, error: any) => {
-      if (error?.name === "SubscriptionRequiredError") return false;
-      return failureCount < 3;
-    }
+    retry: false
   });
 
   const createLeadMutation = useMutation({
@@ -450,16 +430,12 @@ export default function LeadsPage() {
     },
   });
 
-  const [selectedLead, setSelectedLead] = useState<SelectLead | null>(null);
-  const [proposalDialogOpen, setProposalDialogOpen] = useState(false);
+
   const proposalForm = useForm<ProposalFormData>({
     defaultValues: {
       proposal: "",
     },
   });
-
-  const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
-  const [selectedResponse, setSelectedResponse] = useState<any>(null);
 
   const acceptProposalForm = useForm<AcceptProposalData>({
     defaultValues: {
@@ -492,19 +468,6 @@ export default function LeadsPage() {
       });
     },
   });
-
-
-  if (isLoadingLeads) {
-    return (
-      <div className="flex items-center justify-center min-h-[200px]">
-        <Loader className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  const userLeadsFiltered = user?.userType === "business"
-    ? leads
-    : leads.filter(lead => lead.user_id === user?.id);
 
   const BusinessLeadsView = () => {
     const isFirstLoadRef = useRef(true);
@@ -727,7 +690,7 @@ export default function LeadsPage() {
                               >
                                 {sendProposalMutation.isPending ? (
                                   <>
-                                    <Loader className="mr-2 h-4 w-4 animate-spin" />
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                     Sending...
                                   </>
                                 ) : (
@@ -874,7 +837,7 @@ export default function LeadsPage() {
                             >
                               {updateLeadMutation.isPending ? (
                                 <>
-                                  <Loader className="mr-2 h-4 w-4 animate-spin" />
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                   Saving...
                                 </>
                               ) : (
@@ -981,18 +944,19 @@ export default function LeadsPage() {
                                     </DialogDescription>
                                   </DialogHeader>
                                   <form onSubmit={acceptProposalForm.handleSubmit((data) => {
-                                      if (selectedResponse && selectedLead) {
-                                        acceptProposalMutation.mutate({
-                                          responseId: selectedResponse.id,
-                                          contactDetails: data.contactDetails
-                                        });
-                                      } else {
-                                        toast({
-                                          title: "Error",
-                                          description: "Missing lead or response information",
-                                          variant: "destructive",
-                                        });                                    }
-                                    })}>
+                                    if (selectedResponse && selectedLead) {
+                                      acceptProposalMutation.mutate({
+                                        responseId: selectedResponse.id,
+                                        contactDetails: data.contactDetails
+                                      });
+                                    } else {
+                                      toast({
+                                        title: "Error",
+                                        description: "Missing lead or response information",
+                                        variant: "destructive",
+                                      });
+                                    }
+                                  })}>
                                     <div className="space-y-4">
                                       <div>
                                         <Label htmlFor="contactDetails">Contact Details</Label>
@@ -1011,7 +975,7 @@ export default function LeadsPage() {
                                       >
                                         {acceptProposalMutation.isPending ? (
                                           <>
-                                            <Loader className="mr-2 h-4 w-4 animate-spin" />
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                             Accepting...
                                           </>
                                         ) : (
@@ -1068,219 +1032,207 @@ export default function LeadsPage() {
       </TabsContent>
     </Tabs>
   );
+};
 
-  const CreateLeadForm = () => (
-    <form
-      onSubmit={form.handleSubmit((data) => createLeadMutation.mutate(data))}
-      className="space-y-4 max-w-md mx-auto"
+const CreateLeadForm = () => (
+  <form
+    onSubmit={form.handleSubmit((data) => createLeadMutation.mutate(data))}
+    className="space-y-4"
+  >
+    <div>
+      <Label htmlFor="title">Title</Label>
+      <Input
+        id="title"
+        {...form.register("title")}
+        required
+      />
+    </div>
+    <div>
+      <Label htmlFor="description">Description</Label>
+      <Textarea
+        id="description"
+        {...form.register("description")}
+        required
+      />
+    </div>
+    <div>
+      <Label htmlFor="category">Category</Label>
+      <Input
+        id="category"
+        {...form.register("category")}
+        required
+      />
+    </div>
+    <div>
+      <Label htmlFor="budget">Budget (£)</Label>
+      <Input
+        id="budget"
+        type="number"
+        {...form.register("budget")}
+        required
+      />
+    </div>
+    <div>
+      <Label htmlFor="location">Location</Label>
+      <Input
+        id="location"
+        {...form.register("location")}
+        required
+      />
+    </div>
+    <Button
+      type="submit"
+      className="w-full"
+      disabled={createLeadMutation.isPending}
     >
-      <div>
-        <Label htmlFor="title">Title</Label>
-        <Input id="title" {...form.register("title")} required />
-      </div>
-      <div>
-        <Label htmlFor="description">Description</Label>
-        <Textarea
-          id="description"
-          {...form.register("description")}
-          required
-        />
-      </div>
-      <div>
-        <Label htmlFor="category">Category</Label>
-        <Input id="category" {...form.register("category")} required />
-      </div>
-      <div>
-        <Label htmlFor="budget">Budget (£)</Label>
-        <Input
-          id="budget"
-          type="number"
-          {...form.register("budget")}
-          required
-        />
-      </div>
-      <div>
-        <Label htmlFor="location">Location</Label>
-        <Input id="location" {...form.register("location")} required />
-      </div>
-      <Button
-        type="submit"
-        className="w-full"
-        disabled={createLeadMutation.isPending}
-      >
-        {createLeadMutation.isPending ? (
-          <>
-            <Loader className="mr-2 h-4 w-4 animate-spin" />
-            Posting...
-          </>
-        ) : (
-          'Post Lead'
-        )}
-      </Button>
-    </form>);
+      {createLeadMutation.isPending ? (
+        <>
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          Posting...
+        </>
+      ) : (
+        'Post Lead'
+      )}
+    </Button>
+  </form>
+);
 
+if (isLoadingLeads) {
   return (
-    <div className="container max-w-7xl mx-auto p-6 space-y-8">
-      <div className="mb-8">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-3xl font-bold">Dashboard</h1>
-            {user?.profile?.name && (
-              <p className="text-muted-foreground">
-                Welcome back, {user.profile.name}
-              </p>
-            )}
-          </div>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="flex items-center gap-2">
-                <Settings className="h-4 w-4" />
-                Account Settings
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Account Settings</DialogTitle>
-              </DialogHeader>
-              <Tabs defaultValue="profile">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="profile">Profile</TabsTrigger>
-                  <TabsTrigger value="username">Username</TabsTrigger>
-                  <TabsTrigger value="password">Password</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="profile">
-                  <form onSubmit={profileForm.handleSubmit((data) => updateProfileMutation.mutate(data))} className="space-y-4">
-                    <div>
-                      <Label htmlFor="name">Display Name</Label>
-                      <Input id="name" {...profileForm.register("name")} />
-                    </div>
-                    <div>
-                      <Label htmlFor="description">Description</Label>
-                      <Textarea id="description" {...profileForm.register("description")} />
-                    </div>
-                    <div>
-                      <Label htmlFor="categories">Categories (comma-separated)</Label>
-                      <Input id="categories" {...profileForm.register("categories")} />
-                    </div>
-                    <div>
-                      <Label htmlFor="location">Location</Label>
-                      <Input id="location" {...profileForm.register("location")} />
-                    </div>
-                    <Button type="submit" className="w-full" disabled={updateProfileMutation.isPending}>
-                      {updateProfileMutation.isPending ? (
-                        <>
-                          <Loader className="mr-2 h-4 w-4 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        'Save Profile'
-                      )}
-                    </Button>
-                  </form>
-                </TabsContent>
-
-                <TabsContent value="username">
-                  <form onSubmit={usernameForm.handleSubmit((data) => updateUsernameMutation.mutate(data))} className="space-y-4">
-                    <div>
-                      <Label htmlFor="username">Username</Label>
-                      <Input id="username" {...usernameForm.register("username")} required />
-                    </div>
-                    <Button type="submit" className="w-full" disabled={updateUsernameMutation.isPending}>
-                      {updateUsernameMutation.isPending ? (
-                        <>
-                          <Loader className="mr-2 h-4 w-4 animate-spin" />
-                          Updating...
-                        </>
-                      ) : (
-                        'Update Username'
-                      )}
-                    </Button>
-                  </form>
-                </TabsContent>
-
-                <TabsContent value="password">
-                  <form onSubmit={passwordForm.handleSubmit((data) => updatePasswordMutation.mutate(data))} className="space-y-4">
-                    <div>
-                      <Label htmlFor="currentPassword">Current Password</Label>
-                      <Input
-                        id="currentPassword"
-                        type="password"
-                        {...passwordForm.register("currentPassword")}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="newPassword">New Password</Label>
-                      <Input
-                        id="newPassword"
-                        type="password"
-                        {...passwordForm.register("newPassword")}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                      <Input
-                        id="confirmPassword"
-                        type="password"
-                        {...passwordForm.register("confirmPassword")}
-                        required
-                      />
-                    </div>
-                    <Button type="submit" className="w-full" disabled={updatePasswordMutation.isPending}>
-                      {updatePasswordMutation.isPending ? (
-                        <>
-                          <Loader className="mr-2 h-4 w-4 animate-spin" />
-                          Updating...
-                        </>
-                      ) : (
-                        'Update Password'
-                      )}
-                    </Button>
-                  </form>
-                </TabsContent>
-              </Tabs>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
-          <Card>
-            <CardHeader><CardTitle className="text-lg">
-                {user?.userType === "business" ? "Available Leads" : "Total Leads"}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">{userLeadsFiltered?.length || 0}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">
-                {user?.userType === "business" ? "Matching Leads" : "Active Leads"}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">
-                {userLeadsFiltered?.filter(lead => lead.status === "open")?.length || 0}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">
-                {user?.userType === "business" ? "Proposals Sent" : "Total Responses"}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">0</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {user?.userType === "business" ? <BusinessLeadsView /> : <FreeUserLeadsView />}
-      </div>
+    <div className="flex items-center justify-center min-h-[200px]">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   );
+}
+
+const userLeadsFiltered = user?.userType === "business"
+  ? leads
+  : leads.filter(lead => lead.user_id === user?.id);
+
+return (
+  <div className="container max-w-7xl mx-auto p-6 space-y-8">
+    <div className="flex justify-between items-center">
+      <h1 className="text-3xl font-bold">Leads Dashboard</h1>
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button variant="outline">
+            <Settings className="h-4 w-4 mr-2" />
+            Settings
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Profile Settings</DialogTitle>
+          </DialogHeader>
+          <Tabs defaultValue="profile">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="profile">Profile</TabsTrigger>
+              <TabsTrigger value="username">Username</TabsTrigger>
+              <TabsTrigger value="password">Password</TabsTrigger>
+            </TabsList>
+            <TabsContent value="profile">
+              <form onSubmit={profileForm.handleSubmit((data) => updateProfileMutation.mutate(data))} className="space-y-4">
+                <div>
+                  <Label htmlFor="name">Display Name</Label>
+                  <Input id="name" {...profileForm.register("name")} />
+                </div>
+                <div>
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea id="description" {...profileForm.register("description")} />
+                </div>
+                <div>
+                  <Label htmlFor="categories">Categories (comma-separated)</Label>
+                  <Input id="categories" {...profileForm.register("categories")} />
+                </div>
+                <div>
+                  <Label htmlFor="location">Location</Label>
+                  <Input id="location" {...profileForm.register("location")} />
+                </div>
+                <Button type="submit" className="w-full" disabled={updateProfileMutation.isPending}>
+                  {updateProfileMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Profile'
+                  )}
+                </Button>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="username">
+              <form onSubmit={usernameForm.handleSubmit((data) => updateUsernameMutation.mutate(data))} className="space-y-4">
+                <div>
+                  <Label htmlFor="username">Username</Label>
+                  <Input id="username" {...usernameForm.register("username")} required />
+                </div>
+                <Button type="submit" className="w-full" disabled={updateUsernameMutation.isPending}>
+                  {updateUsernameMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    'Update Username'
+                  )}
+                </Button>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="password">
+              <form onSubmit={passwordForm.handleSubmit((data) => updatePasswordMutation.mutate(data))} className="space-y-4">
+                <div>
+                  <Label htmlFor="currentPassword">Current Password</Label>
+                  <Input
+                    id="currentPassword"
+                    type="password"
+                    {...passwordForm.register("currentPassword")}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="newPassword">New Password</Label>
+                  <Input
+                    id="newPassword"
+                    type="password"
+                    {...passwordForm.register("newPassword")}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    {...passwordForm.register("confirmPassword")}
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={updatePasswordMutation.isPending}>
+                  {updatePasswordMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    'Update Password'
+                  )}
+                </Button>
+              </form>
+            </TabsContent>
+          </Tabs>
+        </DialogContent>
+      </Dialog>
+    </div>
+
+    {user?.userType === "business" ? <BusinessLeadsView /> : <FreeUserLeadsView />}
+
+    <SubscriptionRequiredModal
+      isOpen={showSubscriptionModal}
+      onClose={() => setShowSubscriptionModal(false)}
+      userType={user.userType}
+    />
+  </div>
+);
 }

@@ -65,15 +65,13 @@ router.post("/subscriptions", authenticateToken, async (req, res) => {
       success_url: `${req.protocol}://${req.get("host")}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.protocol}://${req.get("host")}/subscription`,
       customer_email: req.user?.email,
-      subscription_data: {
-        trial_period_days: 30,
-        metadata: {
-          userId: req.user?.id,
-          tier,
-          paymentFrequency,
-        },
+      metadata: {
+        userId: req.user?.id,
+        tier,
+        paymentFrequency,
       },
       automatic_tax: { enabled: true },
+      trial_period_days: 30,
     });
 
     // Update user's subscription status to pending
@@ -96,10 +94,14 @@ router.post("/subscriptions", authenticateToken, async (req, res) => {
 
 router.get("/subscriptions/current", authenticateToken, async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
     const [user] = await db
       .select()
       .from(users)
-      .where(eq(users.id, req.user!.id))
+      .where(eq(users.id, req.user.id))
       .limit(1);
 
     return res.json({
