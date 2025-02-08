@@ -87,7 +87,7 @@ const calculateMatchScore = (lead: SelectLead, user: SelectUser | null): {
   return { totalScore, categoryScore, locationScore, budgetScore, industryScore };
 };
 
-// Add this component
+// Update MessageDialogContent
 function MessageDialogContent({
   leadId,
   receiverId,
@@ -97,7 +97,7 @@ function MessageDialogContent({
   receiverId: number;
   onClose?: () => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true); // Start with dialog open
 
   // Handle dialog state changes
   const handleOpenChange = (newOpen: boolean) => {
@@ -508,7 +508,7 @@ export default function LeadsPage() {
       },
       enabled: !!selectedLead
     });
-  
+
     useEffect(() => {
       if (messages.length > previousMessagesLengthRef.current && !isFirstLoadRef.current) {
         const lastMessage = messages[messages.length - 1];

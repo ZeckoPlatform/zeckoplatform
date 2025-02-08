@@ -55,7 +55,7 @@ export function MessageDialog({
     enabled: isOpen,
     refetchInterval: isOpen ? 3000 : false,
     staleTime: 0,
-    gcTime: Infinity, // Keep messages in cache indefinitely (renamed from cacheTime in v5)
+    gcTime: Infinity, // Keep messages in cache indefinitely
   });
 
   const scrollToBottom = () => {
@@ -79,56 +79,47 @@ export function MessageDialog({
 
   // Effect for initial load and dialog open
   useEffect(() => {
-    if (isOpen && messages.length > 0) {
+    if (isOpen) {
       // Delay scroll to ensure DOM is ready
       const timer = setTimeout(() => {
         scrollToBottom();
-      }, 300);
+      }, 100);
 
-      if (isFirstLoadRef.current) {
-        isFirstLoadRef.current = false;
-      }
+      // Mark messages as read when dialog opens
+      const markMessagesAsRead = async () => {
+        if (messages.length > 0) {
+          const hasUnreadMessages = messages.some(m => 
+            m.sender.id !== user?.id && !m.read
+          );
 
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen, messages]);
+          if (hasUnreadMessages) {
+            try {
+              const res = await apiRequest("POST", `/api/leads/${leadId}/messages/read`, {});
+              if (res.ok) {
+                // Update message read status in cache
+                queryClient.setQueryData<Message[]>(messagesQueryKey, oldMessages => 
+                  oldMessages?.map(m => ({
+                    ...m,
+                    read: m.sender.id !== user?.id ? true : m.read
+                  }))
+                );
 
-  // Mark messages as read when dialog opens
-  useEffect(() => {
-    const markMessagesAsRead = async () => {
-      if (isOpen && messages.length > 0) {
-        const hasUnreadMessages = messages.some(m => 
-          m.sender.id !== user?.id && !m.read
-        );
+                // Invalidate queries to refresh unread counts
+                await queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
 
-        if (hasUnreadMessages) {
-          try {
-            const res = await apiRequest("POST", `/api/leads/${leadId}/messages/read`, {});
-            if (res.ok) {
-              // Update message read status in cache
-              queryClient.setQueryData<Message[]>(messagesQueryKey, oldMessages => 
-                oldMessages?.map(m => ({
-                  ...m,
-                  read: m.sender.id !== user?.id ? true : m.read
-                }))
-              );
-
-              // Invalidate queries to refresh unread counts
-              await queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-
-              if (onMessagesRead) {
-                onMessagesRead();
+                if (onMessagesRead) {
+                  onMessagesRead();
+                }
               }
+            } catch (error) {
+              console.error("Error marking messages as read:", error);
             }
-          } catch (error) {
-            console.error("Error marking messages as read:", error);
           }
         }
-      }
-    };
+      };
 
-    if (isOpen) {
       markMessagesAsRead();
+      return () => clearTimeout(timer);
     }
   }, [isOpen, messages, leadId, user?.id, queryClient, onMessagesRead]);
 
@@ -143,9 +134,9 @@ export function MessageDialog({
     onSuccess: (newMessage) => {
       setNewMessage("");
       playNotification('send');
-      queryClient.setQueryData(messagesQueryKey, (old: Message[] = []) => {
-        return [...old, newMessage];
-      });
+      // Update cache with new message
+      queryClient.setQueryData<Message[]>(messagesQueryKey, (old = []) => [...old, newMessage]);
+      // Invalidate to ensure consistency
       queryClient.invalidateQueries({ queryKey: messagesQueryKey });
       setTimeout(scrollToBottom, 100);
     },
