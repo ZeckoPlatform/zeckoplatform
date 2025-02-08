@@ -80,13 +80,14 @@ export function MessageDialog({
 
   // Effect for initial load and dialog open
   useEffect(() => {
-    if (isOpen) {
-      setTimeout(scrollToBottom, 100);
+    if (isOpen && messages.length > 0) {
+      // Add a longer delay for initial load to ensure DOM is ready
+      setTimeout(scrollToBottom, 500);
       if (isFirstLoadRef.current) {
         isFirstLoadRef.current = false;
       }
     }
-  }, [isOpen, messages.length]);
+  }, [isOpen, messages]);
 
   // Mark messages as read when dialog opens
   useEffect(() => {
