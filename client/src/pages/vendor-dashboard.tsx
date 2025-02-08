@@ -18,7 +18,7 @@ interface Product {
   id: number;
   title: string;
   description: string;
-  price: number;
+  price: number | string; // Updated to allow for string price
   category: string;
   imageUrl?: string;
   vendorId: number;
@@ -27,7 +27,7 @@ interface Product {
 interface EditProductFormData {
   title: string;
   description: string;
-  price: number;
+  price: number | string; // Updated to allow for string price
   category: string;
   imageUrl?: string;
 }
@@ -297,7 +297,7 @@ export default function VendorDashboard() {
                   </p>
                   <div className="flex items-center justify-between mt-4">
                     <span className="text-lg font-semibold">
-                      £{product.price.toFixed(2)}
+                      £{typeof product.price === 'string' ? parseFloat(product.price).toFixed(2) : product.price.toFixed(2)}
                     </span>
                     <span className="text-sm text-muted-foreground">
                       {product.category}
@@ -343,7 +343,7 @@ export default function VendorDashboard() {
                       id: editingProduct.id,
                       data: {
                         ...data,
-                        price: parseFloat(data.price.toString()),
+                        price: typeof data.price === 'string' ? parseFloat(data.price) : data.price,
                       },
                     })
                   )}
