@@ -705,60 +705,70 @@ export function registerRoutes(app: Express): Server {
       }
 
       // First check how many unread messages we have
-      const [{ count: unreadCount }] = await db.select({ count: sql<number>`count(*)` })
-        .from(messages)
+      const [{ count }] = await db.select({
+        count: sql<number>`count(*)`
+      })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.lead_id, leadId),
+          eq(messages.receiver_id, req.user.id),
+          eq(messages.read, false)
+        )
+      );
+
+      log(`Found ${count} unread messages`);
+
+      if (count === 0) {
+        return res.json({ 
+          success: true, 
+          updatedCount: 0,
+          message: "No unread messages to update"
+        });
+      }
+
+      // Update messages
+      const [result] = await db.update(messages)
+        .set({
+          read: true,
+          updated_at: new Date()
+        })
         .where(
           and(
             eq(messages.lead_id, leadId),
             eq(messages.receiver_id, req.user.id),
             eq(messages.read, false)
           )
-        );
-
-      log(`Found ${unreadCount} unread messages`);
-
-      // Update messages using raw SQL with transaction
-      const updateQuery = sql`
-        WITH updated AS (
-          UPDATE messages 
-          SET read = true, 
-              updated_at = NOW() 
-          WHERE lead_id = ${leadId} 
-          AND receiver_id = ${req.user.id} 
-          AND read = false 
-          RETURNING id, read, updated_at, content, sender_id
         )
-        SELECT 
-          u.id,
-          u.read,
-          u.updated_at,
-          u.content,
-          u.sender_id
-        FROM updated u;`;
+        .returning();
 
-      const result = await db.execute(updateQuery);
-      const updatedMessages = Array.isArray(result) ? result : [];
+      if (!result) {
+        log('No messages were updated');
+        return res.json({ 
+          success: false,
+          message: "Failed to update messages"
+        });
+      }
 
-      log(`Successfully marked ${updatedMessages.length} messages as read`);
+      // Verify the update
+      const [{ count: verifiedCount }] = await db.select({
+        count: sql<number>`count(*)`
+      })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.lead_id, leadId),
+          eq(messages.receiver_id, req.user.id),
+          eq(messages.read, true)
+        )
+      );
 
-      // Query again to verify the update
-      const [{ count: verifyCount }] = await db.select({ count: sql<number>`count(*)` })
-        .from(messages)
-        .where(
-          and(
-            eq(messages.lead_id, leadId),
-            eq(messages.receiver_id, req.user.id),
-            eq(messages.read, true)
-          )
-        );
-
-      log(`Verification: ${verifyCount} read messages after update`);
+      log(`Successfully marked messages as read. Verified count: ${verifiedCount}`);
 
       res.json({ 
         success: true, 
-        updatedCount: updatedMessages.length,
-        messages: updatedMessages,
-        verificationCount: verifyCount
+        updatedCount: count,
+        verifiedCount
       });
 
     } catch (error) {
