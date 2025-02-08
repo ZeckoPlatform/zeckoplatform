@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -11,9 +11,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { apiRequest } from "@/lib/queryClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Store, Package, Settings, Edit, Trash2, Loader2, Upload } from "lucide-react";
+import { Store, Package, Settings, Edit, Trash2, Loader2, Upload, AlertCircle, CheckCircle2 } from "lucide-react";
 import { ProductForm } from "@/components/ProductForm";
 
+// Keep existing interfaces
 interface Product {
   id: number;
   title: string;
@@ -40,8 +41,39 @@ export default function VendorDashboard() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string>();
+  const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Add Stripe account status query
+  const { data: accountStatus, isLoading: statusLoading } = useQuery({
+    queryKey: ["/api/vendor/stripe/account/status"],
+    enabled: user?.stripeAccountId !== undefined,
+  });
+
+  // Add Stripe account setup mutation
+  const setupAccountMutation = useMutation({
+    mutationFn: async () => {
+      setIsLoading(true);
+      const response = await apiRequest("POST", "/api/vendor/stripe/account", {
+        email: user?.username, // Using username as email for demo
+      });
+      if (!response.ok) {
+        throw new Error("Failed to create Stripe account");
+      }
+      const data = await response.json();
+      window.location.href = data.onboardingUrl;
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+      setIsLoading(false);
+    },
+  });
+
+  // Keep existing product queries and mutations
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ["/api/products"],
     select: (data) =>
@@ -51,8 +83,10 @@ export default function VendorDashboard() {
     enabled: !!user?.id,
   });
 
+  // Keep existing form handling
   const editForm = useForm<EditProductFormData>();
 
+  // Keep existing file upload handler
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -196,6 +230,17 @@ export default function VendorDashboard() {
     },
   });
 
+  // Add status badge helper
+  const getStatusBadge = () => {
+    if (statusLoading) return <Loader2 className="h-4 w-4 animate-spin" />;
+    if (!accountStatus) return <AlertCircle className="h-4 w-4 text-yellow-500" />;
+    return accountStatus?.status === "enabled" ? (
+      <CheckCircle2 className="h-4 w-4 text-green-500" />
+    ) : (
+      <AlertCircle className="h-4 w-4 text-yellow-500" />
+    );
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <h1 className="text-3xl font-bold mb-8">Zecko Vendor Dashboard</h1>
@@ -206,9 +251,9 @@ export default function VendorDashboard() {
             <Package className="h-4 w-4" />
             Products
           </TabsTrigger>
-          <TabsTrigger value="store" className="flex items-center gap-2">
+          <TabsTrigger value="payments" className="flex items-center gap-2">
             <Store className="h-4 w-4" />
-            Store Profile
+            Payments
           </TabsTrigger>
           <TabsTrigger value="settings" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
@@ -426,6 +471,71 @@ export default function VendorDashboard() {
               </Card>
             )}
           </div>
+        </TabsContent>
+
+        <TabsContent value="payments">
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                Payment Account Status {getStatusBadge()}
+              </CardTitle>
+              <CardDescription>
+                Set up your Stripe account to receive payments from customers
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!user?.stripeAccountId ? (
+                <div>
+                  <p className="mb-4">
+                    You haven't set up your payment account yet. Set up Stripe to start
+                    receiving payments for your products.
+                  </p>
+                  <Button
+                    onClick={() => setupAccountMutation.mutate()}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Setting up...
+                      </>
+                    ) : (
+                      "Set up Stripe Account"
+                    )}
+                  </Button>
+                </div>
+              ) : accountStatus?.status === "enabled" ? (
+                <div className="space-y-2">
+                  <p className="text-green-600 font-medium">
+                    Your Stripe account is fully set up and ready to receive payments!
+                  </p>
+                  <dl className="space-y-1">
+                    <div className="flex gap-2">
+                      <dt className="font-medium">Charges Enabled:</dt>
+                      <dd>{accountStatus.details.chargesEnabled ? "Yes" : "No"}</dd>
+                    </div>
+                    <div className="flex gap-2">
+                      <dt className="font-medium">Payouts Enabled:</dt>
+                      <dd>{accountStatus.details.payoutsEnabled ? "Yes" : "No"}</dd>
+                    </div>
+                  </dl>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-yellow-600 mb-4">
+                    Your Stripe account setup is pending. Please complete the
+                    onboarding process to start receiving payments.
+                  </p>
+                  <Button
+                    onClick={() => setupAccountMutation.mutate()}
+                    disabled={isLoading}
+                  >
+                    Complete Stripe Setup
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="store">
