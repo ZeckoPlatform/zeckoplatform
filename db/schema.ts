@@ -22,6 +22,10 @@ export const users = pgTable("users", {
   subscriptionActive: boolean("subscription_active").default(false),
   subscriptionTier: text("subscription_tier", { enum: ["none", "business", "vendor"] }).default("none"),
   subscriptionEndsAt: timestamp("subscription_ends_at"),
+  stripeAccountId: text("stripe_account_id"),
+  stripeAccountStatus: text("stripe_account_status", { 
+    enum: ["pending", "enabled", "disabled"] 
+  }).default("pending"),
   profile: jsonb("profile").$type<{
     name?: string;
     description?: string;

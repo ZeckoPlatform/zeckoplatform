@@ -8,6 +8,7 @@ import { log } from "./vite";
 import { comparePasswords, hashPassword } from './auth';
 import fs from 'fs';
 import express from 'express';
+import { createConnectedAccount, retrieveConnectedAccount } from './stripe';
 
 declare global {
   namespace Express {
@@ -24,6 +25,8 @@ export function registerRoutes(app: Express): Server {
     if (req.path.endsWith('/login') || 
         req.path.endsWith('/register') || 
         req.path.endsWith('/auth/verify') || 
+        req.path.endsWith('/vendor/stripe/account') ||
+        req.path.endsWith('/vendor/stripe/account/status') ||
         req.method === 'OPTIONS') {
       return next();
     }
@@ -1021,6 +1024,72 @@ export function registerRoutes(app: Express): Server {
       console.error('Full error:', error);
       res.status(500).json({ 
         message: "Failed to update product",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  app.post("/api/vendor/stripe/account", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      if (req.user.userType !== "vendor") {
+        return res.status(403).json({ message: "Only vendors can create Stripe accounts" });
+      }
+
+      const { accountId, onboardingUrl } = await createConnectedAccount(req.body.email);
+
+      // Update user with Stripe account ID
+      await db.update(users)
+        .set({ 
+          stripeAccountId: accountId,
+          stripeAccountStatus: "pending"
+        })
+        .where(eq(users.id, req.user.id));
+
+      res.json({ onboardingUrl });
+    } catch (error) {
+      log(`Stripe account creation error: ${error instanceof Error ? error.message : String(error)}`);
+      res.status(500).json({ 
+        message: "Failed to create Stripe account",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  app.get("/api/vendor/stripe/account/status", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      if (!req.user.stripeAccountId) {
+        return res.status(404).json({ message: "No Stripe account found" });
+      }
+
+      const account = await retrieveConnectedAccount(req.user.stripeAccountId);
+
+      // Update local status if needed
+      if (account.charges_enabled && req.user.stripeAccountStatus !== "enabled") {
+        await db.update(users)
+          .set({ stripeAccountStatus: "enabled" })
+          .where(eq(users.id, req.user.id));
+      }
+
+      res.json({
+        status: account.charges_enabled ? "enabled" : "pending",
+        details: {
+          chargesEnabled: account.charges_enabled,
+          payoutsEnabled: account.payouts_enabled,
+          detailsSubmitted: account.details_submitted,
+        }
+      });
+    } catch (error) {
+      log(`Stripe account status check error: ${error instanceof Error ? error.message : String(error)}`);
+      res.status(500).json({ 
+        message: "Failed to check Stripe account status",
         error: error instanceof Error ? error.message : "Unknown error"
       });
     }
