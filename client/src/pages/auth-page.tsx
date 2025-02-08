@@ -11,6 +11,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { startTrialSubscription } from "@/lib/subscription";
 import { useToast } from "@/hooks/use-toast";
 
+const SUBSCRIPTION_PRICES = {
+  business: {
+    monthly: 29.99,
+    annual: (29.99 * 12 * 0.9).toFixed(2), // 10% annual discount
+  },
+  vendor: {
+    monthly: 49.99,
+    annual: (49.99 * 12 * 0.9).toFixed(2), // 10% annual discount
+  }
+};
+
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
   const [location, setLocation] = useLocation();
@@ -81,6 +92,13 @@ export default function AuthPage() {
     } else {
       setLocation("/leads");
     }
+  };
+
+  const getSubscriptionPrice = () => {
+    const userType = registerForm.watch("userType");
+    const frequency = registerForm.watch("paymentFrequency");
+    if (userType === "free" || !SUBSCRIPTION_PRICES[userType]) return null;
+    return SUBSCRIPTION_PRICES[userType][frequency];
   };
 
   if (user) {
@@ -198,11 +216,15 @@ export default function AuthPage() {
                       </div>
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="business" id="business" />
-                        <Label htmlFor="business">Business</Label>
+                        <Label htmlFor="business">
+                          Business (£{SUBSCRIPTION_PRICES.business.monthly}/month)
+                        </Label>
                       </div>
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="vendor" id="vendor" />
-                        <Label htmlFor="vendor">Vendor</Label>
+                        <Label htmlFor="vendor">
+                          Vendor (£{SUBSCRIPTION_PRICES.vendor.monthly}/month)
+                        </Label>
                       </div>
                     </RadioGroup>
                   </div>
@@ -318,11 +340,15 @@ export default function AuthPage() {
                           >
                             <div className="flex items-center space-x-2">
                               <RadioGroupItem value="monthly" id="monthly" />
-                              <Label htmlFor="monthly">Monthly</Label>
+                              <Label htmlFor="monthly">
+                                Monthly (£{getSubscriptionPrice()}/month)
+                              </Label>
                             </div>
                             <div className="flex items-center space-x-2">
                               <RadioGroupItem value="annual" id="annual" />
-                              <Label htmlFor="annual">Annual (10% discount)</Label>
+                              <Label htmlFor="annual">
+                                Annual (£{SUBSCRIPTION_PRICES[registerForm.watch("userType")]?.annual}/year - Save 10%)
+                              </Label>
                             </div>
                           </RadioGroup>
                         </div>
@@ -342,13 +368,20 @@ export default function AuthPage() {
                           >
                             <div className="flex items-center space-x-2">
                               <RadioGroupItem value="stripe" id="stripe" />
-                              <Label htmlFor="stripe">Credit/Debit Card</Label>
+                              <Label htmlFor="stripe">
+                                Credit/Debit Card (Secure payment via Stripe)
+                              </Label>
                             </div>
                             <div className="flex items-center space-x-2">
                               <RadioGroupItem value="direct_debit" id="direct_debit" />
                               <Label htmlFor="direct_debit">Direct Debit</Label>
                             </div>
                           </RadioGroup>
+                          {registerForm.watch("paymentMethod") === "stripe" && (
+                            <p className="text-sm text-muted-foreground mt-2">
+                              You'll be redirected to our secure payment provider after registration to set up your card details.
+                            </p>
+                          )}
                         </div>
 
                         {registerForm.watch("paymentMethod") === "direct_debit" && (

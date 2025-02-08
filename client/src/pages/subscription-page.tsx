@@ -17,24 +17,23 @@ import { zodResolver } from "@hookform/resolvers/zod";
 const subscriptionFormSchema = z.object({
   paymentMethod: z.enum(["stripe", "direct_debit"]),
   paymentFrequency: z.enum(["monthly", "annual"]),
-  // Direct debit fields are required when paymentMethod is direct_debit
   bankAccountHolder: z.string().min(1, "Account holder name is required").optional()
-    .refine((val) => {
-      if (useForm().getValues("paymentMethod") === "direct_debit") {
+    .refine((val, ctx) => {
+      if (ctx.parent.paymentMethod === "direct_debit") {
         return val && val.length > 0;
       }
       return true;
     }, "Account holder name is required for direct debit"),
   bankSortCode: z.string().regex(/^\d{6}$/, "Sort code must be 6 digits").optional()
-    .refine((val) => {
-      if (useForm().getValues("paymentMethod") === "direct_debit") {
+    .refine((val, ctx) => {
+      if (ctx.parent.paymentMethod === "direct_debit") {
         return val && val.length === 6;
       }
       return true;
     }, "Valid sort code is required for direct debit"),
   bankAccountNumber: z.string().regex(/^\d{8}$/, "Account number must be 8 digits").optional()
-    .refine((val) => {
-      if (useForm().getValues("paymentMethod") === "direct_debit") {
+    .refine((val, ctx) => {
+      if (ctx.parent.paymentMethod === "direct_debit") {
         return val && val.length === 8;
       }
       return true;
@@ -199,7 +198,7 @@ export default function SubscriptionPage() {
                       >
                         <div className="flex items-center space-x-3">
                           <RadioGroupItem value="stripe" id="stripe" />
-                          <Label htmlFor="stripe">Credit/Debit Card</Label>
+                          <Label htmlFor="stripe">Credit/Debit Card (Secure payment via Stripe)</Label>
                         </div>
                         <div className="flex items-center space-x-3">
                           <RadioGroupItem value="direct_debit" id="direct_debit" />
