@@ -22,7 +22,7 @@ interface CreateSubscriptionParams {
   };
 }
 
-export async function startTrialSubscription({
+export async function startSubscription({
   userId,
   tier,
   paymentMethod,
@@ -30,19 +30,20 @@ export async function startTrialSubscription({
   stripePaymentMethodId,
   bankDetails,
 }: CreateSubscriptionParams) {
+  // Trial period is now mandatory
   const trialEndDate = addDays(new Date(), 30);
-  const subscriptionEndDate = paymentFrequency === "annual" 
+  const subscriptionEndDate = paymentFrequency === "annual"
     ? addYears(trialEndDate, 1)
     : addMonths(trialEndDate, 1);
 
-  // Calculate price (example values, adjust as needed)
-  const basePrice = tier === "business" ? 49900 : 99900; // £499 or £999
+  // Calculate price with annual discount
+  const baseMonthlyPrice = tier === "business" ? 2999 : 4999; // £29.99 or £49.99
   const finalPrice = paymentFrequency === "annual"
-    ? Math.floor(basePrice * 12 * 0.9) // 10% discount for annual
-    : basePrice;
+    ? Math.floor(baseMonthlyPrice * 12 * 0.9) // 10% annual discount
+    : baseMonthlyPrice;
 
   if (paymentMethod === "stripe" && stripePaymentMethodId) {
-    // Create Stripe subscription with trial
+    // Create Stripe subscription with mandatory trial
     const customer = await stripe.customers.create({
       payment_method: stripePaymentMethodId,
       invoice_settings: {
@@ -58,10 +59,12 @@ export async function startTrialSubscription({
         payment_method_types: ["card"],
         save_default_payment_method: "on_subscription",
       },
+      trial_period_days: 30,
+      cancel_at_period_end: false,
     });
 
     // Create local subscription record
-    return await db.insert(subscriptions).values({
+    await db.insert(subscriptions).values({
       user_id: userId,
       tier,
       status: "trial",
@@ -73,10 +76,21 @@ export async function startTrialSubscription({
       price: finalPrice,
       stripe_subscription_id: subscription.id,
       stripe_payment_method_id: stripePaymentMethodId,
+      auto_renew: true,
     });
+
+    // Update user's subscription status
+    await db.update(users)
+      .set({
+        subscriptionActive: true,
+        subscriptionTier: tier,
+        subscriptionEndsAt: subscriptionEndDate
+      })
+      .where(eq(users.id, userId));
+
   } else if (paymentMethod === "direct_debit" && bankDetails) {
     // Create local subscription record for direct debit
-    return await db.insert(subscriptions).values({
+    await db.insert(subscriptions).values({
       user_id: userId,
       tier,
       status: "trial",
@@ -90,10 +104,20 @@ export async function startTrialSubscription({
       bank_sort_code: bankDetails.sortCode,
       bank_account_number: bankDetails.accountNumber,
       mandate_status: "pending",
+      auto_renew: true,
     });
+
+    // Update user's subscription status
+    await db.update(users)
+      .set({
+        subscriptionActive: true,
+        subscriptionTier: tier,
+        subscriptionEndsAt: subscriptionEndDate
+      })
+      .where(eq(users.id, userId));
   }
 
-  throw new Error("Invalid payment method configuration");
+  return true;
 }
 
 export async function handleTrialEnd(subscriptionId: number) {
@@ -113,13 +137,25 @@ export async function handleTrialEnd(subscriptionId: number) {
       .set({ status: "active" })
       .where(eq(subscriptions.id, subscriptionId));
   } else if (subscription.payment_method === "direct_debit") {
-    // Initiate direct debit payment
-    // This would integrate with your direct debit provider
+    // Initiate first direct debit payment
+    // Here you would integrate with your direct debit provider
     // For now, we'll just update the status
     await db
       .update(subscriptions)
       .set({ status: "active" })
       .where(eq(subscriptions.id, subscriptionId));
+  }
+
+  // Update user subscription status
+  const [sub] = await db
+    .select()
+    .from(subscriptions)
+    .where(eq(subscriptions.id, subscriptionId));
+
+  if (sub) {
+    await db.update(users)
+      .set({ subscriptionActive: true })
+      .where(eq(users.id, sub.user_id));
   }
 }
 
@@ -140,9 +176,17 @@ export async function cancelSubscription(subscriptionId: number) {
   // Update local subscription status
   await db
     .update(subscriptions)
-    .set({ 
+    .set({
       status: "cancelled",
-      auto_renew: false 
+      auto_renew: false
     })
     .where(eq(subscriptions.id, subscriptionId));
+
+  // Update user subscription status
+  await db.update(users)
+    .set({
+      subscriptionActive: false,
+      subscriptionTier: "none"
+    })
+    .where(eq(users.id, subscription.user_id));
 }

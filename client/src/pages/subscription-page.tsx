@@ -1,11 +1,30 @@
+import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarDays, CreditCard, AlertTriangle } from "lucide-react";
-import { format } from "date-fns";
+import { CalendarDays, CreditCard, Loader2, Building2 } from "lucide-react";
+import { format, addDays } from "date-fns";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+const subscriptionFormSchema = z.object({
+  paymentMethod: z.enum(["stripe", "direct_debit"]),
+  paymentFrequency: z.enum(["monthly", "annual"]),
+  // Direct debit fields
+  bankAccountHolder: z.string().optional(),
+  bankSortCode: z.string().optional(),
+  bankAccountNumber: z.string().optional(),
+});
+
+type SubscriptionFormData = z.infer<typeof subscriptionFormSchema>;
 
 type SubscriptionResponse = {
   status: {
@@ -16,17 +35,30 @@ type SubscriptionResponse = {
   subscription: {
     id: number;
     tier: "business" | "vendor";
-    status: "active" | "cancelled" | "expired";
+    status: "trial" | "active" | "cancelled" | "expired";
     start_date: string;
     end_date: string;
+    trial_end_date?: string;
     auto_renew: boolean;
     price: number;
+    payment_method: "stripe" | "direct_debit";
+    payment_frequency: "monthly" | "annual";
   } | null;
 };
 
 export default function SubscriptionPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isLoading, setIsLoading] = useState(false);
+
+  const form = useForm<SubscriptionFormData>({
+    resolver: zodResolver(subscriptionFormSchema),
+    defaultValues: {
+      paymentMethod: "stripe",
+      paymentFrequency: "monthly",
+    },
+  });
 
   const { data: subscriptionData } = useQuery<SubscriptionResponse>({
     queryKey: ["/api/subscriptions/current"],
@@ -34,34 +66,51 @@ export default function SubscriptionPage() {
   });
 
   const subscribeMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/subscriptions");
-      const data = await res.json();
+    mutationFn: async (data: SubscriptionFormData) => {
+      setIsLoading(true);
+      try {
+        if (data.paymentMethod === "stripe") {
+          const res = await apiRequest("POST", "/api/subscriptions", {
+            tier: user?.userType,
+            paymentMethod: data.paymentMethod,
+            paymentFrequency: data.paymentFrequency,
+          });
+          const responseData = await res.json();
 
-      // If payment setup is required, we'll handle it here in the future
-      if (data.setupRequired) {
-        toast({
-          title: "Payment Required",
-          description: "This feature is coming soon. Currently only available in test mode.",
-          variant: "destructive",
-        });
-        throw new Error("Subscription requires payment setup");
+          if (responseData.stripeUrl) {
+            window.location.href = responseData.stripeUrl;
+            return;
+          }
+          return responseData;
+        } else {
+          const res = await apiRequest("POST", "/api/subscriptions", {
+            tier: user?.userType,
+            paymentMethod: data.paymentMethod,
+            paymentFrequency: data.paymentFrequency,
+            bankDetails: {
+              accountHolder: data.bankAccountHolder,
+              sortCode: data.bankSortCode,
+              accountNumber: data.bankAccountNumber,
+            },
+          });
+          return res.json();
+        }
+      } finally {
+        setIsLoading(false);
       }
-
-      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/subscriptions/current"] });
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       toast({
-        title: "Subscription activated",
-        description: "Your subscription has been successfully activated.",
+        title: "Success",
+        description: "Your 30-day free trial has started.",
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Subscription failed",
-        description: error.message,
+        title: "Error",
+        description: error.message || "Failed to start subscription",
         variant: "destructive",
       });
     },
@@ -100,6 +149,14 @@ export default function SubscriptionPage() {
 
   const isSubscriptionActive = subscriptionData?.status.isActive;
   const currentSubscription = subscriptionData?.subscription;
+  const isTrialPeriod = currentSubscription?.status === "trial";
+  const trialEndDate = currentSubscription?.trial_end_date
+    ? new Date(currentSubscription.trial_end_date)
+    : addDays(new Date(), 30);
+
+  const basePrice = user?.userType === "business" ? 29.99 : 49.99;
+  const monthlyPrice = basePrice;
+  const annualPrice = (basePrice * 12 * 0.9).toFixed(2); // 10% discount
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -108,18 +165,25 @@ export default function SubscriptionPage() {
       {isSubscriptionActive && currentSubscription ? (
         <Card>
           <CardHeader>
-            <CardTitle>Active Subscription</CardTitle>
+            <CardTitle>
+              {isTrialPeriod ? "Free Trial Active" : "Active Subscription"}
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5 text-primary" />
+              {currentSubscription.payment_method === "stripe" ? (
+                <CreditCard className="h-5 w-5 text-primary" />
+              ) : (
+                <Building2 className="h-5 w-5 text-primary" />
+              )}
               <div>
                 <p className="font-medium">
                   {currentSubscription.tier.charAt(0).toUpperCase() +
                     currentSubscription.tier.slice(1)} Plan
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  ${(currentSubscription.price / 100).toFixed(2)}/month
+                  £{(currentSubscription.price / 100).toFixed(2)}/
+                  {currentSubscription.payment_frequency}
                 </p>
               </div>
             </div>
@@ -127,11 +191,18 @@ export default function SubscriptionPage() {
             <div className="flex items-center gap-2">
               <CalendarDays className="h-5 w-5 text-primary" />
               <div>
-                <p className="font-medium">Subscription Period</p>
+                <p className="font-medium">
+                  {isTrialPeriod ? "Trial Period" : "Subscription Period"}
+                </p>
                 <p className="text-sm text-muted-foreground">
                   {format(new Date(currentSubscription.start_date), "PPP")} -{" "}
                   {format(new Date(currentSubscription.end_date), "PPP")}
                 </p>
+                {isTrialPeriod && (
+                  <p className="text-sm text-primary mt-1">
+                    Trial ends on {format(trialEndDate, "PPP")}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -151,46 +222,138 @@ export default function SubscriptionPage() {
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>Subscribe Now</CardTitle>
+            <CardTitle>Start Your 30-Day Free Trial</CardTitle>
+            <CardDescription>
+              Try our full {user?.userType} plan free for 30 days.
+              You won't be charged during the trial period.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="flex items-center gap-4 p-4 bg-muted rounded-lg">
-              <AlertTriangle className="h-6 w-6 text-primary" />
-              <div>
-                <p className="font-medium">No Active Subscription</p>
-                <p className="text-sm text-muted-foreground">
-                  {user?.userType === "business"
-                    ? "Subscribe to start responding to leads"
-                    : "Subscribe to start selling products"}
-                </p>
-              </div>
-            </div>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit((data) => subscribeMutation.mutate(data))}
+                    className="space-y-6">
+                <FormField
+                  control={form.control}
+                  name="paymentFrequency"
+                  render={({ field }) => (
+                    <FormItem className="space-y-3">
+                      <FormLabel>Billing Frequency</FormLabel>
+                      <FormControl>
+                        <RadioGroup
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          className="flex flex-col space-y-1"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <RadioGroupItem value="monthly" id="monthly" />
+                            <Label htmlFor="monthly">
+                              Monthly (£{monthlyPrice}/month)
+                            </Label>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <RadioGroupItem value="annual" id="annual" />
+                            <Label htmlFor="annual">
+                              Annual (£{annualPrice}/year - Save 10%)
+                            </Label>
+                          </div>
+                        </RadioGroup>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <div className="space-y-4">
-              <div className="flex justify-between items-center p-4 border rounded-lg">
-                <div>
-                  <p className="font-medium">
-                    {user?.userType === "business" ? "Business Plan" : "Vendor Plan"}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {user?.userType === "business"
-                      ? "Access to all leads and direct communication"
-                      : "List and sell products in the marketplace"}
-                  </p>
-                </div>
-                <p className="text-xl font-bold">
-                  ${user?.userType === "business" ? "29.99" : "49.99"}/mo
-                </p>
-              </div>
+                <FormField
+                  control={form.control}
+                  name="paymentMethod"
+                  render={({ field }) => (
+                    <FormItem className="space-y-3">
+                      <FormLabel>Payment Method</FormLabel>
+                      <FormControl>
+                        <RadioGroup
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          className="flex flex-col space-y-1"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <RadioGroupItem value="stripe" id="stripe" />
+                            <Label htmlFor="stripe">
+                              Credit/Debit Card
+                            </Label>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <RadioGroupItem value="direct_debit" id="direct_debit" />
+                            <Label htmlFor="direct_debit">
+                              Direct Debit
+                            </Label>
+                          </div>
+                        </RadioGroup>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <Button
-                className="w-full"
-                onClick={() => subscribeMutation.mutate()}
-                disabled={subscribeMutation.isPending}
-              >
-                Subscribe Now
-              </Button>
-            </div>
+                {form.watch("paymentMethod") === "direct_debit" && (
+                  <div className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="bankAccountHolder"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Account Holder Name</FormLabel>
+                          <FormControl>
+                            <Input {...field} required />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="bankSortCode"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Sort Code</FormLabel>
+                          <FormControl>
+                            <Input {...field} required />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="bankAccountNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Account Number</FormLabel>
+                          <FormControl>
+                            <Input {...field} required />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                )}
+
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={isLoading || subscribeMutation.isPending}
+                >
+                  {isLoading || subscribeMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Setting up subscription...
+                    </>
+                  ) : (
+                    'Start Free Trial'
+                  )}
+                </Button>
+              </form>
+            </Form>
           </CardContent>
         </Card>
       )}
