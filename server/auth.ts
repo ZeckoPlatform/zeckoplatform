@@ -128,19 +128,32 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
 export function setupAuth(app: Express) {
   app.post("/api/register", async (req, res) => {
     try {
-      log(`Registration attempt - Email: ${req.body.email}, Type: ${req.body.userType}`);
+      log(`Registration attempt - Email: ${req.body.email}, Username: ${req.body.username}, Type: ${req.body.userType}`);
       const result = insertUserSchema.safeParse(req.body);
       if (!result.success) {
         return res.status(400).json({ message: fromZodError(result.error).toString() });
       }
 
-      const [existingUser] = await getUserByEmail(result.data.email);
-      if (existingUser) {
+      // Check for existing email
+      const [existingEmail] = await db.select()
+        .from(users)
+        .where(eq(users.email, result.data.email));
+
+      if (existingEmail) {
         return res.status(400).json({ message: "Email already registered" });
       }
 
+      // Check for existing username
+      const [existingUsername] = await db.select()
+        .from(users)
+        .where(eq(users.username, result.data.username));
+
+      if (existingUsername) {
+        return res.status(400).json({ message: "Username already taken" });
+      }
+
       const profileData = {
-        name: result.data.email.split('@')[0],
+        name: result.data.username,
         description: "",
         categories: [],
         location: "",
@@ -149,6 +162,7 @@ export function setupAuth(app: Express) {
       const [user] = await db.insert(users)
         .values({
           email: result.data.email,
+          username: result.data.username,
           password: await hashPassword(result.data.password),
           userType: result.data.userType,
           subscriptionActive: false,

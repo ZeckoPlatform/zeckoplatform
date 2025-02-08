@@ -6,14 +6,15 @@ import { z } from "zod";
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   email: text("email").unique().notNull(),
+  username: text("username").unique().notNull(),
   password: text("password").notNull(),
   userType: text("user_type", { enum: ["free", "business", "vendor"] }).notNull().default("free"),
   subscriptionActive: boolean("subscription_active").default(false),
   subscriptionTier: text("subscription_tier", { enum: ["none", "business", "vendor"] }).default("none"),
   subscriptionEndsAt: timestamp("subscription_ends_at"),
   stripeAccountId: text("stripe_account_id"),
-  stripeAccountStatus: text("stripe_account_status", { 
-    enum: ["pending", "enabled", "disabled"] 
+  stripeAccountStatus: text("stripe_account_status", {
+    enum: ["pending", "enabled", "disabled"]
   }).default("pending"),
   profile: jsonb("profile").$type<{
     name?: string;
@@ -66,8 +67,8 @@ export const subscriptions = pgTable("subscriptions", {
   id: serial("id").primaryKey(),
   user_id: integer("user_id").references(() => users.id).notNull(),
   tier: text("tier", { enum: ["business", "vendor"] }).notNull(),
-  status: text("status", { 
-    enum: ["trial", "active", "cancelled", "expired"] 
+  status: text("status", {
+    enum: ["trial", "active", "cancelled", "expired"]
   }).notNull(),
   payment_frequency: text("payment_frequency", {
     enum: ["monthly", "annual"]
@@ -166,6 +167,7 @@ export const messagesRelations = relations(messages, ({ one }) => ({
 
 export const insertUserSchema = createInsertSchema(users, {
   email: z.string().email("Please enter a valid email address"),
+  username: z.string().min(3, "Username must be at least 3 characters").max(30, "Username must be less than 30 characters"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   userType: z.enum(["free", "business", "vendor"]),
 });
