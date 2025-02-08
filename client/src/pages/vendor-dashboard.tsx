@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Store, Package, Settings, Edit, Trash2, Loader2, Upload, AlertCircle, CheckCircle2 } from "lucide-react";
 import { ProductForm } from "@/components/ProductForm";
 
-// Keep existing interfaces
+// Keep existing interfaces with updated types
 interface Product {
   id: number;
   title: string;
