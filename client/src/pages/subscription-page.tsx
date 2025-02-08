@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
@@ -22,7 +22,6 @@ type SubscriptionFormData = z.infer<typeof subscriptionFormSchema>;
 export default function SubscriptionPage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<SubscriptionFormData>({
@@ -45,8 +44,13 @@ export default function SubscriptionPage() {
           tier: user?.userType,
           paymentFrequency: data.paymentFrequency,
         });
-        const responseData = await res.json();
 
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.error || "Failed to start subscription");
+        }
+
+        const responseData = await res.json();
         if (responseData.checkoutUrl) {
           window.location.href = responseData.checkoutUrl;
           return;

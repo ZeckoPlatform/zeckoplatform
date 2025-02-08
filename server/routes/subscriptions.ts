@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { users } from "@db/schema";
 import { db } from "@db";
 import { eq } from "drizzle-orm";
+import { authenticateToken } from "../auth";
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("STRIPE_SECRET_KEY is required");
@@ -21,15 +22,14 @@ const SUBSCRIPTION_PRICES = {
     monthly: 4999, // in cents
     annual: 53989, // in cents (49.99 * 12 * 0.9)
   },
-};
+} as const;
 
-router.post("/subscriptions", async (req, res) => {
+router.post("/subscriptions", authenticateToken, async (req, res) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    const { tier, paymentFrequency } = req.body;
+    const { tier, paymentFrequency } = req.body as {
+      tier: keyof typeof SUBSCRIPTION_PRICES;
+      paymentFrequency: "monthly" | "annual";
+    };
 
     if (!tier || !paymentFrequency) {
       return res.status(400).json({ error: "Missing required fields" });
@@ -63,11 +63,11 @@ router.post("/subscriptions", async (req, res) => {
       ],
       success_url: `${req.protocol}://${req.get("host")}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.protocol}://${req.get("host")}/subscription`,
-      customer_email: req.user.username,
+      customer_email: req.user?.email,
       subscription_data: {
         trial_period_days: 30,
         metadata: {
-          userId: req.user.id,
+          userId: req.user?.id,
           tier,
           paymentFrequency,
         },
@@ -80,7 +80,7 @@ router.post("/subscriptions", async (req, res) => {
       .set({
         subscriptionTier: tier,
       })
-      .where(eq(users.id, req.user.id));
+      .where(eq(users.id, req.user!.id));
 
     return res.json({ checkoutUrl: session.url });
   } catch (error) {
@@ -92,16 +92,12 @@ router.post("/subscriptions", async (req, res) => {
   }
 });
 
-router.get("/subscriptions/current", async (req, res) => {
-  if (!req.user) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-
+router.get("/subscriptions/current", authenticateToken, async (req, res) => {
   try {
     const [user] = await db
       .select()
       .from(users)
-      .where(eq(users.id, req.user.id))
+      .where(eq(users.id, req.user!.id))
       .limit(1);
 
     return res.json({

@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useForm } from "react-hook-form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { startTrialSubscription } from "@/lib/subscription";
+//import { startTrialSubscription } from "@/lib/subscription"; //Removed as per intention
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -88,20 +88,7 @@ export default function AuthPage() {
 
   const onRegisterSuccess = async (data: any) => {
     if (data.userType !== "free") {
-      try {
-        await startTrialSubscription({
-          userId: data.id,
-          tier: data.userType,
-          paymentFrequency: data.paymentFrequency,
-        });
-        setLocation("/subscription");
-      } catch (error: any) {
-        toast({
-          title: "Subscription setup failed",
-          description: error.message || "Failed to setup subscription",
-          variant: "destructive",
-        });
-      }
+      setLocation("/subscription");
     } else {
       setLocation("/leads");
     }
