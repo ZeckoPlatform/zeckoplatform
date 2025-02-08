@@ -21,6 +21,72 @@ import { useNotificationSound } from "@/lib/useNotificationSound";
 import { MessageDialog } from "@/components/MessageDialog";
 
 
+// Add necessary interfaces
+interface LeadFormData {
+  title: string;
+  description: string;
+  category: string;
+  budget: string;
+  location: string;
+}
+
+interface ProfileFormData {
+  name?: string;
+  description?: string;
+  categories?: string;
+  location?: string;
+}
+
+interface PasswordFormData {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+interface UsernameFormData {
+  username: string;
+}
+
+interface ProposalFormData {
+  proposal: string;
+}
+
+interface MessageFormData {
+  content: string;
+}
+
+// Add calculateMatchScore function
+const calculateMatchScore = (lead: SelectLead, user: SelectUser | null): {
+  totalScore: number;
+  categoryScore: number;
+  locationScore: number;
+  budgetScore: number;
+  industryScore: number;
+} => {
+  let totalScore = 0;
+  let categoryScore = 0;
+  let locationScore = 0;
+  let budgetScore = 0;
+  let industryScore = 0;
+
+  if (user?.profile?.categories?.includes(lead.category)) {
+    categoryScore = 25;
+  }
+  if (user?.profile?.location === lead.location) {
+    locationScore = 25;
+  }
+  if (user?.profile?.budget && lead.budget && 
+      Math.abs(lead.budget - user.profile.budget) < 1000) {
+    budgetScore = 25;
+  }
+  if (user?.profile?.industries?.includes(lead.industry)) {
+    industryScore = 25;
+  }
+
+  totalScore = categoryScore + locationScore + budgetScore + industryScore;
+  return { totalScore, categoryScore, locationScore, budgetScore, industryScore };
+};
+
 // Add this component
 function MessageDialogContent({
   leadId,
