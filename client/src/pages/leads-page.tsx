@@ -302,7 +302,7 @@ export default function LeadsPage() {
       if (totalUnreadCount > 0 && initialLoadRef.current) {
         toast({
           title: "Welcome back!",
-          description: `You have ${totalUnreadCount} unread message${totalUnreadCount === 1 ? '' : 's'}.`,
+          description: `You have ${totalUnreadCount} unread message${totalUnreadCount === 1 ? '' : 's'} in your leads.`,
         });
         playNotification('receive');
       }

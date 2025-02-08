@@ -59,22 +59,29 @@ export function MessageDialog({
 
   // Play notification sound when new messages arrive
   useEffect(() => {
-    if (messages.length > previousMessagesLengthRef.current && isOpen) {
+    if (messages.length > previousMessagesLengthRef.current && !isFirstLoadRef.current) {
       const lastMessage = messages[messages.length - 1];
       if (lastMessage?.sender?.id !== user?.id) {
         playNotification('receive');
       }
     }
     previousMessagesLengthRef.current = messages.length;
-  }, [messages.length, isOpen, user?.id, playNotification]);
+  }, [messages.length, user?.id, playNotification]);
 
   // Scroll to bottom when new messages arrive or on initial load
   useEffect(() => {
-    if (scrollRef.current && (messages.length > 0 || isFirstLoadRef.current)) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-      isFirstLoadRef.current = false;
+    const scrollToBottom = () => {
+      if (scrollRef.current) {
+        const scrollElement = scrollRef.current;
+        scrollElement.scrollTop = scrollElement.scrollHeight;
+      }
+    };
+
+    if (isOpen) {
+      // Use setTimeout to ensure DOM is updated
+      setTimeout(scrollToBottom, 100);
     }
-  }, [messages.length]);
+  }, [messages.length, isOpen]);
 
   // Mark messages as read when dialog opens
   useEffect(() => {
@@ -100,7 +107,10 @@ export function MessageDialog({
       }
     };
 
-    markMessagesAsRead();
+    if (isOpen) {
+      markMessagesAsRead();
+      isFirstLoadRef.current = false;
+    }
   }, [isOpen, messages, leadId, user?.id, queryClient, onMessagesRead]);
 
   const sendMessageMutation = useMutation({
