@@ -58,6 +58,36 @@ export function MessageDialog({
     gcTime: Infinity, // Keep messages in cache indefinitely
   });
 
+  const markAsReadMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/leads/${leadId}/messages/read`, {
+        leadId,
+        userId: user?.id
+      });
+      if (!res.ok) {
+        throw new Error("Failed to mark messages as read");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      // Update message read status in cache
+      queryClient.setQueryData<Message[]>(messagesQueryKey, oldMessages => 
+        oldMessages?.map(m => ({
+          ...m,
+          read: m.sender.id !== user?.id ? true : m.read
+        }))
+      );
+      // Invalidate queries to refresh unread counts
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      if (onMessagesRead) {
+        onMessagesRead();
+      }
+    },
+    onError: (error) => {
+      console.error("Error marking messages as read:", error);
+    }
+  });
+
   const scrollToBottom = () => {
     if (messagesContainerRef.current) {
       const container = messagesContainerRef.current;
@@ -90,46 +120,17 @@ export function MessageDialog({
       }, 300);
 
       // Mark messages as read when dialog opens
-      const markMessagesAsRead = async () => {
-        if (messages.length > 0) {
-          const hasUnreadMessages = messages.some(m => 
-            m.sender.id !== user?.id && !m.read
-          );
+      const hasUnreadMessages = messages.some(m => 
+        m.sender.id !== user?.id && !m.read
+      );
 
-          if (hasUnreadMessages) {
-            try {
-              const res = await apiRequest("POST", `/api/leads/${leadId}/messages/read`, {
-                leadId,
-                userId: user?.id
-              });
+      if (hasUnreadMessages) {
+        markAsReadMutation.mutate();
+      }
 
-              if (res.ok) {
-                // Update message read status in cache
-                queryClient.setQueryData<Message[]>(messagesQueryKey, oldMessages => 
-                  oldMessages?.map(m => ({
-                    ...m,
-                    read: m.sender.id !== user?.id ? true : m.read
-                  }))
-                );
-
-                // Invalidate queries to refresh unread counts
-                await queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-
-                if (onMessagesRead) {
-                  onMessagesRead();
-                }
-              }
-            } catch (error) {
-              console.error("Error marking messages as read:", error);
-            }
-          }
-        }
-      };
-
-      markMessagesAsRead();
       return () => clearTimeout(scrollTimer);
     }
-  }, [isOpen, messages, leadId, user?.id, queryClient, onMessagesRead]);
+  }, [isOpen, messages]);
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
