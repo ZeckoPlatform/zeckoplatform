@@ -65,33 +65,63 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
 
     if (!token) {
       log('No token provided');
-      return res.status(401).json({ message: 'Authentication required' });
+      return res.status(401).json({ 
+        message: 'Authentication required',
+        code: 'AUTH_REQUIRED'
+      });
     }
 
     jwt.verify(token, JWT_SECRET, async (err: any, decoded: any) => {
       if (err) {
         log(`Token verification failed: ${err.message}`);
-        return res.status(401).json({ message: 'Invalid or expired token' });
+        if (err.name === 'TokenExpiredError') {
+          return res.status(401).json({ 
+            message: 'Token has expired',
+            code: 'TOKEN_EXPIRED'
+          });
+        }
+        return res.status(401).json({ 
+          message: 'Invalid token',
+          code: 'INVALID_TOKEN'
+        });
       }
 
       try {
-        const [user] = await db.select().from(users).where(eq(users.id, decoded.id));
+        const [user] = await db.select()
+          .from(users)
+          .where(eq(users.id, decoded.id));
 
         if (!user) {
           log('User not found in database');
-          return res.status(401).json({ message: 'User not found' });
+          return res.status(401).json({ 
+            message: 'User not found',
+            code: 'USER_NOT_FOUND'
+          });
+        }
+
+        // Update token if user subscription status has changed
+        if (user.subscriptionActive !== decoded.subscriptionActive ||
+            user.subscriptionTier !== decoded.subscriptionTier) {
+          const newToken = generateToken(user);
+          res.setHeader('X-New-Token', newToken);
         }
 
         req.user = user;
         next();
       } catch (dbError) {
         log(`Database error during authentication: ${dbError}`);
-        return res.status(500).json({ message: 'Internal server error during authentication' });
+        return res.status(500).json({ 
+          message: 'Internal server error during authentication',
+          code: 'AUTH_DB_ERROR'
+        });
       }
     });
   } catch (error) {
     log(`Authentication middleware error: ${error}`);
-    return res.status(500).json({ message: 'Internal server error in auth middleware' });
+    return res.status(500).json({ 
+      message: 'Internal server error in auth middleware',
+      code: 'AUTH_INTERNAL_ERROR'
+    });
   }
 }
 

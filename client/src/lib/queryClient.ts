@@ -19,6 +19,13 @@ export const getQueryFn: <T>(options: {
       console.log(`Query request - ${queryKey[0]}`);
       console.log(`Query response status: ${res.status}`);
 
+      // Check for new token in headers
+      const newToken = res.headers.get('X-New-Token');
+      if (newToken) {
+        console.log('Received new token, updating local storage');
+        localStorage.setItem("token", newToken);
+      }
+
       if (res.status === 401) {
         console.log("Authentication failed, clearing user state");
         localStorage.removeItem("token");
@@ -27,6 +34,13 @@ export const getQueryFn: <T>(options: {
         }
         const error = new Error("Authentication required");
         error.name = "AuthenticationError";
+        throw error;
+      }
+
+      if (res.status === 403) {
+        console.log("Access forbidden");
+        const error = new Error("Access forbidden - Subscription may be required");
+        error.name = "ForbiddenError";
         throw error;
       }
 
@@ -58,7 +72,7 @@ export const queryClient = new QueryClient({
       staleTime: 0, // Set staleTime to 0 to always refetch
       cacheTime: 5 * 60 * 1000, // Cache for 5 minutes
       retry: (failureCount, error: any) => {
-        if (error?.name === "AuthenticationError") return false;
+        if (error?.name === "AuthenticationError" || error?.name === "ForbiddenError") return false;
         return failureCount < 3;
       },
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
@@ -89,6 +103,13 @@ export async function apiRequest(
     const res = await fetch(url, fetchOptions);
     console.log(`Response status: ${res.status}`);
 
+    // Check for new token in headers
+    const newToken = res.headers.get('X-New-Token');
+    if (newToken) {
+      console.log('Received new token, updating local storage');
+      localStorage.setItem("token", newToken);
+    }
+
     if (!res.ok) {
       const text = await res.text();
       let errorMessage: string;
@@ -102,6 +123,9 @@ export async function apiRequest(
       if (res.status === 401) {
         localStorage.removeItem("token");
         error.name = "AuthenticationError";
+      }
+      if (res.status === 403) {
+        error.name = "ForbiddenError";
       }
       throw error;
     }
