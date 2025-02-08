@@ -57,6 +57,13 @@ export function MessageDialog({
     refetchInterval: isOpen ? 3000 : false, // Poll every 3 seconds when dialog is open
   });
 
+  const scrollToBottom = () => {
+    if (scrollRef.current) {
+      const scrollElement = scrollRef.current;
+      scrollElement.scrollTop = scrollElement.scrollHeight;
+    }
+  };
+
   // Play notification sound when new messages arrive
   useEffect(() => {
     if (messages.length > previousMessagesLengthRef.current && !isFirstLoadRef.current) {
@@ -68,15 +75,8 @@ export function MessageDialog({
     previousMessagesLengthRef.current = messages.length;
   }, [messages.length, user?.id, playNotification]);
 
-  // Scroll to bottom when new messages arrive or on initial load
+  // Scroll to bottom when new messages arrive or dialog opens
   useEffect(() => {
-    const scrollToBottom = () => {
-      if (scrollRef.current) {
-        const scrollElement = scrollRef.current;
-        scrollElement.scrollTop = scrollElement.scrollHeight;
-      }
-    };
-
     if (isOpen) {
       // Use setTimeout to ensure DOM is updated
       setTimeout(scrollToBottom, 100);
@@ -131,6 +131,8 @@ export function MessageDialog({
       });
       // Also invalidate to ensure we get the latest from the server
       queryClient.invalidateQueries({ queryKey: messagesQueryKey });
+      // Scroll to bottom after sending
+      setTimeout(scrollToBottom, 100);
     },
     onError: (error: Error) => {
       console.error("Failed to send message:", error);

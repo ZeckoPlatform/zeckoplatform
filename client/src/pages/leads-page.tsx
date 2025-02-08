@@ -303,6 +303,7 @@ export default function LeadsPage() {
         toast({
           title: "Welcome back!",
           description: `You have ${totalUnreadCount} unread message${totalUnreadCount === 1 ? '' : 's'} in your leads.`,
+          duration: 5000,
         });
         playNotification('receive');
       }
