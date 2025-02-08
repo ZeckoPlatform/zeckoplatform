@@ -691,14 +691,14 @@ export function registerRoutes(app: Express): Server {
       const leadId = parseInt(req.params.leadId);
       log(`Marking messages as read for lead ${leadId} and user ${req.user.id}`);
 
-      // Update all unread messages for this user in this lead to read
-      const result = await db.update(messages)
+      // Update all unread messages for this user in this lead using correct column names
+      const result = await db
+        .update(messages)
         .set({ read: true })
         .where(
           and(
             eq(messages.lead_id, leadId),
-            eq(messages.receiver_id, req.user.id),
-            eq(messages.read, false)
+            eq(messages.receiver_id, req.user.id)
           )
         )
         .returning();
@@ -893,7 +893,7 @@ export function registerRoutes(app: Express): Server {
 
       res.json({ message: "Product deleted successfully" });
     } catch (error) {
-      log(`Product deletion error: ${error instanceof Error ? errormessage : String(error)}`);
+      log(`Product deletion error: ${error instanceof Error ? error.message : String(error)}`);
       console.error('Full error:', error);
       res.status(500).json({ 
         message: "Failed to delete product",
