@@ -115,6 +115,12 @@ function useAuthState() {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
+      await fetch("/api/logout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
       localStorage.removeItem("token");
       queryClient.setQueryData(["/api/user"], null);
     },
@@ -123,6 +129,13 @@ function useAuthState() {
       toast({
         title: "Logged out",
         description: "You have been logged out successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Logout failed",
+        description: error.message,
+        variant: "destructive",
       });
     },
   });
