@@ -21,7 +21,7 @@ import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { useNotificationSound } from "@/lib/useNotificationSound";
 import { MessageDialog } from "@/components/MessageDialog";
-
+import { SubscriptionRequiredModal } from "@/components/subscription-required-modal";
 
 // Add necessary interfaces
 interface LeadFormData {
@@ -131,6 +131,7 @@ interface LeadWithUnreadCount extends SelectLead {
 
 export default function LeadsPage() {
   const { user } = useAuth();
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
 
   // If user is not logged in, redirect to auth page
   if (!user) {
@@ -288,19 +289,27 @@ export default function LeadsPage() {
     },
   });
 
-  // Update the leads query to handle notifications properly
+  // Update the leads query to handle notifications and subscription errors
   const {
     data: leads = [],
     isLoading: isLoadingLeads,
+    error: leadsError
   } = useQuery<LeadWithUnreadCount[]>({
     queryKey: ["/api/leads"],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/leads");
-      if (!response.ok) {
-        throw new Error("Failed to fetch leads");
+      try {
+        const response = await apiRequest("GET", "/api/leads");
+        if (!response.ok) {
+          throw new Error("Failed to fetch leads");
+        }
+        const data = await response.json();
+        return data as LeadWithUnreadCount[];
+      } catch (error: any) {
+        if (error?.name === "SubscriptionRequiredError") {
+          setShowSubscriptionModal(true);
+        }
+        throw error;
       }
-      const data = await response.json();
-      return data as LeadWithUnreadCount[];
     },
     enabled: !!user,
     onSuccess: (data) => {
@@ -328,8 +337,11 @@ export default function LeadsPage() {
     refetchInterval: 5000, // Poll every 5 seconds for new messages
     staleTime: 0,
     gcTime: Infinity, // Keep messages in cache indefinitely
+    retry: (failureCount, error: any) => {
+      if (error?.name === "SubscriptionRequiredError") return false;
+      return failureCount < 3;
+    }
   });
-
 
   const createLeadMutation = useMutation({
     mutationFn: async (data: LeadFormData) => {
