@@ -17,27 +17,33 @@ import { zodResolver } from "@hookform/resolvers/zod";
 const subscriptionFormSchema = z.object({
   paymentMethod: z.enum(["stripe", "direct_debit"]),
   paymentFrequency: z.enum(["monthly", "annual"]),
-  bankAccountHolder: z.string().min(1, "Account holder name is required").optional()
-    .refine((val, ctx) => {
-      if (ctx.parent.paymentMethod === "direct_debit") {
-        return val && val.length > 0;
-      }
-      return true;
-    }, "Account holder name is required for direct debit"),
-  bankSortCode: z.string().regex(/^\d{6}$/, "Sort code must be 6 digits").optional()
-    .refine((val, ctx) => {
-      if (ctx.parent.paymentMethod === "direct_debit") {
-        return val && val.length === 6;
-      }
-      return true;
-    }, "Valid sort code is required for direct debit"),
-  bankAccountNumber: z.string().regex(/^\d{8}$/, "Account number must be 8 digits").optional()
-    .refine((val, ctx) => {
-      if (ctx.parent.paymentMethod === "direct_debit") {
-        return val && val.length === 8;
-      }
-      return true;
-    }, "Valid account number is required for direct debit"),
+  bankAccountHolder: z.string().optional(),
+  bankSortCode: z.string().optional(),
+  bankAccountNumber: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.paymentMethod === "direct_debit") {
+    if (!data.bankAccountHolder || data.bankAccountHolder.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Account holder name is required for direct debit",
+        path: ["bankAccountHolder"],
+      });
+    }
+    if (!data.bankSortCode || !/^\d{6}$/.test(data.bankSortCode)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Valid sort code is required for direct debit",
+        path: ["bankSortCode"],
+      });
+    }
+    if (!data.bankAccountNumber || !/^\d{8}$/.test(data.bankAccountNumber)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Valid account number is required for direct debit",
+        path: ["bankAccountNumber"],
+      });
+    }
+  }
 });
 
 type SubscriptionFormData = z.infer<typeof subscriptionFormSchema>;
