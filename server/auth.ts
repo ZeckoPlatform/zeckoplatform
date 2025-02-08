@@ -159,20 +159,25 @@ export function setupAuth(app: Express) {
         location: "",
       };
 
+      // Set initial subscription status based on user type
+      const subscriptionActive = result.data.userType === "free";
+      const subscriptionTier = result.data.userType === "free" ? "none" : result.data.userType;
+
       const [user] = await db.insert(users)
         .values({
           email: result.data.email,
           username: result.data.username,
           password: await hashPassword(result.data.password),
           userType: result.data.userType,
-          subscriptionActive: false,
-          subscriptionTier: "none",
+          subscriptionActive,
+          subscriptionTier,
           profile: profileData,
         })
         .returning();
 
+      log(`Registration successful - User ID: ${user.id}, Type: ${user.userType}, Subscription: ${user.subscriptionActive}`);
+
       const token = generateToken(user);
-      log(`Registration successful for user: ${user.id} (${user.userType})`);
       res.status(201).json({ user, token });
     } catch (error) {
       log(`Registration error: ${error instanceof Error ? error.message : String(error)}`);

@@ -153,71 +153,86 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Update the GET /api/leads endpoint to properly handle unread messages
+  // GET /api/leads endpoint
   app.get("/api/leads", async (req, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ message: "Authentication required" });
       }
 
-      // For business users, check subscription
-      if (req.user.userType === "business" && !req.user.subscriptionActive) {
-        return res.status(403).json({ 
-          message: "Active subscription required to view leads",
-          subscriptionRequired: true 
-        });
-      }
+      log(`User type: ${req.user.userType}, Subscription active: ${req.user.subscriptionActive}`);
 
-      log(`Fetching leads for user ${req.user.id} (${req.user.userType})`);
-
-      const baseQuery = req.user.userType === "free" 
-        ? eq(leads.user_id, req.user.id)
-        : req.user.userType === "business" 
-          ? eq(leads.status, "open")
-          : undefined;
-
-      // Use Drizzle's query builder with relations
-      const fetchedLeads = await db.query.leads.findMany({
-        where: baseQuery,
-        with: {
-          responses: {
-            with: {
-              business: true
-            }
-          },
-          messages: {
-            where: eq(messages.receiver_id, req.user.id),
-            with: {
-              sender: true
+      // For free users, only show their own leads
+      if (req.user.userType === "free") {
+        const leads = await db.query.leads.findMany({
+          where: eq(leads.user_id, req.user.id),
+          with: {
+            responses: {
+              with: {
+                business: true
+              }
+            },
+            messages: {
+              where: eq(messages.receiver_id, req.user.id),
+              with: {
+                sender: true
+              }
             }
           }
-        }
-      });
+        });
 
-      log(`Successfully fetched ${fetchedLeads.length} leads with responses and messages`);
+        const processedLeads = leads.map(lead => ({
+          ...lead,
+          unreadMessages: lead.messages?.filter(m => !m.read).length || 0,
+          messages: undefined
+        }));
 
-      // Process leads to include unread message counts
-      const processedLeads = fetchedLeads.map(lead => ({
-        ...lead,
-        unreadMessages: lead.messages?.filter(m => !m.read).length || 0,
-        // Remove messages array from response to avoid sending unnecessary data
-        messages: undefined
-      }));
-
-      // For business users, sort leads by match score
-      if (req.user.userType === "business" && req.user.profile?.matchPreferences) {
-        const { calculateMatchScore } = await import("./utils/matching");
-        const scoredLeads = processedLeads
-          .map(lead => ({
-            ...lead,
-            matchScore: calculateMatchScore(lead, req.user)
-          }))
-          .sort((a, b) => (b.matchScore?.totalScore || 0) - (a.matchScore?.totalScore || 0));
-
-        res.json(scoredLeads);
-      } else {
-        res.json(processedLeads);
+        return res.json(processedLeads);
       }
+
+      // For business users, check subscription
+      if (req.user.userType === "business") {
+        if (!req.user.subscriptionActive) {
+          log(`Business user ${req.user.id} attempted to access leads without active subscription`);
+          return res.status(403).json({ 
+            message: "Active subscription required to view leads",
+            subscriptionRequired: true,
+            userType: req.user.userType 
+          });
+        }
+
+        const leads = await db.query.leads.findMany({
+          where: eq(leads.status, "open"),
+          with: {
+            responses: {
+              with: {
+                business: true
+              }
+            },
+            messages: {
+              where: eq(messages.receiver_id, req.user.id),
+              with: {
+                sender: true
+              }
+            }
+          }
+        });
+
+        const processedLeads = leads.map(lead => ({
+          ...lead,
+          unreadMessages: lead.messages?.filter(m => !m.read).length || 0,
+          messages: undefined
+        }));
+
+        return res.json(processedLeads);
+      }
+
+      // For vendors, return an empty array as they don't need to see leads
+      if (req.user.userType === "vendor") {
+        return res.json([]);
+      }
+
+      res.json([]);
     } catch (error) {
       log(`Leads fetch error: ${error instanceof Error ? error.message : String(error)}`);
       console.error('Full error:', error);
