@@ -11,7 +11,14 @@ import jwt from 'jsonwebtoken';
 const scryptAsync = promisify(scrypt);
 const JWT_SECRET = process.env.REPL_ID!;
 
-// Export these functions so they can be used in routes.ts
+declare global {
+  namespace Express {
+    interface Request {
+      user?: SelectUser;
+    }
+  }
+}
+
 export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;
@@ -55,13 +62,15 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
 
     jwt.verify(token, JWT_SECRET, async (err: any, decoded: any) => {
       if (err) {
-        log('Token verification failed:', err);
+        log('Token verification failed:', err.message);
         return res.status(401).json({ message: 'Invalid or expired token' });
       }
 
       try {
-        // Get fresh user data from database
-        const [user] = await db.select().from(users).where(eq(users.id, decoded.id));
+        const [user] = await db.select()
+          .from(users)
+          .where(eq(users.id, decoded.id));
+
         if (!user) {
           log('User not found in database');
           return res.status(401).json({ message: 'User not found' });
@@ -69,13 +78,13 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
 
         req.user = user;
         next();
-      } catch (error) {
-        log('Database error during authentication:', error);
+      } catch (dbError) {
+        log('Database error during authentication:', String(dbError));
         return res.status(500).json({ message: 'Internal server error' });
       }
     });
   } catch (error) {
-    log('Authentication middleware error:', error);
+    log('Authentication middleware error:', String(error));
     return res.status(500).json({ message: 'Internal server error' });
   }
 }
@@ -94,39 +103,13 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ message: "Username already exists" });
       }
 
-      // Validate userType
-      const validUserTypes = ["free", "business", "vendor"];
-      if (!validUserTypes.includes(result.data.userType)) {
-        return res.status(400).json({ message: "Invalid user type. Must be 'free', 'business', or 'vendor'" });
-      }
-
       // Initialize profile based on user type
-      let profileData = {
+      const profileData = {
         name: result.data.username,
         description: "",
         categories: [],
         location: "",
       };
-
-      // Add specific fields based on user type
-      if (result.data.userType === "business") {
-        profileData = {
-          ...profileData,
-          matchPreferences: {
-            preferredCategories: [],
-            locationPreference: [],
-            budgetRange: { min: 0, max: 1000000 }
-          }
-        };
-      } else if (result.data.userType === "vendor") {
-        profileData = {
-          ...profileData,
-          services: [],
-          portfolio: [],
-          ratings: [],
-          averageRating: 0
-        };
-      }
 
       const [user] = await db.insert(users)
         .values({
@@ -166,13 +149,13 @@ export function setupAuth(app: Express) {
       log(`Login successful for user: ${user.id} (${user.userType})`);
       res.json({ user, token });
     } catch (error) {
-      log(`Login error: ${error}`);
+      log(`Login error: ${error instanceof Error ? error.message : String(error)}`);
       res.status(500).json({ message: "Internal server error" });
     }
   });
 
-  app.get("/api/auth/verify", authenticateToken, (req, res) => {
-    res.json({ authenticated: true, user: req.user });
+  app.post("/api/logout", (req, res) => {
+    res.json({ message: "Logged out successfully" });
   });
 
   app.get("/api/user", authenticateToken, (req, res) => {
