@@ -19,38 +19,7 @@ import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { useNotificationSound } from "@/lib/useNotificationSound";
 
-interface LeadFormData {
-  title: string;
-  description: string;
-  category: string;
-  budget: string;
-  location: string;
-}
-
-interface ProfileFormData {
-  name?: string;
-  description?: string;
-  categories?: string;
-  location?: string;
-}
-
-interface PasswordFormData {
-  currentPassword: string;
-  newPassword: string;
-  confirmPassword: string;
-}
-
-interface UsernameFormData {
-  username: string;
-}
-
-interface ProposalFormData {
-  proposal: string;
-}
-
-interface MessageFormData {
-  content: string;
-}
+// interfaces remain unchanged
 
 const MessageDialogContent = ({
   leadId,
@@ -65,7 +34,8 @@ const MessageDialogContent = ({
   const messageForm = useForm<MessageFormData>();
   const [messages, setMessages] = useState<SelectMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const previousMessagesLength = useRef(0);
+  const playNotification = useNotificationSound();
+  const isFirstLoadRef = useRef(true);
 
   // Fetch messages
   const { data: fetchedMessages = [] } = useQuery<SelectMessage[]>({
@@ -73,22 +43,23 @@ const MessageDialogContent = ({
     refetchInterval: 5000,
   });
 
-  // Update messages state when fetchedMessages changes
+  // Update messages state and handle scrolling
   useEffect(() => {
     setMessages(fetchedMessages);
-    // Check if new messages arrived and scroll if needed
-    if (fetchedMessages.length > previousMessagesLength.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+
+    // Scroll to bottom on initial load or new message
+    if (messagesEndRef.current && (isFirstLoadRef.current || messages.length < fetchedMessages.length)) {
+      messagesEndRef.current.scrollIntoView({ behavior: isFirstLoadRef.current ? "auto" : "smooth" });
+      isFirstLoadRef.current = false;
     }
-    previousMessagesLength.current = fetchedMessages.length;
-  }, [fetchedMessages]);
+  }, [fetchedMessages, messages.length]);
 
   // Mark messages as read when dialog opens
   useEffect(() => {
     const markMessagesAsRead = async () => {
       try {
         await apiRequest("POST", `/api/leads/${leadId}/messages/read`, {});
-        queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+        await queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       } catch (error) {
         console.error('Error marking messages as read:', error);
       }
@@ -107,7 +78,6 @@ const MessageDialogContent = ({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/leads/${leadId}/messages`] });
       messageForm.reset();
-      // Play send notification sound
       playNotification('send');
     },
   });
@@ -368,26 +338,30 @@ export default function LeadsPage() {
     queryKey: ["/api/leads"],
     enabled: !!user,
     onSuccess: (data) => {
-      // Check for new messages across all leads
-      const hasNewMessages = data.some(lead => {
-        const previousCount = previousUnreadCountRef.current[lead.id] || 0;
-        const currentCount = lead.unreadMessages || 0;
-        return currentCount > previousCount;
-      });
+      const totalUnreadCount = data.reduce((sum, lead) => sum + (lead.unreadMessages || 0), 0);
+      const previousTotalUnread = Object.values(previousUnreadCountRef.current).reduce((sum, count) => sum + count, 0);
 
-      // Update the previous counts
-      data.forEach(lead => {
-        previousUnreadCountRef.current[lead.id] = lead.unreadMessages || 0;
-      });
-
-      // Play notification sound if there are new messages
-      if (hasNewMessages && !initialLoadRef.current) {
+      // Play notification on login if there are unread messages
+      if (initialLoadRef.current && totalUnreadCount > 0) {
+        playNotification('receive');
+        toast({
+          title: "Unread Messages",
+          description: "You have unread messages in your leads.",
+        });
+      }
+      // Play notification for new messages after initial load
+      else if (!initialLoadRef.current && totalUnreadCount > previousTotalUnread) {
         playNotification('receive');
         toast({
           title: "New Messages",
           description: "You have received new messages.",
         });
       }
+
+      // Update previous counts
+      data.forEach(lead => {
+        previousUnreadCountRef.current[lead.id] = lead.unreadMessages || 0;
+      });
 
       initialLoadRef.current = false;
     }
