@@ -298,18 +298,26 @@ export default function LeadsPage() {
     onSuccess: (data) => {
       const totalUnreadCount = data.reduce((sum, lead) => sum + (lead.unreadMessages || 0), 0);
 
-      // Only show notification and play sound if there are unread messages on initial load
-      if (totalUnreadCount > 0 && initialLoadRef.current) {
+      // Only show notification and play sound if there are unread messages and it's not the initial load
+      if (totalUnreadCount > 0 && !initialLoadRef.current) {
         toast({
-          title: "Welcome back!",
-          description: `You have ${totalUnreadCount} unread message${totalUnreadCount === 1 ? '' : 's'} in your leads.`,
+          title: "New Message",
+          description: `You have ${totalUnreadCount} new message${totalUnreadCount === 1 ? '' : 's'}`,
           duration: 5000,
         });
         playNotification('receive');
+      } else if (totalUnreadCount > 0 && initialLoadRef.current) {
+        // Show welcome back message with unread count only on initial load
+        toast({
+          title: "Welcome back!",
+          description: `You have ${totalUnreadCount} unread message${totalUnreadCount === 1 ? '' : 's'}`,
+          duration: 5000,
+        });
       }
 
       initialLoadRef.current = false;
-    }
+    },
+    refetchInterval: 5000, // Poll every 5 seconds for new messages
   });
 
 

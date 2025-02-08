@@ -3,7 +3,6 @@ import { DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/c
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
@@ -45,7 +44,7 @@ export function MessageDialog({
   const queryClient = useQueryClient();
   const playNotification = useNotificationSound();
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const isFirstLoadRef = useRef(true);
   const previousMessagesLengthRef = useRef(0);
 
@@ -58,11 +57,8 @@ export function MessageDialog({
   });
 
   const scrollToBottom = () => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
   };
 
@@ -81,11 +77,12 @@ export function MessageDialog({
   // Effect for initial load and dialog open
   useEffect(() => {
     if (isOpen && messages.length > 0) {
-      // Add a longer delay for initial load to ensure DOM is ready
-      setTimeout(scrollToBottom, 500);
+      // Force scroll after a delay to ensure DOM is ready
+      const timer = setTimeout(scrollToBottom, 100);
       if (isFirstLoadRef.current) {
         isFirstLoadRef.current = false;
       }
+      return () => clearTimeout(timer);
     }
   }, [isOpen, messages]);
 
@@ -99,11 +96,13 @@ export function MessageDialog({
 
         if (hasUnreadMessages) {
           try {
-            await apiRequest("POST", `/api/leads/${leadId}/messages/read`, {});
-            await queryClient.invalidateQueries({ queryKey: messagesQueryKey });
-            await queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-            if (onMessagesRead) {
-              onMessagesRead();
+            const res = await apiRequest("POST", `/api/leads/${leadId}/messages/read`, {});
+            if (res.ok) {
+              await queryClient.invalidateQueries({ queryKey: messagesQueryKey });
+              await queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+              if (onMessagesRead) {
+                onMessagesRead();
+              }
             }
           } catch (error) {
             console.error("Error marking messages as read:", error);
@@ -154,7 +153,10 @@ export function MessageDialog({
         </DialogDescription>
       </DialogHeader>
       <div className="flex flex-col h-[400px]">
-        <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+        <div 
+          ref={messagesContainerRef}
+          className="flex-1 overflow-y-auto p-4"
+        >
           {isLoading ? (
             <div className="flex items-center justify-center h-full">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -187,7 +189,7 @@ export function MessageDialog({
               <div ref={messagesEndRef} />
             </div>
           )}
-        </ScrollArea>
+        </div>
         <form onSubmit={handleSend} className="flex gap-2 p-4 border-t">
           <Input
             value={newMessage}
