@@ -1069,12 +1069,11 @@ export default function LeadsPage() {
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-3xl font-bold">Dashboard</h1>
-            <p className="text-muted-foreground">
-              Welcome back{user?.profile?.name ? `, ${user.profile.name}` : ''}
-              {leads.some(lead => lead.unreadMessages > 0) && (
-                <span> • You have unread messages</span>
-              )}
-            </p>
+            {user?.profile?.name && (
+              <p className="text-muted-foreground">
+                Welcome back, {user.profile.name}
+              </p>
+            )}
           </div>
           <Dialog>
             <DialogTrigger asChild>

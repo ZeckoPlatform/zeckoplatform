@@ -44,44 +44,49 @@ export function MessageDialog({
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const playNotification = useNotificationSound();
-  const previousMessagesLengthRef = useRef(0);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const isFirstLoadRef = useRef(true);
+  const previousMessagesLengthRef = useRef(0);
 
-  // Use a consistent query key format
   const messagesQueryKey = [`/api/leads/${leadId}/messages`];
 
-  const { data: messages = [], isLoading, error } = useQuery<Message[]>({
+  const { data: messages = [], isLoading } = useQuery<Message[]>({
     queryKey: messagesQueryKey,
     enabled: isOpen,
-    refetchInterval: isOpen ? 3000 : false, // Poll every 3 seconds when dialog is open
+    refetchInterval: isOpen ? 3000 : false,
   });
 
   const scrollToBottom = () => {
     if (scrollRef.current) {
-      const scrollElement = scrollRef.current;
-      scrollElement.scrollTop = scrollElement.scrollHeight;
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   };
 
-  // Play notification sound when new messages arrive
+  // Effect for handling new messages and notifications
   useEffect(() => {
     if (messages.length > previousMessagesLengthRef.current && !isFirstLoadRef.current) {
       const lastMessage = messages[messages.length - 1];
       if (lastMessage?.sender?.id !== user?.id) {
         playNotification('receive');
       }
+      scrollToBottom();
     }
     previousMessagesLengthRef.current = messages.length;
-  }, [messages.length, user?.id, playNotification]);
+  }, [messages, user?.id, playNotification]);
 
-  // Scroll to bottom when new messages arrive or dialog opens
+  // Effect for initial load and dialog open
   useEffect(() => {
     if (isOpen) {
-      // Use setTimeout to ensure DOM is updated
       setTimeout(scrollToBottom, 100);
+      if (isFirstLoadRef.current) {
+        isFirstLoadRef.current = false;
+      }
     }
-  }, [messages.length, isOpen]);
+  }, [isOpen, messages.length]);
 
   // Mark messages as read when dialog opens
   useEffect(() => {
@@ -94,7 +99,6 @@ export function MessageDialog({
         if (hasUnreadMessages) {
           try {
             await apiRequest("POST", `/api/leads/${leadId}/messages/read`, {});
-            // Invalidate both messages and leads queries to update unread status
             await queryClient.invalidateQueries({ queryKey: messagesQueryKey });
             await queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
             if (onMessagesRead) {
@@ -109,7 +113,6 @@ export function MessageDialog({
 
     if (isOpen) {
       markMessagesAsRead();
-      isFirstLoadRef.current = false;
     }
   }, [isOpen, messages, leadId, user?.id, queryClient, onMessagesRead]);
 
@@ -119,19 +122,15 @@ export function MessageDialog({
         receiverId,
         content,
       });
-      const data = await response.json();
-      return data;
+      return response.json();
     },
     onSuccess: (newMessage) => {
       setNewMessage("");
       playNotification('send');
-      // Optimistically update the messages list
       queryClient.setQueryData(messagesQueryKey, (old: Message[] = []) => {
         return [...old, newMessage];
       });
-      // Also invalidate to ensure we get the latest from the server
       queryClient.invalidateQueries({ queryKey: messagesQueryKey });
-      // Scroll to bottom after sending
       setTimeout(scrollToBottom, 100);
     },
     onError: (error: Error) => {
@@ -154,17 +153,10 @@ export function MessageDialog({
         </DialogDescription>
       </DialogHeader>
       <div className="flex flex-col h-[400px]">
-        <div className="bg-muted/50 px-4 py-2 text-xs text-muted-foreground">
-          Message history is retained for 30 days or until the lead is closed
-        </div>
         <ScrollArea className="flex-1 p-4" ref={scrollRef}>
           {isLoading ? (
             <div className="flex items-center justify-center h-full">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : error ? (
-            <div className="text-center text-destructive p-4">
-              Failed to load messages. Please try again.
             </div>
           ) : (
             <div className="space-y-4">
@@ -191,6 +183,7 @@ export function MessageDialog({
                   </span>
                 </div>
               ))}
+              <div ref={messagesEndRef} />
             </div>
           )}
         </ScrollArea>
