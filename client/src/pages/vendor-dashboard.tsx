@@ -11,10 +11,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { apiRequest } from "@/lib/queryClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Store, Package, Settings, Edit, Trash2, Loader2, Upload, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Store, Package, Settings, Edit, Trash2, Loader2, Upload } from "lucide-react";
 import { ProductForm } from "@/components/ProductForm";
 
-// Keep existing interfaces with updated types
 interface Product {
   id: number;
   title: string;
@@ -41,59 +40,33 @@ export default function VendorDashboard() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string>();
-  const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // Add Stripe account status query
-  const { data: accountStatus, isLoading: statusLoading } = useQuery({
-    queryKey: ["/api/vendor/stripe/account/status"],
-    enabled: user?.stripeAccountId !== undefined,
-  });
-
-  // Add Stripe account setup mutation
-  const setupAccountMutation = useMutation({
-    mutationFn: async () => {
-      setIsLoading(true);
-      const response = await apiRequest("POST", "/api/vendor/stripe/account", {
-        email: user?.username, // Using username as email for demo
-      });
-      if (!response.ok) {
-        throw new Error("Failed to create Stripe account");
-      }
-      const data = await response.json();
-      window.location.href = data.onboardingUrl;
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-      setIsLoading(false);
-    },
-  });
-
-  // Update the products query to be less restrictive and add more logging
+  // Query for products
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ["/api/products"],
     select: (data) => {
       console.log("Products data:", data);
-      console.log("Current user:", user);
       return Array.isArray(data)
-        ? data.filter((product) => {
-            console.log("Checking product:", product);
-            return product.vendorId === user?.id;
-          })
+        ? data.filter((product) => product.vendorId === user?.id)
         : [];
     },
     enabled: !!user?.id,
   });
 
-  // Keep existing form handling
+  // Form handling
   const editForm = useForm<EditProductFormData>();
+  const accountForm = useForm({
+    defaultValues: {
+      username: user?.username || '',
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: '',
+    },
+  });
 
-  // Keep existing file upload handler
+  // File upload handler
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -158,7 +131,7 @@ export default function VendorDashboard() {
       editForm.reset({
         title: editingProduct.title,
         description: editingProduct.description,
-        price: parseFloat(editingProduct.price).toFixed(2),
+        price: editingProduct.price,
         category: editingProduct.category,
         imageUrl: editingProduct.imageUrl,
       });
@@ -169,28 +142,57 @@ export default function VendorDashboard() {
     }
   }, [editingProduct, editForm]);
 
+  // Account update mutation
+  const updateAccountMutation = useMutation({
+    mutationFn: async (data: {
+      username: string;
+      currentPassword: string;
+      newPassword: string;
+    }) => {
+      const res = await apiRequest("PATCH", "/api/user", data);
+      if (!res.ok) {
+        throw new Error("Failed to update account");
+      }
+      return res.json();
+    },
+    onSuccess: (updatedUser) => {
+      queryClient.setQueryData(["/api/user"], updatedUser);
+      toast({
+        title: "Success",
+        description: "Account updated successfully",
+      });
+      accountForm.reset({
+        username: updatedUser.username,
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update account",
+        variant: "destructive",
+      });
+    },
+    onSettled: () => {
+      setIsUpdating(false);
+    },
+  });
+
+  // Product mutations
   const updateProductMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: EditProductFormData }) => {
-      const price = parseFloat(data.price.toString());
-      if (isNaN(price) || price <= 0) {
-        throw new Error("Please enter a valid positive number for the price.");
-      }
-
-      const res = await apiRequest("PATCH", `/api/products/${id}`, {
-        ...data,
-        price: price.toFixed(2), // Ensure price is sent with exactly 2 decimal places
-      });
-
+      const res = await apiRequest("PATCH", `/api/products/${id}`, data);
       if (!res.ok) {
         throw new Error("Failed to update product");
       }
-
       return res.json();
     },
     onSuccess: (updatedProduct) => {
       queryClient.setQueryData<Product[]>(
         ["/api/products"],
-        (old = []) => old?.map(p => p.id === updatedProduct.id ? updatedProduct : p) ?? []
+        (old = []) => old.map(p => p.id === updatedProduct.id ? updatedProduct : p)
       );
       toast({
         title: "Success",
@@ -233,70 +235,12 @@ export default function VendorDashboard() {
         description: error.message || "Failed to delete product",
         variant: "destructive",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
-    },
-  });
-
-  // Add status badge helper
-  const getStatusBadge = () => {
-    if (statusLoading) return <Loader2 className="h-4 w-4 animate-spin" />;
-    if (!accountStatus) return <AlertCircle className="h-4 w-4 text-yellow-500" />;
-    return accountStatus?.status === "enabled" ? (
-      <CheckCircle2 className="h-4 w-4 text-green-500" />
-    ) : (
-      <AlertCircle className="h-4 w-4 text-yellow-500" />
-    );
-  };
-
-  const accountForm = useForm({
-    defaultValues: {
-      username: user?.username || '',
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: '',
-    },
-  });
-
-  const updateAccountMutation = useMutation({
-    mutationFn: async (data: {
-      username: string;
-      currentPassword: string;
-      newPassword: string;
-    }) => {
-      const res = await apiRequest("PATCH", "/api/user", data);
-      if (!res.ok) {
-        throw new Error("Failed to update account");
-      }
-      return res.json();
-    },
-    onSuccess: (updatedUser) => {
-      queryClient.setQueryData(["/api/user"], updatedUser);
-      toast({
-        title: "Success",
-        description: "Account updated successfully",
-      });
-      accountForm.reset({
-        username: updatedUser.username,
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: '',
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update account",
-        variant: "destructive",
-      });
-    },
-    onSettled: () => {
-      setIsUpdating(false);
     },
   });
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 className="text-3xl font-bold mb-8">Zecko Vendor Dashboard</h1>
+      <h1 className="text-3xl font-bold mb-8">Vendor Dashboard</h1>
 
       <Tabs defaultValue="products">
         <TabsList className="mb-8">
@@ -304,17 +248,14 @@ export default function VendorDashboard() {
             <Package className="h-4 w-4" />
             Products
           </TabsTrigger>
-          <TabsTrigger value="payments" className="flex items-center gap-2">
-            <Store className="h-4 w-4" />
-            Payments
-          </TabsTrigger>
-          <TabsTrigger value="store" className="flex items-center gap-2">
-            <Store className="h-4 w-4" />
-            Store Profile
-          </TabsTrigger>
           <TabsTrigger value="settings" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             Settings
+          </TabsTrigger>
+          {/* Added Store Profile Tab */}
+          <TabsTrigger value="store" className="flex items-center gap-2">
+            <Store className="h-4 w-4" />
+            Store Profile
           </TabsTrigger>
         </TabsList>
 
@@ -325,11 +266,11 @@ export default function VendorDashboard() {
               <DialogTrigger asChild>
                 <Button>Add Product</Button>
               </DialogTrigger>
-              <DialogContent className="max-h-[85vh] overflow-y-auto" aria-describedby="add-product-description">
+              <DialogContent className="max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>Add New Zecko Product</DialogTitle>
-                  <DialogDescription id="dialog-description">
-                    Fill in the details below to add a new product to your Zecko store.
+                  <DialogTitle>Add New Product</DialogTitle>
+                  <DialogDescription>
+                    Fill in the details below to add a new product to your store.
                   </DialogDescription>
                 </DialogHeader>
                 <ProductForm onSuccess={() => setDialogOpen(false)} />
@@ -337,11 +278,61 @@ export default function VendorDashboard() {
             </Dialog>
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {products?.map((product) => (
+              <Card key={product.id}>
+                <div className="aspect-square relative">
+                  <img
+                    src={product.imageUrl || "https://via.placeholder.com/400"}
+                    alt={product.title}
+                    className="absolute inset-0 w-full h-full object-cover rounded-t-lg"
+                  />
+                </div>
+                <CardHeader>
+                  <CardTitle className="line-clamp-2">{product.title}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground line-clamp-3">
+                    {product.description}
+                  </p>
+                  <div className="flex items-center justify-between mt-4">
+                    <span className="text-lg font-semibold">
+                      £{product.price.toFixed(2)}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      {product.category}
+                    </span>
+                  </div>
+                </CardContent>
+                <CardFooter className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setEditingProduct(product)}
+                  >
+                    <Edit className="h-4 w-4 mr-2" /> Edit
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    onClick={() => {
+                      if (confirm('Are you sure you want to delete this product?')) {
+                        deleteProductMutation.mutate(product.id);
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
+
           <Dialog open={!!editingProduct} onOpenChange={(open) => !open && setEditingProduct(null)}>
-            <DialogContent className="max-h-[85vh] overflow-y-auto" aria-describedby="edit-product-description">
+            <DialogContent className="max-h-[85vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Edit Product</DialogTitle>
-                <DialogDescription id="edit-product-description">
+                <DialogDescription>
                   Update your product details below.
                 </DialogDescription>
               </DialogHeader>
@@ -352,53 +343,41 @@ export default function VendorDashboard() {
                       id: editingProduct.id,
                       data: {
                         ...data,
-                        price: parseFloat(data.price).toFixed(2),
-                        imageUrl: editForm.getValues("imageUrl"),
+                        price: parseFloat(data.price.toString()),
                       },
                     })
                   )}
                   className="space-y-4"
                 >
                   <div>
-                    <Label htmlFor="edit-title">Title</Label>
-                    <Input id="edit-title" {...editForm.register("title")} required />
+                    <Label htmlFor="title">Title</Label>
+                    <Input id="title" {...editForm.register("title")} required />
                   </div>
                   <div>
-                    <Label htmlFor="edit-description">Description</Label>
+                    <Label htmlFor="description">Description</Label>
                     <Textarea
-                      id="edit-description"
+                      id="description"
                       {...editForm.register("description")}
                       required
                     />
                   </div>
                   <div>
-                    <Label htmlFor="edit-price">Price (£)</Label>
+                    <Label htmlFor="price">Price (£)</Label>
                     <Input
-                      id="edit-price"
-                      type="text"
-                      pattern="^\d*\.?\d{0,2}$"
-                      inputMode="decimal"
+                      id="price"
+                      type="number"
+                      step="0.01"
+                      min="0"
                       {...editForm.register("price", {
-                        setValueAs: (value) => {
-                          const parsed = parseFloat(value);
-                          return isNaN(parsed) ? 0 : parsed;
-                        },
-                        validate: (value) => value > 0 || "Price must be greater than 0",
+                        valueAsNumber: true,
                       })}
-                      onKeyDown={(e) => {
-                        // Prevent up/down arrow keys from modifying the value
-                        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                          e.preventDefault();
-                        }
-                      }}
-                      placeholder="0.00"
                       required
                     />
                   </div>
                   <div>
-                    <Label htmlFor="edit-category">Category</Label>
+                    <Label htmlFor="category">Category</Label>
                     <Input
-                      id="edit-category"
+                      id="category"
                       {...editForm.register("category")}
                       required
                     />
@@ -424,7 +403,7 @@ export default function VendorDashboard() {
                             <Upload className="h-8 w-8 text-primary" />
                             <span>Click to upload image</span>
                             <span className="text-xs text-muted-foreground">
-                              PNG, JPG, GIF up to 10MB
+                              PNG, JPG up to 10MB
                             </span>
                           </>
                         )}
@@ -469,132 +448,9 @@ export default function VendorDashboard() {
               )}
             </DialogContent>
           </Dialog>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {products?.map((product) => (
-              <Card key={product.id}>
-                <div className="aspect-square relative">
-                  <img
-                    src={product.imageUrl || "https://images.unsplash.com/photo-1518302057166-c990a3585cc3"}
-                    alt={product.title}
-                    className="absolute inset-0 w-full h-full object-cover rounded-t-lg"
-                  />
-                </div>
-                <CardHeader>
-                  <CardTitle className="line-clamp-2">{product.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground line-clamp-3">
-                    {product.description}
-                  </p>
-                  <div className="flex items-center justify-between mt-4">
-                    <span className="text-lg font-semibold">
-                      £{parseFloat(product.price).toFixed(2)}
-                    </span>
-                    <span className="text-sm text-muted-foreground">
-                      {product.category}
-                    </span>
-                  </div>
-                </CardContent>
-                <CardFooter className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => setEditingProduct(product)}
-                  >
-                    <Edit className="h-4 w-4 mr-2" /> Edit
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    onClick={() => {
-                      if (confirm('Are you sure you want to delete this product?')) {
-                        deleteProductMutation.mutate(product.id);
-                      }
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </CardFooter>
-              </Card>
-            ))}
-            {(!products || products.length === 0) && (
-              <Card>
-                <CardContent className="py-8 text-center">
-                  <p className="text-muted-foreground">
-                    You haven't added any products yet. Click the "Add Product" button to get started.
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
         </TabsContent>
 
-        <TabsContent value="payments">
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                Payment Account Status {getStatusBadge()}
-              </CardTitle>
-              <CardDescription>
-                Set up your Stripe account to receive payments from customers
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {!user?.stripeAccountId ? (
-                <div>
-                  <p className="mb-4">
-                    You haven't set up your payment account yet. Set up Stripe to start
-                    receiving payments for your products.
-                  </p>
-                  <Button
-                    onClick={() => setupAccountMutation.mutate()}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Setting up...
-                      </>
-                    ) : (
-                      "Set up Stripe Account"
-                    )}
-                  </Button>
-                </div>
-              ) : accountStatus?.status === "enabled" ? (
-                <div className="space-y-2">
-                  <p className="text-green-600 font-medium">
-                    Your Stripe account is fully set up and ready to receive payments!
-                  </p>
-                  <dl className="space-y-1">
-                    <div className="flex gap-2">
-                      <dt className="font-medium">Charges Enabled:</dt>
-                      <dd>{accountStatus.details.chargesEnabled ? "Yes" : "No"}</dd>
-                    </div>
-                    <div className="flex gap-2">
-                      <dt className="font-medium">Payouts Enabled:</dt>
-                      <dd>{accountStatus.details.payoutsEnabled ? "Yes" : "No"}</dd>
-                    </div>
-                  </dl>
-                </div>
-              ) : (
-                <div>
-                  <p className="text-yellow-600 mb-4">
-                    Your Stripe account setup is pending. Please complete the
-                    onboarding process to start receiving payments.
-                  </p>
-                  <Button
-                    onClick={() => setupAccountMutation.mutate()}
-                    disabled={isLoading}
-                  >
-                    Complete Stripe Setup
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
+        {/* Re-added Store Profile Tab Content */}
         <TabsContent value="store">
           <Card>
             <CardHeader>
