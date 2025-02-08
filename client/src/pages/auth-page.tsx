@@ -9,11 +9,12 @@ import { useForm } from "react-hook-form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { startTrialSubscription } from "@/lib/subscription";
-import { toast } from "@/components/ui/toast";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
   const [location, setLocation] = useLocation();
+  const { toast } = useToast();
 
   const loginForm = useForm({
     defaultValues: {
@@ -70,10 +71,10 @@ export default function AuthPage() {
           } : undefined,
         });
         setLocation("/subscription");
-      } catch (error) {
+      } catch (error: any) {
         toast({
           title: "Subscription setup failed",
-          description: error.message,
+          description: error.message || "Failed to setup subscription",
           variant: "destructive",
         });
       }
@@ -182,7 +183,7 @@ export default function AuthPage() {
                     <RadioGroup
                       defaultValue="free"
                       onValueChange={(value) => {
-                        registerForm.setValue("userType", value as any);
+                        registerForm.setValue("userType", value as "free" | "business" | "vendor");
                         if (value === "free") {
                           registerForm.setValue("businessType", "");
                           registerForm.setValue("companyNumber", "");
