@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
+import { Redirect } from "wouter";
+import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -13,7 +15,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Settings, Edit, Trash2, Send, AlertTriangle, Info } from "lucide-react";
+import { Loader2 as Loader, Settings, Edit, Trash2, Send, AlertTriangle, Info } from "lucide-react";
 import type { SelectLead, SelectUser, SelectMessage } from "@db/schema";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -129,6 +131,12 @@ interface LeadWithUnreadCount extends SelectLead {
 
 export default function LeadsPage() {
   const { user } = useAuth();
+
+  // If user is not logged in, redirect to auth page
+  if (!user) {
+    return <Redirect to="/auth" />;
+  }
+
   const { toast } = useToast();
   const [editingLead, setEditingLead] = useState<LeadWithUnreadCount | null>(null);
   const playNotification = useNotificationSound();
@@ -477,7 +485,7 @@ export default function LeadsPage() {
   if (isLoadingLeads) {
     return (
       <div className="flex items-center justify-center min-h-[200px]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -525,7 +533,7 @@ export default function LeadsPage() {
     if (isLoadingLeads) {
       return (
         <div className="flex items-center justify-center min-h-[200px]">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <Loader className="h-8 w-8 animate-spin text-primary" />
         </div>
       );
     }
@@ -715,7 +723,7 @@ export default function LeadsPage() {
                               >
                                 {sendProposalMutation.isPending ? (
                                   <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    <Loader className="mr-2 h-4 w-4 animate-spin" />
                                     Sending...
                                   </>
                                 ) : (
@@ -862,7 +870,7 @@ export default function LeadsPage() {
                             >
                               {updateLeadMutation.isPending ? (
                                 <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  <Loader className="mr-2 h-4 w-4 animate-spin" />
                                   Saving...
                                 </>
                               ) : (
@@ -999,7 +1007,7 @@ export default function LeadsPage() {
                                       >
                                         {acceptProposalMutation.isPending ? (
                                           <>
-                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            <Loader className="mr-2 h-4 w-4 animate-spin" />
                                             Accepting...
                                           </>
                                         ) : (
@@ -1098,7 +1106,7 @@ export default function LeadsPage() {
       >
         {createLeadMutation.isPending ? (
           <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <Loader className="mr-2 h-4 w-4 animate-spin" />
             Posting...
           </>
         ) : (
@@ -1158,7 +1166,7 @@ export default function LeadsPage() {
                     <Button type="submit" className="w-full" disabled={updateProfileMutation.isPending}>
                       {updateProfileMutation.isPending ? (
                         <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          <Loader className="mr-2 h-4 w-4 animate-spin" />
                           Saving...
                         </>
                       ) : (
@@ -1177,7 +1185,7 @@ export default function LeadsPage() {
                     <Button type="submit" className="w-full" disabled={updateUsernameMutation.isPending}>
                       {updateUsernameMutation.isPending ? (
                         <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          <Loader className="mr-2 h-4 w-4 animate-spin" />
                           Updating...
                         </>
                       ) : (
@@ -1219,7 +1227,7 @@ export default function LeadsPage() {
                     <Button type="submit" className="w-full" disabled={updatePasswordMutation.isPending}>
                       {updatePasswordMutation.isPending ? (
                         <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          <Loader className="mr-2 h-4 w-4 animate-spin" />
                           Updating...
                         </>
                       ) : (
