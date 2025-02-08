@@ -31,6 +31,40 @@ export async function startTrialSubscription(params: StartTrialParams): Promise<
   }
 }
 
+export async function getSubscriptionStatus(): Promise<{
+  active: boolean;
+  tier: string | null;
+  endsAt: string | null;
+}> {
+  try {
+    const response = await apiRequest("GET", "/api/subscriptions/current");
+    if (!response.ok) {
+      throw new Error("Failed to fetch subscription status");
+    }
+    return response.json();
+  } catch (error) {
+    throw error;
+  }
+}
+
+export async function createCheckoutSession(tier: "business" | "vendor", paymentFrequency: "monthly" | "annual"): Promise<{ checkoutUrl: string }> {
+  try {
+    const response = await apiRequest("POST", "/api/subscriptions", {
+      tier,
+      paymentFrequency,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Failed to create checkout session");
+    }
+
+    return response.json();
+  } catch (error) {
+    throw error;
+  }
+}
+
 export async function cancelSubscription(subscriptionId: number): Promise<void> {
   try {
     const response = await apiRequest("POST", `/api/subscriptions/${subscriptionId}/cancel`);

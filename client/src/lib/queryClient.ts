@@ -38,9 +38,14 @@ export const getQueryFn: <T>(options: {
       }
 
       if (res.status === 403) {
-        console.log("Access forbidden");
-        const error = new Error("Access forbidden - Subscription may be required");
+        const data = await res.json();
+        console.log("Access forbidden:", data);
+        const error = new Error(data.message || "Access forbidden");
         error.name = "ForbiddenError";
+        if (data.subscriptionRequired) {
+          error.name = "SubscriptionRequiredError";
+          (error as any).userType = data.userType;
+        }
         throw error;
       }
 
@@ -72,7 +77,7 @@ export const queryClient = new QueryClient({
       staleTime: 0, // Set staleTime to 0 to always refetch
       cacheTime: 5 * 60 * 1000, // Cache for 5 minutes
       retry: (failureCount, error: any) => {
-        if (error?.name === "AuthenticationError" || error?.name === "ForbiddenError") return false;
+        if (error?.name === "AuthenticationError" || error?.name === "SubscriptionRequiredError") return false;
         return failureCount < 3;
       },
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
@@ -116,6 +121,12 @@ export async function apiRequest(
       try {
         const json = JSON.parse(text);
         errorMessage = json.message || text;
+        if (json.subscriptionRequired) {
+          const error = new Error(errorMessage);
+          error.name = "SubscriptionRequiredError";
+          (error as any).userType = json.userType;
+          throw error;
+        }
       } catch {
         errorMessage = text;
       }
