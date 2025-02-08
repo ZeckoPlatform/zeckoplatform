@@ -56,6 +56,7 @@ router.post("/subscriptions", authenticateToken, async (req, res) => {
             unit_amount: price,
             recurring: {
               interval: paymentFrequency === "annual" ? "year" : "month",
+              interval_count: 1,
             },
           },
           quantity: 1,
@@ -72,6 +73,7 @@ router.post("/subscriptions", authenticateToken, async (req, res) => {
           paymentFrequency,
         },
       },
+      automatic_tax: { enabled: true },
     });
 
     // Update user's subscription status to pending
