@@ -43,6 +43,7 @@ export default function VendorDashboard() {
   const [previewUrl, setPreviewUrl] = useState<string>();
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   // Add Stripe account status query
   const { data: accountStatus, isLoading: statusLoading } = useQuery({
@@ -73,13 +74,19 @@ export default function VendorDashboard() {
     },
   });
 
-  // Keep existing product queries and mutations
+  // Update the products query to be less restrictive and add more logging
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ["/api/products"],
-    select: (data) =>
-      Array.isArray(data)
-        ? data.filter((product) => product.vendorId === user?.id)
-        : [],
+    select: (data) => {
+      console.log("Products data:", data);
+      console.log("Current user:", user);
+      return Array.isArray(data)
+        ? data.filter((product) => {
+            console.log("Checking product:", product);
+            return product.vendorId === user?.id;
+          })
+        : [];
+    },
     enabled: !!user?.id,
   });
 
@@ -240,6 +247,52 @@ export default function VendorDashboard() {
       <AlertCircle className="h-4 w-4 text-yellow-500" />
     );
   };
+
+  const accountForm = useForm({
+    defaultValues: {
+      username: user?.username || '',
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: '',
+    },
+  });
+
+  const updateAccountMutation = useMutation({
+    mutationFn: async (data: {
+      username: string;
+      currentPassword: string;
+      newPassword: string;
+    }) => {
+      const res = await apiRequest("PATCH", "/api/user", data);
+      if (!res.ok) {
+        throw new Error("Failed to update account");
+      }
+      return res.json();
+    },
+    onSuccess: (updatedUser) => {
+      queryClient.setQueryData(["/api/user"], updatedUser);
+      toast({
+        title: "Success",
+        description: "Account updated successfully",
+      });
+      accountForm.reset({
+        username: updatedUser.username,
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update account",
+        variant: "destructive",
+      });
+    },
+    onSettled: () => {
+      setIsUpdating(false);
+    },
+  });
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -592,22 +645,100 @@ export default function VendorDashboard() {
         </TabsContent>
 
         <TabsContent value="settings">
-          <Card>
-            <CardHeader>
-              <CardTitle>Account Settings</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div>
-                <h3 className="font-medium mb-2">Subscription Status</h3>
-                <p className="text-sm text-muted-foreground">
-                  Your vendor subscription is {user?.subscriptionActive ? "active" : "inactive"}
-                </p>
-              </div>
-              <Button variant="outline" asChild className="mt-4">
-                <a href="/subscription">Manage Subscription</a>
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="grid gap-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Account Settings</CardTitle>
+                <CardDescription>
+                  Update your account details and password
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form
+                  className="space-y-4"
+                  onSubmit={accountForm.handleSubmit((data) => {
+                    if (data.newPassword !== accountForm.getValues("confirmPassword")) {
+                      toast({
+                        title: "Error",
+                        description: "New passwords do not match",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                    setIsUpdating(true);
+                    updateAccountMutation.mutate({
+                      username: data.username,
+                      currentPassword: data.currentPassword,
+                      newPassword: data.newPassword,
+                    });
+                  })}
+                >
+                  <div>
+                    <Label htmlFor="username">Username</Label>
+                    <Input
+                      id="username"
+                      {...accountForm.register("username")}
+                      placeholder="Your username"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="current-password">Current Password</Label>
+                    <Input
+                      id="current-password"
+                      type="password"
+                      {...accountForm.register("currentPassword")}
+                      placeholder="Enter current password"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="new-password">New Password</Label>
+                    <Input
+                      id="new-password"
+                      type="password"
+                      {...accountForm.register("newPassword")}
+                      placeholder="Enter new password"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="confirm-password">Confirm New Password</Label>
+                    <Input
+                      id="confirm-password"
+                      type="password"
+                      {...accountForm.register("confirmPassword")}
+                      placeholder="Confirm new password"
+                    />
+                  </div>
+                  <Button type="submit" disabled={isUpdating}>
+                    {isUpdating ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      'Update Account'
+                    )}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Subscription Status</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div>
+                  <h3 className="font-medium mb-2">Current Plan</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Your vendor subscription is {user?.subscriptionActive ? "active" : "inactive"}
+                  </p>
+                </div>
+                <Button variant="outline" asChild className="mt-4">
+                  <a href="/subscription">Manage Subscription</a>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
