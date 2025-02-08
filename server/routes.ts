@@ -9,6 +9,7 @@ import { comparePasswords, hashPassword } from './auth';
 import fs from 'fs';
 import express from 'express';
 import { createConnectedAccount, retrieveConnectedAccount } from './stripe';
+import subscriptionRoutes from './routes/subscriptions';
 
 declare global {
   namespace Express {
@@ -32,6 +33,9 @@ export function registerRoutes(app: Express): Server {
     }
     authenticateToken(req, res, next);
   });
+
+  // Register subscription routes
+  app.use('/api', subscriptionRoutes);
 
   // DELETE /api/leads/:id - Delete a lead
   app.delete("/api/leads/:id", async (req, res) => {
@@ -238,209 +242,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/subscriptions", async (req, res) => {
-    if (!req.user || !["business", "vendor"].includes(req.user.userType)) {
-      return res.status(403).json({ message: "Invalid user type for subscription" });
-    }
-
-    try {
-      // Check if this is a development/test account
-      const isTestAccount = process.env.NODE_ENV === 'development' && req.user.id === 1;
-
-      if (!isTestAccount) {
-        // Regular user flow - should include Stripe payment
-        return res.status(400).json({ 
-          message: "Subscription requires payment processing. Please use the Stripe checkout flow.",
-          setupRequired: true
-        });
-      }
-
-      // Test account flow - direct activation without payment
-      const subscription = await db.insert(subscriptions).values({
-        user_id: req.user.id,
-        tier: req.user.userType as "business" | "vendor",
-        status: "active",
-        start_date: new Date(),
-        end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-        auto_renew: true,
-        price: req.user.userType === "business" ? 2999 : 4999, // prices in cents
-      }).returning();
-
-      await db.update(users)
-        .set({
-          subscriptionActive: true,
-          subscriptionTier: req.user.userType as "business" | "vendor",
-          subscriptionEndsAt: subscription[0].end_date,
-        })
-        .where(eq(users.id, req.user.id));
-
-      res.json(subscription[0]);
-    } catch (error) {
-      log(`Subscription creation error: ${error instanceof Error ? error.message : String(error)}`);
-      console.error('Full error:', error);
-      res.status(500).json({ 
-        message: "Failed to create subscription",
-        error: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
-  });
-
-  app.get("/api/subscriptions/current", async (req, res) => {
-    if (!req.user) {
-      return res.status(401).json({ message: "Authentication required" });
-    }
-
-    try {
-      // First get the user's current subscription status
-      const [currentUser] = await db.select({
-        subscriptionActive: users.subscriptionActive,
-        subscriptionTier: users.subscriptionTier,
-        subscriptionEndsAt: users.subscriptionEndsAt,
-      })
-      .from(users)
-      .where(eq(users.id, req.user.id));
-
-      // Then get the actual subscription record if it exists
-      const [subscription] = await db.select({
-        id: subscriptions.id,
-        tier: subscriptions.tier,
-        status: subscriptions.status,
-        start_date: subscriptions.start_date,
-        end_date: subscriptions.end_date,
-        auto_renew: subscriptions.auto_renew,
-        price: subscriptions.price,
-      })
-      .from(subscriptions)
-      .where(
-        and(
-          eq(subscriptions.user_id, req.user.id),
-          eq(subscriptions.status, "active")
-        )
-      )
-      .orderBy(subscriptions.start_date, 'desc')
-      .limit(1);
-
-      // Return both user subscription status and subscription details
-      res.json({
-        status: {
-          isActive: currentUser.subscriptionActive,
-          tier: currentUser.subscriptionTier,
-          endsAt: currentUser.subscriptionEndsAt,
-        },
-        subscription: subscription || null
-      });
-    } catch (error) {
-      log(`Subscription fetch error: ${error instanceof Error ? error.message : String(error)}`);
-      console.error('Full error:', error);
-      res.status(500).json({ 
-        message: "Failed to fetch subscription",
-        error: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
-  });
-
-  app.post("/api/subscriptions/cancel", async (req, res) => {
-    if(!req.user) {
-      return res.status(401).json({ message: "Authentication required" });
-    }
-
-    try {
-      const [subscription] = await db.update(subscriptions)
-        .set({ status: "cancelled" })
-        .where(
-          and(
-            eq(subscriptions.user_id, req.user.id),
-            eq(subscriptions.status, "active")
-          )
-        )
-        .returning();
-
-      if (subscription) {
-        await db.update(users)
-          .set({
-            subscriptionActive: false,
-            subscriptionTier: "none",
-          })
-          .where(eq(users.id, req.user.id));
-      }
-
-      res.json(subscription || null);
-    } catch (error) {
-      log(`Subscription cancellation error: ${error instanceof Error ? error.message : String(error)}`);
-      console.error('Full error:', error);
-      res.status(500).json({ 
-        message: "Failed to cancel subscription",
-        error: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
-  });
-
-  // Update the product creation endpoint to handle decimal prices correctly
-  app.post("/api/products", async (req, res) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-
-      log(`Creating product for user ${req.user.id} (${req.user.userType})`);
-
-      // Convert price from decimal string to cents
-      const priceInCents = Math.round(parseFloat(req.body.price) * 100);
-      if (isNaN(priceInCents)) {
-        log(`Invalid price format: ${req.body.price}`);
-        return res.status(400).json({ message: "Invalid price format" });
-      }
-
-      log(`Attempting to create product with price: ${priceInCents} cents`);
-
-      const product = await db.insert(products).values({
-        vendorId: req.user.id,
-        title: req.body.title,
-        description: req.body.description,
-        price: priceInCents,
-        category: req.body.category,
-        imageUrl: req.body.imageUrl,
-      }).returning();
-
-      // Convert price back to decimal for response
-      const productWithDecimalPrice = {
-        ...product[0],
-        price: (product[0].price / 100).toFixed(2),
-      };
-
-      log(`Product created successfully: ${JSON.stringify(productWithDecimalPrice)}`);
-      res.json(productWithDecimalPrice);
-    } catch (error) {
-      log(`Product creation error: ${error instanceof Error ? error.message : String(error)}`);
-      console.error('Full error:', error);
-      res.status(500).json({ 
-        message: "Failed to create product",
-        error: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
-  });
-
-  app.get("/api/products", async (req, res) => {
-    try {
-      const allProducts = await db.query.products.findMany({
-        with: {
-          vendor: true,
-        },
-      });
-
-      // Convert all prices from cents to dollars
-      const productsWithDecimalPrices = allProducts.map(product => ({
-        ...product,
-        price: (product.price / 100).toFixed(2), // Convert cents to dollars
-      }));
-
-      log(`Fetched ${allProducts.length} products, converting prices from cents to dollars`);
-      res.json(productsWithDecimalPrices);
-    } catch (error) {
-      log(`Products retrieval error: ${error}`);
-      res.status(500).json({ message: "Failed to retrieve products" });
-    }
-  });
 
   // POST /api/leads/:leadId/responses - Add subscription check
   app.post("/api/leads/:leadId/responses", async (req, res) => {
@@ -784,6 +585,7 @@ export function registerRoutes(app: Express): Server {
       });
     }
   });
+
 
 
   app.patch("/api/user/password", async (req, res) => {

@@ -8,9 +8,7 @@ if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("STRIPE_SECRET_KEY is required");
 }
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2023-10-16",
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 const router = Router();
 
@@ -26,29 +24,34 @@ const SUBSCRIPTION_PRICES = {
 };
 
 router.post("/subscriptions", async (req, res) => {
-  if (!req.user) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-
-  const { tier, paymentFrequency } = req.body;
-
-  if (!SUBSCRIPTION_PRICES[tier]) {
-    return res.status(400).json({ error: "Invalid subscription tier" });
-  }
-
   try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { tier, paymentFrequency } = req.body;
+
+    if (!tier || !paymentFrequency) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    if (!SUBSCRIPTION_PRICES[tier]) {
+      return res.status(400).json({ error: "Invalid subscription tier" });
+    }
+
     const price = SUBSCRIPTION_PRICES[tier][paymentFrequency];
+    const productName = `${tier.charAt(0).toUpperCase() + tier.slice(1)} ${paymentFrequency} Plan`;
+
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
-      customer_email: req.user.username,
       line_items: [
         {
           price_data: {
             currency: "gbp",
             product_data: {
-              name: `${tier.charAt(0).toUpperCase() + tier.slice(1)} ${paymentFrequency} Plan`,
-              description: `${tier.charAt(0).toUpperCase() + tier.slice(1)} subscription with ${paymentFrequency} billing`,
+              name: productName,
+              description: `${productName} with 30-day free trial`,
             },
             unit_amount: price,
             recurring: {
@@ -60,6 +63,7 @@ router.post("/subscriptions", async (req, res) => {
       ],
       success_url: `${req.protocol}://${req.get("host")}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.protocol}://${req.get("host")}/subscription`,
+      customer_email: req.user.username,
       subscription_data: {
         trial_period_days: 30,
         metadata: {
@@ -70,11 +74,10 @@ router.post("/subscriptions", async (req, res) => {
       },
     });
 
-    // Update user's subscription status
+    // Update user's subscription status to pending
     await db
       .update(users)
       .set({
-        subscriptionActive: true,
         subscriptionTier: tier,
       })
       .where(eq(users.id, req.user.id));
@@ -82,7 +85,33 @@ router.post("/subscriptions", async (req, res) => {
     return res.json({ checkoutUrl: session.url });
   } catch (error) {
     console.error("Stripe session creation error:", error);
-    return res.status(500).json({ error: "Failed to create checkout session" });
+    return res.status(500).json({ 
+      error: "Failed to create checkout session",
+      details: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
+router.get("/subscriptions/current", async (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  try {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, req.user.id))
+      .limit(1);
+
+    return res.json({
+      active: user.subscriptionActive,
+      tier: user.subscriptionTier,
+      endsAt: user.subscriptionEndsAt,
+    });
+  } catch (error) {
+    console.error("Error fetching subscription:", error);
+    return res.status(500).json({ error: "Failed to fetch subscription details" });
   }
 });
 
