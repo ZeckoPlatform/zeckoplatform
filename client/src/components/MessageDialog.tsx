@@ -47,6 +47,7 @@ export function MessageDialog({
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const observerRef = useRef<MutationObserver | null>(null);
   const isFirstLoadRef = useRef(true);
   const previousMessagesLengthRef = useRef(0);
 
@@ -54,10 +55,22 @@ export function MessageDialog({
 
   const { data: messages = [], isLoading } = useQuery<Message[]>({
     queryKey: messagesQueryKey,
-    enabled: isOpen,
-    refetchInterval: isOpen ? 3000 : false,
-    staleTime: 0,
-    gcTime: Infinity,
+    enabled: isOpen || user?.id != null,
+    refetchInterval: isOpen ? 3000 : 10000, // Check less frequently when closed
+    onSuccess: (newMessages) => {
+      const unreadMessages = newMessages.filter(m => !m.read && m.sender.id !== user?.id);
+      console.log("Messages loaded, unread count:", unreadMessages.length);
+
+      if (unreadMessages.length > 0 && !isOpen) {
+        toast({
+          title: "New Messages",
+          description: `You have ${unreadMessages.length} unread message${unreadMessages.length > 1 ? 's' : ''}`,
+          variant: "default",
+          duration: 5000,
+        });
+        playNotification('receive');
+      }
+    },
   });
 
   const markAsReadMutation = useMutation({
@@ -99,27 +112,55 @@ export function MessageDialog({
     }
   });
 
-  const scrollToBottom = () => {
+  const forceScrollToBottom = () => {
     if (messagesContainerRef.current) {
       const container = messagesContainerRef.current;
-      const scrollHeight = container.scrollHeight;
-      const height = container.clientHeight;
-      const maxScrollTop = scrollHeight - height;
-      container.style.scrollBehavior = 'smooth';
-      container.scrollTop = maxScrollTop > 0 ? maxScrollTop : 0;
+      // Force layout recalculation
+      container.style.display = 'none';
+      container.offsetHeight; // Force reflow
+      container.style.display = '';
+
+      container.scrollTop = container.scrollHeight;
+      console.log("Forced scroll to bottom:", container.scrollTop, container.scrollHeight);
     }
   };
 
+  // Setup mutation observer for new messages
+  useEffect(() => {
+    if (messagesContainerRef.current && isOpen) {
+      observerRef.current = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+            requestAnimationFrame(() => {
+              forceScrollToBottom();
+            });
+          }
+        });
+      });
+
+      observerRef.current.observe(messagesContainerRef.current, {
+        childList: true,
+        subtree: true
+      });
+
+      return () => {
+        if (observerRef.current) {
+          observerRef.current.disconnect();
+        }
+      };
+    }
+  }, [isOpen]);
+
+  // Initial scroll and mark as read when dialog opens
   useEffect(() => {
     if (isOpen && messages.length > 0) {
-      const timer = setTimeout(() => {
-        if (messagesContainerRef.current) {
-          messagesContainerRef.current.style.scrollBehavior = 'auto';
-          scrollToBottom();
-          messagesContainerRef.current.style.scrollBehavior = 'smooth';
-        }
+      console.log("Dialog opened with messages:", messages.length);
+
+      // Ensure DOM is ready and force scroll
+      setTimeout(() => {
+        forceScrollToBottom();
         isFirstLoadRef.current = false;
-      }, 100);
+      }, 50);
 
       const hasUnreadMessages = messages.some(m => 
         m.sender.id !== user?.id && !m.read
@@ -128,32 +169,22 @@ export function MessageDialog({
       if (hasUnreadMessages && user?.id) {
         markAsReadMutation.mutate();
       }
-
-      return () => clearTimeout(timer);
     }
   }, [isOpen, messages, user?.id]);
 
+  // Handle new messages
   useEffect(() => {
-    const unreadMessages = messages.filter(m => !m.read && m.sender.id !== user?.id);
-
-    if (unreadMessages.length > 0 && !isOpen) {
-      toast({
-        title: "New Messages",
-        description: `You have ${unreadMessages.length} new unread message${unreadMessages.length > 1 ? 's' : ''}`,
-        variant: "default",
-        duration: 5000,
-      });
-      playNotification('receive');
-    }
-
     if (messages.length > previousMessagesLengthRef.current && !isFirstLoadRef.current) {
-      scrollToBottom();
-      if (messages[messages.length - 1]?.sender?.id !== user?.id) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage?.sender?.id !== user?.id) {
         playNotification('receive');
       }
+      requestAnimationFrame(() => {
+        forceScrollToBottom();
+      });
     }
     previousMessagesLengthRef.current = messages.length;
-  }, [messages, isOpen, user?.id]);
+  }, [messages, user?.id]);
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
@@ -172,7 +203,9 @@ export function MessageDialog({
       playNotification('send');
       queryClient.setQueryData<Message[]>(messagesQueryKey, (old = []) => [...old, newMessage]);
       queryClient.invalidateQueries({ queryKey: messagesQueryKey });
-      setTimeout(scrollToBottom, 100);
+      requestAnimationFrame(() => {
+        forceScrollToBottom();
+      });
     },
     onError: (error: Error) => {
       console.error("Failed to send message:", error);
@@ -201,8 +234,7 @@ export function MessageDialog({
       <div className="flex flex-col h-[400px]">
         <div 
           ref={messagesContainerRef}
-          className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth"
-          style={{ scrollBehavior: 'smooth' }}
+          className="flex-1 overflow-y-auto p-4 space-y-4"
         >
           {isLoading ? (
             <div className="flex items-center justify-center h-full">
