@@ -35,12 +35,9 @@ export async function comparePasswords(supplied: string, stored: string) {
 async function getUserByUsername(username: string): Promise<SelectUser[]> {
   try {
     log(`Fetching user with username: ${username}`);
-    const users = await db.query.users.findMany({
-      where: eq(users.username, username),
-      limit: 1,
-    });
-    log(`Found ${users.length} users matching username: ${username}`);
-    return users;
+    const result = await db.select().from(users).where(eq(users.username, username));
+    log(`Found ${result.length} users matching username: ${username}`);
+    return result;
   } catch (error) {
     log(`Database error in getUserByUsername: ${error instanceof Error ? error.message : String(error)}`);
     throw new Error('Database error occurred');
@@ -78,10 +75,7 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
       }
 
       try {
-        const [user] = await db.query.users.findMany({
-          where: eq(users.id, decoded.id),
-          limit: 1,
-        });
+        const [user] = await db.select().from(users).where(eq(users.id, decoded.id));
 
         if (!user) {
           log('User not found in database');
