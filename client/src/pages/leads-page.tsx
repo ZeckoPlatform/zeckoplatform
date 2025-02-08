@@ -118,24 +118,6 @@ function MessageDialogContent({
   );
 }
 
-// Add this hook to the main component to handle initial unread message notification
-function useUnreadMessageNotification(leads: any[] | undefined) {
-  const playNotification = useNotificationSound();
-  const hasCheckedRef = useRef(false);
-
-  useEffect(() => {
-    if (leads && !hasCheckedRef.current) {
-      const hasUnreadMessages = leads.some(lead =>
-        lead.unreadMessages > 0
-      );
-
-      if (hasUnreadMessages) {
-        playNotification('receive');
-      }
-      hasCheckedRef.current = true;
-    }
-  }, [leads, playNotification]);
-}
 
 interface AcceptProposalData {
   contactDetails: string;
@@ -151,7 +133,7 @@ export default function LeadsPage() {
   const [editingLead, setEditingLead] = useState<LeadWithUnreadCount | null>(null);
   const playNotification = useNotificationSound();
   const initialLoadRef = useRef(true);
-  const previousUnreadCountRef = useRef<Record<number, number>>({});
+
 
   const form = useForm<LeadFormData>({
     defaultValues: {
@@ -315,35 +297,19 @@ export default function LeadsPage() {
     enabled: !!user,
     onSuccess: (data) => {
       const totalUnreadCount = data.reduce((sum, lead) => sum + (lead.unreadMessages || 0), 0);
-      const previousTotalUnread = Object.values(previousUnreadCountRef.current).reduce((sum, count) => sum + count, 0);
 
-      // Play notification on login if there are unread messages
-      if (initialLoadRef.current && totalUnreadCount > 0) {
-        playNotification('receive');
+      // Only show notification and play sound if there are unread messages on initial load
+      if (totalUnreadCount > 0 && initialLoadRef.current) {
         toast({
-          title: "Unread Messages",
-          description: "You have unread messages in your leads.",
+          title: "Welcome back!",
+          description: `You have ${totalUnreadCount} unread message${totalUnreadCount === 1 ? '' : 's'}.`,
         });
-      }
-      // Play notification for new messages after initial load
-      else if (!initialLoadRef.current && totalUnreadCount > previousTotalUnread) {
         playNotification('receive');
-        toast({
-          title: "New Messages",
-          description: "You have received new messages.",
-        });
       }
-
-      // Update previous counts
-      data.forEach(lead => {
-        previousUnreadCountRef.current[lead.id] = lead.unreadMessages || 0;
-      });
 
       initialLoadRef.current = false;
     }
   });
-
-  useUnreadMessageNotification(leads);
 
 
   const createLeadMutation = useMutation({
@@ -1028,7 +994,7 @@ export default function LeadsPage() {
           ))}
           {(!userLeadsFiltered || userLeadsFiltered.length === 0) && (
             <p className="text-muted-foreground text-center py-8">
-              You haven't posted any leads yet. Create your first lead to get started!
+              You haven't postedany leads yet. Create your first lead to get started!
             </p>
           )}
         </div>
@@ -1102,9 +1068,12 @@ export default function LeadsPage() {
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-3xl font-bold">Dashboard</h1>
-            {user?.profile?.name && (
-              <p className="text-muted-foreground">Welcome, {user.profile.name}</p>
-            )}
+            <p className="text-muted-foreground">
+              Welcome back{user?.profile?.name ? `, ${user.profile.name}` : ''}
+              {leads.some(lead => lead.unreadMessages > 0) && (
+                <span> • You have unread messages</span>
+              )}
+            </p>
           </div>
           <Dialog>
             <DialogTrigger asChild>
