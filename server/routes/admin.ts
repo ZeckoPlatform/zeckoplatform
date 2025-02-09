@@ -206,21 +206,18 @@ router.post("/admin/users/:userId/subscription", authenticateToken, checkSuperAd
     await db
       .update(subscriptions)
       .set({ status: "cancelled" })
-      .where(eq(subscriptions.userId, userId));
+      .where(eq(subscriptions.user_id, userId));
 
     if (subscriptionType !== "free") {
       // Create new subscription
       const newSubscription = {
-        userId: userId,
+        user_id: userId,
+        tier: subscriptionType,
         status: skipPayment ? "active" : "pending_payment",
-        type: subscriptionType,
         price: subscriptionType === "business" ? 2999 : 4999, // Price in pence
-        startDate: skipPayment ? new Date() : null,
-        endDate: skipPayment ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null, // 30 days from now if skipping payment
-        stripeSubscriptionId: null,
-        stripeCustomerId: null,
-        stripePriceId: null,
-        stripePaymentMethodId: null,
+        start_date: skipPayment ? new Date() : new Date(),
+        end_date: skipPayment ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : new Date(), // 30 days from now
+        auto_renew: false
       };
 
       await db
