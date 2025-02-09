@@ -23,7 +23,6 @@ import { useNotificationSound } from "@/lib/useNotificationSound";
 import { MessageDialog } from "@/components/MessageDialog";
 import { SubscriptionRequiredModal } from "@/components/subscription-required-modal";
 
-// Add necessary interfaces
 interface LeadFormData {
   title: string;
   description: string;
@@ -57,96 +56,37 @@ interface MessageFormData {
   content: string;
 }
 
-// Add calculateMatchScore function
-const calculateMatchScore = (lead: SelectLead, user: SelectUser | null): {
-  totalScore: number;
-  categoryScore: number;
-  locationScore: number;
-  budgetScore: number;
-  industryScore: number;
-} => {
-  let totalScore = 0;
-  let categoryScore = 0;
-  let locationScore = 0;
-  let budgetScore = 0;
-  let industryScore = 0;
-
-  if (user?.profile?.categories?.includes(lead.category)) {
-    categoryScore = 25;
-  }
-  if (user?.profile?.location === lead.location) {
-    locationScore = 25;
-  }
-  if (user?.profile?.budget && lead.budget &&
-    Math.abs(lead.budget - user.profile.budget) < 1000) {
-    budgetScore = 25;
-  }
-  if (user?.profile?.industries?.includes(lead.industry)) {
-    industryScore = 25;
-  }
-
-  totalScore = categoryScore + locationScore + budgetScore + industryScore;
-  return { totalScore, categoryScore, locationScore, budgetScore, industryScore };
-};
-
-// Update MessageDialogContent
-function MessageDialogContent({
-  leadId,
-  receiverId,
-  onClose,
-}: {
-  leadId: number;
-  receiverId: number;
-  onClose?: () => void;
-}) {
-  const [open, setOpen] = useState(true); // Start with dialog open
-
-  // Handle dialog state changes
-  const handleOpenChange = (newOpen: boolean) => {
-    setOpen(newOpen);
-    if (!newOpen && onClose) {
-      onClose();
-    }
-  };
-
-  return (
-    <MessageDialog
-      leadId={leadId}
-      receiverId={receiverId}
-      isOpen={open}
-      onOpenChange={handleOpenChange}
-      onMessagesRead={onClose}
-    />
-  );
-}
-
-
-interface AcceptProposalData {
-  contactDetails: string;
-}
-
 interface LeadWithUnreadCount extends SelectLead {
   unreadMessages: number;
 }
 
-export default function LeadsPage() {
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
-  const [editingLead, setEditingLead] = useState<LeadWithUnreadCount | null>(null);
-  const [selectedLead, setSelectedLead] = useState<SelectLead | null>(null);
-  const [proposalDialogOpen, setProposalDialogOpen] = useState(false);
-  const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
-  const [selectedResponse, setSelectedResponse] = useState<any>(null);
-  const playNotification = useNotificationSound();
-  const initialLoadRef = useRef(true);
+interface CreateLeadFormProps {
+  onSubmit: (data: LeadFormData) => void;
+  isSubmitting: boolean;
+}
 
-  // If user is not logged in, redirect to auth page
-  if (!user) {
-    return <Redirect to="/auth" />;
-  }
+interface BusinessLeadsViewProps {
+  leads: LeadWithUnreadCount[];
+  user: SelectUser;
+  selectedLead: SelectLead | null;
+  setSelectedLead: (lead: SelectLead | null) => void;
+  proposalDialogOpen: boolean;
+  setProposalDialogOpen: (open: boolean) => void;
+  toast: any;
+  playNotification: (type: string) => void;
+}
 
-  // Forms setup
+interface FreeUserLeadsViewProps {
+  leads: LeadWithUnreadCount[];
+  createLeadMutation: any;
+  updateLeadMutation: any;
+  editingLead: LeadWithUnreadCount | null;
+  setEditingLead: (lead: LeadWithUnreadCount | null) => void;
+  deleteLeadMutation: any;
+  user: SelectUser;
+}
+
+const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
   const form = useForm<LeadFormData>({
     defaultValues: {
       title: "",
@@ -157,250 +97,146 @@ export default function LeadsPage() {
     },
   });
 
-  const editForm = useForm<LeadFormData>({
-    defaultValues: {
-      title: editingLead?.title || "",
-      description: editingLead?.description || "",
-      category: editingLead?.category || "",
-      budget: editingLead?.budget?.toString() || "",
-      location: editingLead?.location || "",
+  return (
+    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <div>
+        <Label htmlFor="title">Title</Label>
+        <Input id="title" {...form.register("title")} required />
+      </div>
+      <div>
+        <Label htmlFor="description">Description</Label>
+        <Textarea
+          id="description"
+          {...form.register("description")}
+          required
+        />
+      </div>
+      <div>
+        <Label htmlFor="category">Category</Label>
+        <Input id="category" {...form.register("category")} required />
+      </div>
+      <div>
+        <Label htmlFor="budget">Budget (£)</Label>
+        <Input
+          id="budget"
+          type="number"
+          {...form.register("budget")}
+          required
+        />
+      </div>
+      <div>
+        <Label htmlFor="location">Location</Label>
+        <Input id="location" {...form.register("location")} required />
+      </div>
+      <Button
+        type="submit"
+        className="w-full"
+        disabled={isSubmitting}
+      >
+        {isSubmitting ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Posting...
+          </>
+        ) : (
+          'Post Lead'
+        )}
+      </Button>
+    </form>
+  );
+};
+
+const BusinessLeadsView = ({
+  leads,
+  user,
+  selectedLead,
+  setSelectedLead,
+  proposalDialogOpen,
+  setProposalDialogOpen,
+  toast,
+  playNotification
+}: BusinessLeadsViewProps) => {
+  const isFirstLoadRef = useRef(true);
+  const previousMessagesLengthRef = useRef(0);
+  const proposalForm = useForm<ProposalFormData>({
+    defaultValues: { proposal: "" }
+  });
+
+  const scrollToBottom = () => {
+    const messageContainer = document.getElementById('message-container');
+    if (messageContainer) {
+      messageContainer.scrollTop = messageContainer.scrollHeight;
+    }
+  };
+
+  const { data: messages = [] } = useQuery({
+    queryKey: ['/api/messages', selectedLead?.id],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/leads/${selectedLead?.id}/messages`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch messages');
+      }
+      return response.json();
     },
+    enabled: !!selectedLead
   });
 
   useEffect(() => {
-    if (editingLead) {
-      editForm.reset({
-        title: editingLead.title,
-        description: editingLead.description,
-        category: editingLead.category,
-        budget: editingLead.budget?.toString(),
-        location: editingLead.location || "",
-      });
+    if (messages.length > previousMessagesLengthRef.current && !isFirstLoadRef.current) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage?.sender?.id !== user?.id) {
+        playNotification('receive');
+      }
+      scrollToBottom();
     }
-  }, [editingLead, editForm]);
+    previousMessagesLengthRef.current = messages.length;
+    isFirstLoadRef.current = false;
+  }, [messages, user?.id, playNotification]);
 
-  const profileForm = useForm<ProfileFormData>({
-    defaultValues: {
-      name: user?.profile?.name || "",
-      description: user?.profile?.description || "",
-      categories: user?.profile?.categories?.join(", ") || "",
-      location: user?.profile?.location || "",
-    },
-  });
 
-  const updateProfileMutation = useMutation({
-    mutationFn: async (data: ProfileFormData) => {
-      const res = await apiRequest("PATCH", "/api/user/profile", {
-        profile: {
-          ...user?.profile,
-          name: data.name?.trim(),
-          description: data.description?.trim(),
-          categories: data.categories?.split(",").map(c => c.trim()).filter(Boolean),
-          location: data.location?.trim(),
-        },
-      });
-      const updatedUser = await res.json();
-      return updatedUser;
-    },
-    onSuccess: (updatedUser: SelectUser) => {
-      queryClient.setQueryData(["/api/user"], updatedUser);
-      profileForm.reset({
-        name: updatedUser.profile?.name || "",
-        description: updatedUser.profile?.description || "",
-        categories: updatedUser.profile?.categories?.join(", ") || "",
-        location: updatedUser.profile?.location || "",
-      });
-      toast({
-        title: "Profile Updated",
-        description: "Your profile has been updated successfully.",
-      });
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      }, 100);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update profile",
-        variant: "destructive",
-      });
-    },
-  });
+  if (!user?.subscriptionActive) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Subscription Required</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center gap-4 p-4 bg-muted rounded-lg">
+            <AlertTriangle className="h-6 w-6 text-primary" />
+            <div>
+              <p className="font-medium">No Active Subscription</p>
+              <p className="text-sm text-muted-foreground">
+                An active business subscription is required to:
+              </p>
+              <ul className="text-sm text-muted-foreground list-disc list-inside mt-2">
+                <li>View and access leads</li>
+                <li>Get matched with relevant opportunities</li>
+                <li>Send proposals to potential clients</li>
+              </ul>
+            </div>
+          </div>
+          <Button asChild className="w-full">
+            <a href="/subscription">Subscribe Now</a>
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
-  const updatePasswordMutation = useMutation({
-    mutationFn: async (data: PasswordFormData) => {
-      if (data.newPassword !== data.confirmPassword) {
-        throw new Error("New passwords do not match");
-      }
-      const res = await apiRequest("PATCH", "/api/user/password", {
-        currentPassword: data.currentPassword,
-        newPassword: data.newPassword,
-      });
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Your password has been updated successfully.",
-      });
-      passwordForm.reset();
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update password",
-        variant: "destructive",
-      });
-    },
-  });
+  const myResponses = leads.reduce((acc, lead) => {
+    const response = lead.responses?.find(r => r.business?.id === user.id);
+    if (response) {
+      acc[lead.id] = response;
+    }
+    return acc;
+  }, {} as Record<number, any>);
 
-  const updateUsernameMutation = useMutation({
-    mutationFn: async (data: UsernameFormData) => {
-      const res = await apiRequest("PATCH", "/api/user/username", {
-        username: data.username,
-      });
-      return res.json();
-    },
-    onSuccess: (updatedUser: SelectUser) => {
-      queryClient.setQueryData(["/api/user"], updatedUser);
-      toast({
-        title: "Success",
-        description: "Your username has been updated successfully.",
-      });
-      usernameForm.reset();
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update username",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const passwordForm = useForm<PasswordFormData>({
-    defaultValues: {
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    },
-  });
-
-  const usernameForm = useForm<UsernameFormData>({
-    defaultValues: {
-      username: user?.username || "",
-    },
-  });
-
-  // Update the leads query to properly handle subscription errors
-  const {
-    data: leads = [],
-    isLoading: isLoadingLeads,
-    error: leadsError
-  } = useQuery<LeadWithUnreadCount[]>({
-    queryKey: ["/api/leads"],
-    queryFn: async () => {
-      try {
-        const response = await apiRequest("GET", "/api/leads");
-        if (!response.ok) {
-          const errorData = await response.json();
-          if (errorData.subscriptionRequired) {
-            setShowSubscriptionModal(true);
-            throw new Error("Subscription required");
-          }
-          throw new Error("Failed to fetch leads");
-        }
-        return await response.json();
-      } catch (error: any) {
-        if (error.subscriptionRequired ||
-            (error.response && error.response.status === 403 && error.response.data?.subscriptionRequired)) {
-          setShowSubscriptionModal(true);
-        }
-        throw error;
-      }
-    },
-    enabled: !!user,
-    retry: false
-  });
-
-  const createLeadMutation = useMutation({
-    mutationFn: async (data: LeadFormData) => {
-      if (!user) {
-        throw new Error("You must be logged in to create a lead");
-      }
-
-      if (user.userType !== "free") {
-        throw new Error("Only free users can create leads");
-      }
-
-      const res = await apiRequest("POST", "/api/leads", {
-        ...data,
-        budget: parseInt(data.budget),
-      });
-
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-      toast({
-        title: "Success",
-        description: "Your lead has been posted successfully.",
-      });
-      form.reset();
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create lead. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const updateLeadMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: LeadFormData }) => {
-      const res = await apiRequest("PATCH", `/api/leads/${id}`, {
-        ...data,
-        budget: parseInt(data.budget),
-      });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-      toast({
-        title: "Success",
-        description: "Lead updated successfully.",
-      });
-      setEditingLead(null);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update lead",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const deleteLeadMutation = useMutation({
-    mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/leads/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-      toast({
-        title: "Success",
-        description: "Lead deleted successfully.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete lead",
-        variant: "destructive",
-      });
-    },
-  });
+  const hasUnreadMessages = leads.some(lead =>
+    lead.messages?.some(m =>
+      m.sender_id !== user?.id &&
+      !m.read
+    )
+  );
 
   const sendProposalMutation = useMutation({
     mutationFn: async ({ leadId, proposal }: { leadId: number; proposal: string }) => {
@@ -430,331 +266,231 @@ export default function LeadsPage() {
     },
   });
 
-
-  const proposalForm = useForm<ProposalFormData>({
-    defaultValues: {
-      proposal: "",
-    },
-  });
-
-  const acceptProposalForm = useForm<AcceptProposalData>({
-    defaultValues: {
-      contactDetails: "",
-    },
-  });
-
-  const acceptProposalMutation = useMutation({
-    mutationFn: async ({ responseId, contactDetails }: { responseId: number; contactDetails: string }) => {
-      const res = await apiRequest("PATCH", `/api/leads/${selectedLead?.id}/responses/${responseId}`, {
-        status: "accepted",
-        contactDetails
-      });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-      toast({
-        title: "Success",
-        description: "Proposal accepted successfully.",
-      });
-      setAcceptDialogOpen(false);
-      acceptProposalForm.reset();
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to accept proposal",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const BusinessLeadsView = () => {
-    const isFirstLoadRef = useRef(true);
-    const previousMessagesLengthRef = useRef(0);
-
-    const scrollToBottom = () => {
-      const messageContainer = document.getElementById('message-container');
-      if (messageContainer) {
-        messageContainer.scrollTop = messageContainer.scrollHeight;
-      }
-    };
-
-    const { data: messages = [] } = useQuery({
-      queryKey: ['/api/messages', selectedLead?.id],
-      queryFn: async () => {
-        const response = await apiRequest('GET', `/api/leads/${selectedLead?.id}/messages`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch messages');
-        }
-        return response.json();
-      },
-      enabled: !!selectedLead
-    });
-
-    useEffect(() => {
-      if (messages.length > previousMessagesLengthRef.current && !isFirstLoadRef.current) {
-        const lastMessage = messages[messages.length - 1];
-        if (lastMessage?.sender?.id !== user?.id) {
-          playNotification('receive');
-        }
-        scrollToBottom();
-      }
-      previousMessagesLengthRef.current = messages.length;
-      isFirstLoadRef.current = false;
-    }, [messages, user?.id, playNotification]);
-
-
-    if (!user?.subscriptionActive) {
-      return (
-        <Card>
-          <CardHeader>
-            <CardTitle>Subscription Required</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex items-center gap-4 p-4 bg-muted rounded-lg">
-              <AlertTriangle className="h-6 w-6 text-primary" />
-              <div>
-                <p className="font-medium">No Active Subscription</p>
-                <p className="text-sm text-muted-foreground">
-                  An active business subscription is required to:
-                </p>
-                <ul className="text-sm text-muted-foreground list-disc list-inside mt-2">
-                  <li>View and access leads</li>
-                  <li>Get matched with relevant opportunities</li>
-                  <li>Send proposals to potential clients</li>
-                </ul>
-              </div>
-            </div>
-            <Button asChild className="w-full">
-              <a href="/subscription">Subscribe Now</a>
-            </Button>
-          </CardContent>
-        </Card>
-      );
-    }
-
-    const myResponses = leads.reduce((acc, lead) => {
-      const response = lead.responses?.find(r => r.business?.id === user.id);
-      if (response) {
-        acc[lead.id] = response;
-      }
-      return acc;
-    }, {} as Record<number, any>);
-
-    const hasUnreadMessages = leads.some(lead =>
-      lead.messages?.some(m =>
-        m.sender_id !== user?.id &&
-        !m.read
-      )
-    );
-
-    return (
-      <div className="space-y-8">
-        {hasUnreadMessages && (
-          <div className="bg-muted/50 p-4 rounded-lg flex items-center gap-2 mb-4">
-            <Info className="h-5 w-5 text-primary" />
-            <p className="text-sm">You have unread messages in your leads</p>
-          </div>
-        )}
-        <Card>
-          <CardHeader>
-            <CardTitle>Your Proposals</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {Object.entries(myResponses).map(([leadId, response]) => {
-                const lead = leads.find(l => l.id === parseInt(leadId));
-                return (
-                  <div key={leadId} className="border rounded-lg p-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <h3 className="font-medium">{lead?.title}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Sent: {response.created_at ? format(new Date(response.created_at), 'PPp') : 'Recently'}
+  return (
+    <div className="space-y-8">
+      {hasUnreadMessages && (
+        <div className="bg-muted/50 p-4 rounded-lg flex items-center gap-2 mb-4">
+          <Info className="h-5 w-5 text-primary" />
+          <p className="text-sm">You have unread messages in your leads</p>
+        </div>
+      )}
+      <Card>
+        <CardHeader>
+          <CardTitle>Your Proposals</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {Object.entries(myResponses).map(([leadId, response]) => {
+              const lead = leads.find(l => l.id === parseInt(leadId));
+              return (
+                <div key={leadId} className="border rounded-lg p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <h3 className="font-medium">{lead?.title}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Sent: {response.created_at ? format(new Date(response.created_at), 'PPp') : 'Recently'}
+                      </p>
+                    </div>
+                    <Badge variant={
+                      response.status === "accepted" ? "success" :
+                        response.status === "rejected" ? "destructive" :
+                          "secondary"
+                    }>
+                      {response.status.charAt(0).toUpperCase() + response.status.slice(1)}
+                    </Badge>
+                  </div>
+                  <p className="text-sm mt-2">{response.proposal}</p>
+                  {response.status === "accepted" && (
+                    <div className="mt-4 space-y-4">
+                      <div className="p-4 bg-background rounded-lg border">
+                        <h4 className="font-medium mb-2">Contact Information</h4>
+                        <p className="text-sm whitespace-pre-wrap">
+                          {response.contactDetails || "No contact details provided yet."}
                         </p>
                       </div>
-                      <Badge variant={
-                        response.status === "accepted" ? "success" :
-                          response.status === "rejected" ? "destructive" :
-                            "secondary"
-                      }>
-                        {response.status.charAt(0).toUpperCase() + response.status.slice(1)}
-                      </Badge>
-                    </div>
-                    <p className="text-sm mt-2">{response.proposal}</p>
-                    {response.status === "accepted" && (
-                      <div className="mt-4 space-y-4">
-                        <div className="p-4 bg-background rounded-lg border">
-                          <h4 className="font-medium mb-2">Contact Information</h4>
-                          <p className="text-sm whitespace-pre-wrap">
-                            {response.contactDetails || "No contact details provided yet."}
-                          </p>
-                        </div>
 
-                        <div className="p-4 bg-background rounded-lg border">
-                          <div className="flex justify-between items-center mb-4">
-                            <h4 className="font-medium">Messages</h4>
-                            <Dialog>
-                              <DialogTrigger asChild>
-                                <Button variant="outline" size="sm" className="relative">
-                                  <Send className="h-4 w-4 mr-2" />
-                                  Open Messages
-                                  {lead.unreadMessages > 0 && (
-                                    <span className="absolute -top-1 -right-1 h-3 w-3 bg-destructive rounded-full" />
-                                  )}
-                                </Button>
-                              </DialogTrigger>
-                              <MessageDialogContent
-                                leadId={lead.id}
-                                receiverId={user?.id === lead.user_id ? response.business_id : lead.user_id}
-                                onClose={() => queryClient.invalidateQueries({ queryKey: ["/api/leads"] })}
-                              />
-                            </Dialog>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="grid gap-6">
-          <h2 className="text-2xl font-bold">Available Leads</h2>
-          {leads.map((lead) => {
-            const matchScore = calculateMatchScore(lead, user);
-            const existingResponse = myResponses[lead.id];
-
-            return (
-              <Card key={lead.id}>
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <CardTitle>{lead.title}</CardTitle>
-                    {!existingResponse && (
-                      <Dialog
-                        open={proposalDialogOpen}
-                        onOpenChange={(open) => {
-                          setProposalDialogOpen(open);
-                          if (!open) {
-                            proposalForm.reset();
-                            setSelectedLead(null);
-                          }
-                        }}
-                      >
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedLead(lead);
-                              proposalForm.reset();
-                            }}
-                          >
-                            <Send className="h-4 w-4 mr-2" />
-                            Send Proposal
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Send Proposal for "{selectedLead?.title}"</DialogTitle>
-                            <DialogDescription>
-                              Write your proposal message to the lead owner. Be specific about how you can help.
-                            </DialogDescription>
-                          </DialogHeader>
-                          <form onSubmit={proposalForm.handleSubmit((data) => {
-                            if (selectedLead) {
-                              sendProposalMutation.mutate({
-                                leadId: selectedLead.id,
-                                proposal: data.proposal
-                              });
-                            }
-                          })}>
-                            <div className="space-y-4">
-                              <div>
-                                <Label htmlFor="proposal">Your Proposal</Label>
-                                <Textarea
-                                  id="proposal"
-                                  placeholder="Describe how you can help with this project..."
-                                  {...proposalForm.register("proposal")}
-                                  className="min-h-[150px]"
-                                  required
-                                />
-                              </div>
-                              <Button
-                                type="submit"
-                                className="w-full"
-                                disabled={sendProposalMutation.isPending}
-                              >
-                                {sendProposalMutation.isPending ? (
-                                  <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Sending...
-                                  </>
-                                ) : (
-                                  'Send Proposal'
+                      <div className="p-4 bg-background rounded-lg border">
+                        <div className="flex justify-between items-center mb-4">
+                          <h4 className="font-medium">Messages</h4>
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button variant="outline" size="sm" className="relative">
+                                <Send className="h-4 w-4 mr-2" />
+                                Open Messages
+                                {lead.unreadMessages > 0 && (
+                                  <span className="absolute -top-1 -right-1 h-3 w-3 bg-destructive rounded-full" />
                                 )}
                               </Button>
-                            </div>
-                          </form>
-                        </DialogContent>
-                      </Dialog>
-                    )}
-                    {existingResponse && (
-                      <Badge variant={
-                        existingResponse.status === "accepted" ? "success" :
-                          existingResponse.status === "rejected" ? "destructive" :
-                            "secondary"
-                      }>
-                        Proposal {existingResponse.status.charAt(0).toUpperCase() + existingResponse.status.slice(1)}
-                      </Badge>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground mb-4">{lead.description}</p>
-                  <div className="grid grid-cols-3 gap-4 text-sm">
-                    <div>
-                      <span className="font-medium">Category:</span> {lead.category}
+                            </DialogTrigger>
+                            <MessageDialogContent
+                              leadId={lead.id}
+                              receiverId={user?.id === lead.user_id ? response.business_id : lead.user_id}
+                              onClose={() => queryClient.invalidateQueries({ queryKey: ["/api/leads"] })}
+                            />
+                          </Dialog>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <span className="font-medium">Budget:</span> £{lead.budget}
-                    </div>
-                    <div>
-                      <span className="font-medium">Location:</span> {lead.location}
-                    </div>
-                  </div>
-                </CardContent>
-                <CardFooter className="flex justify-between items-center">
-                  <p className="text-sm text-muted-foreground">
-                    Posted {lead.created_at ? format(new Date(lead.created_at), 'PPp') : 'Recently'}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Progress
-                      value={matchScore.totalScore}
-                      className="w-[100px]"
-                    />
-                    <span className="text-sm text-muted-foreground">
-                      {Math.round(matchScore.totalScore)}% Match
-                    </span>
-                  </div>
-                </CardFooter>
-              </Card>
-            );
-          })}
-          {(!leads || leads.length === 0) && (
-            <p className="text-muted-foreground text-center py-8">
-              No matching leads found. Update your business profile to see more relevant leads.
-            </p>
-          )}
-        </div>
-      </div>
-    );
-  };
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
-  const FreeUserLeadsView = () => (
+      <div className="grid gap-6">
+        <h2 className="text-2xl font-bold">Available Leads</h2>
+        {leads.map((lead) => {
+          const matchScore = calculateMatchScore(lead, user);
+          const existingResponse = myResponses[lead.id];
+
+          return (
+            <Card key={lead.id}>
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <CardTitle>{lead.title}</CardTitle>
+                  {!existingResponse && (
+                    <Dialog
+                      open={proposalDialogOpen}
+                      onOpenChange={(open) => {
+                        setProposalDialogOpen(open);
+                        if (!open) {
+                          proposalForm.reset();
+                          setSelectedLead(null);
+                        }
+                      }}
+                    >
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedLead(lead);
+                            proposalForm.reset();
+                          }}
+                        >
+                          <Send className="h-4 w-4 mr-2" />
+                          Send Proposal
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Send Proposal for "{selectedLead?.title}"</DialogTitle>
+                          <DialogDescription>
+                            Write your proposal message to the lead owner. Be specific about how you can help.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <form onSubmit={proposalForm.handleSubmit((data) => {
+                          if (selectedLead) {
+                            sendProposalMutation.mutate({
+                              leadId: selectedLead.id,
+                              proposal: data.proposal
+                            });
+                          }
+                        })}>
+                          <div className="space-y-4">
+                            <div>
+                              <Label htmlFor="proposal">Your Proposal</Label>
+                              <Textarea
+                                id="proposal"
+                                placeholder="Describe how you can help with this project..."
+                                {...proposalForm.register("proposal")}
+                                className="min-h-[150px]"
+                                required
+                              />
+                            </div>
+                            <Button
+                              type="submit"
+                              className="w-full"
+                              disabled={sendProposalMutation.isPending}
+                            >
+                              {sendProposalMutation.isPending ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Sending...
+                                </>
+                              ) : (
+                                'Send Proposal'
+                              )}
+                            </Button>
+                          </div>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                  {existingResponse && (
+                    <Badge variant={
+                      existingResponse.status === "accepted" ? "success" :
+                        existingResponse.status === "rejected" ? "destructive" :
+                          "secondary"
+                    }>
+                      Proposal {existingResponse.status.charAt(0).toUpperCase() + existingResponse.status.slice(1)}
+                    </Badge>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground mb-4">{lead.description}</p>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium">Category:</span> {lead.category}
+                  </div>
+                  <div>
+                    <span className="font-medium">Budget:</span> £{lead.budget}
+                  </div>
+                  <div>
+                    <span className="font-medium">Location:</span> {lead.location}
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="flex justify-between items-center">
+                <p className="text-sm text-muted-foreground">
+                  Posted {lead.created_at ? format(new Date(lead.created_at), 'PPp') : 'Recently'}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Progress
+                    value={matchScore.totalScore}
+                    className="w-[100px]"
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    {Math.round(matchScore.totalScore)}% Match
+                  </span>
+                </div>
+              </CardFooter>
+            </Card>
+          );
+        })}
+        {(!leads || leads.length === 0) && (
+          <p className="text-muted-foreground text-center py-8">
+            No matching leads found. Update your business profile to see more relevant leads.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const FreeUserLeadsView = ({
+  leads,
+  createLeadMutation,
+  updateLeadMutation,
+  editingLead,
+  setEditingLead,
+  deleteLeadMutation,
+  user
+}: FreeUserLeadsViewProps) => {
+  const editForm = useForm<LeadFormData>({
+    defaultValues: {
+      title: editingLead?.title || "",
+      description: editingLead?.description || "",
+      category: editingLead?.category || "",
+      budget: editingLead?.budget?.toString() || "",
+      location: editingLead?.location || "",
+    },
+  });
+
+  return (
     <Tabs defaultValue="my-leads">
       <TabsList>
         <TabsTrigger value="my-leads">My Posted Leads</TabsTrigger>
@@ -762,7 +498,7 @@ export default function LeadsPage() {
       </TabsList>
       <TabsContent value="my-leads" className="mt-4">
         <div className="grid gap-6">
-          {userLeadsFiltered?.map((lead) => (
+          {leads.map((lead) => (
             <Card key={lead.id}>
               <CardHeader>
                 <div className="flex justify-between items-start">
@@ -924,68 +660,15 @@ export default function LeadsPage() {
 
                           {response.status === "pending" && (
                             <div className="flex gap-2 mt-4">
-                              <Dialog open={acceptDialogOpen} onOpenChange={setAcceptDialogOpen}>
-                                <DialogTrigger asChild>
-                                  <Button
-                                    size="sm"
-                                    onClick={() => {
-                                      setSelectedResponse(response);
-                                      setSelectedLead(lead);
-                                    }}
-                                  >
-                                    Accept
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                  <DialogHeader>
-                                    <DialogTitle>Accept Proposal</DialogTitle>
-                                    <DialogDescription>
-                                      Please provide your contact details. This will be shared with the business when you accept their proposal.
-                                    </DialogDescription>
-                                  </DialogHeader>
-                                  <form onSubmit={acceptProposalForm.handleSubmit((data) => {
-                                    if (selectedResponse && selectedLead) {
-                                      acceptProposalMutation.mutate({
-                                        responseId: selectedResponse.id,
-                                        contactDetails: data.contactDetails
-                                      });
-                                    } else {
-                                      toast({
-                                        title: "Error",
-                                        description: "Missing lead or response information",
-                                        variant: "destructive",
-                                      });
-                                    }
-                                  })}>
-                                    <div className="space-y-4">
-                                      <div>
-                                        <Label htmlFor="contactDetails">Contact Details</Label>
-                                        <Textarea
-                                          id="contactDetails"
-                                          placeholder="Please provide your preferred contact method (email, phone) and any additional information for the business to reach you."
-                                          {...acceptProposalForm.register("contactDetails")}
-                                          className="min-h-[100px]"
-                                          required
-                                        />
-                                      </div>
-                                      <Button
-                                        type="submit"
-                                        className="w-full"
-                                        disabled={acceptProposalMutation.isPending}
-                                      >
-                                        {acceptProposalMutation.isPending ? (
-                                          <>
-                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                            Accepting...
-                                          </>
-                                        ) : (
-                                          'Accept Proposal'
-                                        )}
-                                      </Button>
-                                    </div>
-                                  </form>
-                                </DialogContent>
-                              </Dialog>
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  //setSelectedResponse(response);
+                                  //setSelectedLead(lead);
+                                }}
+                              >
+                                Accept
+                              </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -1013,7 +696,7 @@ export default function LeadsPage() {
               </CardFooter>
             </Card>
           ))}
-          {(!userLeadsFiltered || userLeadsFiltered.length === 0) && (
+          {(!leads || leads.length === 0) && (
             <p className="text-muted-foreground text-center py-8">
               You haven't postedany leads yet. Create your first lead to get started!
             </p>
@@ -1026,7 +709,10 @@ export default function LeadsPage() {
             <CardTitle>Post a New Lead</CardTitle>
           </CardHeader>
           <CardContent>
-            <CreateLeadForm />
+            <CreateLeadForm 
+              onSubmit={(data) => createLeadMutation.mutate(data)} 
+              isSubmitting={createLeadMutation.isPending} 
+            />
           </CardContent>
         </Card>
       </TabsContent>
@@ -1034,205 +720,487 @@ export default function LeadsPage() {
   );
 };
 
-const CreateLeadForm = () => (
-  <form
-    onSubmit={form.handleSubmit((data) => createLeadMutation.mutate(data))}
-    className="space-y-4"
-  >
-    <div>
-      <Label htmlFor="title">Title</Label>
-      <Input
-        id="title"
-        {...form.register("title")}
-        required
-      />
-    </div>
-    <div>
-      <Label htmlFor="description">Description</Label>
-      <Textarea
-        id="description"
-        {...form.register("description")}
-        required
-      />
-    </div>
-    <div>
-      <Label htmlFor="category">Category</Label>
-      <Input
-        id="category"
-        {...form.register("category")}
-        required
-      />
-    </div>
-    <div>
-      <Label htmlFor="budget">Budget (£)</Label>
-      <Input
-        id="budget"
-        type="number"
-        {...form.register("budget")}
-        required
-      />
-    </div>
-    <div>
-      <Label htmlFor="location">Location</Label>
-      <Input
-        id="location"
-        {...form.register("location")}
-        required
-      />
-    </div>
-    <Button
-      type="submit"
-      className="w-full"
-      disabled={createLeadMutation.isPending}
-    >
-      {createLeadMutation.isPending ? (
-        <>
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Posting...
-        </>
-      ) : (
-        'Post Lead'
-      )}
-    </Button>
-  </form>
-);
+function MessageDialogContent({
+  leadId,
+  receiverId,
+  onClose,
+}: {
+  leadId: number;
+  receiverId: number;
+  onClose?: () => void;
+}) {
+  const [open, setOpen] = useState(true);
 
-if (isLoadingLeads) {
+  const handleOpenChange = (newOpen: boolean) => {
+    setOpen(newOpen);
+    if (!newOpen && onClose) {
+      onClose();
+    }
+  };
+
   return (
-    <div className="flex items-center justify-center min-h-[200px]">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-    </div>
+    <MessageDialog
+      leadId={leadId}
+      receiverId={receiverId}
+      isOpen={open}
+      onOpenChange={handleOpenChange}
+      onMessagesRead={onClose}
+    />
   );
 }
 
-const userLeadsFiltered = user?.userType === "business"
-  ? leads
-  : leads.filter(lead => lead.user_id === user?.id);
+const calculateMatchScore = (lead: SelectLead, user: SelectUser | null): {
+  totalScore: number;
+  categoryScore: number;
+  locationScore: number;
+  budgetScore: number;
+  industryScore: number;
+} => {
+  let totalScore = 0;
+  let categoryScore = 0;
+  let locationScore = 0;
+  let budgetScore = 0;
+  let industryScore = 0;
 
-return (
-  <div className="container max-w-7xl mx-auto p-6 space-y-8">
-    <div className="flex justify-between items-center">
-      <h1 className="text-3xl font-bold">Leads Dashboard</h1>
-      <Dialog>
-        <DialogTrigger asChild>
-          <Button variant="outline">
-            <Settings className="h-4 w-4 mr-2" />
-            Settings
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Profile Settings</DialogTitle>
-          </DialogHeader>
-          <Tabs defaultValue="profile">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="profile">Profile</TabsTrigger>
-              <TabsTrigger value="username">Username</TabsTrigger>
-              <TabsTrigger value="password">Password</TabsTrigger>
-            </TabsList>
-            <TabsContent value="profile">
-              <form onSubmit={profileForm.handleSubmit((data) => updateProfileMutation.mutate(data))} className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Display Name</Label>
-                  <Input id="name" {...profileForm.register("name")} />
-                </div>
-                <div>
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea id="description" {...profileForm.register("description")} />
-                </div>
-                <div>
-                  <Label htmlFor="categories">Categories (comma-separated)</Label>
-                  <Input id="categories" {...profileForm.register("categories")} />
-                </div>
-                <div>
-                  <Label htmlFor="location">Location</Label>
-                  <Input id="location" {...profileForm.register("location")} />
-                </div>
-                <Button type="submit" className="w-full" disabled={updateProfileMutation.isPending}>
-                  {updateProfileMutation.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    'Save Profile'
-                  )}
-                </Button>
-              </form>
-            </TabsContent>
+  if (user?.profile?.categories?.includes(lead.category)) {
+    categoryScore = 25;
+  }
+  if (user?.profile?.location === lead.location) {
+    locationScore = 25;
+  }
+  if (user?.profile?.budget && lead.budget &&
+    Math.abs(lead.budget - user.profile.budget) < 1000) {
+    budgetScore = 25;
+  }
+  if (user?.profile?.industries?.includes(lead.industry)) {
+    industryScore = 25;
+  }
 
-            <TabsContent value="username">
-              <form onSubmit={usernameForm.handleSubmit((data) => updateUsernameMutation.mutate(data))} className="space-y-4">
-                <div>
-                  <Label htmlFor="username">Username</Label>
-                  <Input id="username" {...usernameForm.register("username")} required />
-                </div>
-                <Button type="submit" className="w-full" disabled={updateUsernameMutation.isPending}>
-                  {updateUsernameMutation.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Updating...
-                    </>
-                  ) : (
-                    'Update Username'
-                  )}
-                </Button>
-              </form>
-            </TabsContent>
+  totalScore = categoryScore + locationScore + budgetScore + industryScore;
+  return { totalScore, categoryScore, locationScore, budgetScore, industryScore };
+};
 
-            <TabsContent value="password">
-              <form onSubmit={passwordForm.handleSubmit((data) => updatePasswordMutation.mutate(data))} className="space-y-4">
-                <div>
-                  <Label htmlFor="currentPassword">Current Password</Label>
-                  <Input
-                    id="currentPassword"
-                    type="password"
-                    {...passwordForm.register("currentPassword")}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="newPassword">New Password</Label>
-                  <Input
-                    id="newPassword"
-                    type="password"
-                    {...passwordForm.register("newPassword")}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    {...passwordForm.register("confirmPassword")}
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={updatePasswordMutation.isPending}>
-                  {updatePasswordMutation.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Updating...
-                    </>
-                  ) : (
-                    'Update Password'
-                  )}
-                </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
-        </DialogContent>
-      </Dialog>
+export default function LeadsPage() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [editingLead, setEditingLead] = useState<LeadWithUnreadCount | null>(null);
+  const [selectedLead, setSelectedLead] = useState<SelectLead | null>(null);
+  const [proposalDialogOpen, setProposalDialogOpen] = useState(false);
+  const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
+  const [selectedResponse, setSelectedResponse] = useState<any>(null);
+  const playNotification = useNotificationSound();
+
+  // If user is not logged in, redirect to auth page
+  if (!user) {
+    return <Redirect to="/auth" />;
+  }
+
+  // Query setup
+  const {
+    data: leads = [],
+    isLoading: isLoadingLeads,
+    //error: leadsError
+  } = useQuery<LeadWithUnreadCount[]>({
+    queryKey: ["/api/leads"],
+    queryFn: async () => {
+      try {
+        const response = await apiRequest("GET", "/api/leads");
+        if (!response.ok) {
+          const errorData = await response.json();
+          if (errorData.subscriptionRequired) {
+            setShowSubscriptionModal(true);
+            throw new Error("Subscription required");
+          }
+          throw new Error("Failed to fetch leads");
+        }
+        return await response.json();
+      } catch (error: any) {
+        if (error.subscriptionRequired ||
+            (error.response && error.response.status === 403 && error.response.data?.subscriptionRequired)) {
+          setShowSubscriptionModal(true);
+        }
+        throw error;
+      }
+    },
+    enabled: !!user,
+    retry: false
+  });
+
+  // Mutations setup
+  const createLeadMutation = useMutation({
+    mutationFn: async (data: LeadFormData) => {
+      const res = await apiRequest("POST", "/api/leads", {
+        ...data,
+        budget: parseInt(data.budget),
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      toast({
+        title: "Success",
+        description: "Your lead has been posted successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create lead",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update lead mutation
+  const updateLeadMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: LeadFormData }) => {
+      const res = await apiRequest("PATCH", `/api/leads/${id}`, {
+        ...data,
+        budget: parseInt(data.budget),
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      toast({
+        title: "Success",
+        description: "Lead updated successfully.",
+      });
+      setEditingLead(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update lead",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Loading state
+  if (isLoadingLeads) {
+    return (
+      <div className="flex items-center justify-center min-h-[200px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Filter leads based on user type
+  const userLeadsFiltered = user?.userType === "business"
+    ? leads
+    : leads.filter(lead => lead.user_id === user?.id);
+
+  const deleteLeadMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/leads/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      toast({
+        title: "Success",
+        description: "Lead deleted successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete lead",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const acceptProposalForm = useForm<AcceptProposalData>({
+    defaultValues: {
+      contactDetails: "",
+    },
+  });
+
+  const acceptProposalMutation = useMutation({
+    mutationFn: async ({ responseId, contactDetails }: { responseId: number; contactDetails: string }) => {
+      const res = await apiRequest("PATCH", `/api/leads/${selectedLead?.id}/responses/${responseId}`, {
+        status: "accepted",
+        contactDetails
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      toast({
+        title: "Success",
+        description: "Proposal accepted successfully.",
+      });
+      setAcceptDialogOpen(false);
+      acceptProposalForm.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to accept proposal",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: ProfileFormData) => {
+      const res = await apiRequest("PATCH", "/api/user/profile", {
+        profile: {
+          ...user?.profile,
+          name: data.name?.trim(),
+          description: data.description?.trim(),
+          categories: data.categories?.split(",").map(c => c.trim()).filter(Boolean),
+          location: data.location?.trim(),
+        },
+      });
+      const updatedUser = await res.json();
+      return updatedUser;
+    },
+    onSuccess: (updatedUser: SelectUser) => {
+      queryClient.setQueryData(["/api/user"], updatedUser);
+      profileForm.reset({
+        name: updatedUser.profile?.name || "",
+        description: updatedUser.profile?.description || "",
+        categories: updatedUser.profile?.categories?.join(", ") || "",
+        location: updatedUser.profile?.location || "",
+      });
+      toast({
+        title: "Profile Updated",
+        description: "Your profile has been updated successfully.",
+      });
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      }, 100);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update profile",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updatePasswordMutation = useMutation({
+    mutationFn: async (data: PasswordFormData) => {
+      if (data.newPassword !== data.confirmPassword) {
+        throw new Error("New passwords do not match");
+      }
+      const res = await apiRequest("PATCH", "/api/user/password", {
+        currentPassword: data.currentPassword,
+        newPassword: data.newPassword,
+      });
+      return res.json();    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Your password has been updated successfully.",
+      });
+      passwordForm.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update password",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateUsernameMutation = useMutation({
+    mutationFn: async (data: UsernameFormData) => {
+      const res = await apiRequest("PATCH", "/api/user/username", {
+        username: data.username,
+      });
+      return res.json();
+    },
+    onSuccess: (updatedUser: SelectUser) => {
+      queryClient.setQueryData(["/api/user"], updatedUser);
+      toast({
+        title: "Success",
+        description: "Your username has been updated successfully.",
+      });
+      usernameForm.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update username",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const passwordForm = useForm<PasswordFormData>({
+    defaultValues: {
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    },
+  });
+
+  const usernameForm = useForm<UsernameFormData>({
+    defaultValues: {
+      username: user?.username || "",
+    },
+  });
+
+  const profileForm = useForm<ProfileFormData>({
+    defaultValues: {
+      name: user?.profile?.name || "",
+      description: user?.profile?.description || "",
+      categories: user?.profile?.categories?.join(", ") || "",
+      location: user?.profile?.location || "",
+    },
+  });
+
+  return (
+    <div className="container max-w-7xl mx-auto p-6 space-y-8">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">Leads Dashboard</h1>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="outline">
+              <Settings className="h-4 w-4 mr-2" />
+              Settings
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Profile Settings</DialogTitle>
+            </DialogHeader>
+            <Tabs defaultValue="profile">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="profile">Profile</TabsTrigger>
+                <TabsTrigger value="username">Username</TabsTrigger>
+                <TabsTrigger value="password">Password</TabsTrigger>
+              </TabsList>
+              <TabsContent value="profile">
+                <form onSubmit={profileForm.handleSubmit((data) => updateProfileMutation.mutate(data))} className="space-y-4">
+                  <div>
+                    <Label htmlFor="name">Display Name</Label>
+                    <Input id="name" {...profileForm.register("name")} />
+                  </div>
+                  <div>
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea id="description" {...profileForm.register("description")} />
+                  </div>
+                  <div>
+                    <Label htmlFor="categories">Categories (comma-separated)</Label>
+                    <Input id="categories" {...profileForm.register("categories")} />
+                  </div>
+                  <div>
+                    <Label htmlFor="location">Location</Label>
+                    <Input id="location" {...profileForm.register("location")} />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={updateProfileMutation.isPending}>
+                    {updateProfileMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Profile'
+                    )}
+                  </Button>
+                </form>
+              </TabsContent>
+
+              <TabsContent value="username">
+                <form onSubmit={usernameForm.handleSubmit((data) => updateUsernameMutation.mutate(data))} className="space-y-4">
+                  <div>
+                    <Label htmlFor="username">Username</Label>
+                    <Input id="username" {...usernameForm.register("username")} required />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={updateUsernameMutation.isPending}>
+                    {updateUsernameMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      'Update Username'
+                    )}
+                  </Button>
+                </form>
+              </TabsContent>
+
+              <TabsContent value="password">
+                <form onSubmit={passwordForm.handleSubmit((data) => updatePasswordMutation.mutate(data))} className="space-y-4">
+                  <div>
+                    <Label htmlFor="currentPassword">Current Password</Label>
+                    <Input
+                      id="currentPassword"
+                      type="password"
+                      {...passwordForm.register("currentPassword")}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="newPassword">New Password</Label>
+                    <Input
+                      id="newPassword"
+                      type="password"
+                      {...passwordForm.register("newPassword")}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                    <Input
+                      id="confirmPassword"
+                      type="password"
+                      {...passwordForm.register("confirmPassword")}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={updatePasswordMutation.isPending}>
+                    {updatePasswordMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      'Update Password'
+                    )}
+                  </Button>
+                </form>
+              </TabsContent>
+            </Tabs>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {user?.userType === "business" ? (
+        <BusinessLeadsView
+          leads={leads}
+          user={user}
+          selectedLead={selectedLead}
+          setSelectedLead={setSelectedLead}
+          proposalDialogOpen={proposalDialogOpen}
+          setProposalDialogOpen={setProposalDialogOpen}
+          toast={toast}
+          playNotification={playNotification}
+        />
+      ) : (
+        <FreeUserLeadsView
+          leads={userLeadsFiltered}
+          createLeadMutation={createLeadMutation}
+          updateLeadMutation={updateLeadMutation}
+          editingLead={editingLead}
+          setEditingLead={setEditingLead}
+          deleteLeadMutation={deleteLeadMutation}
+          user={user}
+        />
+      )}
+
+      <SubscriptionRequiredModal
+        isOpen={showSubscriptionModal}
+        onClose={() => setShowSubscriptionModal(false)}
+        userType={user.userType}
+      />
     </div>
-
-    {user?.userType === "business" ? <BusinessLeadsView /> : <FreeUserLeadsView />}
-
-    <SubscriptionRequiredModal
-      isOpen={showSubscriptionModal}
-      onClose={() => setShowSubscriptionModal(false)}
-      userType={user.userType}
-    />
-  </div>
-);
+  );
 }
