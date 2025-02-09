@@ -56,11 +56,13 @@ router.get("/admin/stats", authenticateToken, checkSuperAdminAccess, async (req,
       .from(subscriptions)
       .where(eq(subscriptions.status, "active"));
 
+    const totalRevenue = revenue?.total ? Number(revenue.total) / 100 : 0;
+
     res.json({
       totalUsers: userStats.count || 0,
       totalDocuments: docStats.count || 0,
       activeSubscriptions: subStats.count || 0,
-      totalRevenue: Math.floor((revenue?.total || 0) / 100), // Convert from pence to pounds
+      totalRevenue: Math.floor(totalRevenue),
     });
   } catch (error) {
     console.error("Error fetching admin stats:", error);
@@ -82,7 +84,7 @@ router.get("/users", authenticateToken, checkSuperAdminAccess, async (req, res) 
   }
 });
 
-// Add this route after the GET /users route
+// Get single user
 router.get("/users/:userId", authenticateToken, checkSuperAdminAccess, async (req, res) => {
   try {
     const [user] = await db
@@ -99,6 +101,83 @@ router.get("/users/:userId", authenticateToken, checkSuperAdminAccess, async (re
   } catch (error) {
     console.error("Error fetching user:", error);
     return res.status(500).json({ error: "Failed to fetch user" });
+  }
+});
+
+// Update user subscription (super admin only)
+router.post("/admin/users/:userId/subscription", authenticateToken, checkSuperAdminAccess, async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    const { subscriptionType } = req.body;
+
+    if (!["free", "business", "vendor"].includes(subscriptionType)) {
+      return res.status(400).json({ error: "Invalid subscription type" });
+    }
+
+    // Check if user exists
+    const [targetUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!targetUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Cancel any existing subscription
+    await db
+      .update(subscriptions)
+      .set({ status: "cancelled" })
+      .where(eq(subscriptions.user_id, userId));
+
+    if (subscriptionType !== "free") {
+      // Create new subscription
+      await db
+        .insert(subscriptions)
+        .values({
+          user_id: userId,
+          status: "active",
+          type: subscriptionType,
+          price: subscriptionType === "business" ? 2999 : 4999, // Price in pence
+          start_date: new Date(),
+          end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+        });
+    }
+
+    // Update user type
+    const [updatedUser] = await db
+      .update(users)
+      .set({ userType: subscriptionType })
+      .where(eq(users.id, userId))
+      .returning();
+
+    return res.json(updatedUser);
+  } catch (error) {
+    console.error("Error updating subscription:", error);
+    return res.status(500).json({ error: "Failed to update subscription" });
+  }
+});
+
+// Product management routes
+router.post("/products", authenticateToken, checkSuperAdminAccess, async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const [product] = await db
+      .insert(products)
+      .values({
+        ...req.body,
+        vendor_id: req.user.id,
+      })
+      .returning();
+
+    return res.status(201).json(product);
+  } catch (error) {
+    console.error("Error creating product:", error);
+    return res.status(500).json({ error: "Failed to create product" });
   }
 });
 
@@ -157,59 +236,7 @@ router.post("/admin/users/:userId/reset-password", authenticateToken, checkSuper
   }
 });
 
-// Update user subscription (super admin only)
-router.post("/admin/users/:userId/subscription", authenticateToken, checkSuperAdminAccess, async (req, res) => {
-  try {
-    const userId = parseInt(req.params.userId);
-    const { subscriptionType } = req.body;
 
-    if (!["free", "business", "vendor"].includes(subscriptionType)) {
-      return res.status(400).json({ error: "Invalid subscription type" });
-    }
-
-    // Check if user exists
-    const [targetUser] = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, userId))
-      .limit(1);
-
-    if (!targetUser) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    // Cancel any existing subscription
-    await db
-      .update(subscriptions)
-      .set({ status: "cancelled" })
-      .where(eq(subscriptions.userId, userId));
-
-    if (subscriptionType !== "free") {
-      // Create new subscription
-      await db
-        .insert(subscriptions)
-        .values({
-          userId,
-          status: "active",
-          type: subscriptionType,
-          startDate: new Date(),
-          endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-        });
-    }
-
-    // Update user type
-    const [updatedUser] = await db
-      .update(users)
-      .set({ userType: subscriptionType })
-      .where(eq(users.id, userId))
-      .returning();
-
-    return res.json(updatedUser);
-  } catch (error) {
-    console.error("Error updating subscription:", error);
-    return res.status(500).json({ error: "Failed to update subscription" });
-  }
-});
 
 // Grant admin access to a user
 router.post("/admins/:userId", authenticateToken, checkSuperAdminAccess, async (req, res) => {
@@ -374,23 +401,6 @@ router.get("/products", authenticateToken, async (req, res) => {
   }
 });
 
-// Create new product
-router.post("/products", authenticateToken, checkSuperAdminAccess, async (req, res) => {
-  try {
-    const [product] = await db
-      .insert(products)
-      .values({
-        ...req.body,
-        vendorId: req.user.id,
-      })
-      .returning();
-
-    return res.status(201).json(product);
-  } catch (error) {
-    console.error("Error creating product:", error);
-    return res.status(500).json({ error: "Failed to create product" });
-  }
-});
 
 // Update product
 router.patch("/products/:productId", authenticateToken, checkSuperAdminAccess, async (req, res) => {
