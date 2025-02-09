@@ -9,7 +9,9 @@ if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("STRIPE_SECRET_KEY is required");
 }
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: "2025-01-27.acacia" // Updated to latest supported version
+});
 
 const router = Router();
 
@@ -31,15 +33,19 @@ let stripePriceIds: Record<string, string> = {};
 // Initialize Stripe products and prices
 async function initializeStripePrices() {
   try {
+    console.log("Initializing Stripe prices...");
+
     // Create or retrieve products for each tier
     for (const tier of ['business', 'vendor'] as const) {
       const productName = `${tier.charAt(0).toUpperCase() + tier.slice(1)} Subscription`;
+      console.log(`Setting up product: ${productName}`);
 
       // Create or get product
       let product = (await stripe.products.list({ active: true })).data
         .find(p => p.name === productName);
 
       if (!product) {
+        console.log(`Creating new product: ${productName}`);
         product = await stripe.products.create({
           name: productName,
           description: `${productName} with 30-day free trial`,
@@ -50,6 +56,7 @@ async function initializeStripePrices() {
       for (const frequency of ['monthly', 'annual'] as const) {
         const priceKey = `${tier}_${frequency}`;
         const amount = SUBSCRIPTION_PRICES[tier][frequency];
+        console.log(`Setting up price for ${priceKey} (${amount} pence)`);
 
         let price = (await stripe.prices.list({ 
           product: product.id,
@@ -60,6 +67,7 @@ async function initializeStripePrices() {
         );
 
         if (!price) {
+          console.log(`Creating new price for ${priceKey}`);
           price = await stripe.prices.create({
             product: product.id,
             unit_amount: amount,
@@ -71,8 +79,11 @@ async function initializeStripePrices() {
         }
 
         stripePriceIds[priceKey] = price.id;
+        console.log(`Price ID for ${priceKey}: ${price.id}`);
       }
     }
+
+    console.log("Stripe prices initialized successfully:", stripePriceIds);
   } catch (error) {
     console.error('Error initializing Stripe prices:', error);
     throw error;
@@ -84,6 +95,8 @@ initializeStripePrices().catch(console.error);
 
 router.post("/subscriptions/checkout", authenticateToken, async (req, res) => {
   try {
+    console.log("Creating checkout session with body:", req.body);
+
     const { tier, paymentFrequency } = req.body as {
       tier: keyof typeof SUBSCRIPTION_PRICES;
       paymentFrequency: "monthly" | "annual";
@@ -95,29 +108,36 @@ router.post("/subscriptions/checkout", authenticateToken, async (req, res) => {
 
     const priceId = stripePriceIds[`${tier}_${paymentFrequency}`];
     if (!priceId) {
+      console.error("Price ID not found for:", { tier, paymentFrequency });
       return res.status(500).json({ error: "Price configuration not found" });
     }
 
+    console.log(`Creating checkout session with price ID: ${priceId}`);
+
     const session = await stripe.checkout.sessions.create({
-      mode: "subscription",
-      payment_method_types: ["card"],
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
-      success_url: `${req.protocol}://${req.get("host")}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
+      billing_address_collection: 'required',
+      payment_method_types: ['card'],
+      mode: 'subscription',
+      line_items: [{
+        price: priceId,
+        quantity: 1
+      }],
+      success_url: `${req.protocol}://${req.get("host")}/dashboard?subscription=success`,
       cancel_url: `${req.protocol}://${req.get("host")}/subscription?canceled=true`,
       customer_email: req.user?.email,
-      metadata: {
-        userId: req.user?.id,
-        tier,
-        paymentFrequency,
-      },
       subscription_data: {
         trial_period_days: 30,
       },
+      metadata: {
+        userId: req.user?.id.toString(),
+        tier,
+        paymentFrequency,
+      },
+    });
+
+    console.log("Checkout session created:", { 
+      sessionId: session.id,
+      url: session.url 
     });
 
     // Update user's subscription status to pending
