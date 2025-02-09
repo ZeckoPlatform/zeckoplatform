@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { createCheckoutSession } from "@/lib/subscription";
 import { useState } from "react";
@@ -36,7 +36,7 @@ export function SubscriptionRequiredModal({ isOpen, onClose, userType }: Subscri
         <DialogHeader>
           <DialogTitle>Subscription Required</DialogTitle>
           <DialogDescription>
-            To access this feature, you need an active subscription.
+            Start your 30-day free trial to access all features.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -51,7 +51,7 @@ export function SubscriptionRequiredModal({ isOpen, onClose, userType }: Subscri
                 disabled={isLoading}
                 className="w-full"
               >
-                Subscribe Monthly
+                Start Free Trial
               </Button>
               <p className="text-sm text-muted-foreground mt-2">
                 £29.99/month for Business
@@ -70,7 +70,7 @@ export function SubscriptionRequiredModal({ isOpen, onClose, userType }: Subscri
                 className="w-full"
                 variant="secondary"
               >
-                Subscribe Annually
+                Start Free Trial
               </Button>
               <p className="text-sm text-muted-foreground mt-2">
                 £323.89/year for Business (£26.99/month)
