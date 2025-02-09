@@ -70,7 +70,6 @@ router.post("/subscriptions", authenticateToken, async (req, res) => {
         tier,
         paymentFrequency,
       },
-      automatic_tax: { enabled: true },
       subscription_data: {
         trial_period_days: 30,
       },
