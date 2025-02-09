@@ -10,7 +10,7 @@ if (!process.env.STRIPE_SECRET_KEY) {
 }
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2025-01-27.acacia" // Updated to latest supported version
+  apiVersion: "2023-10-16"
 });
 
 const router = Router();
@@ -115,7 +115,6 @@ router.post("/subscriptions/checkout", authenticateToken, async (req, res) => {
     console.log(`Creating checkout session with price ID: ${priceId}`);
 
     const session = await stripe.checkout.sessions.create({
-      billing_address_collection: 'required',
       payment_method_types: ['card'],
       mode: 'subscription',
       line_items: [{
