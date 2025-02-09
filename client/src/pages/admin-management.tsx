@@ -375,7 +375,7 @@ export default function AdminManagementPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setLocation(`/admin/users/${user.id}`)}
+                        onClick={() => setLocation(`/admin/users/edit/${user.id}`)}
                       >
                         Edit
                       </Button>

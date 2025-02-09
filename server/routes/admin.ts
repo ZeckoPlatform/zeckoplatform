@@ -82,6 +82,26 @@ router.get("/users", authenticateToken, checkSuperAdminAccess, async (req, res) 
   }
 });
 
+// Add this route after the GET /users route
+router.get("/users/:userId", authenticateToken, checkSuperAdminAccess, async (req, res) => {
+  try {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, parseInt(req.params.userId)))
+      .limit(1);
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    return res.json(user);
+  } catch (error) {
+    console.error("Error fetching user:", error);
+    return res.status(500).json({ error: "Failed to fetch user" });
+  }
+});
+
 // Get all admins
 router.get("/admins", authenticateToken, checkSuperAdminAccess, async (req, res) => {
   try {
