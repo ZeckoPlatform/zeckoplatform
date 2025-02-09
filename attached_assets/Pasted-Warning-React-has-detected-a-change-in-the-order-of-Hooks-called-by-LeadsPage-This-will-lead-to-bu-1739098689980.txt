@@ -1,0 +1,68 @@
+Warning: React has detected a change in the order of Hooks called by LeadsPage. This will lead to bugs and errors if not fixed. For more information, read the Rules of Hooks: https://reactjs.org/link/rules-of-hooks
+
+   Previous render            Next render
+   ------------------------------------------------------
+1. useContext                 useContext
+2. useState                   useState
+3. useEffect                  useEffect
+4. useState                   useState
+5. useState                   useState
+6. useState                   useState
+7. useState                   useState
+8. useState                   useState
+9. useState                   useState
+10. useRef                    useRef
+11. useRef                    useRef
+12. useCallback               useCallback
+13. useContext                useContext
+14. useContext                useContext
+15. useContext                useContext
+16. useEffect                 useEffect
+17. useState                  useState
+18. useCallback               useCallback
+19. useSyncExternalStore      useSyncExternalStore
+20. useEffect                 useEffect
+21. useContext                useContext
+22. useState                  useState
+23. useEffect                 useEffect
+24. useCallback               useCallback
+25. useSyncExternalStore      useSyncExternalStore
+26. useCallback               useCallback
+27. useContext                useContext
+28. useState                  useState
+29. useEffect                 useEffect
+30. useCallback               useCallback
+31. useSyncExternalStore      useSyncExternalStore
+32. useCallback               useCallback
+33. undefined                 useContext
+   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+LeadsPage@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/pages/leads-page.tsx:1494:27
+Route@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js:323:14
+ProtectedRoute@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/lib/protected-route.tsx:25:5
+Switch@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js:380:27
+div
+Router
+AuthProvider@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/hooks/use-auth.tsx:175:6
+QueryClientProvider@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js:2805:9
+App
+Rendered more hooks than during the previous render.
+Rendered more hooks than during the previous render.
+The above error occurred in the <LeadsPage> component:
+
+LeadsPage@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/pages/leads-page.tsx:1494:27
+Route@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js:323:14
+ProtectedRoute@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/lib/protected-route.tsx:25:5
+Switch@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js:380:27
+div
+Router
+AuthProvider@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/hooks/use-auth.tsx:175:6
+QueryClientProvider@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js:2805:9
+App
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+t@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:12639
+value@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:32772
+@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:34410
+Rendered more hooks than during the previous render.

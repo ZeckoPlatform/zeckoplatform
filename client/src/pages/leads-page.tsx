@@ -56,34 +56,12 @@ interface MessageFormData {
   content: string;
 }
 
+interface AcceptProposalData {
+  contactDetails: string;
+}
+
 interface LeadWithUnreadCount extends SelectLead {
   unreadMessages: number;
-}
-
-interface CreateLeadFormProps {
-  onSubmit: (data: LeadFormData) => void;
-  isSubmitting: boolean;
-}
-
-interface BusinessLeadsViewProps {
-  leads: LeadWithUnreadCount[];
-  user: SelectUser;
-  selectedLead: SelectLead | null;
-  setSelectedLead: (lead: SelectLead | null) => void;
-  proposalDialogOpen: boolean;
-  setProposalDialogOpen: (open: boolean) => void;
-  toast: any;
-  playNotification: (type: string) => void;
-}
-
-interface FreeUserLeadsViewProps {
-  leads: LeadWithUnreadCount[];
-  createLeadMutation: any;
-  updateLeadMutation: any;
-  editingLead: LeadWithUnreadCount | null;
-  setEditingLead: (lead: LeadWithUnreadCount | null) => void;
-  deleteLeadMutation: any;
-  user: SelectUser;
 }
 
 const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
@@ -662,19 +640,12 @@ const FreeUserLeadsView = ({
                             <div className="flex gap-2 mt-4">
                               <Button
                                 size="sm"
-                                onClick={() => {
-                                  //setSelectedResponse(response);
-                                  //setSelectedLead(lead);
-                                }}
                               >
                                 Accept
                               </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => {
-                                  console.log('Reject proposal:', response.id);
-                                }}
                               >
                                 Reject
                               </Button>
@@ -709,9 +680,9 @@ const FreeUserLeadsView = ({
             <CardTitle>Post a New Lead</CardTitle>
           </CardHeader>
           <CardContent>
-            <CreateLeadForm 
-              onSubmit={(data) => createLeadMutation.mutate(data)} 
-              isSubmitting={createLeadMutation.isPending} 
+            <CreateLeadForm
+              onSubmit={(data) => createLeadMutation.mutate(data)}
+              isSubmitting={createLeadMutation.isPending}
             />
           </CardContent>
         </Card>
@@ -719,6 +690,37 @@ const FreeUserLeadsView = ({
     </Tabs>
   );
 };
+
+function calculateMatchScore(lead: SelectLead, user: SelectUser | null): {
+  totalScore: number;
+  categoryScore: number;
+  locationScore: number;
+  budgetScore: number;
+  industryScore: number;
+} {
+  let totalScore = 0;
+  let categoryScore = 0;
+  let locationScore = 0;
+  let budgetScore = 0;
+  let industryScore = 0;
+
+  if (user?.profile?.categories?.includes(lead.category)) {
+    categoryScore = 25;
+  }
+  if (user?.profile?.location === lead.location) {
+    locationScore = 25;
+  }
+  if (user?.profile?.budget && lead.budget &&
+    Math.abs(lead.budget - user.profile.budget) < 1000) {
+    budgetScore = 25;
+  }
+  if (user?.profile?.industries?.includes(lead.industry)) {
+    industryScore = 25;
+  }
+
+  totalScore = categoryScore + locationScore + budgetScore + industryScore;
+  return { totalScore, categoryScore, locationScore, budgetScore, industryScore };
+}
 
 function MessageDialogContent({
   leadId,
@@ -749,49 +751,45 @@ function MessageDialogContent({
   );
 }
 
-const calculateMatchScore = (lead: SelectLead, user: SelectUser | null): {
-  totalScore: number;
-  categoryScore: number;
-  locationScore: number;
-  budgetScore: number;
-  industryScore: number;
-} => {
-  let totalScore = 0;
-  let categoryScore = 0;
-  let locationScore = 0;
-  let budgetScore = 0;
-  let industryScore = 0;
-
-  if (user?.profile?.categories?.includes(lead.category)) {
-    categoryScore = 25;
-  }
-  if (user?.profile?.location === lead.location) {
-    locationScore = 25;
-  }
-  if (user?.profile?.budget && lead.budget &&
-    Math.abs(lead.budget - user.profile.budget) < 1000) {
-    budgetScore = 25;
-  }
-  if (user?.profile?.industries?.includes(lead.industry)) {
-    industryScore = 25;
-  }
-
-  totalScore = categoryScore + locationScore + budgetScore + industryScore;
-  return { totalScore, categoryScore, locationScore, budgetScore, industryScore };
-};
-
 export default function LeadsPage() {
+  // All hooks at the top level
   const { user } = useAuth();
   const { toast } = useToast();
+  const playNotification = useNotificationSound();
+
+  // State hooks
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [editingLead, setEditingLead] = useState<LeadWithUnreadCount | null>(null);
   const [selectedLead, setSelectedLead] = useState<SelectLead | null>(null);
   const [proposalDialogOpen, setProposalDialogOpen] = useState(false);
   const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
   const [selectedResponse, setSelectedResponse] = useState<any>(null);
-  const playNotification = useNotificationSound();
 
-  // If user is not logged in, redirect to auth page
+  // Form hooks
+  const profileForm = useForm<ProfileFormData>({
+    defaultValues: {
+      name: user?.profile?.name || "",
+      description: user?.profile?.description || "",
+      categories: user?.profile?.categories?.join(", ") || "",
+      location: user?.profile?.location || "",
+    },
+  });
+
+  const usernameForm = useForm<UsernameFormData>({
+    defaultValues: {
+      username: user?.username || "",
+    },
+  });
+
+  const passwordForm = useForm<PasswordFormData>({
+    defaultValues: {
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    },
+  });
+
+  // Early return for unauthenticated users
   if (!user) {
     return <Redirect to="/auth" />;
   }
@@ -800,7 +798,6 @@ export default function LeadsPage() {
   const {
     data: leads = [],
     isLoading: isLoadingLeads,
-    //error: leadsError
   } = useQuery<LeadWithUnreadCount[]>({
     queryKey: ["/api/leads"],
     queryFn: async () => {
@@ -827,7 +824,7 @@ export default function LeadsPage() {
     retry: false
   });
 
-  // Mutations setup
+  // Mutations
   const createLeadMutation = useMutation({
     mutationFn: async (data: LeadFormData) => {
       const res = await apiRequest("POST", "/api/leads", {
@@ -878,20 +875,6 @@ export default function LeadsPage() {
     },
   });
 
-  // Loading state
-  if (isLoadingLeads) {
-    return (
-      <div className="flex items-center justify-center min-h-[200px]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  // Filter leads based on user type
-  const userLeadsFiltered = user?.userType === "business"
-    ? leads
-    : leads.filter(lead => lead.user_id === user?.id);
-
   const deleteLeadMutation = useMutation({
     mutationFn: async (id: number) => {
       await apiRequest("DELETE", `/api/leads/${id}`);
@@ -912,12 +895,6 @@ export default function LeadsPage() {
     },
   });
 
-  const acceptProposalForm = useForm<AcceptProposalData>({
-    defaultValues: {
-      contactDetails: "",
-    },
-  });
-
   const acceptProposalMutation = useMutation({
     mutationFn: async ({ responseId, contactDetails }: { responseId: number; contactDetails: string }) => {
       const res = await apiRequest("PATCH", `/api/leads/${selectedLead?.id}/responses/${responseId}`, {
@@ -933,7 +910,6 @@ export default function LeadsPage() {
         description: "Proposal accepted successfully.",
       });
       setAcceptDialogOpen(false);
-      acceptProposalForm.reset();
     },
     onError: (error: Error) => {
       toast({
@@ -970,9 +946,6 @@ export default function LeadsPage() {
         title: "Profile Updated",
         description: "Your profile has been updated successfully.",
       });
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      }, 100);
     },
     onError: (error: Error) => {
       toast({
@@ -1033,28 +1006,19 @@ export default function LeadsPage() {
     },
   });
 
-  const passwordForm = useForm<PasswordFormData>({
-    defaultValues: {
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    },
-  });
+  // Loading state
+  if (isLoadingLeads) {
+    return (
+      <div className="flex items-center justify-center min-h-[200px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
-  const usernameForm = useForm<UsernameFormData>({
-    defaultValues: {
-      username: user?.username || "",
-    },
-  });
-
-  const profileForm = useForm<ProfileFormData>({
-    defaultValues: {
-      name: user?.profile?.name || "",
-      description: user?.profile?.description || "",
-      categories: user?.profile?.categories?.join(", ") || "",
-      location: user?.profile?.location || "",
-    },
-  });
+  // Filter leads based on user type
+  const userLeadsFiltered = user?.userType === "business"
+    ? leads
+    : leads.filter(lead => lead.user_id === user?.id);
 
   return (
     <div className="container max-w-7xl mx-auto p-6 space-y-8">
@@ -1067,9 +1031,9 @@ export default function LeadsPage() {
               Settings
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent>
             <DialogHeader>
-              <DialogTitle>Profile Settings</DialogTitle>
+              <DialogTitle>Account Settings</DialogTitle>
             </DialogHeader>
             <Tabs defaultValue="profile">
               <TabsList className="grid w-full grid-cols-3">
