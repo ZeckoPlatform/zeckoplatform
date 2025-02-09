@@ -16,6 +16,21 @@ export const users = pgTable("users", {
   stripeAccountStatus: text("stripe_account_status", {
     enum: ["pending", "enabled", "disabled"]
   }).default("pending"),
+  // New business verification fields
+  businessVerified: boolean("business_verified").default(false),
+  businessName: text("business_name"),
+  companyNumber: text("company_number").unique(),
+  vatNumber: text("vat_number").unique(),
+  utrNumber: text("utr_number").unique(),
+  verificationStatus: text("verification_status", {
+    enum: ["pending", "verified", "rejected"]
+  }).default("pending"),
+  verificationDocuments: jsonb("verification_documents").$type<{
+    companyDoc?: string;
+    vatDoc?: string;
+    utrDoc?: string;
+    additionalDocs?: string[];
+  }>(),
   profile: jsonb("profile").$type<{
     name?: string;
     description?: string;
@@ -247,7 +262,27 @@ export const insertUserSchema = createInsertSchema(users, {
   username: z.string().min(3, "Username must be at least 3 characters").max(30, "Username must be less than 30 characters"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   userType: z.enum(["free", "business", "vendor"]),
+  // Add business verification fields validation
+  businessName: z.string().optional(),
+  companyNumber: z.string()
+    .regex(/^[A-Z0-9]{8}$/, "Invalid company registration number format")
+    .optional(),
+  vatNumber: z.string()
+    .regex(/^GB[0-9]{9}$/, "Invalid UK VAT number format")
+    .optional(),
+  utrNumber: z.string()
+    .regex(/^[0-9]{10}$/, "Invalid UTR number format")
+    .optional(),
+}).refine((data) => {
+  // For business accounts, require company number or UTR
+  if (data.userType === "business" || data.userType === "vendor") {
+    return (data.companyNumber || data.utrNumber) && data.businessName;
+  }
+  return true;
+}, {
+  message: "Business/Vendor accounts require business name and either company number or UTR number",
 });
+
 export const selectUserSchema = createSelectSchema(users);
 export const insertSubscriptionSchema = createInsertSchema(subscriptions);
 export const selectSubscriptionSchema = createSelectSchema(subscriptions);

@@ -11,22 +11,32 @@ import express from 'express';
 import { createConnectedAccount, retrieveConnectedAccount } from './stripe';
 import subscriptionRoutes from './routes/subscriptions';
 import invoiceRoutes from './routes/invoices';
+import { insertUserSchema } from "@db/schema";
+import { fromZodError } from 'zod-validation-error'; //Assumed import
+
 
 declare global {
   namespace Express {
     interface Request {
       user?: User;
+      login: any; // Assuming a login function exists for passport or similar
     }
   }
+}
+
+// Placeholder function - needs actual implementation
+async function getUserByUsername(username: string): Promise<[User | null]> {
+  const [user] = await db.select().from(users).where(eq(users.username, username));
+  return [user || null];
 }
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
 
   app.use('/api', (req, res, next) => {
-    if (req.path.endsWith('/login') || 
-        req.path.endsWith('/register') || 
-        req.path.endsWith('/auth/verify') || 
+    if (req.path.endsWith('/login') ||
+        req.path.endsWith('/register') ||
+        req.path.endsWith('/auth/verify') ||
         req.path.endsWith('/vendor/stripe/account') ||
         req.path.endsWith('/vendor/stripe/account/status') ||
         req.method === 'OPTIONS') {
@@ -62,7 +72,7 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       log(`Lead deletion error: ${error instanceof Error ? error.message : String(error)}`);
       console.error('Full error:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: "Failed to delete lead",
         error: error instanceof Error ? error.message : "Unknown error"
       });
@@ -102,7 +112,7 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       log(`Lead update error: ${error instanceof Error ? error.message : String(error)}`);
       console.error('Full error:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: "Failed to update lead",
         error: error instanceof Error ? error.message : "Unknown error"
       });
@@ -148,7 +158,7 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       log(`Lead creation error: ${error instanceof Error ? error.message : String(error)}`);
       console.error('Full error:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: "Failed to create lead",
         error: error instanceof Error ? error.message : "Unknown error"
       });
@@ -196,7 +206,7 @@ export function registerRoutes(app: Express): Server {
       if (req.user.userType === "business") {
         if (!req.user.subscriptionActive) {
           log(`Business user ${req.user.id} attempted to access leads without active subscription`);
-          return res.status(403).json({ 
+          return res.status(403).json({
             message: "Active subscription required to view leads",
             subscriptionRequired: true,
             userType: req.user.userType
@@ -238,7 +248,7 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       log(`Leads fetch error: ${error instanceof Error ? error.message : String(error)}`);
       console.error('Full error:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: "Failed to fetch leads",
         error: error instanceof Error ? error.message : "Unknown error"
       });
@@ -248,10 +258,10 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/auth/verify", (req, res) => {
     if (req.isAuthenticated() && req.user) {
       log(`Verified auth for user: ${req.user.id}, Session: ${req.sessionID}`);
-      res.json({ 
-        authenticated: true, 
+      res.json({
+        authenticated: true,
         user: req.user,
-        sessionId: req.sessionID 
+        sessionId: req.sessionID
       });
     } else {
       log(`Auth verification failed - Session: ${req.sessionID}`);
@@ -273,7 +283,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       if (!req.user.subscriptionActive) {
-        return res.status(403).json({ 
+        return res.status(403).json({
           message: "Active subscription required to respond to leads",
           subscriptionRequired: true
         });
@@ -307,9 +317,9 @@ export function registerRoutes(app: Express): Server {
       }
 
       const [response] = await db.update(leadResponses)
-        .set({ 
+        .set({
           status: req.body.status,
-          contactDetails: req.body.contactDetails 
+          contactDetails: req.body.contactDetails
         })
         .where(
           and(
@@ -438,7 +448,7 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       log(`Message creation error: ${error instanceof Error ? error.message : String(error)}`);
       console.error('Full error:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: "Failed to send message",
         error: error instanceof Error ? error.message : "Unknown error"
       });
@@ -495,7 +505,7 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       log(`Messages fetch error: ${error instanceof Error ? error.message : String(error)}`);
       console.error('Full error:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: "Failed to fetch messages",
         error: error instanceof Error ? error.message : "Unknown error"
       });
@@ -529,20 +539,20 @@ export function registerRoutes(app: Express): Server {
       const [{ count }] = await db.select({
         count: sql<number>`count(*)`
       })
-      .from(messages)
-      .where(
-        and(
-          eq(messages.lead_id, leadId),
-          eq(messages.receiver_id, req.user.id),
-          eq(messages.read, false)
-        )
-      );
+        .from(messages)
+        .where(
+          and(
+            eq(messages.lead_id, leadId),
+            eq(messages.receiver_id, req.user.id),
+            eq(messages.read, false)
+          )
+        );
 
       log(`Found ${count} unread messages`);
 
       if (count === 0) {
-        return res.json({ 
-          success: true, 
+        return res.json({
+          success: true,
           updatedCount: 0,
           message: "No unread messages to update"
         });
@@ -565,7 +575,7 @@ export function registerRoutes(app: Express): Server {
 
       if (!result) {
         log('No messages were updated');
-        return res.json({ 
+        return res.json({
           success: false,
           message: "Failed to update messages"
         });
@@ -575,19 +585,19 @@ export function registerRoutes(app: Express): Server {
       const [{ count: verifiedCount }] = await db.select({
         count: sql<number>`count(*)`
       })
-      .from(messages)
-      .where(
-        and(
-          eq(messages.lead_id, leadId),
-          eq(messages.receiver_id, req.user.id),
-          eq(messages.read, true)
-        )
-      );
+        .from(messages)
+        .where(
+          and(
+            eq(messages.lead_id, leadId),
+            eq(messages.receiver_id, req.user.id),
+            eq(messages.read, true)
+          )
+        );
 
       log(`Successfully marked messages as read. Verified count: ${verifiedCount}`);
 
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         updatedCount: count,
         verifiedCount
       });
@@ -596,13 +606,12 @@ export function registerRoutes(app: Express): Server {
       const errorMessage = error instanceof Error ? error.message : String(error);
       log(`Mark messages read error: ${errorMessage}`);
       console.error('Full error:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: "Failed to mark messages as read",
         error: errorMessage
       });
     }
   });
-
 
 
   app.patch("/api/user/password", async (req, res) => {
@@ -696,7 +705,7 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       log(`Profile update error: ${error instanceof Error ? error.message : String(error)}`);
       console.error('Full error:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: "Failed to update profile",
         error: error instanceof Error ? error.message : "Unknown error"
       });
@@ -783,7 +792,7 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       log(`Product deletion error: ${error instanceof Error ? error.message : String(error)}`);
       console.error('Full error:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: "Failed to delete product",
         error: error instanceof Error ? error.message : "Unknown error"
       });
@@ -841,7 +850,7 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       log(`Product update error: ${error instanceof Error ? error.message : String(error)}`);
       console.error('Full error:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: "Failed to update product",
         error: error instanceof Error ? error.message : "Unknown error"
       });
@@ -862,7 +871,7 @@ export function registerRoutes(app: Express): Server {
 
       // Update user with Stripe account ID
       await db.update(users)
-        .set({ 
+        .set({
           stripeAccountId: accountId,
           stripeAccountStatus: "pending"
         })
@@ -871,7 +880,7 @@ export function registerRoutes(app: Express): Server {
       res.json({ onboardingUrl });
     } catch (error) {
       log(`Stripe account creation error: ${error instanceof Error ? error.message : String(error)}`);
-      res.status(500).json({ 
+      res.status(500).json({
         message: "Failed to create Stripe account",
         error: error instanceof Error ? error.message : "Unknown error"
       });
@@ -907,9 +916,67 @@ export function registerRoutes(app: Express): Server {
       });
     } catch (error) {
       log(`Stripe account status check error: ${error instanceof Error ? error.message : String(error)}`);
-      res.status(500).json({ 
-        message: "Failed to check Stripe account status",
+      res.status(500).json({
+        message: "Failedto check Stripe account status",
         error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  app.post("/api/register", async (req, res, next) => {
+    const result = insertUserSchema.safeParse(req.body);
+    if (!result.success) {
+      const error = fromZodError(result.error);
+      return res.status(400).send(error.toString());
+    }
+
+    try {
+      // Check for existing user by email
+      const [existingUser] = await getUserByUsername(result.data.username);
+      if (existingUser) {
+        return res.status(400).send("Username already exists");
+      }
+
+      // For business/vendor accounts, check for duplicate business credentials
+      if (result.data.userType === "business" || result.data.userType === "vendor") {
+        const existingBusiness = await db.select()
+          .from(users)
+          .where(
+            or(
+              result.data.companyNumber ? eq(users.companyNumber, result.data.companyNumber) : undefined,
+              result.data.vatNumber ? eq(users.vatNumber, result.data.vatNumber) : undefined,
+              result.data.utrNumber ? eq(users.utrNumber, result.data.utrNumber) : undefined
+            )
+          )
+          .limit(1);
+
+        if (existingBusiness.length > 0) {
+          return res.status(400).json({
+            error: "Business already registered",
+            message: "A business account with these credentials already exists."
+          });
+        }
+      }
+
+      const [user] = await db
+        .insert(users)
+        .values({
+          ...result.data,
+          password: await hashPassword(result.data.password),
+          verificationStatus: result.data.userType === "free" ? "verified" : "pending",
+          businessVerified: result.data.userType === "free",
+        })
+        .returning();
+
+      req.login(user, (err) => {
+        if (err) return next(err);
+        res.status(201).json(user);
+      });
+    } catch (error) {
+      console.error("Registration error:", error);
+      res.status(500).json({
+        error: "Registration failed",
+        message: error instanceof Error ? error.message : "Unknown error"
       });
     }
   });
