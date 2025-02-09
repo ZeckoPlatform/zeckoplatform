@@ -186,7 +186,7 @@ export const vendorTransactions = pgTable("vendor_transactions", {
 
 export const analyticsLogs = pgTable("analytics_logs", {
   id: serial("id").primaryKey(),
-  user_id: integer("user_id").references(() => users.id).notNull(),
+  user_id: integer("user_id").references(() => users.id),
   event_type: text("event_type", {
     enum: ["login", "lead_view", "lead_response", "message_sent", "subscription_changed"]
   }).notNull(),

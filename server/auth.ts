@@ -224,6 +224,7 @@ export function setupAuth(app: Express) {
           email,
           timestamp,
           successful: false
+          // No userId for failed attempts
         });
 
         log(`User not found or account inactive: ${email}`);

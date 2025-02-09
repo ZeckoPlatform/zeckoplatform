@@ -59,7 +59,7 @@ export async function checkLoginAttempts(ip: string, email: string): Promise<{
 
 export async function recordLoginAttempt(attempt: LoginAttempt) {
   await db.insert(analyticsLogs).values({
-    user_id: attempt.userId || 0, // Use 0 for unsuccessful attempts
+    user_id: attempt.userId, // Now can be undefined
     event_type: "login",
     ip_address: attempt.ip,
     metadata: {
