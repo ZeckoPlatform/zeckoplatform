@@ -76,15 +76,10 @@ export async function startSubscription({
       user_id: userId,
       tier,
       status: "trial",
-      payment_frequency: paymentFrequency,
-      payment_method: "stripe",
       start_date: new Date(),
-      trial_end_date: trialEndDate,
       end_date: subscriptionEndDate,
       price: finalPrice,
-      stripe_subscription_id: subscription.id,
-      stripe_payment_method_id: stripePaymentMethodId,
-      auto_renew: true,
+      auto_renew: true
     });
 
   } else if (paymentMethod === "direct_debit" && bankDetails) {
@@ -93,17 +88,10 @@ export async function startSubscription({
       user_id: userId,
       tier,
       status: "trial",
-      payment_frequency: paymentFrequency,
-      payment_method: "direct_debit",
       start_date: new Date(),
-      trial_end_date: trialEndDate,
       end_date: subscriptionEndDate,
       price: finalPrice,
-      bank_account_holder: bankDetails.accountHolder,
-      bank_sort_code: bankDetails.sortCode,
-      bank_account_number: bankDetails.accountNumber,
-      mandate_status: "pending",
-      auto_renew: true,
+      auto_renew: true
     });
   }
 
@@ -152,9 +140,6 @@ export async function pauseSubscription(
       .update(subscriptions)
       .set({
         status: "paused",
-        paused_at: new Date(),
-        pause_reason: reason,
-        resume_date: resumeDate,
       })
       .where(eq(subscriptions.id, subscriptionId));
 
@@ -198,9 +183,6 @@ export async function resumeSubscription(subscriptionId: number): Promise<boolea
       .update(subscriptions)
       .set({
         status: "active",
-        paused_at: null,
-        pause_reason: null,
-        resume_date: null,
       })
       .where(eq(subscriptions.id, subscriptionId));
 
@@ -228,21 +210,11 @@ export async function handleTrialEnd(subscriptionId: number) {
     return;
   }
 
-  if (subscription.payment_method === "stripe" && subscription.stripe_subscription_id) {
-    // Stripe handles the trial end automatically
-    await db
-      .update(subscriptions)
-      .set({ status: "active" })
-      .where(eq(subscriptions.id, subscriptionId));
-  } else if (subscription.payment_method === "direct_debit") {
-    // Initiate first direct debit payment
-    // Here you would integrate with your direct debit provider
-    // For now, we'll just update the status
-    await db
-      .update(subscriptions)
-      .set({ status: "active" })
-      .where(eq(subscriptions.id, subscriptionId));
-  }
+  // Update status to active after trial
+  await db
+    .update(subscriptions)
+    .set({ status: "active" })
+    .where(eq(subscriptions.id, subscriptionId));
 
   // Update user subscription status
   const [sub] = await db

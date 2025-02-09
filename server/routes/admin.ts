@@ -226,6 +226,7 @@ router.post("/admin/users/:userId/subscription", authenticateToken, checkSuperAd
 
       console.log('Creating new subscription:', newSubscription);
 
+      // Insert the new subscription
       await db
         .insert(subscriptions)
         .values(newSubscription);
@@ -233,7 +234,7 @@ router.post("/admin/users/:userId/subscription", authenticateToken, checkSuperAd
       console.log('Subscription created successfully');
     }
 
-    // Update user type
+    // Update user type and subscription status
     const [updatedUser] = await db
       .update(users)
       .set({ 
