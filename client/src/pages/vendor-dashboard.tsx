@@ -11,8 +11,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { apiRequest } from "@/lib/queryClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Store, Package, Settings, Edit, Trash2, Loader2, Upload, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Store, Package, Settings, Edit, Trash2, Loader2, Upload, AlertCircle, CheckCircle2, Star } from "lucide-react";
 import { ProductForm } from "@/components/ProductForm";
+import { UserReviews } from "@/components/reviews/UserReviews";
+import { format } from 'date-fns'
 
 interface Product {
   id: number;
@@ -40,6 +42,23 @@ interface StripeAccountStatus {
   };
 }
 
+// Placeholder for SubscriptionRequiredModal -  You'll need to create this component
+const SubscriptionRequiredModal = ({ isOpen, onClose, userType }: { isOpen: boolean; onClose: () => void; userType: string }) => {
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Upgrade Your Plan</DialogTitle>
+          <DialogDescription>
+            To access {userType === 'vendor' ? 'Vendor' : 'Customer'} features, please upgrade your subscription.
+          </DialogDescription>
+        </DialogHeader>
+        <Button onClick={onClose}>Close</Button> {/*  Add actual upgrade logic here */}
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 
 export default function VendorDashboard() {
   const queryClient = useQueryClient();
@@ -52,6 +71,11 @@ export default function VendorDashboard() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+
+  const isFeatureAvailable = (feature: 'payments' | 'analytics' | 'advanced_reviews') => {
+    return user?.subscriptionActive || feature === 'basic';
+  };
 
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ["/api/products"],
@@ -280,9 +304,46 @@ export default function VendorDashboard() {
     );
   };
 
+  const { data: balance, isLoading: balanceLoading } = useQuery({
+    queryKey: ['/api/vendor/balance'],
+    enabled: !!user?.id,
+  })
+
+  const { data: transactions = [], isLoading: transactionsLoading } = useQuery({
+    queryKey: ['/api/vendor/transactions'],
+    enabled: !!user?.id,
+  })
+
+  const syncTransactionsMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest('POST', '/api/vendor/transactions/sync')
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['/api/vendor/transactions'])
+    }
+  })
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <h1 className="text-3xl font-bold mb-8">Vendor Dashboard</h1>
+
+      {!user?.subscriptionActive && (
+        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-center gap-2 text-yellow-800">
+            <AlertCircle className="h-5 w-5" />
+            <p>
+              You are using a free vendor account.
+              <Button
+                variant="link"
+                className="text-yellow-800 underline"
+                onClick={() => setShowSubscriptionModal(true)}
+              >
+                Upgrade to access all features
+              </Button>
+            </p>
+          </div>
+        </div>
+      )}
 
       <Tabs defaultValue="products">
         <TabsList className="mb-8">
@@ -290,18 +351,26 @@ export default function VendorDashboard() {
             <Package className="h-4 w-4" />
             Products
           </TabsTrigger>
+          <TabsTrigger value="reviews" className="flex items-center gap-2">
+            <Star className="h-4 w-4" />
+            Reviews
+          </TabsTrigger>
           <TabsTrigger value="settings" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             Settings
           </TabsTrigger>
-          <TabsTrigger value="store" className="flex items-center gap-2">
-            <Store className="h-4 w-4" />
-            Store Profile
-          </TabsTrigger>
-          <TabsTrigger value="payments" className="flex items-center gap-2">
-            <Store className="h-4 w-4" />
-            Payments Setup
-          </TabsTrigger>
+          {isFeatureAvailable('payments') && (
+            <>
+              <TabsTrigger value="store" className="flex items-center gap-2">
+                <Store className="h-4 w-4" />
+                Store Profile
+              </TabsTrigger>
+              <TabsTrigger value="payments" className="flex items-center gap-2">
+                <Store className="h-4 w-4" />
+                Payments Setup
+              </TabsTrigger>
+            </>
+          )}
         </TabsList>
 
         <TabsContent value="products">
@@ -495,51 +564,16 @@ export default function VendorDashboard() {
           </Dialog>
         </TabsContent>
 
-        <TabsContent value="store">
+        <TabsContent value="reviews">
           <Card>
             <CardHeader>
-              <CardTitle>Store Profile</CardTitle>
+              <CardTitle>Store Reviews</CardTitle>
               <CardDescription>
-                Manage your store details and preferences
+                View and manage customer reviews for your store
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form className="space-y-4">
-                <div>
-                  <Label htmlFor="store-name">Store Name</Label>
-                  <Input
-                    id="store-name"
-                    placeholder="Enter your store name"
-                    defaultValue={user?.storeName}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="store-description">Store Description</Label>
-                  <Textarea
-                    id="store-description"
-                    placeholder="Describe your store"
-                    defaultValue={user?.storeDescription}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="contact-email">Contact Email</Label>
-                  <Input
-                    id="contact-email"
-                    type="email"
-                    placeholder="contact@example.com"
-                    defaultValue={user?.contactEmail}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="business-address">Business Address</Label>
-                  <Textarea
-                    id="business-address"
-                    placeholder="Enter your business address"
-                    defaultValue={user?.businessAddress}
-                  />
-                </div>
-                <Button type="submit">Save Changes</Button>
-              </form>
+              {user && <UserReviews userId={user.id} showForm={false} />}
             </CardContent>
           </Card>
         </TabsContent>
@@ -641,71 +675,209 @@ export default function VendorDashboard() {
           </div>
         </TabsContent>
 
-        <TabsContent value="payments">
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                Payment Account Status {getStatusBadge()}
-              </CardTitle>
-              <CardDescription>
-                Set up your Stripe account to receive payments from customers
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {!user?.stripeAccountId ? (
-                <div>
-                  <p className="mb-4">
-                    You haven't set up your payment account yet. Set up Stripe to start
-                    receiving payments for your products.
-                  </p>
-                  <Button
-                    onClick={() => setupAccountMutation.mutate()}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Setting up...
-                      </>
-                    ) : (
-                      "Set up Stripe Account"
-                    )}
-                  </Button>
-                </div>
-              ) : accountStatus?.status === "enabled" ? (
-                <div className="space-y-2">
-                  <p className="text-green-600 font-medium">
-                    Your Stripe account is fully set up and ready to receive payments!
-                  </p>
-                  <dl className="space-y-1">
-                    <div className="flex gap-2">
-                      <dt className="font-medium">Charges Enabled:</dt>
-                      <dd>{accountStatus.details.chargesEnabled ? "Yes" : "No"}</dd>
+        {isFeatureAvailable('payments') && (
+          <>
+            <TabsContent value="store">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Store Profile</CardTitle>
+                  <CardDescription>
+                    Manage your store details and preferences
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form className="space-y-4">
+                    <div>
+                      <Label htmlFor="store-name">Store Name</Label>
+                      <Input
+                        id="store-name"
+                        placeholder="Enter your store name"
+                        defaultValue={user?.storeName}
+                      />
                     </div>
-                    <div className="flex gap-2">
-                      <dt className="font-medium">Payouts Enabled:</dt>
-                      <dd>{accountStatus.details.payoutsEnabled ? "Yes" : "No"}</dd>
+                    <div>
+                      <Label htmlFor="store-description">Store Description</Label>
+                      <Textarea
+                        id="store-description"
+                        placeholder="Describe your store"
+                        defaultValue={user?.storeDescription}
+                      />
                     </div>
-                  </dl>
-                </div>
-              ) : (
-                <div>
-                  <p className="text-yellow-600 mb-4">
-                    Your Stripe account setup is pending. Please complete the
-                    onboarding process to start receiving payments.
-                  </p>
-                  <Button
-                    onClick={() => setupAccountMutation.mutate()}
-                    disabled={isLoading}
-                  >
-                    Complete Stripe Setup
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                    <div>
+                      <Label htmlFor="contact-email">Contact Email</Label>
+                      <Input
+                        id="contact-email"
+                        type="email"
+                        placeholder="contact@example.com"
+                        defaultValue={user?.contactEmail}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="business-address">Business Address</Label>
+                      <Textarea
+                        id="business-address"
+                        placeholder="Enter your business address"
+                        defaultValue={user?.businessAddress}
+                      />
+                    </div>
+                    <Button type="submit">Save Changes</Button>
+                  </form>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="payments">
+              <Card className="mb-8">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    Payment Account Status {getStatusBadge()}
+                  </CardTitle>
+                  <CardDescription>
+                    Set up your Stripe account to receive payments from customers
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {!user?.stripeAccountId ? (
+                    <div>
+                      <p className="mb-4">
+                        You haven't set up your payment account yet. Set up Stripe to start
+                        receiving payments for your products.
+                      </p>
+                      <Button
+                        onClick={() => setupAccountMutation.mutate()}
+                        disabled={isLoading}
+                      >
+                        {isLoading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Setting up...
+                          </>
+                        ) : (
+                          "Set up Stripe Account"
+                        )}
+                      </Button>
+                    </div>
+                  ) : accountStatus?.status === "enabled" ? (
+                    <>
+                      <div className="space-y-2 mb-6">
+                        <p className="text-green-600 font-medium">
+                          Your Stripe account is fully set up and ready to receive payments!
+                        </p>
+                        <dl className="space-y-1">
+                          <div className="flex gap-2">
+                            <dt className="font-medium">Charges Enabled:</dt>
+                            <dd>{accountStatus.details.chargesEnabled ? "Yes" : "No"}</dd>
+                          </div>
+                          <div className="flex gap-2">
+                            <dt className="font-medium">Payouts Enabled:</dt>
+                            <dd>{accountStatus.details.payoutsEnabled ? "Yes" : "No"}</dd>
+                          </div>
+                        </dl>
+                      </div>
+
+                      {/* Balance section */}
+                      {balance && (
+                        <div className="space-y-4 mb-6">
+                          <h3 className="font-semibold">Current Balance</h3>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Available</p>
+                            <p className="text-2xl font-bold">
+                              £{((balance.available?.[0]?.amount || 0) / 100).toFixed(2)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Pending</p>
+                            <p className="text-xl">
+                              £{((balance.pending?.[0]?.amount || 0) / 100).toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Transactions section */}
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                          <h3 className="font-semibold">Recent Transactions</h3>
+                          <Button
+                            variant="outline"
+                            onClick={() => syncTransactionsMutation.mutate()}
+                            disabled={syncTransactionsMutation.isPending}
+                          >
+                            {syncTransactionsMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              "Sync Transactions"
+                            )}
+                          </Button>
+                        </div>
+
+                        {transactionsLoading ? (
+                          <div className="flex justify-center py-8">
+                            <Loader2 className="h-8 w-8 animate-spin" />
+                          </div>
+                        ) : transactions.length > 0 ? (
+                          <div className="space-y-4">
+                            {transactions.map((transaction: any) => (
+                              <div
+                                key={transaction.id}
+                                className="flex justify-between items-center p-4 border rounded-lg"
+                              >
+                                <div>
+                                  <p className="font-medium">
+                                    Transfer #{transaction.stripe_transfer_id}
+                                  </p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {format(new Date(transaction.created_at), "PPP")}
+                                  </p>
+                                  <p className="text-sm">
+                                    Amount: £{(transaction.amount / 100).toFixed(2)}
+                                  </p>
+                                  <p className="text-sm capitalize">Status: {transaction.status}</p>
+                                </div>
+                                {transaction.product_details && (
+                                  <div className="text-sm text-muted-foreground">
+                                    <p>Product: {transaction.product_details.name}</p>
+                                    <p>Quantity: {transaction.product_details.quantity}</p>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-center py-8 text-muted-foreground">
+                            No transactions found
+                          </p>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div>
+                      <p className="text-yellow-600 mb-4">
+                        Your Stripe account setup is pending. Please complete the
+                        onboarding process to start receiving payments.
+                      </p>
+                      <Button
+                        onClick={() => setupAccountMutation.mutate()}
+                        disabled={isLoading}
+                      >
+                        Complete Stripe Setup
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </>
+        )}
       </Tabs>
+
+      {showSubscriptionModal && (
+        <SubscriptionRequiredModal
+          isOpen={showSubscriptionModal}
+          onClose={() => setShowSubscriptionModal(false)}
+          userType="vendor"
+        />
+      )}
     </div>
   );
 }
