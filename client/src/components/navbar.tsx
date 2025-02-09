@@ -17,7 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { useCart } from "@/hooks/use-cart"; // Import useCart hook
+import { useCart } from "@/hooks/use-cart";
 
 export default function Navbar() {
   const { user, logoutMutation } = useAuth();
@@ -66,11 +66,18 @@ export default function Navbar() {
                   </NavigationMenuItem>
                 )}
                 {user && user.userType !== "free" && (
-                  <NavigationMenuItem>
-                    <NavigationMenuLink asChild>
-                      <Link href="/subscription">Subscription</Link>
-                    </NavigationMenuLink>
-                  </NavigationMenuItem>
+                  <>
+                    <NavigationMenuItem>
+                      <NavigationMenuLink asChild>
+                        <Link href="/subscription">Subscription</Link>
+                      </NavigationMenuLink>
+                    </NavigationMenuItem>
+                    <NavigationMenuItem>
+                      <NavigationMenuLink asChild>
+                        <Link href="/analytics">Analytics</Link>
+                      </NavigationMenuLink>
+                    </NavigationMenuItem>
+                  </>
                 )}
               </NavigationMenuList>
             </NavigationMenu>
@@ -104,9 +111,14 @@ export default function Navbar() {
                     <Link href={getDashboardLink()}>Dashboard</Link>
                   </DropdownMenuItem>
                   {user.userType !== "free" && (
-                    <DropdownMenuItem asChild>
-                      <Link href="/subscription">Subscription</Link>
-                    </DropdownMenuItem>
+                    <>
+                      <DropdownMenuItem asChild>
+                        <Link href="/subscription">Subscription</Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/analytics">Analytics</Link>
+                      </DropdownMenuItem>
+                    </>
                   )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem

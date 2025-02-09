@@ -13,6 +13,7 @@ import SubscriptionPage from "@/pages/subscription-page";
 import VendorDashboard from "@/pages/vendor-dashboard";
 import CartPage from "@/pages/cart-page";
 import Navbar from "@/components/navbar";
+import AnalyticsDashboard from "@/pages/analytics-dashboard";
 
 function Router() {
   return (
@@ -27,6 +28,7 @@ function Router() {
         <ProtectedRoute path="/subscription" component={SubscriptionPage} />
         <ProtectedRoute path="/vendor" component={VendorDashboard} />
         <ProtectedRoute path="/vendor/dashboard" component={VendorDashboard} />
+        <ProtectedRoute path="/analytics" component={AnalyticsDashboard} />
         <Route component={NotFound} />
       </Switch>
     </div>
