@@ -167,9 +167,10 @@ export default function AdminManagementPage() {
 
   // New mutations for subscription management
   const updateSubscriptionMutation = useMutation({
-    mutationFn: async ({ userId, subscriptionType }: { userId: number; subscriptionType: string }) => {
+    mutationFn: async ({ userId, subscriptionType, skipPayment }: { userId: number; subscriptionType: string; skipPayment: boolean }) => {
       const response = await apiRequest("POST", `/api/admin/users/${userId}/subscription`, {
         subscriptionType,
+        skipPayment,
       });
       if (!response.ok) throw new Error("Failed to update subscription");
       return response.json();
@@ -595,7 +596,8 @@ export default function AdminManagementPage() {
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="outline" size="sm">
-                            Change Subscription
+                            <Package className="w-4 h-4 mr-2" />
+                            Manage Subscription
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent>
@@ -603,6 +605,7 @@ export default function AdminManagementPage() {
                             onClick={() => updateSubscriptionMutation.mutate({
                               userId: user.id,
                               subscriptionType: "free",
+                              skipPayment: true,
                             })}
                           >
                             Set to Free
@@ -611,17 +614,37 @@ export default function AdminManagementPage() {
                             onClick={() => updateSubscriptionMutation.mutate({
                               userId: user.id,
                               subscriptionType: "business",
+                              skipPayment: true,
                             })}
                           >
-                            Set to Business
+                            Grant Business (No Payment)
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => updateSubscriptionMutation.mutate({
                               userId: user.id,
                               subscriptionType: "vendor",
+                              skipPayment: true,
                             })}
                           >
-                            Set to Vendor
+                            Grant Vendor (No Payment)
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => updateSubscriptionMutation.mutate({
+                              userId: user.id,
+                              subscriptionType: "business",
+                              skipPayment: false,
+                            })}
+                          >
+                            Require Business Payment
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => updateSubscriptionMutation.mutate({
+                              userId: user.id,
+                              subscriptionType: "vendor",
+                              skipPayment: false,
+                            })}
+                          >
+                            Require Vendor Payment
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>

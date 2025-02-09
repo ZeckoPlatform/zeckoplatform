@@ -185,7 +185,7 @@ router.get("/users/:userId", authenticateToken, checkSuperAdminAccess, async (re
 router.post("/admin/users/:userId/subscription", authenticateToken, checkSuperAdminAccess, async (req, res) => {
   try {
     const userId = parseInt(req.params.userId);
-    const { subscriptionType } = req.body;
+    const { subscriptionType, skipPayment } = req.body;
 
     if (!["free", "business", "vendor"].includes(subscriptionType)) {
       return res.status(400).json({ error: "Invalid subscription type" });
@@ -210,22 +210,32 @@ router.post("/admin/users/:userId/subscription", authenticateToken, checkSuperAd
 
     if (subscriptionType !== "free") {
       // Create new subscription
+      const newSubscription = {
+        user_id: userId,
+        status: skipPayment ? "active" : "pending_payment",
+        type: subscriptionType,
+        price: subscriptionType === "business" ? 2999 : 4999, // Price in pence
+        start_date: skipPayment ? new Date() : null,
+        end_date: skipPayment ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null, // 30 days from now if skipping payment
+        stripe_subscription_id: null,
+        stripe_customer_id: null,
+        stripe_price_id: null,
+        stripe_payment_method_id: null,
+      };
+
       await db
         .insert(subscriptions)
-        .values({
-          user_id: userId,
-          status: "active",
-          type: subscriptionType,
-          price: subscriptionType === "business" ? 2999 : 4999, // Price in pence
-          start_date: new Date(),
-          end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-        });
+        .values(newSubscription);
     }
 
     // Update user type
     const [updatedUser] = await db
       .update(users)
-      .set({ userType: subscriptionType })
+      .set({ 
+        userType: subscriptionType,
+        subscription_active: subscriptionType !== "free" && skipPayment,
+        subscription_ends_at: skipPayment ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null
+      })
       .where(eq(users.id, userId))
       .returning();
 
