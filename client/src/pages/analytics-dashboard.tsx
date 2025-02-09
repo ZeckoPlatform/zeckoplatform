@@ -15,10 +15,8 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  BarChart,
-  Bar,
 } from "recharts";
-import { Loader2, TrendingUp, TrendingDown, Activity } from "lucide-react";
+import { Loader2, TrendingUp, Activity, ShoppingCart, CreditCard } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
 export default function AnalyticsDashboard() {
@@ -40,6 +38,7 @@ export default function AnalyticsDashboard() {
   const {
     recentActivity,
     businessMetrics,
+    vendorMetrics,
     revenueMetrics,
   } = analyticsData || {};
 
@@ -167,6 +166,65 @@ export default function AnalyticsDashboard() {
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {businessMetrics?.activity_score ? 'Based on recent activity' : 'No recent activity'}
+                </p>
+              </CardContent>
+            </Card>
+          </>
+        )}
+
+        {user?.userType === "vendor" && (
+          <>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Total Transactions
+                </CardTitle>
+                <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {vendorMetrics?.total_transactions || 0}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {vendorMetrics?.successful_transactions || 0} successful transactions
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Success Rate
+                </CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {formatPercentage(vendorMetrics?.success_rate)}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Successful transaction rate
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Latest Transaction
+                </CardTitle>
+                <CreditCard className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {vendorMetrics?.transactions?.[0]
+                    ? formatCurrency(vendorMetrics.transactions[0].amount)
+                    : "£0.00"}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {vendorMetrics?.transactions?.[0]
+                    ? format(new Date(vendorMetrics.transactions[0].created_at), "MMM d, yyyy")
+                    : "No transactions yet"}
                 </p>
               </CardContent>
             </Card>

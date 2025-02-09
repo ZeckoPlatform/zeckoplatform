@@ -6,9 +6,10 @@ import {
   leadAnalytics,
   businessAnalytics,
   revenueAnalytics,
+  vendorTransactions,
   users,
 } from "@db/schema";
-import { eq, and, gte, lte, sql } from "drizzle-orm";
+import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
 
 const router = Router();
 
@@ -148,8 +149,10 @@ router.get("/analytics/dashboard", authenticateToken, async (req, res) => {
       limit: 10,
     });
 
-    // Get business metrics if applicable
     let businessMetrics = null;
+    let vendorMetrics = null;
+
+    // Get business metrics if applicable
     if (req.user.userType === "business") {
       businessMetrics = await db.query.businessAnalytics.findFirst({
         where: and(
@@ -157,6 +160,32 @@ router.get("/analytics/dashboard", authenticateToken, async (req, res) => {
           gte(businessAnalytics.period_start, thirtyDaysAgo)
         ),
       });
+    }
+
+    // Get vendor metrics if applicable
+    if (req.user.userType === "vendor") {
+      const vendorTransactionData = await db.query.vendorTransactions.findMany({
+        where: and(
+          eq(vendorTransactions.vendor_id, req.user.id),
+          gte(vendorTransactions.created_at, thirtyDaysAgo)
+        ),
+        orderBy: (vendorTransactions, { desc }) => [desc(vendorTransactions.created_at)],
+      });
+
+      if (vendorTransactionData.length > 0) {
+        const totalAmount = vendorTransactionData.reduce((sum, transaction) =>
+          sum + transaction.amount, 0);
+        const successfulTransactions = vendorTransactionData.filter(t =>
+          t.status === "paid").length;
+
+        vendorMetrics = {
+          total_transactions: vendorTransactionData.length,
+          successful_transactions: successfulTransactions,
+          total_amount: totalAmount,
+          success_rate: (successfulTransactions / vendorTransactionData.length) * 100,
+          transactions: vendorTransactionData.slice(0, 5) // Latest 5 transactions
+        };
+      }
     }
 
     // Get revenue metrics
@@ -171,6 +200,7 @@ router.get("/analytics/dashboard", authenticateToken, async (req, res) => {
     res.json({
       recentActivity,
       businessMetrics,
+      vendorMetrics,
       revenueMetrics,
     });
   } catch (error) {
