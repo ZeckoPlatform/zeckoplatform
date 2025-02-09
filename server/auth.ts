@@ -7,6 +7,7 @@ import { eq, and } from "drizzle-orm";
 import { fromZodError } from "zod-validation-error";
 import { log } from "./vite";
 import jwt from 'jsonwebtoken';
+import { checkLoginAttempts, recordLoginAttempt } from "./services/rate-limiter";
 
 const scryptAsync = promisify(scrypt);
 const JWT_SECRET = process.env.REPL_ID!;
@@ -178,7 +179,7 @@ export function setupAuth(app: Express) {
           subscriptionActive,
           subscriptionTier,
           profile: profileData,
-          active: true // Added active field
+          active: true 
         })
         .returning();
 
@@ -198,19 +199,63 @@ export function setupAuth(app: Express) {
 
   app.post("/api/login", async (req, res) => {
     try {
-      log(`Login attempt for email: ${req.body.email}`);
-      const [user] = await getUserByEmail(req.body.email);
+      const ip = req.ip;
+      const { email, password } = req.body;
+
+      log(`Login attempt for email: ${email} from IP: ${ip}`);
+
+      // Check if login attempts are allowed
+      const loginCheck = await checkLoginAttempts(ip, email);
+      if (!loginCheck.allowed) {
+        log(`Login blocked due to too many attempts from IP: ${ip}`);
+        return res.status(429).json({
+          message: "Too many login attempts. Please try again later.",
+          lockoutEndTime: loginCheck.lockoutEndTime,
+          code: 'TOO_MANY_ATTEMPTS'
+        });
+      }
+
+      const [user] = await getUserByEmail(email);
+      const timestamp = new Date();
 
       if (!user) {
-        log(`User not found or account inactive: ${req.body.email}`);
-        return res.status(401).json({ message: "Invalid credentials or account inactive" });
+        await recordLoginAttempt({
+          ip,
+          email,
+          timestamp,
+          successful: false
+        });
+
+        log(`User not found or account inactive: ${email}`);
+        return res.status(401).json({
+          message: "Invalid credentials or account inactive",
+          remainingAttempts: loginCheck.remainingAttempts
+        });
       }
 
-      const isValidPassword = await comparePasswords(req.body.password, user.password);
+      const isValidPassword = await comparePasswords(password, user.password);
       if (!isValidPassword) {
-        log(`Invalid password for user: ${req.body.email}`);
-        return res.status(401).json({ message: "Invalid credentials" });
+        await recordLoginAttempt({
+          ip,
+          email,
+          timestamp,
+          successful: false
+        });
+
+        log(`Invalid password for user: ${email}`);
+        return res.status(401).json({
+          message: "Invalid credentials",
+          remainingAttempts: loginCheck.remainingAttempts
+        });
       }
+
+      // Record successful login attempt
+      await recordLoginAttempt({
+        ip,
+        email,
+        timestamp,
+        successful: true
+      });
 
       const token = generateToken(user);
       log(`Login successful for user: ${user.id} (${user.userType})`);
