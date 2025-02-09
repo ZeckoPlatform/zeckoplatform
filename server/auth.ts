@@ -209,8 +209,9 @@ export function setupAuth(app: Express) {
       if (!loginCheck.allowed) {
         log(`Login blocked due to too many attempts from IP: ${ip}`);
         return res.status(429).json({
-          message: "Too many login attempts. Please try again later.",
+          message: `Too many login attempts. Please try again in ${loginCheck.lockoutMinutes} minutes.`,
           lockoutEndTime: loginCheck.lockoutEndTime,
+          lockoutMinutes: loginCheck.lockoutMinutes,
           code: 'TOO_MANY_ATTEMPTS'
         });
       }

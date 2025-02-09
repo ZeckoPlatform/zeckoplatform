@@ -17,6 +17,7 @@ export async function checkLoginAttempts(ip: string, email: string): Promise<{
   allowed: boolean;
   remainingAttempts?: number;
   lockoutEndTime?: Date;
+  lockoutMinutes?: number;
 }> {
   const lockoutStart = new Date(Date.now() - LOCKOUT_DURATION);
 
@@ -44,9 +45,13 @@ export async function checkLoginAttempts(ip: string, email: string): Promise<{
     );
 
     if (lockoutEnd > new Date()) {
+      const remainingMs = lockoutEnd.getTime() - Date.now();
+      const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
+
       return {
         allowed: false,
         lockoutEndTime: lockoutEnd,
+        lockoutMinutes: remainingMinutes
       };
     }
   }
@@ -59,7 +64,7 @@ export async function checkLoginAttempts(ip: string, email: string): Promise<{
 
 export async function recordLoginAttempt(attempt: LoginAttempt) {
   await db.insert(analyticsLogs).values({
-    user_id: attempt.userId, // Now can be undefined
+    user_id: attempt.userId,
     event_type: "login",
     ip_address: attempt.ip,
     metadata: {
