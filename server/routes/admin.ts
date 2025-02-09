@@ -213,8 +213,8 @@ router.post("/admin/users/:userId/subscription", authenticateToken, checkSuperAd
       .where(eq(subscriptions.user_id, userId));
 
     if (subscriptionType !== "free") {
-      // Create new subscription with only the columns that exist in the schema
-      const newSubscription = {
+      // Create subscription using only the existing columns in the schema
+      const subscriptionData = {
         user_id: userId,
         tier: subscriptionType,
         status: skipPayment ? "active" : "pending_payment",
@@ -224,12 +224,10 @@ router.post("/admin/users/:userId/subscription", authenticateToken, checkSuperAd
         auto_renew: false
       };
 
-      console.log('Creating new subscription:', newSubscription);
+      console.log('Creating new subscription:', subscriptionData);
 
       // Insert the new subscription
-      await db
-        .insert(subscriptions)
-        .values(newSubscription);
+      await db.insert(subscriptions).values(subscriptionData);
 
       console.log('Subscription created successfully');
     }
