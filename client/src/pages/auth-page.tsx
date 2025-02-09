@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useForm } from "react-hook-form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -33,40 +32,18 @@ const registerSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
   userType: z.enum(["free", "business", "vendor"]),
   businessName: z.string().min(2, "Company name must be at least 2 characters").optional(),
-  businessType: z.string().optional(),
   companyNumber: z.string()
     .regex(/^[A-Z0-9]{8}$/, "Please enter a valid 8-character Companies House number")
     .optional(),
-  vatNumber: z.string()
-    .regex(/^GB[0-9]{9}$/, "Please enter a valid UK VAT number (format: GB123456789)")
-    .optional(),
-  utrNumber: z.string()
-    .regex(/^[0-9]{10}$/, "Please enter a valid 10-digit UTR number")
-    .optional(),
-  paymentFrequency: z.enum(["monthly", "annual"]),
+  paymentFrequency: z.enum(["monthly", "annual"]).optional(),
 }).refine((data) => {
-  if (data.userType === "business") {
-    if (data.businessType === "registered") {
-      return !!data.businessName && !!data.companyNumber;
-    }
-    if (data.businessType === "selfEmployed") {
-      return !!data.businessName && !!data.utrNumber;
-    }
-  }
-  if (data.userType === "vendor") {
+  if (data.userType === "business" || data.userType === "vendor") {
     return !!data.businessName && !!data.companyNumber;
   }
   return true;
 }, {
-  message: (data) => {
-    if (data.userType === "business") {
-      return data.businessType === "registered"
-        ? "Company name and Companies House number are required for registered businesses"
-        : "Company name and UTR number are required for self-employed businesses";
-    }
-    return "Company name and Companies House number are required for vendor registration";
-  },
-  path: ["businessType"],
+  message: "Company name and Companies House number are required for business/vendor registration",
+  path: ["businessName"],
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -92,10 +69,7 @@ export default function AuthPage() {
       password: "",
       userType: "free",
       businessName: "",
-      businessType: "",
       companyNumber: "",
-      vatNumber: "",
-      utrNumber: "",
       paymentFrequency: "monthly",
     },
   });
@@ -255,11 +229,8 @@ export default function AuthPage() {
                       onValueChange={(value) => {
                         registerForm.setValue("userType", value as "free" | "business" | "vendor");
                         if (value === "free") {
-                          registerForm.setValue("businessType", "");
                           registerForm.setValue("businessName", "");
                           registerForm.setValue("companyNumber", "");
-                          registerForm.setValue("vatNumber", "");
-                          registerForm.setValue("utrNumber", "");
                         }
                       }}
                     >
@@ -298,111 +269,46 @@ export default function AuthPage() {
                         )}
                       </div>
 
-                      {registerForm.watch("userType") === "business" && (
-                        <div>
-                          <Label htmlFor="businessType">Business Type</Label>
-                          <Select
-                            onValueChange={(value) => {
-                              registerForm.setValue("businessType", value);
-                              if (value === "registered") {
-                                registerForm.setValue("utrNumber", "");
-                              } else if (value === "selfEmployed") {
-                                registerForm.setValue("companyNumber", "");
-                                registerForm.setValue("vatNumber", "");
-                              }
-                            }}
-                            defaultValue={registerForm.watch("businessType")}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select business type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="registered">Registered Company</SelectItem>
-                              {registerForm.watch("userType") === "business" && (
-                                <SelectItem value="selfEmployed">Self-employed</SelectItem>
-                              )}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-
-                      {(registerForm.watch("businessType") === "registered" ||
-                        registerForm.watch("userType") === "vendor") && (
-                        <>
-                          <div>
-                            <Label htmlFor="companyNumber">Companies House Number (Required)</Label>
-                            <Input
-                              id="companyNumber"
-                              {...registerForm.register("companyNumber")}
-                              placeholder="12345678"
-                            />
-                            {registerForm.formState.errors.companyNumber && (
-                              <p className="text-sm text-destructive mt-1">
-                                {registerForm.formState.errors.companyNumber.message}
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <Label htmlFor="vatNumber">VAT Number (Optional)</Label>
-                            <Input
-                              id="vatNumber"
-                              {...registerForm.register("vatNumber")}
-                              placeholder="GB123456789"
-                            />
-                            {registerForm.formState.errors.vatNumber && (
-                              <p className="text-sm text-destructive mt-1">
-                                {registerForm.formState.errors.vatNumber.message}
-                              </p>
-                            )}
-                          </div>
-                        </>
-                      )}
-
-                      {registerForm.watch("businessType") === "selfEmployed" &&
-                        registerForm.watch("userType") === "business" && (
-                        <div>
-                          <Label htmlFor="utrNumber">UTR Number (Required)</Label>
-                          <Input
-                            id="utrNumber"
-                            {...registerForm.register("utrNumber")}
-                            placeholder="1234567890"
-                          />
-                          {registerForm.formState.errors.utrNumber && (
-                            <p className="text-sm text-destructive mt-1">
-                              {registerForm.formState.errors.utrNumber.message}
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </>
-                  )}
-
-                  {registerForm.watch("userType") !== "free" && (
-                    <div className="space-y-4 mt-4">
-                      <Label>Payment Preferences</Label>
                       <div>
-                        <Label>Billing Frequency</Label>
-                        <RadioGroup
-                          defaultValue="monthly"
-                          onValueChange={(value) =>
-                            registerForm.setValue("paymentFrequency", value as "monthly" | "annual")
-                          }
-                        >
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="monthly" id="monthly" />
-                            <Label htmlFor="monthly">
-                              Monthly (£{getSubscriptionPrice()}/month)
-                            </Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="annual" id="annual" />
-                            <Label htmlFor="annual">
-                              Annual (£{SUBSCRIPTION_PRICES[registerForm.watch("userType")]?.annual}/year - Save 10%)
-                            </Label>
-                          </div>
-                        </RadioGroup>
+                        <Label htmlFor="companyNumber">Companies House Number</Label>
+                        <Input
+                          id="companyNumber"
+                          {...registerForm.register("companyNumber")}
+                          placeholder="12345678"
+                        />
+                        {registerForm.formState.errors.companyNumber && (
+                          <p className="text-sm text-destructive mt-1">
+                            {registerForm.formState.errors.companyNumber.message}
+                          </p>
+                        )}
                       </div>
-                    </div>
+
+                      <div className="space-y-4 mt-4">
+                        <Label>Payment Preferences</Label>
+                        <div>
+                          <Label>Billing Frequency</Label>
+                          <RadioGroup
+                            defaultValue="monthly"
+                            onValueChange={(value) =>
+                              registerForm.setValue("paymentFrequency", value as "monthly" | "annual")
+                            }
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="monthly" id="monthly" />
+                              <Label htmlFor="monthly">
+                                Monthly (£{getSubscriptionPrice()}/month)
+                              </Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="annual" id="annual" />
+                              <Label htmlFor="annual">
+                                Annual (£{SUBSCRIPTION_PRICES[registerForm.watch("userType")]?.annual}/year - Save 10%)
+                              </Label>
+                            </div>
+                          </RadioGroup>
+                        </div>
+                      </div>
+                    </>
                   )}
                   <Button
                     type="submit"
