@@ -187,6 +187,8 @@ router.post("/admin/users/:userId/subscription", authenticateToken, checkSuperAd
     const userId = parseInt(req.params.userId);
     const { subscriptionType, skipPayment } = req.body;
 
+    console.log('Updating subscription:', { userId, subscriptionType, skipPayment });
+
     if (!["free", "business", "vendor"].includes(subscriptionType)) {
       return res.status(400).json({ error: "Invalid subscription type" });
     }
@@ -202,6 +204,8 @@ router.post("/admin/users/:userId/subscription", authenticateToken, checkSuperAd
       return res.status(404).json({ error: "User not found" });
     }
 
+    console.log('Found user:', targetUser);
+
     // Cancel any existing subscription
     await db
       .update(subscriptions)
@@ -209,20 +213,24 @@ router.post("/admin/users/:userId/subscription", authenticateToken, checkSuperAd
       .where(eq(subscriptions.user_id, userId));
 
     if (subscriptionType !== "free") {
-      // Create new subscription
+      // Create new subscription with only the columns that exist in the schema
       const newSubscription = {
         user_id: userId,
         tier: subscriptionType,
         status: skipPayment ? "active" : "pending_payment",
         price: subscriptionType === "business" ? 2999 : 4999, // Price in pence
-        start_date: skipPayment ? new Date() : new Date(),
-        end_date: skipPayment ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : new Date(), // 30 days from now
+        start_date: new Date(),
+        end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
         auto_renew: false
       };
+
+      console.log('Creating new subscription:', newSubscription);
 
       await db
         .insert(subscriptions)
         .values(newSubscription);
+
+      console.log('Subscription created successfully');
     }
 
     // Update user type
@@ -239,7 +247,7 @@ router.post("/admin/users/:userId/subscription", authenticateToken, checkSuperAd
     return res.json(updatedUser);
   } catch (error) {
     console.error("Error updating subscription:", error);
-    return res.status(500).json({ error: "Failed to update subscription" });
+    return res.status(500).json({ error: "Failed to update subscription", details: error.message });
   }
 });
 
