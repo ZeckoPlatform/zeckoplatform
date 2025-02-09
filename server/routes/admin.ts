@@ -422,11 +422,11 @@ router.get("/messages/:userId", authenticateToken, checkSuperAdminAccess, async 
       .from(messages)
       .where(
         and(
-          eq(messages.senderId, adminId),
-          eq(messages.receiverId, userId)
+          eq(messages.sender_id, adminId),
+          eq(messages.receiver_id, userId)
         )
       )
-      .orderBy(desc(messages.createdAt));
+      .orderBy(desc(messages.created_at));
 
     return res.json(chatMessages);
   } catch (error) {
@@ -440,7 +440,7 @@ router.post("/messages/:userId", authenticateToken, checkSuperAdminAccess, async
   try {
     const userId = parseInt(req.params.userId);
     const adminId = req.user!.id;
-    const { content } = req.body;
+    const { content, leadId } = req.body;
 
     if (!content) {
       return res.status(400).json({ error: "Message content is required" });
@@ -450,8 +450,9 @@ router.post("/messages/:userId", authenticateToken, checkSuperAdminAccess, async
     const [message] = await db
       .insert(messages)
       .values({
-        senderId: adminId,
-        receiverId: userId,
+        sender_id: adminId,
+        receiver_id: userId,
+        lead_id: leadId, // This is required by our schema
         content,
         read: false,
       })

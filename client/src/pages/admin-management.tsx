@@ -12,7 +12,19 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { Shield, UserX, FileText, Archive, Users, Settings, BarChart4, Lock, KeyRound, Package, MessageCircle } from "lucide-react";
+import {
+  Shield,
+  UserX,
+  FileText,
+  Archive,
+  Users,
+  Settings,
+  BarChart4,
+  Lock,
+  KeyRound,
+  Package,
+  MessageCircle,
+} from "lucide-react";
 import {
   Table,
   TableBody,
@@ -247,6 +259,7 @@ export default function AdminManagementPage() {
     mutationFn: async (message: string) => {
       const response = await apiRequest("POST", `/api/messages/${selectedUser.id}`, {
         content: message,
+        leadId: 0, // We'll use lead ID 0 for system/admin messages
       });
       if (!response.ok) throw new Error("Failed to send message");
       return response.json();
@@ -669,14 +682,14 @@ export default function AdminManagementPage() {
                 <div
                   key={message.id}
                   className={`p-2 rounded-lg ${
-                    message.senderId === user?.id
+                    message.sender_id === user?.id
                       ? "bg-primary/10 ml-auto"
                       : "bg-muted"
                   } max-w-[80%]`}
                 >
                   <p className="text-sm">{message.content}</p>
                   <span className="text-xs text-muted-foreground">
-                    {new Date(message.createdAt).toLocaleTimeString()}
+                    {new Date(message.created_at).toLocaleTimeString()}
                   </span>
                 </div>
               ))}
