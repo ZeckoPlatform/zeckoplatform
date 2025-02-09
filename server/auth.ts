@@ -3,7 +3,7 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { users, insertUserSchema, type SelectUser } from "@db/schema";
 import { db } from "@db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { fromZodError } from "zod-validation-error";
 import { log } from "./vite";
 import jwt from 'jsonwebtoken';
@@ -35,8 +35,11 @@ export async function comparePasswords(supplied: string, stored: string) {
 async function getUserByEmail(email: string): Promise<SelectUser[]> {
   try {
     log(`Fetching user with email: ${email}`);
-    const result = await db.select().from(users).where(eq(users.email, email));
-    log(`Found ${result.length} users matching email: ${email}`);
+    const result = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.email, email), eq(users.active, true)));
+    log(`Found ${result.length} active users matching email: ${email}`);
     return result;
   } catch (error) {
     log(`Database error in getUserByEmail: ${error instanceof Error ? error.message : String(error)}`);
@@ -89,13 +92,16 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
       try {
         const [user] = await db.select()
           .from(users)
-          .where(eq(users.id, decoded.id));
+          .where(and(
+            eq(users.id, decoded.id),
+            eq(users.active, true)
+          ));
 
         if (!user) {
-          log('User not found in database');
+          log('User not found or account deactivated');
           return res.status(401).json({ 
-            message: 'User not found',
-            code: 'USER_NOT_FOUND'
+            message: 'Account not active',
+            code: 'ACCOUNT_INACTIVE'
           });
         }
 
@@ -172,6 +178,7 @@ export function setupAuth(app: Express) {
           subscriptionActive,
           subscriptionTier,
           profile: profileData,
+          active: true // Added active field
         })
         .returning();
 
@@ -195,8 +202,8 @@ export function setupAuth(app: Express) {
       const [user] = await getUserByEmail(req.body.email);
 
       if (!user) {
-        log(`User not found: ${req.body.email}`);
-        return res.status(401).json({ message: "Invalid credentials" });
+        log(`User not found or account inactive: ${req.body.email}`);
+        return res.status(401).json({ message: "Invalid credentials or account inactive" });
       }
 
       const isValidPassword = await comparePasswords(req.body.password, user.password);
