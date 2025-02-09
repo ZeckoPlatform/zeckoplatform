@@ -18,6 +18,7 @@ import AdminManagementPage from "@/pages/admin-management";
 import SecuritySettingsPage from "@/pages/settings/security-settings";
 import NotificationSettingsPage from "@/pages/settings/notification-settings";
 import AnalyticsSettingsPage from "@/pages/settings/analytics-settings";
+import UserEditPage from "@/pages/admin/user-edit";
 
 function Router() {
   return (
@@ -56,6 +57,9 @@ function Router() {
         </Route>
         <Route path="/admin/settings/analytics">
           {() => <ProtectedRoute component={AnalyticsSettingsPage} />}
+        </Route>
+        <Route path="/admin/users/edit/:id">
+          {() => <ProtectedRoute component={UserEditPage} />}
         </Route>
         <Route component={NotFound} />
       </Switch>
