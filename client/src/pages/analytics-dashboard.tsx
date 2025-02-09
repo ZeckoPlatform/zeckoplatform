@@ -50,6 +50,11 @@ export default function AnalyticsDashboard() {
     }).format(amount);
   };
 
+  const formatPercentage = (value: number | undefined) => {
+    if (typeof value !== 'number') return '0%';
+    return `${value.toFixed(1)}%`;
+  };
+
   const getRevenueChangeText = () => {
     if (!revenueMetrics?.total_revenue || !revenueMetrics?.revenue_breakdown) {
       return null;
@@ -70,6 +75,24 @@ export default function AnalyticsDashboard() {
         {isPositive ? '+' : ''}{percentageChange.toFixed(1)}% from last month
       </p>
     );
+  };
+
+  const getResponseRateText = () => {
+    if (!businessMetrics?.total_responses || !businessMetrics?.total_leads_viewed) {
+      return null;
+    }
+
+    const responseRate = (businessMetrics.total_responses / businessMetrics.total_leads_viewed) * 100;
+    return `${responseRate.toFixed(1)}% response rate`;
+  };
+
+  const getConversionText = () => {
+    if (!businessMetrics?.successful_conversions || !businessMetrics?.total_responses) {
+      return null;
+    }
+
+    const conversionRate = (businessMetrics.successful_conversions / businessMetrics.total_responses) * 100;
+    return `${businessMetrics.successful_conversions} successful conversions (${conversionRate.toFixed(1)}%)`;
   };
 
   return (
@@ -109,7 +132,7 @@ export default function AnalyticsDashboard() {
                   {businessMetrics?.total_responses || 0}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {businessMetrics?.metrics?.response_rate}% response rate
+                  {getResponseRateText() || 'No responses yet'}
                 </p>
               </CardContent>
             </Card>
@@ -123,10 +146,10 @@ export default function AnalyticsDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {businessMetrics?.metrics?.conversion_rate || 0}%
+                  {formatPercentage(businessMetrics?.metrics?.conversion_rate)}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {businessMetrics?.successful_conversions || 0} successful conversions
+                  {getConversionText() || 'No conversions yet'}
                 </p>
               </CardContent>
             </Card>
@@ -143,7 +166,7 @@ export default function AnalyticsDashboard() {
                   {businessMetrics?.activity_score || 0}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Based on recent activity
+                  {businessMetrics?.activity_score ? 'Based on recent activity' : 'No recent activity'}
                 </p>
               </CardContent>
             </Card>
