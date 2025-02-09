@@ -105,6 +105,34 @@ export const products = pgTable("products", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const invoices = pgTable("invoices", {
+  id: serial("id").primaryKey(),
+  user_id: integer("user_id").references(() => users.id).notNull(),
+  stripe_invoice_id: text("stripe_invoice_id").notNull(),
+  amount: integer("amount").notNull(),
+  status: text("status", {
+    enum: ["draft", "open", "paid", "void", "uncollectible"]
+  }).notNull(),
+  currency: text("currency").notNull(),
+  billing_reason: text("billing_reason").notNull(),
+  invoice_pdf: text("invoice_pdf"),
+  hosted_invoice_url: text("hosted_invoice_url"),
+  created_at: timestamp("created_at").defaultNow(),
+  paid_at: timestamp("paid_at"),
+  period_start: timestamp("period_start"),
+  period_end: timestamp("period_end"),
+  metadata: jsonb("metadata"),
+});
+
+export const notificationPreferences = pgTable("notification_preferences", {
+  id: serial("id").primaryKey(),
+  user_id: integer("user_id").references(() => users.id).notNull(),
+  renewal_reminder: boolean("renewal_reminder").default(true),
+  reminder_days_before: integer("reminder_days_before").default(7),
+  invoice_available: boolean("invoice_available").default(true),
+  payment_failed: boolean("payment_failed").default(true),
+});
+
 export const usersRelations = relations(users, ({ many }) => ({
   leads: many(leads),
   products: many(products),
@@ -112,6 +140,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   subscriptions: many(subscriptions),
   sentMessages: many(messages, { relationName: "sentMessages" }),
   receivedMessages: many(messages, { relationName: "receivedMessages" }),
+  invoices: many(invoices),
+  notificationPreferences: many(notificationPreferences),
 }));
 
 export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
@@ -165,6 +195,20 @@ export const messagesRelations = relations(messages, ({ one }) => ({
   }),
 }));
 
+export const invoicesRelations = relations(invoices, ({ one }) => ({
+  user: one(users, {
+    fields: [invoices.user_id],
+    references: [users.id],
+  }),
+}));
+
+export const notificationPreferencesRelations = relations(notificationPreferences, ({ one }) => ({
+  user: one(users, {
+    fields: [notificationPreferences.user_id],
+    references: [users.id],
+  }),
+}));
+
 export const insertUserSchema = createInsertSchema(users, {
   email: z.string().email("Please enter a valid email address"),
   username: z.string().min(3, "Username must be at least 3 characters").max(30, "Username must be less than 30 characters"),
@@ -178,6 +222,10 @@ export const insertLeadSchema = createInsertSchema(leads);
 export const selectLeadSchema = createSelectSchema(leads);
 export const insertMessageSchema = createInsertSchema(messages);
 export const selectMessageSchema = createSelectSchema(messages);
+export const insertInvoiceSchema = createInsertSchema(invoices);
+export const selectInvoiceSchema = createSelectSchema(invoices);
+export const insertNotificationPreferencesSchema = createInsertSchema(notificationPreferences);
+export const selectNotificationPreferencesSchema = createSelectSchema(notificationPreferences);
 
 export type InsertUser = typeof users.$inferInsert;
 export type SelectUser = typeof users.$inferSelect;
@@ -188,3 +236,7 @@ export type SelectLead = typeof leads.$inferSelect;
 export type InsertMessage = typeof messages.$inferInsert;
 export type SelectMessage = typeof messages.$inferSelect;
 export type SubscriptionWithPayment = typeof subscriptions.$inferSelect;
+export type InsertInvoice = typeof invoices.$inferInsert;
+export type SelectInvoice = typeof invoices.$inferSelect;
+export type InsertNotificationPreferences = typeof notificationPreferences.$inferInsert;
+export type SelectNotificationPreferences = typeof notificationPreferences.$inferSelect;

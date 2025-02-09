@@ -10,6 +10,7 @@ import fs from 'fs';
 import express from 'express';
 import { createConnectedAccount, retrieveConnectedAccount } from './stripe';
 import subscriptionRoutes from './routes/subscriptions';
+import invoiceRoutes from './routes/invoices';
 
 declare global {
   namespace Express {
@@ -34,8 +35,9 @@ export function registerRoutes(app: Express): Server {
     authenticateToken(req, res, next);
   });
 
-  // Register subscription routes
+  // Register subscription and invoice routes
   app.use('/api', subscriptionRoutes);
+  app.use('/api', invoiceRoutes);
 
   // DELETE /api/leads/:id - Delete a lead
   app.delete("/api/leads/:id", async (req, res) => {
