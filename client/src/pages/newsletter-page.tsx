@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import {
   Card,
   CardContent,
@@ -23,6 +24,14 @@ import { useAuth } from "@/hooks/use-auth";
 
 export default function NewsletterPage() {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
+
+  // Redirect if user is not an admin
+  if (!user || user.userType !== "admin") {
+    setLocation("/");
+    return null;
+  }
+
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState<Date>();
 
@@ -130,6 +139,7 @@ export default function NewsletterPage() {
     <div className="container mx-auto py-8 space-y-8">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Newsletter Management</h1>
+        <p className="text-sm text-muted-foreground">Admin Only</p>
       </div>
 
       <Tabs defaultValue="create">

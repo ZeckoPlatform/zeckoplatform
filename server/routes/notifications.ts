@@ -9,8 +9,16 @@ import { sendEmail, sendNewsletterToAllUsers, createNewsletterFromTemplate } fro
 
 const router = Router();
 
-// Email template routes
-router.post("/email-templates", authenticateToken, async (req, res) => {
+// Middleware to check admin access
+const checkAdminAccess = (req, res, next) => {
+  if (!req.user || req.user.userType !== "admin") {
+    return res.status(403).json({ message: "Admin access required" });
+  }
+  next();
+};
+
+// Email template routes - Admin only
+router.post("/email-templates", authenticateToken, checkAdminAccess, async (req, res) => {
   try {
     const [template] = await db
       .insert(emailTemplates)
@@ -24,7 +32,7 @@ router.post("/email-templates", authenticateToken, async (req, res) => {
   }
 });
 
-router.get("/email-templates", authenticateToken, async (req, res) => {
+router.get("/email-templates", authenticateToken, checkAdminAccess, async (req, res) => {
   try {
     const templates = await db
       .select()
@@ -38,8 +46,8 @@ router.get("/email-templates", authenticateToken, async (req, res) => {
   }
 });
 
-// Newsletter routes
-router.post("/newsletters", authenticateToken, async (req, res) => {
+// Newsletter routes - Admin only
+router.post("/newsletters", authenticateToken, checkAdminAccess, async (req, res) => {
   try {
     const { templateId, ...newsletterData } = req.body;
     let newNewsletterId;
@@ -74,7 +82,7 @@ router.post("/newsletters", authenticateToken, async (req, res) => {
   }
 });
 
-router.get("/newsletters", authenticateToken, async (req, res) => {
+router.get("/newsletters", authenticateToken, checkAdminAccess, async (req, res) => {
   try {
     const newsletters = await db
       .select()
