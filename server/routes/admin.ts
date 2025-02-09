@@ -55,6 +55,9 @@ router.post("/admin/users/create", authenticateToken, checkSuperAdminAccess, asy
       return res.status(400).json({ error: "User with this email already exists" });
     }
 
+    // Generate username from email
+    const username = email.split('@')[0];
+
     // Hash password
     const hashedPassword = await hashPassword(password);
 
@@ -63,12 +66,13 @@ router.post("/admin/users/create", authenticateToken, checkSuperAdminAccess, asy
       .insert(users)
       .values({
         email,
+        username,
         password: hashedPassword,
         userType,
-        businessType,
-        businessName,
-        companyNumber,
-        utrNumber,
+        businessType: businessType || null,
+        businessName: businessName || null,
+        companyNumber: companyNumber || null,
+        utrNumber: utrNumber || null,
         createdAt: new Date(),
         updatedAt: new Date(),
       })
@@ -79,12 +83,12 @@ router.post("/admin/users/create", authenticateToken, checkSuperAdminAccess, asy
       await db
         .insert(subscriptions)
         .values({
-          userId: newUser.id,
+          user_id: newUser.id,
           status: "active",
           type: userType,
           price: userType === "business" ? 2999 : 4999, // Price in pence
-          startDate: new Date(),
-          endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+          start_date: new Date(),
+          end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
         });
     }
 
