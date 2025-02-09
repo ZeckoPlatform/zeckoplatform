@@ -26,14 +26,13 @@ const SUBSCRIPTION_PRICES = {
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(8, "Password must be at least 8 characters"),
-  username: z.string().min(3, "Username must be at least 3 characters"),
 });
 
 const registerSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
-  username: z.string().min(3, "Username must be at least 3 characters"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   userType: z.enum(["free", "business", "vendor"]),
+  businessName: z.string().min(2, "Company name must be at least 2 characters").optional(),
   businessType: z.string().optional(),
   companyNumber: z.string()
     .regex(/^[A-Z0-9]{8}$/, "Please enter a valid 8-character Companies House number")
@@ -46,15 +45,27 @@ const registerSchema = z.object({
     .optional(),
   paymentFrequency: z.enum(["monthly", "annual"]),
 }).refine((data) => {
-  if (data.userType === "business" && data.businessType === "registered") {
-    return !!data.companyNumber;
+  if (data.userType === "business") {
+    if (data.businessType === "registered") {
+      return !!data.businessName && !!data.companyNumber;
+    }
+    if (data.businessType === "selfEmployed") {
+      return !!data.businessName && !!data.utrNumber;
+    }
   }
   if (data.userType === "vendor") {
-    return !!data.utrNumber;
+    return !!data.businessName && !!data.companyNumber;
   }
   return true;
 }, {
-  message: "Required business information missing",
+  message: (data) => {
+    if (data.userType === "business") {
+      return data.businessType === "registered"
+        ? "Company name and Companies House number are required for registered businesses"
+        : "Company name and UTR number are required for self-employed businesses";
+    }
+    return "Company name and Companies House number are required for vendor registration";
+  },
   path: ["businessType"],
 });
 
@@ -70,7 +81,6 @@ export default function AuthPage() {
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: "",
-      username: "",
       password: "",
     },
   });
@@ -79,9 +89,9 @@ export default function AuthPage() {
     resolver: zodResolver(registerSchema),
     defaultValues: {
       email: "",
-      username: "",
       password: "",
       userType: "free",
+      businessName: "",
       businessType: "",
       companyNumber: "",
       vatNumber: "",
@@ -168,18 +178,6 @@ export default function AuthPage() {
                   className="space-y-4"
                 >
                   <div>
-                    <Label htmlFor="username">Username</Label>
-                    <Input
-                      id="username"
-                      {...loginForm.register("username")}
-                    />
-                    {loginForm.formState.errors.username && (
-                      <p className="text-sm text-destructive mt-1">
-                        {loginForm.formState.errors.username.message}
-                      </p>
-                    )}
-                  </div>
-                  <div>
                     <Label htmlFor="email">Email</Label>
                     <Input
                       id="email"
@@ -238,18 +236,6 @@ export default function AuthPage() {
                     )}
                   </div>
                   <div>
-                    <Label htmlFor="reg-username">Username</Label>
-                    <Input
-                      id="reg-username"
-                      {...registerForm.register("username")}
-                    />
-                    {registerForm.formState.errors.username && (
-                      <p className="text-sm text-destructive mt-1">
-                        {registerForm.formState.errors.username.message}
-                      </p>
-                    )}
-                  </div>
-                  <div>
                     <Label htmlFor="reg-password">Password</Label>
                     <Input
                       id="reg-password"
@@ -270,6 +256,7 @@ export default function AuthPage() {
                         registerForm.setValue("userType", value as "free" | "business" | "vendor");
                         if (value === "free") {
                           registerForm.setValue("businessType", "");
+                          registerForm.setValue("businessName", "");
                           registerForm.setValue("companyNumber", "");
                           registerForm.setValue("vatNumber", "");
                           registerForm.setValue("utrNumber", "");
@@ -295,34 +282,52 @@ export default function AuthPage() {
                     </RadioGroup>
                   </div>
 
-                  {(registerForm.watch("userType") === "business" ||
-                    registerForm.watch("userType") === "vendor") && (
+                  {registerForm.watch("userType") !== "free" && (
                     <>
                       <div>
-                        <Label htmlFor="businessType">Business Type</Label>
-                        <Select
-                          onValueChange={(value) => {
-                            registerForm.setValue("businessType", value);
-                            if (value === "registered") {
-                              registerForm.setValue("utrNumber", "");
-                            } else if (value === "selfEmployed") {
-                              registerForm.setValue("companyNumber", "");
-                              registerForm.setValue("vatNumber", "");
-                            }
-                          }}
-                          defaultValue={registerForm.watch("businessType")}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select business type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="registered">Registered Company</SelectItem>
-                            <SelectItem value="selfEmployed">Self-employed</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Label htmlFor="businessName">Company Name</Label>
+                        <Input
+                          id="businessName"
+                          {...registerForm.register("businessName")}
+                          placeholder="Enter your company name"
+                        />
+                        {registerForm.formState.errors.businessName && (
+                          <p className="text-sm text-destructive mt-1">
+                            {registerForm.formState.errors.businessName.message}
+                          </p>
+                        )}
                       </div>
 
-                      {registerForm.watch("businessType") === "registered" && (
+                      {registerForm.watch("userType") === "business" && (
+                        <div>
+                          <Label htmlFor="businessType">Business Type</Label>
+                          <Select
+                            onValueChange={(value) => {
+                              registerForm.setValue("businessType", value);
+                              if (value === "registered") {
+                                registerForm.setValue("utrNumber", "");
+                              } else if (value === "selfEmployed") {
+                                registerForm.setValue("companyNumber", "");
+                                registerForm.setValue("vatNumber", "");
+                              }
+                            }}
+                            defaultValue={registerForm.watch("businessType")}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select business type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="registered">Registered Company</SelectItem>
+                              {registerForm.watch("userType") === "business" && (
+                                <SelectItem value="selfEmployed">Self-employed</SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {(registerForm.watch("businessType") === "registered" ||
+                        registerForm.watch("userType") === "vendor") && (
                         <>
                           <div>
                             <Label htmlFor="companyNumber">Companies House Number (Required)</Label>
@@ -353,8 +358,8 @@ export default function AuthPage() {
                         </>
                       )}
 
-                      {(registerForm.watch("businessType") === "selfEmployed" ||
-                        registerForm.watch("userType") === "vendor") && (
+                      {registerForm.watch("businessType") === "selfEmployed" &&
+                        registerForm.watch("userType") === "business" && (
                         <div>
                           <Label htmlFor="utrNumber">UTR Number (Required)</Label>
                           <Input
@@ -369,35 +374,36 @@ export default function AuthPage() {
                           )}
                         </div>
                       )}
-
-                      <div className="space-y-4 mt-4">
-                        <Label>Payment Preferences</Label>
-                        <div>
-                          <Label>Billing Frequency</Label>
-                          <RadioGroup
-                            defaultValue="monthly"
-                            onValueChange={(value) =>
-                              registerForm.setValue("paymentFrequency", value as "monthly" | "annual")
-                            }
-                          >
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="monthly" id="monthly" />
-                              <Label htmlFor="monthly">
-                                Monthly (£{getSubscriptionPrice()}/month)
-                              </Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="annual" id="annual" />
-                              <Label htmlFor="annual">
-                                Annual (£{SUBSCRIPTION_PRICES[registerForm.watch("userType")]?.annual}/year - Save 10%)
-                              </Label>
-                            </div>
-                          </RadioGroup>
-                        </div>
-                      </div>
                     </>
                   )}
 
+                  {registerForm.watch("userType") !== "free" && (
+                    <div className="space-y-4 mt-4">
+                      <Label>Payment Preferences</Label>
+                      <div>
+                        <Label>Billing Frequency</Label>
+                        <RadioGroup
+                          defaultValue="monthly"
+                          onValueChange={(value) =>
+                            registerForm.setValue("paymentFrequency", value as "monthly" | "annual")
+                          }
+                        >
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="monthly" id="monthly" />
+                            <Label htmlFor="monthly">
+                              Monthly (£{getSubscriptionPrice()}/month)
+                            </Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="annual" id="annual" />
+                            <Label htmlFor="annual">
+                              Annual (£{SUBSCRIPTION_PRICES[registerForm.watch("userType")]?.annual}/year - Save 10%)
+                            </Label>
+                          </div>
+                        </RadioGroup>
+                      </div>
+                    </div>
+                  )}
                   <Button
                     type="submit"
                     className="w-full"
