@@ -18,6 +18,7 @@ import analyticsRoutes from './routes/analytics';
 import notificationRoutes from './routes/notifications';
 import adminRoutes from './routes/admin';  // Import admin routes
 import documentRoutes from './routes/documents'; // Add this line with the other imports at the top
+import reviewRoutes from './routes/reviews';  // Add this line with other imports
 
 interface User {
   id: number;
@@ -69,6 +70,7 @@ export function registerRoutes(app: Express): Server {
   app.use('/api', notificationRoutes);  // Add notification routes
   app.use('/api', adminRoutes);  // Add admin routes
   app.use('/api', documentRoutes);  // Add document management routes
+  app.use('/api', reviewRoutes);  // Add this line to register review routes
 
   // DELETE /api/leads/:id - Delete a lead
   app.delete("/api/leads/:id", async (req, res) => {

@@ -619,3 +619,88 @@ export type InsertDocumentVersion = typeof documentVersions.$inferInsert;
 export type SelectDocumentVersion = typeof documentVersions.$inferSelect;
 export type InsertDocumentAccess = typeof documentAccess.$inferInsert;
 export type SelectDocumentAccess = typeof documentAccess.$inferSelect;
+
+// Add these new tables after the existing tables
+export const reviews = pgTable("reviews", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  targetId: integer("target_id").references(() => users.id).notNull(),
+  rating: integer("rating").notNull(),
+  content: text("content").notNull(),
+  status: text("status", { 
+    enum: ["pending", "approved", "rejected"] 
+  }).default("pending"),
+  moderatedBy: integer("moderated_by").references(() => users.id),
+  moderationNotes: text("moderation_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const reviewVotes = pgTable("review_votes", {
+  id: serial("id").primaryKey(),
+  reviewId: integer("review_id").references(() => reviews.id).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  voteType: text("vote_type", { enum: ["helpful", "unhelpful"] }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const reputationScores = pgTable("reputation_scores", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  overallScore: numeric("overall_score").notNull().default("0"),
+  totalReviews: integer("total_reviews").notNull().default(0),
+  averageRating: numeric("average_rating").notNull().default("0"),
+  responseRate: numeric("response_rate").notNull().default("0"),
+  completionRate: numeric("completion_rate").notNull().default("0"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Add relations
+export const reviewsRelations = relations(reviews, ({ one }) => ({
+  author: one(users, {
+    fields: [reviews.userId],
+    references: [users.id],
+  }),
+  target: one(users, {
+    fields: [reviews.targetId],
+    references: [users.id],
+  }),
+  moderator: one(users, {
+    fields: [reviews.moderatedBy],
+    references: [users.id],
+  }),
+}));
+
+export const reviewVotesRelations = relations(reviewVotes, ({ one }) => ({
+  review: one(reviews, {
+    fields: [reviewVotes.reviewId],
+    references: [reviews.id],
+  }),
+  user: one(users, {
+    fields: [reviewVotes.userId],
+    references: [users.id],
+  }),
+}));
+
+export const reputationScoresRelations = relations(reputationScores, ({ one }) => ({
+  user: one(users, {
+    fields: [reputationScores.userId],
+    references: [users.id],
+  }),
+}));
+
+// Add Zod schemas
+export const insertReviewSchema = createInsertSchema(reviews);
+export const selectReviewSchema = createSelectSchema(reviews);
+export const insertReviewVoteSchema = createInsertSchema(reviewVotes);
+export const selectReviewVoteSchema = createSelectSchema(reviewVotes);
+export const insertReputationScoreSchema = createInsertSchema(reputationScores);
+export const selectReputationScoreSchema = createSelectSchema(reputationScores);
+
+// Add types
+export type InsertReview = typeof reviews.$inferInsert;
+export type SelectReview = typeof reviews.$inferSelect;
+export type InsertReviewVote = typeof reviewVotes.$inferInsert;
+export type SelectReviewVote = typeof reviewVotes.$inferSelect;
+export type InsertReputationScore = typeof reputationScores.$inferInsert;
+export type SelectReputationScore = typeof reputationScores.$inferSelect;
