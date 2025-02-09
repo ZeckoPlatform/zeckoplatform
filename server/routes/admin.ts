@@ -8,12 +8,6 @@ import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
 import sgMail from "@sendgrid/mail";
 
-if (!process.env.SENDGRID_API_KEY) {
-  throw new Error("SENDGRID_API_KEY must be set");
-}
-
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-
 const router = Router();
 const scryptAsync = promisify(scrypt);
 
@@ -44,12 +38,19 @@ router.post("/admin/users/create", authenticateToken, checkSuperAdminAccess, asy
       utrNumber
     } = req.body;
 
+    console.log('Creating user with data:', {
+      email,
+      userType,
+      businessType,
+      businessName,
+      companyNumber,
+      utrNumber
+    });
+
     // Check if user with email already exists
-    const [existingUser] = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, email))
-      .limit(1);
+    const existingUser = await db.query.users.findFirst({
+      where: eq(users.email, email),
+    });
 
     if (existingUser) {
       return res.status(400).json({ error: "User with this email already exists" });
@@ -62,37 +63,45 @@ router.post("/admin/users/create", authenticateToken, checkSuperAdminAccess, asy
     const hashedPassword = await hashPassword(password);
 
     // Create new user
-    const [newUser] = await db
-      .insert(users)
-      .values({
-        email,
-        username,
-        password: hashedPassword,
-        userType,
-        businessType: businessType || null,
-        businessName: businessName || null,
-        companyNumber: companyNumber || null,
-        utrNumber: utrNumber || null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
+    const newUser = await db.insert(users).values({
+      email,
+      username,
+      password: hashedPassword,
+      userType,
+      businessType: businessType || null,
+      businessName: businessName || null,
+      companyNumber: companyNumber || null,
+      utrNumber: utrNumber || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      superAdmin: false,
+      profile: null,
+      verificationCode: null,
+      resetPasswordToken: null,
+      resetPasswordExpiry: null,
+    }).returning();
+
+    console.log('User created:', newUser[0]);
 
     // If creating a business or vendor account, create initial subscription
     if (userType === "business" || userType === "vendor") {
-      await db
-        .insert(subscriptions)
-        .values({
-          user_id: newUser.id,
-          status: "active",
-          type: userType,
-          price: userType === "business" ? 2999 : 4999, // Price in pence
-          start_date: new Date(),
-          end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-        });
+      const subscription = await db.insert(subscriptions).values({
+        userId: newUser[0].id,
+        status: "active",
+        type: userType,
+        price: userType === "business" ? 2999 : 4999, // Price in pence
+        startDate: new Date(),
+        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+        stripeSubscriptionId: null,
+        stripeCustomerId: null,
+        stripePriceId: null,
+        stripePaymentMethodId: null,
+      }).returning();
+
+      console.log('Subscription created:', subscription[0]);
     }
 
-    return res.status(201).json(newUser);
+    return res.status(201).json(newUser[0]);
   } catch (error) {
     console.error("Error creating user:", error);
     return res.status(500).json({ error: "Failed to create user" });
