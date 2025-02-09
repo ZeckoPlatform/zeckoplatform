@@ -50,6 +50,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useState } from "react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 export default function AdminManagementPage() {
   const { user } = useAuth();
@@ -293,6 +294,206 @@ export default function AdminManagementPage() {
         <h1 className="text-3xl font-bold">Super Admin Dashboard</h1>
         <p className="text-sm text-muted-foreground">Super Admin Controls</p>
       </div>
+
+      {/* Account Creation - Moved to top for prominence */}
+      <Card className="border-2 border-primary/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            Create New Account
+          </CardTitle>
+          <CardDescription>
+            Create new user accounts with specific roles and permissions
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form
+            className="space-y-4"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const formData = new FormData(e.currentTarget);
+              const data = {
+                email: formData.get("email") as string,
+                userType: formData.get("userType") as "free" | "business" | "vendor" | "admin",
+                businessType: formData.get("businessType") as "registered" | "selfEmployed",
+                businessName: formData.get("businessName") as string,
+                companyNumber: formData.get("companyNumber") as string,
+                utrNumber: formData.get("utrNumber") as string,
+                password: formData.get("password") as string,
+              };
+
+              try {
+                const response = await apiRequest("POST", "/api/admin/users/create", data);
+                if (!response.ok) {
+                  throw new Error("Failed to create user");
+                }
+
+                toast({
+                  title: "Success",
+                  description: "User account created successfully",
+                });
+
+                queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+
+                // Reset form
+                e.currentTarget.reset();
+              } catch (error) {
+                toast({
+                  title: "Error",
+                  description: error instanceof Error ? error.message : "Failed to create user",
+                  variant: "destructive",
+                });
+              }
+            }}
+          >
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  required
+                  placeholder="user@example.com"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  required
+                  placeholder="Minimum 8 characters"
+                  minLength={8}
+                />
+              </div>
+
+              <div>
+                <Label>Account Type</Label>
+                <RadioGroup
+                  name="userType"
+                  defaultValue="free"
+                  className="mt-2"
+                  onValueChange={(value) => {
+                    const form = document.querySelector('form') as HTMLFormElement;
+                    const businessTypeField = form.querySelector('[name="businessType"]') as HTMLSelectElement;
+                    const businessFields = form.querySelector('#businessFields') as HTMLDivElement;
+
+                    if (value === "business") {
+                      businessFields.style.display = "block";
+                      if (businessTypeField) {
+                        businessTypeField.value = "registered";
+                      }
+                    } else if (value === "vendor") {
+                      businessFields.style.display = "block";
+                      if (businessTypeField) {
+                        businessTypeField.value = "registered";
+                      }
+                    } else {
+                      businessFields.style.display = "none";
+                    }
+                  }}
+                >
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="free" id="free" />
+                      <Label htmlFor="free">Free User</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="business" id="business" />
+                      <Label htmlFor="business">Business</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="vendor" id="vendor" />
+                      <Label htmlFor="vendor">Vendor</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="admin" id="admin" />
+                      <Label htmlFor="admin">Admin</Label>
+                    </div>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div id="businessFields" className="space-y-4" style={{ display: 'none' }}>
+                <div className="business-only">
+                  <Label>Business Type</Label>
+                  <RadioGroup
+                    name="businessType"
+                    defaultValue="registered"
+                    className="mt-2"
+                    onValueChange={(value) => {
+                      const form = document.querySelector('form') as HTMLFormElement;
+                      const companyFields = form.querySelector('#companyFields') as HTMLDivElement;
+                      const utrField = form.querySelector('#utrField') as HTMLDivElement;
+
+                      if (value === "registered") {
+                        companyFields.style.display = "block";
+                        utrField.style.display = "none";
+                      } else {
+                        companyFields.style.display = "none";
+                        utrField.style.display = "block";
+                      }
+                    }}
+                  >
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="registered" id="registered" />
+                        <Label htmlFor="registered">Registered Company</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="selfEmployed" id="selfEmployed" />
+                        <Label htmlFor="selfEmployed">Self-employed</Label>
+                      </div>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                <div id="companyFields" className="space-y-4">
+                  <div>
+                    <Label htmlFor="businessName">Company Name</Label>
+                    <Input
+                      id="businessName"
+                      name="businessName"
+                      placeholder="Enter company name"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="companyNumber">Companies House Number</Label>
+                    <Input
+                      id="companyNumber"
+                      name="companyNumber"
+                      placeholder="12345678"
+                      pattern="[A-Z0-9]{8}"
+                    />
+                  </div>
+                </div>
+
+                <div id="utrField" className="space-y-4" style={{ display: 'none' }}>
+                  <div>
+                    <Label htmlFor="utrNumber">UTR Number</Label>
+                    <Input
+                      id="utrNumber"
+                      name="utrNumber"
+                      placeholder="1234567890"
+                      pattern="[0-9]{10}"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full"
+              >
+                Create Account
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
 
       {/* Statistics Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -666,6 +867,7 @@ export default function AdminManagementPage() {
           </div>
         </CardContent>
       </Card>
+
 
       {/* Chat Dialog */}
       <Dialog open={chatOpen} onOpenChange={setChatOpen}>

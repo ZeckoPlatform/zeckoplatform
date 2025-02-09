@@ -31,6 +31,70 @@ const checkSuperAdminAccess = (req: any, res: any, next: any) => {
   next();
 };
 
+// Create user account (super admin only)
+router.post("/admin/users/create", authenticateToken, checkSuperAdminAccess, async (req, res) => {
+  try {
+    const {
+      email,
+      password,
+      userType,
+      businessType,
+      businessName,
+      companyNumber,
+      utrNumber
+    } = req.body;
+
+    // Check if user with email already exists
+    const [existingUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+
+    if (existingUser) {
+      return res.status(400).json({ error: "User with this email already exists" });
+    }
+
+    // Hash password
+    const hashedPassword = await hashPassword(password);
+
+    // Create new user
+    const [newUser] = await db
+      .insert(users)
+      .values({
+        email,
+        password: hashedPassword,
+        userType,
+        businessType,
+        businessName,
+        companyNumber,
+        utrNumber,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+
+    // If creating a business or vendor account, create initial subscription
+    if (userType === "business" || userType === "vendor") {
+      await db
+        .insert(subscriptions)
+        .values({
+          userId: newUser.id,
+          status: "active",
+          type: userType,
+          price: userType === "business" ? 2999 : 4999, // Price in pence
+          startDate: new Date(),
+          endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+        });
+    }
+
+    return res.status(201).json(newUser);
+  } catch (error) {
+    console.error("Error creating user:", error);
+    return res.status(500).json({ error: "Failed to create user" });
+  }
+});
+
 // Get admin statistics
 router.get("/admin/stats", authenticateToken, checkSuperAdminAccess, async (req, res) => {
   try {
@@ -235,7 +299,6 @@ router.post("/admin/users/:userId/reset-password", authenticateToken, checkSuper
     return res.status(500).json({ error: "Failed to reset password" });
   }
 });
-
 
 
 // Grant admin access to a user
