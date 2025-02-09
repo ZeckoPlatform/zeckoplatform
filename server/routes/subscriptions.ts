@@ -13,6 +13,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 const router = Router();
 
+// Price configurations for different tiers and frequencies
 const SUBSCRIPTION_PRICES = {
   business: {
     monthly: 2999, // in cents
@@ -24,7 +25,64 @@ const SUBSCRIPTION_PRICES = {
   },
 } as const;
 
-router.post("/subscriptions", authenticateToken, async (req, res) => {
+// Cache for Stripe product and price IDs
+let stripePriceIds: Record<string, string> = {};
+
+// Initialize Stripe products and prices
+async function initializeStripePrices() {
+  try {
+    // Create or retrieve products for each tier
+    for (const tier of ['business', 'vendor'] as const) {
+      const productName = `${tier.charAt(0).toUpperCase() + tier.slice(1)} Subscription`;
+
+      // Create or get product
+      let product = (await stripe.products.list({ active: true })).data
+        .find(p => p.name === productName);
+
+      if (!product) {
+        product = await stripe.products.create({
+          name: productName,
+          description: `${productName} with 30-day free trial`,
+        });
+      }
+
+      // Create or get prices for each frequency
+      for (const frequency of ['monthly', 'annual'] as const) {
+        const priceKey = `${tier}_${frequency}`;
+        const amount = SUBSCRIPTION_PRICES[tier][frequency];
+
+        let price = (await stripe.prices.list({ 
+          product: product.id,
+          active: true,
+        })).data.find(p => 
+          p.unit_amount === amount && 
+          p.recurring?.interval === (frequency === 'annual' ? 'year' : 'month')
+        );
+
+        if (!price) {
+          price = await stripe.prices.create({
+            product: product.id,
+            unit_amount: amount,
+            currency: 'gbp',
+            recurring: {
+              interval: frequency === 'annual' ? 'year' : 'month',
+            },
+          });
+        }
+
+        stripePriceIds[priceKey] = price.id;
+      }
+    }
+  } catch (error) {
+    console.error('Error initializing Stripe prices:', error);
+    throw error;
+  }
+}
+
+// Initialize prices when the server starts
+initializeStripePrices().catch(console.error);
+
+router.post("/subscriptions/checkout", authenticateToken, async (req, res) => {
   try {
     const { tier, paymentFrequency } = req.body as {
       tier: keyof typeof SUBSCRIPTION_PRICES;
@@ -35,35 +93,22 @@ router.post("/subscriptions", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    if (!SUBSCRIPTION_PRICES[tier]) {
-      return res.status(400).json({ error: "Invalid subscription tier" });
+    const priceId = stripePriceIds[`${tier}_${paymentFrequency}`];
+    if (!priceId) {
+      return res.status(500).json({ error: "Price configuration not found" });
     }
-
-    const price = SUBSCRIPTION_PRICES[tier][paymentFrequency];
-    const productName = `${tier.charAt(0).toUpperCase() + tier.slice(1)} ${paymentFrequency} Plan`;
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
       line_items: [
         {
-          price_data: {
-            currency: "gbp",
-            product_data: {
-              name: productName,
-              description: `${productName} with 30-day free trial`,
-            },
-            unit_amount: price,
-            recurring: {
-              interval: paymentFrequency === "annual" ? "year" : "month",
-              interval_count: 1,
-            },
-          },
+          price: priceId,
           quantity: 1,
         },
       ],
       success_url: `${req.protocol}://${req.get("host")}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.protocol}://${req.get("host")}/subscription`,
+      cancel_url: `${req.protocol}://${req.get("host")}/subscription?canceled=true`,
       customer_email: req.user?.email,
       metadata: {
         userId: req.user?.id,
