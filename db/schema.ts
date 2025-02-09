@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
 import { z } from "zod";
@@ -177,6 +177,72 @@ export const vendorTransactions = pgTable("vendor_transactions", {
   updated_at: timestamp("updated_at").defaultNow(),
 });
 
+export const analyticsLogs = pgTable("analytics_logs", {
+  id: serial("id").primaryKey(),
+  user_id: integer("user_id").references(() => users.id).notNull(),
+  event_type: text("event_type", {
+    enum: ["login", "lead_view", "lead_response", "message_sent", "subscription_changed"]
+  }).notNull(),
+  metadata: jsonb("metadata"),
+  created_at: timestamp("created_at").defaultNow(),
+  ip_address: text("ip_address"),
+  user_agent: text("user_agent"),
+});
+
+export const leadAnalytics = pgTable("lead_analytics", {
+  id: serial("id").primaryKey(),
+  lead_id: integer("lead_id").references(() => leads.id).notNull(),
+  views: integer("views").default(0),
+  responses: integer("responses").default(0),
+  conversion_rate: numeric("conversion_rate").default(0),
+  avg_response_time: integer("avg_response_time"), // in seconds
+  status_changes: jsonb("status_changes").$type<{
+    timestamp: string;
+    from: string;
+    to: string;
+  }[]>(),
+  created_at: timestamp("created_at").defaultNow(),
+  updated_at: timestamp("updated_at").defaultNow(),
+});
+
+export const businessAnalytics = pgTable("business_analytics", {
+  id: serial("id").primaryKey(),
+  business_id: integer("business_id").references(() => users.id).notNull(),
+  total_leads_viewed: integer("total_leads_viewed").default(0),
+  total_responses: integer("total_responses").default(0),
+  successful_conversions: integer("successful_conversions").default(0),
+  total_revenue: numeric("total_revenue").default(0),
+  avg_response_time: integer("avg_response_time"), // in seconds
+  rating: numeric("rating").default(0),
+  activity_score: integer("activity_score").default(0),
+  period_start: timestamp("period_start").notNull(),
+  period_end: timestamp("period_end").notNull(),
+  metrics: jsonb("metrics").$type<{
+    response_rate: number;
+    conversion_rate: number;
+    revenue_growth: number;
+    customer_satisfaction: number;
+  }>(),
+});
+
+export const revenueAnalytics = pgTable("revenue_analytics", {
+  id: serial("id").primaryKey(),
+  user_id: integer("user_id").references(() => users.id).notNull(),
+  period_type: text("period_type", { enum: ["daily", "weekly", "monthly", "yearly"] }).notNull(),
+  period_start: timestamp("period_start").notNull(),
+  period_end: timestamp("period_end").notNull(),
+  total_revenue: numeric("total_revenue").default(0),
+  subscription_revenue: numeric("subscription_revenue").default(0),
+  transaction_count: integer("transaction_count").default(0),
+  avg_transaction_value: numeric("avg_transaction_value").default(0),
+  revenue_breakdown: jsonb("revenue_breakdown").$type<{
+    services: number;
+    subscriptions: number;
+    other: number;
+  }>(),
+  created_at: timestamp("created_at").defaultNow(),
+});
+
 export const usersRelations = relations(users, ({ many }) => ({
   leads: many(leads),
   products: many(products),
@@ -187,6 +253,9 @@ export const usersRelations = relations(users, ({ many }) => ({
   invoices: many(invoices),
   notificationPreferences: many(notificationPreferences),
   vendorTransactions: many(vendorTransactions),
+  analyticsLogs: many(analyticsLogs),
+  businessAnalytics: many(businessAnalytics),
+  revenueAnalytics: many(revenueAnalytics),
 }));
 
 export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
@@ -261,6 +330,34 @@ export const vendorTransactionsRelations = relations(vendorTransactions, ({ one 
   }),
 }));
 
+export const analyticsLogsRelations = relations(analyticsLogs, ({ one }) => ({
+  user: one(users, {
+    fields: [analyticsLogs.user_id],
+    references: [users.id],
+  }),
+}));
+
+export const leadAnalyticsRelations = relations(leadAnalytics, ({ one }) => ({
+  lead: one(leads, {
+    fields: [leadAnalytics.lead_id],
+    references: [leads.id],
+  }),
+}));
+
+export const businessAnalyticsRelations = relations(businessAnalytics, ({ one }) => ({
+  business: one(users, {
+    fields: [businessAnalytics.business_id],
+    references: [users.id],
+  }),
+}));
+
+export const revenueAnalyticsRelations = relations(revenueAnalytics, ({ one }) => ({
+  user: one(users, {
+    fields: [revenueAnalytics.user_id],
+    references: [users.id],
+  }),
+}));
+
 export const insertUserSchema = createInsertSchema(users, {
   email: z.string().email("Please enter a valid email address"),
   username: z.string().min(3, "Username must be at least 3 characters").max(30, "Username must be less than 30 characters"),
@@ -309,6 +406,15 @@ export const selectNotificationPreferencesSchema = createSelectSchema(notificati
 export const insertVendorTransactionSchema = createInsertSchema(vendorTransactions);
 export const selectVendorTransactionSchema = createSelectSchema(vendorTransactions);
 
+export const insertAnalyticsLogSchema = createInsertSchema(analyticsLogs);
+export const selectAnalyticsLogSchema = createSelectSchema(analyticsLogs);
+export const insertLeadAnalyticsSchema = createInsertSchema(leadAnalytics);
+export const selectLeadAnalyticsSchema = createSelectSchema(leadAnalytics);
+export const insertBusinessAnalyticsSchema = createInsertSchema(businessAnalytics);
+export const selectBusinessAnalyticsSchema = createSelectSchema(businessAnalytics);
+export const insertRevenueAnalyticsSchema = createInsertSchema(revenueAnalytics);
+export const selectRevenueAnalyticsSchema = createSelectSchema(revenueAnalytics);
+
 export type InsertUser = typeof users.$inferInsert;
 export type SelectUser = typeof users.$inferSelect;
 export type InsertSubscription = typeof subscriptions.$inferInsert;
@@ -324,3 +430,11 @@ export type InsertNotificationPreferences = typeof notificationPreferences.$infe
 export type SelectNotificationPreferences = typeof notificationPreferences.$inferSelect;
 export type InsertVendorTransaction = typeof vendorTransactions.$inferInsert;
 export type SelectVendorTransaction = typeof vendorTransactions.$inferSelect;
+export type InsertAnalyticsLog = typeof analyticsLogs.$inferInsert;
+export type SelectAnalyticsLog = typeof analyticsLogs.$inferSelect;
+export type InsertLeadAnalytics = typeof leadAnalytics.$inferInsert;
+export type SelectLeadAnalytics = typeof leadAnalytics.$inferSelect;
+export type InsertBusinessAnalytics = typeof businessAnalytics.$inferInsert;
+export type SelectBusinessAnalytics = typeof businessAnalytics.$inferSelect;
+export type InsertRevenueAnalytics = typeof revenueAnalytics.$inferInsert;
+export type SelectRevenueAnalytics = typeof revenueAnalytics.$inferSelect;

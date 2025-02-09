@@ -14,7 +14,7 @@ import invoiceRoutes from './routes/invoices';
 import { insertUserSchema } from "@db/schema";
 import { fromZodError } from 'zod-validation-error'; //Assumed import
 import authRoutes from './routes/auth';
-
+import analyticsRoutes from './routes/analytics';
 
 declare global {
   namespace Express {
@@ -50,6 +50,7 @@ export function registerRoutes(app: Express): Server {
   app.use('/api', subscriptionRoutes);
   app.use('/api', invoiceRoutes);
   app.use('/api', authRoutes); // Added authRoutes
+  app.use('/api', analyticsRoutes); //Register analytics routes
 
   // DELETE /api/leads/:id - Delete a lead
   app.delete("/api/leads/:id", async (req, res) => {
