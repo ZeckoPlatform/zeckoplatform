@@ -23,7 +23,7 @@ import { useAuth } from "@/hooks/use-auth";
 
 export default function AnalyticsDashboard() {
   const { user } = useAuth();
-  
+
   const { data: analyticsData, isLoading } = useQuery({
     queryKey: ["/api/analytics/dashboard"],
     enabled: !!user,
@@ -50,6 +50,28 @@ export default function AnalyticsDashboard() {
     }).format(amount);
   };
 
+  const getRevenueChangeText = () => {
+    if (!revenueMetrics?.total_revenue || !revenueMetrics?.revenue_breakdown) {
+      return null;
+    }
+
+    const currentRevenue = parseFloat(revenueMetrics.total_revenue.toString());
+    const previousRevenue = revenueMetrics.revenue_breakdown.previous_month || 0;
+
+    if (previousRevenue === 0) {
+      return currentRevenue > 0 ? "First month of revenue" : null;
+    }
+
+    const percentageChange = ((currentRevenue - previousRevenue) / previousRevenue) * 100;
+    const isPositive = percentageChange > 0;
+
+    return (
+      <p className={`text-xs ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+        {isPositive ? '+' : ''}{percentageChange.toFixed(1)}% from last month
+      </p>
+    );
+  };
+
   return (
     <div className="container mx-auto py-8">
       <h1 className="text-3xl font-bold mb-8">Analytics Dashboard</h1>
@@ -66,12 +88,10 @@ export default function AnalyticsDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">
               {revenueMetrics?.total_revenue
-                ? formatCurrency(revenueMetrics.total_revenue)
+                ? formatCurrency(parseFloat(revenueMetrics.total_revenue.toString()))
                 : "£0.00"}
             </div>
-            <p className="text-xs text-muted-foreground">
-              +20.1% from last month
-            </p>
+            {getRevenueChangeText()}
           </CardContent>
         </Card>
 
