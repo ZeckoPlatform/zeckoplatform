@@ -13,6 +13,7 @@ import subscriptionRoutes from './routes/subscriptions';
 import invoiceRoutes from './routes/invoices';
 import { insertUserSchema } from "@db/schema";
 import { fromZodError } from 'zod-validation-error'; //Assumed import
+import authRoutes from './routes/auth';
 
 
 declare global {
@@ -48,6 +49,7 @@ export function registerRoutes(app: Express): Server {
   // Register subscription and invoice routes
   app.use('/api', subscriptionRoutes);
   app.use('/api', invoiceRoutes);
+  app.use('/api', authRoutes); // Added authRoutes
 
   // DELETE /api/leads/:id - Delete a lead
   app.delete("/api/leads/:id", async (req, res) => {

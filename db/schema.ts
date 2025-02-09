@@ -16,7 +16,7 @@ export const users = pgTable("users", {
   stripeAccountStatus: text("stripe_account_status", {
     enum: ["pending", "enabled", "disabled"]
   }).default("pending"),
-  // New business verification fields
+  // Business verification fields
   businessVerified: boolean("business_verified").default(false),
   businessName: text("business_name"),
   companyNumber: text("company_number").unique(),
@@ -25,6 +25,10 @@ export const users = pgTable("users", {
   verificationStatus: text("verification_status", {
     enum: ["pending", "verified", "rejected"]
   }).default("pending"),
+  // 2FA fields
+  twoFactorEnabled: boolean("two_factor_enabled").default(false),
+  twoFactorSecret: text("two_factor_secret"),
+  backupCodes: jsonb("backup_codes").$type<string[]>(),
   verificationDocuments: jsonb("verification_documents").$type<{
     companyDoc?: string;
     vatDoc?: string;
@@ -262,7 +266,7 @@ export const insertUserSchema = createInsertSchema(users, {
   username: z.string().min(3, "Username must be at least 3 characters").max(30, "Username must be less than 30 characters"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   userType: z.enum(["free", "business", "vendor"]),
-  // Add business verification fields validation
+  // Business verification fields with updated validation
   businessName: z.string().optional(),
   companyNumber: z.string()
     .regex(/^[A-Z0-9]{8}$/, "Invalid company registration number format")
@@ -273,14 +277,22 @@ export const insertUserSchema = createInsertSchema(users, {
   utrNumber: z.string()
     .regex(/^[0-9]{10}$/, "Invalid UTR number format")
     .optional(),
+  twoFactorEnabled: z.boolean().optional(),
 }).refine((data) => {
-  // For business accounts, require company number or UTR
-  if (data.userType === "business" || data.userType === "vendor") {
-    return (data.companyNumber || data.utrNumber) && data.businessName;
+  // For business accounts, require company number
+  if (data.userType === "business") {
+    return data.businessName && data.companyNumber;
+  }
+  // For vendor accounts, require UTR
+  if (data.userType === "vendor") {
+    return data.businessName && data.utrNumber;
   }
   return true;
 }, {
-  message: "Business/Vendor accounts require business name and either company number or UTR number",
+  message: (data) =>
+    data.userType === "business"
+      ? "Business accounts require business name and company number"
+      : "Vendor accounts require business name and UTR number",
 });
 
 export const selectUserSchema = createSelectSchema(users);
