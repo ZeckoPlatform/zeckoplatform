@@ -50,17 +50,17 @@ router.get("/admin/stats", authenticateToken, checkSuperAdminAccess, async (req,
       .from(subscriptions)
       .where(eq(subscriptions.status, "active"));
 
-    // Calculate total revenue
+    // Calculate total revenue from active subscriptions
     const [revenue] = await db
-      .select({ total: sum(subscriptions.amount) })
+      .select({ total: sum(subscriptions.price) })
       .from(subscriptions)
-      .where(eq(subscriptions.status, "succeeded"));
+      .where(eq(subscriptions.status, "active"));
 
     res.json({
       totalUsers: userStats.count || 0,
       totalDocuments: docStats.count || 0,
       activeSubscriptions: subStats.count || 0,
-      totalRevenue: Math.floor((revenue?.total || 0) / 100), // Convert from cents to pounds
+      totalRevenue: Math.floor((revenue?.total || 0) / 100), // Convert from pence to pounds
     });
   } catch (error) {
     console.error("Error fetching admin stats:", error);
@@ -127,7 +127,7 @@ router.post("/admin/users/:userId/reset-password", authenticateToken, checkSuper
       .set({ password: hashedPassword })
       .where(eq(users.id, userId));
 
-    return res.json({ 
+    return res.json({
       message: "Password reset successful",
       temporaryPassword // This will be shown to the super admin
     });
@@ -329,13 +329,85 @@ router.post("/admin/mass-email", authenticateToken, checkSuperAdminAccess, async
 
     await Promise.all(emailPromises);
 
-    return res.json({ 
+    return res.json({
       message: "Mass email sent successfully",
       recipientCount: allUsers.length
     });
   } catch (error) {
     console.error("Error sending mass email:", error);
     return res.status(500).json({ error: "Failed to send mass email" });
+  }
+});
+
+// Get all products
+router.get("/products", authenticateToken, async (req, res) => {
+  try {
+    const allProducts = await db
+      .select()
+      .from(products)
+      .orderBy(products.createdAt);
+
+    return res.json(allProducts);
+  } catch (error) {
+    console.error("Error fetching products:", error);
+    return res.status(500).json({ error: "Failed to fetch products" });
+  }
+});
+
+// Create new product
+router.post("/products", authenticateToken, checkSuperAdminAccess, async (req, res) => {
+  try {
+    const [product] = await db
+      .insert(products)
+      .values({
+        ...req.body,
+        vendorId: req.user.id,
+      })
+      .returning();
+
+    return res.status(201).json(product);
+  } catch (error) {
+    console.error("Error creating product:", error);
+    return res.status(500).json({ error: "Failed to create product" });
+  }
+});
+
+// Update product
+router.patch("/products/:productId", authenticateToken, checkSuperAdminAccess, async (req, res) => {
+  try {
+    const [product] = await db
+      .update(products)
+      .set(req.body)
+      .where(eq(products.id, parseInt(req.params.productId)))
+      .returning();
+
+    if (!product) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    return res.json(product);
+  } catch (error) {
+    console.error("Error updating product:", error);
+    return res.status(500).json({ error: "Failed to update product" });
+  }
+});
+
+// Delete product
+router.delete("/products/:productId", authenticateToken, checkSuperAdminAccess, async (req, res) => {
+  try {
+    const [product] = await db
+      .delete(products)
+      .where(eq(products.id, parseInt(req.params.productId)))
+      .returning();
+
+    if (!product) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    return res.json({ message: "Product deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting product:", error);
+    return res.status(500).json({ error: "Failed to delete product" });
   }
 });
 

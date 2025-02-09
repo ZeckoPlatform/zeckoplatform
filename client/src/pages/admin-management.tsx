@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { Shield, UserX, FileText, Archive, Users, Settings, BarChart4, Lock, KeyRound } from "lucide-react";
+import { Shield, UserX, FileText, Archive, Users, Settings, BarChart4, Lock, KeyRound, Package } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -194,6 +194,38 @@ export default function AdminManagementPage() {
     },
   });
 
+  // Add new mutation for deleting products
+  const deleteProductMutation = useMutation({
+    mutationFn: async (productId: number) => {
+      const response = await apiRequest("DELETE", `/api/products/${productId}`);
+      if (!response.ok) throw new Error("Failed to delete product");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      toast({
+        title: "Success",
+        description: "Product deleted successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Fetch marketplace products
+  const { data: products = [] } = useQuery({
+    queryKey: ["/api/products"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/products");
+      if (!response.ok) throw new Error("Failed to fetch products");
+      return response.json();
+    },
+  });
 
   return (
     <div className="container mx-auto py-8 space-y-8">
@@ -400,6 +432,78 @@ export default function AdminManagementPage() {
                 No documents found
               </p>
             )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Product Management */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Marketplace Products</CardTitle>
+          <CardDescription>
+            Manage products in the marketplace
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <Button
+              variant="outline"
+              onClick={() => setLocation('/marketplace/add')}
+            >
+              <Package className="w-4 h-4 mr-2" />
+              Add New Product
+            </Button>
+
+            <div className="space-y-4">
+              {products.map((product: any) => (
+                <div
+                  key={product.id}
+                  className="flex items-center justify-between p-4 rounded-lg border"
+                >
+                  <div className="flex items-center space-x-4">
+                    {product.imageUrl && (
+                      <img
+                        src={product.imageUrl}
+                        alt={product.title}
+                        className="w-16 h-16 object-cover rounded"
+                      />
+                    )}
+                    <div>
+                      <h3 className="font-semibold">{product.title}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        £{(product.price / 100).toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLocation(`/marketplace/edit/${product.id}`)}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => {
+                        if (window.confirm('Are you sure you want to delete this product?')) {
+                          deleteProductMutation.mutate(product.id);
+                        }
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              ))}
+
+              {products.length === 0 && (
+                <p className="text-center text-muted-foreground py-8">
+                  No products found
+                </p>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
