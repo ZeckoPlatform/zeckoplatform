@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { Shield, UserX, FileText, Archive, Users, Settings, BarChart4, Lock, KeyRound, Package } from "lucide-react";
+import { Shield, UserX, FileText, Archive, Users, Settings, BarChart4, Lock, KeyRound, Package, MessageCircle } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -22,6 +22,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -30,18 +37,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-
+import { useState } from "react";
 
 export default function AdminManagementPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-
-  // Redirect if user is not a super admin
-  if (!user?.superAdmin) {
-    setLocation("/");
-    return null;
-  }
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [newMessage, setNewMessage] = useState("");
 
   // Fetch all users for user management
   const { data: users = [] } = useQuery({
@@ -227,6 +231,49 @@ export default function AdminManagementPage() {
     },
   });
 
+  // Add chat related queries
+  const { data: messages = [] } = useQuery({
+    queryKey: ["/api/messages", selectedUser?.id],
+    queryFn: async () => {
+      if (!selectedUser) return [];
+      const response = await apiRequest("GET", `/api/messages/${selectedUser.id}`);
+      if (!response.ok) throw new Error("Failed to fetch messages");
+      return response.json();
+    },
+    enabled: !!selectedUser,
+  });
+
+  const sendMessageMutation = useMutation({
+    mutationFn: async (message: string) => {
+      const response = await apiRequest("POST", `/api/messages/${selectedUser.id}`, {
+        content: message,
+      });
+      if (!response.ok) throw new Error("Failed to send message");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/messages", selectedUser?.id] });
+      setNewMessage("");
+      toast({
+        title: "Success",
+        description: "Message sent successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Redirect if user is not a super admin
+  if (!user?.superAdmin) {
+    setLocation("/");
+    return null;
+  }
+
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div className="flex justify-between items-center">
@@ -304,11 +351,21 @@ export default function AdminManagementPage() {
                       <Button
                         variant="outline"
                         size="sm"
+                        onClick={() => {
+                          setSelectedUser(user);
+                          setChatOpen(true);
+                        }}
+                      >
+                        <MessageCircle className="w-4 h-4 mr-2" />
+                        Chat
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => setLocation(`/admin/users/${user.id}`)}
                       >
                         Edit
                       </Button>
-                      {/* Reset Password Button */}
                       <Button
                         variant="outline"
                         size="sm"
@@ -321,7 +378,6 @@ export default function AdminManagementPage() {
                         <KeyRound className="w-4 h-4 mr-2" />
                         Reset Password
                       </Button>
-                      {/* Subscription Management */}
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="outline" size="sm">
@@ -597,6 +653,55 @@ export default function AdminManagementPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Chat Dialog */}
+      <Dialog open={chatOpen} onOpenChange={setChatOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Chat with {selectedUser?.username}</DialogTitle>
+            <DialogDescription>
+              Send private messages to {selectedUser?.username}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="h-[300px] overflow-y-auto space-y-2 p-4 border rounded">
+              {messages.map((message: any) => (
+                <div
+                  key={message.id}
+                  className={`p-2 rounded-lg ${
+                    message.senderId === user?.id
+                      ? "bg-primary/10 ml-auto"
+                      : "bg-muted"
+                  } max-w-[80%]`}
+                >
+                  <p className="text-sm">{message.content}</p>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(message.createdAt).toLocaleTimeString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (newMessage.trim()) {
+                  sendMessageMutation.mutate(newMessage);
+                }
+              }}
+              className="flex gap-2"
+            >
+              <Input
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Type your message..."
+              />
+              <Button type="submit" disabled={sendMessageMutation.isPending}>
+                Send
+              </Button>
+            </form>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

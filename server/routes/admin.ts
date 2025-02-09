@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { authenticateToken } from "../auth";
 import { db } from "@db";
-import { users, documents, subscriptions, products, leads } from "@db/schema";
-import { eq, and, count, sum } from "drizzle-orm";
+import { users, documents, subscriptions, products, leads, messages } from "@db/schema";
+import { eq, and, count, sum, desc } from "drizzle-orm";
 import { z } from "zod";
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
@@ -408,6 +408,59 @@ router.delete("/products/:productId", authenticateToken, checkSuperAdminAccess, 
   } catch (error) {
     console.error("Error deleting product:", error);
     return res.status(500).json({ error: "Failed to delete product" });
+  }
+});
+
+// Get messages between admin and user
+router.get("/messages/:userId", authenticateToken, checkSuperAdminAccess, async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    const adminId = req.user!.id;
+
+    const chatMessages = await db
+      .select()
+      .from(messages)
+      .where(
+        and(
+          eq(messages.senderId, adminId),
+          eq(messages.receiverId, userId)
+        )
+      )
+      .orderBy(desc(messages.createdAt));
+
+    return res.json(chatMessages);
+  } catch (error) {
+    console.error("Error fetching messages:", error);
+    return res.status(500).json({ error: "Failed to fetch messages" });
+  }
+});
+
+// Send message to user
+router.post("/messages/:userId", authenticateToken, checkSuperAdminAccess, async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    const adminId = req.user!.id;
+    const { content } = req.body;
+
+    if (!content) {
+      return res.status(400).json({ error: "Message content is required" });
+    }
+
+    // Create new message
+    const [message] = await db
+      .insert(messages)
+      .values({
+        senderId: adminId,
+        receiverId: userId,
+        content,
+        read: false,
+      })
+      .returning();
+
+    return res.json(message);
+  } catch (error) {
+    console.error("Error sending message:", error);
+    return res.status(500).json({ error: "Failed to send message" });
   }
 });
 
