@@ -6,6 +6,13 @@ import { eq, and, count, sum } from "drizzle-orm";
 import { z } from "zod";
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
+import sgMail from "@sendgrid/mail";
+
+if (!process.env.SENDGRID_API_KEY) {
+  throw new Error("SENDGRID_API_KEY must be set");
+}
+
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 const router = Router();
 const scryptAsync = promisify(scrypt);
@@ -284,6 +291,51 @@ router.delete("/users/:userId", authenticateToken, checkSuperAdminAccess, async 
   } catch (error) {
     console.error("Error deleting user:", error);
     return res.status(500).json({ error: "Failed to delete user" });
+  }
+});
+
+// Send mass email to all users
+router.post("/admin/mass-email", authenticateToken, checkSuperAdminAccess, async (req, res) => {
+  try {
+    const { subject, message } = req.body;
+
+    if (!subject || !message) {
+      return res.status(400).json({ error: "Subject and message are required" });
+    }
+
+    // Get all users' emails
+    const allUsers = await db
+      .select({
+        email: users.email,
+        username: users.username
+      })
+      .from(users);
+
+    const emailPromises = allUsers.map(user => {
+      return sgMail.send({
+        to: user.email,
+        from: "noreply@zecko.com", // Replace with your verified sender
+        subject: subject,
+        text: message,
+        html: message.replace(/\n/g, '<br>'),
+        personalizations: [{
+          to: [{ email: user.email }],
+          dynamicTemplateData: {
+            username: user.username
+          }
+        }]
+      });
+    });
+
+    await Promise.all(emailPromises);
+
+    return res.json({ 
+      message: "Mass email sent successfully",
+      recipientCount: allUsers.length
+    });
+  } catch (error) {
+    console.error("Error sending mass email:", error);
+    return res.status(500).json({ error: "Failed to send mass email" });
   }
 });
 

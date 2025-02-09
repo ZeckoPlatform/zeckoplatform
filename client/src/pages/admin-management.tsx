@@ -27,6 +27,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+
 
 export default function AdminManagementPage() {
   const { user } = useAuth();
@@ -169,6 +173,28 @@ export default function AdminManagementPage() {
     },
   });
 
+  const sendMassEmailMutation = useMutation({
+    mutationFn: async (data: { subject: string; message: string }) => {
+      const response = await apiRequest("POST", "/api/admin/mass-email", data);
+      if (!response.ok) throw new Error("Failed to send mass email");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Mass email sent successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div className="flex justify-between items-center">
@@ -271,26 +297,26 @@ export default function AdminManagementPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent>
-                          <DropdownMenuItem 
-                            onClick={() => updateSubscriptionMutation.mutate({ 
-                              userId: user.id, 
-                              subscriptionType: "free" 
+                          <DropdownMenuItem
+                            onClick={() => updateSubscriptionMutation.mutate({
+                              userId: user.id,
+                              subscriptionType: "free",
                             })}
                           >
                             Set to Free
                           </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => updateSubscriptionMutation.mutate({ 
-                              userId: user.id, 
-                              subscriptionType: "business" 
+                          <DropdownMenuItem
+                            onClick={() => updateSubscriptionMutation.mutate({
+                              userId: user.id,
+                              subscriptionType: "business",
                             })}
                           >
                             Set to Business
                           </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => updateSubscriptionMutation.mutate({ 
-                              userId: user.id, 
-                              subscriptionType: "vendor" 
+                          <DropdownMenuItem
+                            onClick={() => updateSubscriptionMutation.mutate({
+                              userId: user.id,
+                              subscriptionType: "vendor",
                             })}
                           >
                             Set to Vendor
@@ -375,6 +401,61 @@ export default function AdminManagementPage() {
               </p>
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Mass Email */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Mass Communication</CardTitle>
+          <CardDescription>
+            Send emails to all registered users
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const formData = new FormData(e.currentTarget);
+              const data = {
+                subject: formData.get("subject") as string,
+                message: formData.get("message") as string,
+              };
+              sendMassEmailMutation.mutate(data);
+            }}
+          >
+            <div className="space-y-2">
+              <Label htmlFor="subject">Email Subject</Label>
+              <Input
+                id="subject"
+                name="subject"
+                placeholder="Enter email subject"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="message">Email Message</Label>
+              <Textarea
+                id="message"
+                name="message"
+                placeholder="Enter your message"
+                className="min-h-[200px]"
+                required
+              />
+            </div>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={sendMassEmailMutation.isPending}
+            >
+              {sendMassEmailMutation.isPending ? (
+                <>Sending...</>
+              ) : (
+                <>Send Mass Email</>
+              )}
+            </Button>
+          </form>
         </CardContent>
       </Card>
 
