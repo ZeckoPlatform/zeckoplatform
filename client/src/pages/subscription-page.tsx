@@ -41,24 +41,30 @@ export default function SubscriptionPage() {
       setIsLoading(true);
       try {
         if (!user?.userType) throw new Error("User type not found");
+        console.log("Starting subscription process...");
 
         const { checkoutUrl } = await createCheckoutSession(
           user.userType as "business" | "vendor",
           data.paymentFrequency
         );
 
-        if (checkoutUrl) {
-          window.location.href = checkoutUrl;
-          return;
+        console.log("Received checkout URL:", checkoutUrl);
+
+        if (!checkoutUrl) {
+          throw new Error("No checkout URL received");
         }
-        throw new Error("No checkout URL received");
+
+        // Use window.location.href for the redirect
+        window.location.href = checkoutUrl;
       } catch (error) {
+        console.error("Subscription error:", error);
         throw error;
       } finally {
         setIsLoading(false);
       }
     },
     onError: (error: Error) => {
+      console.error("Subscription mutation error:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to start subscription",

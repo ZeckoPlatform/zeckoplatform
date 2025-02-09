@@ -31,27 +31,13 @@ export async function startTrialSubscription(params: StartTrialParams): Promise<
   }
 }
 
-export async function getSubscriptionStatus(): Promise<{
-  active: boolean;
-  tier: string | null;
-  endsAt: string | null;
-}> {
-  try {
-    const response = await apiRequest("GET", "/api/subscriptions/current");
-    if (!response.ok) {
-      throw new Error("Failed to fetch subscription status");
-    }
-    return response.json();
-  } catch (error) {
-    throw error;
-  }
-}
-
 export async function createCheckoutSession(
   tier: "business" | "vendor",
   paymentFrequency: "monthly" | "annual"
 ): Promise<{ checkoutUrl: string }> {
   try {
+    console.log("Creating checkout session with params:", { tier, paymentFrequency });
+
     const response = await apiRequest("POST", "/api/subscriptions/checkout", {
       tier,
       paymentFrequency,
@@ -62,9 +48,34 @@ export async function createCheckoutSession(
 
     if (!response.ok) {
       const error = await response.json();
+      console.error("Failed to create checkout session:", error);
       throw new Error(error.message || "Failed to create checkout session");
     }
 
+    const data = await response.json();
+    console.log("Received checkout session response:", data);
+
+    if (!data.checkoutUrl) {
+      throw new Error("No checkout URL received from server");
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Error in createCheckoutSession:", error);
+    throw error;
+  }
+}
+
+export async function getSubscriptionStatus(): Promise<{
+  active: boolean;
+  tier: string | null;
+  endsAt: string | null;
+}> {
+  try {
+    const response = await apiRequest("GET", "/api/subscriptions/current");
+    if (!response.ok) {
+      throw new Error("Failed to fetch subscription status");
+    }
     return response.json();
   } catch (error) {
     throw error;
