@@ -15,6 +15,9 @@ import CartPage from "@/pages/cart-page";
 import Navbar from "@/components/navbar";
 import AnalyticsDashboard from "@/pages/analytics-dashboard";
 import AdminManagementPage from "@/pages/admin-management";
+import SecuritySettingsPage from "@/pages/settings/security-settings";
+import NotificationSettingsPage from "@/pages/settings/notification-settings";
+import AnalyticsSettingsPage from "@/pages/settings/analytics-settings";
 
 function Router() {
   return (
@@ -44,6 +47,15 @@ function Router() {
         </Route>
         <Route path="/admin-management">
           {() => <ProtectedRoute component={AdminManagementPage} />}
+        </Route>
+        <Route path="/admin/settings/security">
+          {() => <ProtectedRoute component={SecuritySettingsPage} />}
+        </Route>
+        <Route path="/admin/settings/notifications">
+          {() => <ProtectedRoute component={NotificationSettingsPage} />}
+        </Route>
+        <Route path="/admin/settings/analytics">
+          {() => <ProtectedRoute component={AnalyticsSettingsPage} />}
         </Route>
         <Route component={NotFound} />
       </Switch>
