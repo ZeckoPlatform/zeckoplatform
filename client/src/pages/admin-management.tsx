@@ -21,6 +21,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function AdminManagementPage() {
   const { user } = useAuth();
@@ -138,6 +144,31 @@ export default function AdminManagementPage() {
     },
   });
 
+  // New mutations for subscription management
+  const updateSubscriptionMutation = useMutation({
+    mutationFn: async ({ userId, subscriptionType }: { userId: number; subscriptionType: string }) => {
+      const response = await apiRequest("POST", `/api/admin/users/${userId}/subscription`, {
+        subscriptionType,
+      });
+      if (!response.ok) throw new Error("Failed to update subscription");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({
+        title: "Success",
+        description: "Subscription updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div className="flex justify-between items-center">
@@ -196,7 +227,7 @@ export default function AdminManagementPage() {
                 <TableHead>Username</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Subscription</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -208,7 +239,7 @@ export default function AdminManagementPage() {
                   <TableCell>{user.userType}</TableCell>
                   <TableCell>
                     {user.superAdmin && <Shield className="w-4 h-4 text-primary inline mr-1" />}
-                    {user.userType === "admin" ? "Admin" : "Regular"}
+                    {user.userType}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center space-x-2">
@@ -232,6 +263,40 @@ export default function AdminManagementPage() {
                         <KeyRound className="w-4 h-4 mr-2" />
                         Reset Password
                       </Button>
+                      {/* Subscription Management */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            Change Subscription
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuItem 
+                            onClick={() => updateSubscriptionMutation.mutate({ 
+                              userId: user.id, 
+                              subscriptionType: "free" 
+                            })}
+                          >
+                            Set to Free
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => updateSubscriptionMutation.mutate({ 
+                              userId: user.id, 
+                              subscriptionType: "business" 
+                            })}
+                          >
+                            Set to Business
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => updateSubscriptionMutation.mutate({ 
+                              userId: user.id, 
+                              subscriptionType: "vendor" 
+                            })}
+                          >
+                            Set to Vendor
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       {!user.superAdmin && user.userType !== "admin" && (
                         <Button
                           variant="outline"

@@ -130,6 +130,60 @@ router.post("/admin/users/:userId/reset-password", authenticateToken, checkSuper
   }
 });
 
+// Update user subscription (super admin only)
+router.post("/admin/users/:userId/subscription", authenticateToken, checkSuperAdminAccess, async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    const { subscriptionType } = req.body;
+
+    if (!["free", "business", "vendor"].includes(subscriptionType)) {
+      return res.status(400).json({ error: "Invalid subscription type" });
+    }
+
+    // Check if user exists
+    const [targetUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!targetUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Cancel any existing subscription
+    await db
+      .update(subscriptions)
+      .set({ status: "cancelled" })
+      .where(eq(subscriptions.userId, userId));
+
+    if (subscriptionType !== "free") {
+      // Create new subscription
+      await db
+        .insert(subscriptions)
+        .values({
+          userId,
+          status: "active",
+          type: subscriptionType,
+          startDate: new Date(),
+          endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+        });
+    }
+
+    // Update user type
+    const [updatedUser] = await db
+      .update(users)
+      .set({ userType: subscriptionType })
+      .where(eq(users.id, userId))
+      .returning();
+
+    return res.json(updatedUser);
+  } catch (error) {
+    console.error("Error updating subscription:", error);
+    return res.status(500).json({ error: "Failed to update subscription" });
+  }
+});
+
 // Grant admin access to a user
 router.post("/admins/:userId", authenticateToken, checkSuperAdminAccess, async (req, res) => {
   try {
