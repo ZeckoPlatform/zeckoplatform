@@ -23,12 +23,24 @@ function Router() {
         <Route path="/" component={HomePage} />
         <Route path="/auth" component={AuthPage} />
         <Route path="/cart" component={CartPage} />
-        <ProtectedRoute path="/leads" component={LeadsPage} />
-        <ProtectedRoute path="/marketplace" component={MarketplacePage} />
-        <ProtectedRoute path="/subscription" component={SubscriptionPage} />
-        <ProtectedRoute path="/vendor" component={VendorDashboard} />
-        <ProtectedRoute path="/vendor/dashboard" component={VendorDashboard} />
-        <ProtectedRoute path="/analytics" component={AnalyticsDashboard} />
+        <Route path="/leads">
+          {() => <ProtectedRoute component={LeadsPage} />}
+        </Route>
+        <Route path="/marketplace">
+          {() => <ProtectedRoute component={MarketplacePage} />}
+        </Route>
+        <Route path="/subscription">
+          {() => <ProtectedRoute component={SubscriptionPage} />}
+        </Route>
+        <Route path="/vendor">
+          {() => <ProtectedRoute component={VendorDashboard} />}
+        </Route>
+        <Route path="/vendor/dashboard">
+          {() => <ProtectedRoute component={VendorDashboard} />}
+        </Route>
+        <Route path="/analytics">
+          {() => <ProtectedRoute component={AnalyticsDashboard} />}
+        </Route>
         <Route component={NotFound} />
       </Switch>
     </div>
