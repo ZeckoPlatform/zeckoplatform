@@ -10,6 +10,7 @@ interface LoginAttempt {
   email: string;
   timestamp: Date;
   successful: boolean;
+  userId?: number;
 }
 
 export async function checkLoginAttempts(ip: string, email: string): Promise<{
@@ -25,7 +26,7 @@ export async function checkLoginAttempts(ip: string, email: string): Promise<{
     .from(analyticsLogs)
     .where(
       and(
-        eq(analyticsLogs.event_type, "login_attempt"),
+        eq(analyticsLogs.event_type, "login"),
         eq(analyticsLogs.ip_address, ip),
         gte(analyticsLogs.created_at, lockoutStart)
       )
@@ -58,7 +59,8 @@ export async function checkLoginAttempts(ip: string, email: string): Promise<{
 
 export async function recordLoginAttempt(attempt: LoginAttempt) {
   await db.insert(analyticsLogs).values({
-    event_type: "login_attempt",
+    user_id: attempt.userId || 0, // Use 0 for unsuccessful attempts
+    event_type: "login",
     ip_address: attempt.ip,
     metadata: {
       email: attempt.email,

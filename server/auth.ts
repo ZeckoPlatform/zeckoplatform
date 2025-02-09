@@ -239,7 +239,8 @@ export function setupAuth(app: Express) {
           ip,
           email,
           timestamp,
-          successful: false
+          successful: false,
+          userId: user.id
         });
 
         log(`Invalid password for user: ${email}`);
@@ -254,7 +255,8 @@ export function setupAuth(app: Express) {
         ip,
         email,
         timestamp,
-        successful: true
+        successful: true,
+        userId: user.id
       });
 
       const token = generateToken(user);
