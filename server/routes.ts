@@ -12,15 +12,28 @@ import { createConnectedAccount, retrieveConnectedAccount } from './stripe';
 import subscriptionRoutes from './routes/subscriptions';
 import invoiceRoutes from './routes/invoices';
 import { insertUserSchema } from "@db/schema";
-import { fromZodError } from 'zod-validation-error'; //Assumed import
+import { fromZodError } from 'zod-validation-error';
 import authRoutes from './routes/auth';
 import analyticsRoutes from './routes/analytics';
+import notificationRoutes from './routes/notifications';
+
+interface User {
+  id: number;
+  email: string;
+  userType: string;
+  subscriptionActive: boolean;
+  stripeAccountId?: string;
+  stripeAccountStatus?: string;
+  profile?: any;
+}
 
 declare global {
   namespace Express {
     interface Request {
       user?: User;
-      login: any; // Assuming a login function exists for passport or similar
+      login: any;
+      isAuthenticated(): boolean;
+      sessionID: string;
     }
   }
 }
@@ -46,11 +59,12 @@ export function registerRoutes(app: Express): Server {
     authenticateToken(req, res, next);
   });
 
-  // Register subscription and invoice routes
+  // Register all route modules
   app.use('/api', subscriptionRoutes);
   app.use('/api', invoiceRoutes);
-  app.use('/api', authRoutes); // Added authRoutes
-  app.use('/api', analyticsRoutes); //Register analytics routes
+  app.use('/api', authRoutes);
+  app.use('/api', analyticsRoutes);
+  app.use('/api', notificationRoutes);  // Add notification routes
 
   // DELETE /api/leads/:id - Delete a lead
   app.delete("/api/leads/:id", async (req, res) => {
@@ -615,6 +629,7 @@ export function registerRoutes(app: Express): Server {
       });
     }
   });
+
 
 
   app.patch("/api/user/password", async (req, res) => {

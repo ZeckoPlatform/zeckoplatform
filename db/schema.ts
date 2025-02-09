@@ -159,6 +159,48 @@ export const notificationPreferences = pgTable("notification_preferences", {
   payment_failed: boolean("payment_failed").default(true),
 });
 
+export const emailTemplates = pgTable("email_templates", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  subject: text("subject").notNull(),
+  htmlContent: text("html_content").notNull(),
+  textContent: text("text_content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const newsletters = pgTable("newsletters", {
+  id: serial("id").primaryKey(),
+  subject: text("subject").notNull(),
+  htmlContent: text("html_content").notNull(),
+  textContent: text("text_content").notNull(),
+  status: text("status", {
+    enum: ["draft", "scheduled", "sent", "failed"]
+  }).notNull().default("draft"),
+  scheduledFor: timestamp("scheduled_for"),
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  metadata: jsonb("metadata").$type<{
+    recipientCount?: number;
+    openRate?: number;
+    clickRate?: number;
+  }>(),
+});
+
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  type: text("type", {
+    enum: ["info", "success", "warning", "error"]
+  }).notNull(),
+  read: boolean("read").default(false),
+  link: text("link"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const vendorTransactions = pgTable("vendor_transactions", {
   id: serial("id").primaryKey(),
   vendor_id: integer("vendor_id").references(() => users.id).notNull(),
@@ -275,6 +317,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   analyticsLogs: many(analyticsLogs),
   businessAnalytics: many(businessAnalytics),
   revenueAnalytics: many(revenueAnalytics),
+  notifications: many(notifications),
 }));
 
 export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
@@ -384,6 +427,22 @@ export const trialHistoryRelations = relations(trialHistory, ({ one }) => ({
   }),
 }));
 
+export const emailTemplatesRelations = relations(emailTemplates, ({ many }) => ({
+  newsletters: many(newsletters),
+}));
+
+export const newslettersRelations = relations(newsletters, ({ one }) => ({
+  template: one(emailTemplates),
+}));
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, {
+    fields: [notifications.userId],
+    references: [users.id],
+  }),
+}));
+
+
 export const insertUserSchema = createInsertSchema(users, {
   email: z.string().email("Please enter a valid email address"),
   username: z.string().min(3, "Username must be at least 3 characters").max(30, "Username must be less than 30 characters"),
@@ -441,6 +500,13 @@ export const selectBusinessAnalyticsSchema = createSelectSchema(businessAnalytic
 export const insertRevenueAnalyticsSchema = createInsertSchema(revenueAnalytics);
 export const selectRevenueAnalyticsSchema = createSelectSchema(revenueAnalytics);
 
+export const insertEmailTemplateSchema = createInsertSchema(emailTemplates);
+export const selectEmailTemplateSchema = createSelectSchema(emailTemplates);
+export const insertNewsletterSchema = createInsertSchema(newsletters);
+export const selectNewsletterSchema = createSelectSchema(newsletters);
+export const insertNotificationSchema = createInsertSchema(notifications);
+export const selectNotificationSchema = createSelectSchema(notifications);
+
 export type InsertUser = typeof users.$inferInsert;
 export type SelectUser = typeof users.$inferSelect;
 export type InsertSubscription = typeof subscriptions.$inferInsert;
@@ -464,3 +530,10 @@ export type InsertBusinessAnalytics = typeof businessAnalytics.$inferInsert;
 export type SelectBusinessAnalytics = typeof businessAnalytics.$inferSelect;
 export type InsertRevenueAnalytics = typeof revenueAnalytics.$inferInsert;
 export type SelectRevenueAnalytics = typeof revenueAnalytics.$inferSelect;
+
+export type InsertEmailTemplate = typeof emailTemplates.$inferInsert;
+export type SelectEmailTemplate = typeof emailTemplates.$inferSelect;
+export type InsertNewsletter = typeof newsletters.$inferInsert;
+export type SelectNewsletter = typeof newsletters.$inferSelect;
+export type InsertNotification = typeof notifications.$inferInsert;
+export type SelectNotification = typeof notifications.$inferSelect;
