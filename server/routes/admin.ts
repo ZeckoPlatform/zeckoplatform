@@ -181,7 +181,7 @@ router.get("/users/:userId", authenticateToken, checkSuperAdminAccess, async (re
   }
 });
 
-// Update user subscription (super admin only)
+// Update subscription (super admin only)
 router.post("/admin/users/:userId/subscription", authenticateToken, checkSuperAdminAccess, async (req, res) => {
   try {
     const userId = parseInt(req.params.userId);
@@ -206,21 +206,21 @@ router.post("/admin/users/:userId/subscription", authenticateToken, checkSuperAd
     await db
       .update(subscriptions)
       .set({ status: "cancelled" })
-      .where(eq(subscriptions.user_id, userId));
+      .where(eq(subscriptions.userId, userId));
 
     if (subscriptionType !== "free") {
       // Create new subscription
       const newSubscription = {
-        user_id: userId,
+        userId: userId,
         status: skipPayment ? "active" : "pending_payment",
         type: subscriptionType,
         price: subscriptionType === "business" ? 2999 : 4999, // Price in pence
-        start_date: skipPayment ? new Date() : null,
-        end_date: skipPayment ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null, // 30 days from now if skipping payment
-        stripe_subscription_id: null,
-        stripe_customer_id: null,
-        stripe_price_id: null,
-        stripe_payment_method_id: null,
+        startDate: skipPayment ? new Date() : null,
+        endDate: skipPayment ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null, // 30 days from now if skipping payment
+        stripeSubscriptionId: null,
+        stripeCustomerId: null,
+        stripePriceId: null,
+        stripePaymentMethodId: null,
       };
 
       await db
@@ -233,8 +233,8 @@ router.post("/admin/users/:userId/subscription", authenticateToken, checkSuperAd
       .update(users)
       .set({ 
         userType: subscriptionType,
-        subscription_active: subscriptionType !== "free" && skipPayment,
-        subscription_ends_at: skipPayment ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null
+        subscriptionActive: subscriptionType !== "free" && skipPayment,
+        subscriptionEndsAt: skipPayment ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null
       })
       .where(eq(users.id, userId))
       .returning();
