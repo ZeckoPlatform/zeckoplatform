@@ -16,6 +16,8 @@ import { fromZodError } from 'zod-validation-error';
 import authRoutes from './routes/auth';
 import analyticsRoutes from './routes/analytics';
 import notificationRoutes from './routes/notifications';
+import adminRoutes from './routes/admin';  // Import admin routes
+import documentRoutes from './routes/documents'; // Add this line with the other imports at the top
 
 interface User {
   id: number;
@@ -65,6 +67,8 @@ export function registerRoutes(app: Express): Server {
   app.use('/api', authRoutes);
   app.use('/api', analyticsRoutes);
   app.use('/api', notificationRoutes);  // Add notification routes
+  app.use('/api', adminRoutes);  // Add admin routes
+  app.use('/api', documentRoutes);  // Add document management routes
 
   // DELETE /api/leads/:id - Delete a lead
   app.delete("/api/leads/:id", async (req, res) => {
@@ -912,14 +916,13 @@ export function registerRoutes(app: Express): Server {
       }
 
       if (!req.user.stripeAccountId) {
-        return res.status(404).json({ message: "No Stripe account found" });
-      }
+        return res.status(404).json({ message: "No Stripe account found" });      }
 
       const account = await retrieveConnectedAccount(req.user.stripeAccountId);
 
       // Update local status if needed
       if (account.charges_enabled && req.user.stripeAccountStatus !== "enabled") {
-        await db.update(users)
+                await db.update(users)
           .set({ stripeAccountStatus: "enabled" })
           .where(eq(users.id, req.user.id));
       }

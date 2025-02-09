@@ -8,7 +8,8 @@ export const users = pgTable("users", {
   email: text("email").unique().notNull(),
   username: text("username").unique().notNull(),
   password: text("password").notNull(),
-  userType: text("user_type", { enum: ["free", "business", "vendor"] }).notNull().default("free"),
+  userType: text("user_type", { enum: ["free", "business", "vendor", "admin"] }).notNull().default("free"),
+  superAdmin: boolean("super_admin").default(false),
   subscriptionActive: boolean("subscription_active").default(false),
   subscriptionTier: text("subscription_tier", { enum: ["none", "business", "vendor"] }).default("none"),
   subscriptionEndsAt: timestamp("subscription_ends_at"),
@@ -16,10 +17,8 @@ export const users = pgTable("users", {
   stripeAccountStatus: text("stripe_account_status", {
     enum: ["pending", "enabled", "disabled"]
   }).default("pending"),
-  // Account status fields
   active: boolean("active").default(true),
   deactivatedAt: timestamp("deactivated_at"),
-  // Business verification fields
   businessVerified: boolean("business_verified").default(false),
   businessName: text("business_name"),
   companyNumber: text("company_number").unique(),
@@ -28,7 +27,6 @@ export const users = pgTable("users", {
   verificationStatus: text("verification_status", {
     enum: ["pending", "verified", "rejected"]
   }).default("pending"),
-  // 2FA fields
   twoFactorEnabled: boolean("two_factor_enabled").default(false),
   twoFactorSecret: text("two_factor_secret"),
   backupCodes: jsonb("backup_codes").$type<string[]>(),
@@ -103,11 +101,9 @@ export const subscriptions = pgTable("subscriptions", {
   end_date: timestamp("end_date").notNull(),
   auto_renew: boolean("auto_renew").default(true),
   price: integer("price").notNull(),
-  // Pause related fields
   paused_at: timestamp("paused_at"),
   pause_reason: text("pause_reason"),
   resume_date: timestamp("resume_date"),
-  // Direct debit specific fields
   bank_account_holder: text("bank_account_holder"),
   bank_sort_code: text("bank_sort_code"),
   bank_account_number: text("bank_account_number"),
@@ -115,7 +111,6 @@ export const subscriptions = pgTable("subscriptions", {
   mandate_status: text("mandate_status", {
     enum: ["pending", "active", "failed", "cancelled"]
   }),
-  // Stripe specific fields
   stripe_subscription_id: text("stripe_subscription_id"),
   stripe_payment_method_id: text("stripe_payment_method_id"),
 });
@@ -244,7 +239,7 @@ export const leadAnalytics = pgTable("lead_analytics", {
   views: integer("views").default(0),
   responses: integer("responses").default(0),
   conversion_rate: numeric("conversion_rate").default(0),
-  avg_response_time: integer("avg_response_time"), // in seconds
+  avg_response_time: integer("avg_response_time"),
   status_changes: jsonb("status_changes").$type<{
     timestamp: string;
     from: string;
@@ -261,7 +256,7 @@ export const businessAnalytics = pgTable("business_analytics", {
   total_responses: integer("total_responses").default(0),
   successful_conversions: integer("successful_conversions").default(0),
   total_revenue: numeric("total_revenue").default(0),
-  avg_response_time: integer("avg_response_time"), // in seconds
+  avg_response_time: integer("avg_response_time"),
   rating: numeric("rating").default(0),
   activity_score: integer("activity_score").default(0),
   period_start: timestamp("period_start").notNull(),
@@ -423,7 +418,7 @@ export const revenueAnalyticsRelations = relations(revenueAnalytics, ({ one }) =
 export const trialHistoryRelations = relations(trialHistory, ({ one }) => ({
   user: one(users, {
     fields: [trialHistory.email],
-    references: [users.email],
+    references: [users.id],
   }),
 }));
 
@@ -442,13 +437,11 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
   }),
 }));
 
-
 export const insertUserSchema = createInsertSchema(users, {
   email: z.string().email("Please enter a valid email address"),
   username: z.string().min(3, "Username must be at least 3 characters").max(30, "Username must be less than 30 characters"),
   password: z.string().min(8, "Password must be at least 8 characters"),
-  userType: z.enum(["free", "business", "vendor"]),
-  // Business verification fields with updated validation
+  userType: z.enum(["free", "business", "vendor", "admin"]),
   businessName: z.string().optional(),
   companyNumber: z.string()
     .regex(/^[A-Z0-9]{8}$/, "Invalid company registration number format")
@@ -461,11 +454,9 @@ export const insertUserSchema = createInsertSchema(users, {
     .optional(),
   twoFactorEnabled: z.boolean().optional(),
 }).refine((data) => {
-  // For business accounts, require company number
   if (data.userType === "business") {
     return data.businessName && data.companyNumber;
   }
-  // For vendor accounts, require UTR
   if (data.userType === "vendor") {
     return data.businessName && data.utrNumber;
   }
@@ -537,3 +528,94 @@ export type InsertNewsletter = typeof newsletters.$inferInsert;
 export type SelectNewsletter = typeof newsletters.$inferSelect;
 export type InsertNotification = typeof notifications.$inferInsert;
 export type SelectNotification = typeof notifications.$inferSelect;
+
+
+export const documents = pgTable("documents", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  filePath: text("file_path").notNull(),
+  fileType: text("file_type").notNull(),
+  fileSize: integer("file_size").notNull(), // in bytes
+  isPublic: boolean("is_public").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  metadata: jsonb("metadata").$type<{
+    originalName: string;
+    contentType: string;
+    tags?: string[];
+  }>(),
+});
+
+export const documentVersions = pgTable("document_versions", {
+  id: serial("id").primaryKey(),
+  documentId: integer("document_id").references(() => documents.id).notNull(),
+  version: integer("version").notNull(),
+  filePath: text("file_path").notNull(),
+  fileSize: integer("file_size").notNull(),
+  createdBy: integer("created_by").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  changeLog: text("change_log"),
+});
+
+export const documentAccess = pgTable("document_access", {
+  id: serial("id").primaryKey(),
+  documentId: integer("document_id").references(() => documents.id).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  accessLevel: text("access_level", {
+    enum: ["view", "edit", "admin"]
+  }).notNull(),
+  grantedBy: integer("granted_by").references(() => users.id).notNull(),
+  grantedAt: timestamp("granted_at").defaultNow(),
+  expiresAt: timestamp("expires_at"),
+});
+
+export const documentsRelations = relations(documents, ({ one, many }) => ({
+  owner: one(users, {
+    fields: [documents.userId],
+    references: [users.id],
+  }),
+  versions: many(documentVersions),
+  access: many(documentAccess),
+}));
+
+export const documentVersionsRelations = relations(documentVersions, ({ one }) => ({
+  document: one(documents, {
+    fields: [documentVersions.documentId],
+    references: [documents.id],
+  }),
+  creator: one(users, {
+    fields: [documentVersions.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const documentAccessRelations = relations(documentAccess, ({ one }) => ({
+  document: one(documents, {
+    fields: [documentAccess.documentId],
+    references: [documents.id],
+  }),
+  user: one(users, {
+    fields: [documentAccess.userId],
+    references: [users.id],
+  }),
+  grantor: one(users, {
+    fields: [documentAccess.grantedBy],
+    references: [users.id],
+  }),
+}));
+
+export const insertDocumentSchema = createInsertSchema(documents);
+export const selectDocumentSchema = createSelectSchema(documents);
+export const insertDocumentVersionSchema = createInsertSchema(documentVersions);
+export const selectDocumentVersionSchema = createSelectSchema(documentVersions);
+export const insertDocumentAccessSchema = createInsertSchema(documentAccess);
+export const selectDocumentAccessSchema = createSelectSchema(documentAccess);
+
+export type InsertDocument = typeof documents.$inferInsert;
+export type SelectDocument = typeof documents.$inferSelect;
+export type InsertDocumentVersion = typeof documentVersions.$inferInsert;
+export type SelectDocumentVersion = typeof documentVersions.$inferSelect;
+export type InsertDocumentAccess = typeof documentAccess.$inferInsert;
+export type SelectDocumentAccess = typeof documentAccess.$inferSelect;
