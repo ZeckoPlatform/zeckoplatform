@@ -8,7 +8,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useForm } from "react-hook-form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-//import { startTrialSubscription } from "@/lib/subscription"; //Removed as per intention
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -27,17 +26,36 @@ const SUBSCRIPTION_PRICES = {
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(8, "Password must be at least 8 characters"),
+  username: z.string().min(3, "Username must be at least 3 characters"),
 });
 
 const registerSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
+  username: z.string().min(3, "Username must be at least 3 characters"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   userType: z.enum(["free", "business", "vendor"]),
   businessType: z.string().optional(),
-  companyNumber: z.string().optional(),
-  vatNumber: z.string().optional(),
-  utrNumber: z.string().optional(),
+  companyNumber: z.string()
+    .regex(/^[A-Z0-9]{8}$/, "Please enter a valid 8-character Companies House number")
+    .optional(),
+  vatNumber: z.string()
+    .regex(/^GB[0-9]{9}$/, "Please enter a valid UK VAT number (format: GB123456789)")
+    .optional(),
+  utrNumber: z.string()
+    .regex(/^[0-9]{10}$/, "Please enter a valid 10-digit UTR number")
+    .optional(),
   paymentFrequency: z.enum(["monthly", "annual"]),
+}).refine((data) => {
+  if (data.userType === "business" && data.businessType === "registered") {
+    return !!data.companyNumber;
+  }
+  if (data.userType === "vendor") {
+    return !!data.utrNumber;
+  }
+  return true;
+}, {
+  message: "Required business information missing",
+  path: ["businessType"],
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -52,6 +70,7 @@ export default function AuthPage() {
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: "",
+      username: "",
       password: "",
     },
   });
@@ -60,6 +79,7 @@ export default function AuthPage() {
     resolver: zodResolver(registerSchema),
     defaultValues: {
       email: "",
+      username: "",
       password: "",
       userType: "free",
       businessType: "",
@@ -148,6 +168,18 @@ export default function AuthPage() {
                   className="space-y-4"
                 >
                   <div>
+                    <Label htmlFor="username">Username</Label>
+                    <Input
+                      id="username"
+                      {...loginForm.register("username")}
+                    />
+                    {loginForm.formState.errors.username && (
+                      <p className="text-sm text-destructive mt-1">
+                        {loginForm.formState.errors.username.message}
+                      </p>
+                    )}
+                  </div>
+                  <div>
                     <Label htmlFor="email">Email</Label>
                     <Input
                       id="email"
@@ -202,6 +234,18 @@ export default function AuthPage() {
                     {registerForm.formState.errors.email && (
                       <p className="text-sm text-destructive mt-1">
                         {registerForm.formState.errors.email.message}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="reg-username">Username</Label>
+                    <Input
+                      id="reg-username"
+                      {...registerForm.register("username")}
+                    />
+                    {registerForm.formState.errors.username && (
+                      <p className="text-sm text-destructive mt-1">
+                        {registerForm.formState.errors.username.message}
                       </p>
                     )}
                   </div>
@@ -263,6 +307,7 @@ export default function AuthPage() {
                               registerForm.setValue("utrNumber", "");
                             } else if (value === "selfEmployed") {
                               registerForm.setValue("companyNumber", "");
+                              registerForm.setValue("vatNumber", "");
                             }
                           }}
                           defaultValue={registerForm.watch("businessType")}
@@ -272,9 +317,7 @@ export default function AuthPage() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="registered">Registered Company</SelectItem>
-                            {registerForm.watch("userType") === "business" && (
-                              <SelectItem value="selfEmployed">Self-employed</SelectItem>
-                            )}
+                            <SelectItem value="selfEmployed">Self-employed</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -285,14 +328,8 @@ export default function AuthPage() {
                             <Label htmlFor="companyNumber">Companies House Number (Required)</Label>
                             <Input
                               id="companyNumber"
-                              {...registerForm.register("companyNumber", {
-                                required: "Companies House number is required for registered businesses",
-                                pattern: {
-                                  value: /^[A-Z0-9]{8}$/i,
-                                  message: "Please enter a valid 8-character Companies House number"
-                                }
-                              })}
-                              placeholder="8 digit number"
+                              {...registerForm.register("companyNumber")}
+                              placeholder="12345678"
                             />
                             {registerForm.formState.errors.companyNumber && (
                               <p className="text-sm text-destructive mt-1">
@@ -304,12 +341,7 @@ export default function AuthPage() {
                             <Label htmlFor="vatNumber">VAT Number (Optional)</Label>
                             <Input
                               id="vatNumber"
-                              {...registerForm.register("vatNumber", {
-                                pattern: {
-                                  value: /^GB[0-9]{9}$/i,
-                                  message: "Please enter a valid VAT number (e.g., GB123456789)"
-                                }
-                              })}
+                              {...registerForm.register("vatNumber")}
                               placeholder="GB123456789"
                             />
                             {registerForm.formState.errors.vatNumber && (
@@ -321,28 +353,22 @@ export default function AuthPage() {
                         </>
                       )}
 
-                      {registerForm.watch("businessType") === "selfEmployed" &&
-                        registerForm.watch("userType") === "business" && (
-                          <div>
-                            <Label htmlFor="utrNumber">UTR Number (Required)</Label>
-                            <Input
-                              id="utrNumber"
-                              {...registerForm.register("utrNumber", {
-                                required: "UTR number is required for self-employed registration",
-                                pattern: {
-                                  value: /^[0-9]{10}$/,
-                                  message: "Please enter a valid 10-digit UTR number"
-                                }
-                              })}
-                              placeholder="10 digit UTR"
-                            />
-                            {registerForm.formState.errors.utrNumber && (
-                              <p className="text-sm text-destructive mt-1">
-                                {registerForm.formState.errors.utrNumber.message}
-                              </p>
-                            )}
-                          </div>
-                        )}
+                      {(registerForm.watch("businessType") === "selfEmployed" ||
+                        registerForm.watch("userType") === "vendor") && (
+                        <div>
+                          <Label htmlFor="utrNumber">UTR Number (Required)</Label>
+                          <Input
+                            id="utrNumber"
+                            {...registerForm.register("utrNumber")}
+                            placeholder="1234567890"
+                          />
+                          {registerForm.formState.errors.utrNumber && (
+                            <p className="text-sm text-destructive mt-1">
+                              {registerForm.formState.errors.utrNumber.message}
+                            </p>
+                          )}
+                        </div>
+                      )}
 
                       <div className="space-y-4 mt-4">
                         <Label>Payment Preferences</Label>
