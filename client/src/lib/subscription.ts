@@ -15,22 +15,6 @@ interface StartTrialParams {
   };
 }
 
-export async function startTrialSubscription(params: StartTrialParams): Promise<SubscriptionWithPayment> {
-  try {
-    const response = await apiRequest("POST", "/api/subscriptions/trial", params);
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || "Failed to start trial subscription");
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    throw error;
-  }
-}
-
 export async function createCheckoutSession(
   tier: "business" | "vendor",
   paymentFrequency: "monthly" | "annual"
@@ -41,7 +25,6 @@ export async function createCheckoutSession(
     const response = await apiRequest("POST", "/api/subscriptions/checkout", {
       tier,
       paymentFrequency,
-      trialPeriodDays: 30, // Explicitly specify trial period
       successUrl: `${window.location.origin}/dashboard?subscription=success`,
       cancelUrl: `${window.location.origin}/subscription?canceled=true`,
     });
@@ -90,30 +73,6 @@ export async function cancelSubscription(subscriptionId: number): Promise<void> 
       const error = await response.json();
       throw new Error(error.message || "Failed to cancel subscription");
     }
-  } catch (error) {
-    throw error;
-  }
-}
-
-export async function updatePaymentMethod(
-  subscriptionId: number,
-  method: "stripe" | "direct_debit",
-  details: any
-): Promise<SubscriptionWithPayment> {
-  try {
-    const response = await apiRequest(
-      "PATCH",
-      `/api/subscriptions/${subscriptionId}/payment-method`,
-      { method, details }
-    );
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || "Failed to update payment method");
-    }
-
-    const data = await response.json();
-    return data;
   } catch (error) {
     throw error;
   }
