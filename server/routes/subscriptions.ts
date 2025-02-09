@@ -71,7 +71,9 @@ router.post("/subscriptions", authenticateToken, async (req, res) => {
         paymentFrequency,
       },
       automatic_tax: { enabled: true },
-      trial_period_days: 30,
+      subscription_data: {
+        trial_period_days: 30,
+      },
     });
 
     // Update user's subscription status to pending
