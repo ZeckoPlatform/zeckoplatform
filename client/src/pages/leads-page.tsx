@@ -194,7 +194,7 @@ const BusinessLeadsView = ({
             </div>
           </div>
           <Button asChild className="w-full">
-            <a href="/subscription">Subscribe Now</a>
+            <a href="/subscription">Start Free Trial</a>
           </Button>
         </CardContent>
       </Card>
@@ -917,226 +917,25 @@ export default function LeadsPage() {
         description: error.message || "Failed to accept proposal",
         variant: "destructive",
       });
-    },
-  });
-
-  const updateProfileMutation = useMutation({
-    mutationFn: async (data: ProfileFormData) => {
-      const res = await apiRequest("PATCH", "/api/user/profile", {
-        profile: {
-          ...user?.profile,
-          name: data.name?.trim(),
-          description: data.description?.trim(),
-          categories: data.categories?.split(",").map(c => c.trim()).filter(Boolean),
-          location: data.location?.trim(),
-        },
-      });
-      const updatedUser = await res.json();
-      return updatedUser;
-    },
-    onSuccess: (updatedUser: SelectUser) => {
-      queryClient.setQueryData(["/api/user"], updatedUser);
-      profileForm.reset({
-        name: updatedUser.profile?.name || "",
-        description: updatedUser.profile?.description || "",
-        categories: updatedUser.profile?.categories?.join(", ") || "",
-        location: updatedUser.profile?.location || "",
-      });
-      toast({
-        title: "Profile Updated",
-        description: "Your profile has been updated successfully.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update profile",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const updatePasswordMutation = useMutation({
-    mutationFn: async (data: PasswordFormData) => {
-      if (data.newPassword !== data.confirmPassword) {
-        throw new Error("New passwords do not match");
-      }
-      const res = await apiRequest("PATCH", "/api/user/password", {
-        currentPassword: data.currentPassword,
-        newPassword: data.newPassword,
-      });
-      return res.json();    },
-    onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Your password has been updated successfully.",
-      });
-      passwordForm.reset();
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update password",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const updateUsernameMutation = useMutation({
-    mutationFn: async (data: UsernameFormData) => {
-      const res = await apiRequest("PATCH", "/api/user/username", {
-        username: data.username,
-      });
-      return res.json();
-    },
-    onSuccess: (updatedUser: SelectUser) => {
-      queryClient.setQueryData(["/api/user"], updatedUser);
-      toast({
-        title: "Success",
-        description: "Your username has been updated successfully.",
-      });
-      usernameForm.reset();
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update username",
-        variant: "destructive",
-      });
-    },
+    }
   });
 
   // Loading state
   if (isLoadingLeads) {
     return (
-      <div className="flex items-center justify-center min-h-[200px]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
 
-  // Filter leads based on user type
-  const userLeadsFiltered = user?.userType === "business"
-    ? leads
-    : leads.filter(lead => lead.user_id === user?.id);
-
   return (
-    <div className="container max-w-7xl mx-auto p-6 space-y-8">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Leads Dashboard</h1>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button variant="outline">
-              <Settings className="h-4 w-4 mr-2" />
-              Settings
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Account Settings</DialogTitle>
-            </DialogHeader>
-            <Tabs defaultValue="profile">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="profile">Profile</TabsTrigger>
-                <TabsTrigger value="username">Username</TabsTrigger>
-                <TabsTrigger value="password">Password</TabsTrigger>
-              </TabsList>
-              <TabsContent value="profile">
-                <form onSubmit={profileForm.handleSubmit((data) => updateProfileMutation.mutate(data))} className="space-y-4">
-                  <div>
-                    <Label htmlFor="name">Display Name</Label>
-                    <Input id="name" {...profileForm.register("name")} />
-                  </div>
-                  <div>
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea id="description" {...profileForm.register("description")} />
-                  </div>
-                  <div>
-                    <Label htmlFor="categories">Categories (comma-separated)</Label>
-                    <Input id="categories" {...profileForm.register("categories")} />
-                  </div>
-                  <div>
-                    <Label htmlFor="location">Location</Label>
-                    <Input id="location" {...profileForm.register("location")} />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={updateProfileMutation.isPending}>
-                    {updateProfileMutation.isPending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      'Save Profile'
-                    )}
-                  </Button>
-                </form>
-              </TabsContent>
-
-              <TabsContent value="username">
-                <form onSubmit={usernameForm.handleSubmit((data) => updateUsernameMutation.mutate(data))} className="space-y-4">
-                  <div>
-                    <Label htmlFor="username">Username</Label>
-                    <Input id="username" {...usernameForm.register("username")} required />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={updateUsernameMutation.isPending}>
-                    {updateUsernameMutation.isPending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Updating...
-                      </>
-                    ) : (
-                      'Update Username'
-                    )}
-                  </Button>
-                </form>
-              </TabsContent>
-
-              <TabsContent value="password">
-                <form onSubmit={passwordForm.handleSubmit((data) => updatePasswordMutation.mutate(data))} className="space-y-4">
-                  <div>
-                    <Label htmlFor="currentPassword">Current Password</Label>
-                    <Input
-                      id="currentPassword"
-                      type="password"
-                      {...passwordForm.register("currentPassword")}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="newPassword">New Password</Label>
-                    <Input
-                      id="newPassword"
-                      type="password"
-                      {...passwordForm.register("newPassword")}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                    <Input
-                      id="confirmPassword"
-                      type="password"
-                      {...passwordForm.register("confirmPassword")}
-                      required
-                    />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={updatePasswordMutation.isPending}>
-                    {updatePasswordMutation.isPending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Updating...
-                      </>
-                    ) : (
-                      'Update Password'
-                    )}
-                  </Button>
-                </form>
-              </TabsContent>
-            </Tabs>
-          </DialogContent>
-        </Dialog>
-      </div>
-
+    <div className="max-w-7xl mx-auto px-4 py-8">
+      <SubscriptionRequiredModal
+        isOpen={showSubscriptionModal}
+        onClose={() => setShowSubscriptionModal(false)}
+        userType={user?.userType || ""}
+      />
       {user?.userType === "business" ? (
         <BusinessLeadsView
           leads={leads}
@@ -1150,7 +949,7 @@ export default function LeadsPage() {
         />
       ) : (
         <FreeUserLeadsView
-          leads={userLeadsFiltered}
+          leads={leads}
           createLeadMutation={createLeadMutation}
           updateLeadMutation={updateLeadMutation}
           editingLead={editingLead}
@@ -1159,12 +958,6 @@ export default function LeadsPage() {
           user={user}
         />
       )}
-
-      <SubscriptionRequiredModal
-        isOpen={showSubscriptionModal}
-        onClose={() => setShowSubscriptionModal(false)}
-        userType={user.userType}
-      />
     </div>
   );
 }
