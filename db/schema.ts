@@ -16,6 +16,9 @@ export const users = pgTable("users", {
   stripeAccountStatus: text("stripe_account_status", {
     enum: ["pending", "enabled", "disabled"]
   }).default("pending"),
+  // Account status fields
+  active: boolean("active").default(true),
+  deactivatedAt: timestamp("deactivated_at"),
   // Business verification fields
   businessVerified: boolean("business_verified").default(false),
   businessName: text("business_name"),
@@ -247,6 +250,18 @@ export const revenueAnalytics = pgTable("revenue_analytics", {
   created_at: timestamp("created_at").defaultNow(),
 });
 
+export const trialHistory = pgTable("trial_history", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull(),
+  company_number: text("company_number"),
+  vat_number: text("vat_number"),
+  utr_number: text("utr_number"),
+  trial_start_date: timestamp("trial_start_date").notNull(),
+  trial_end_date: timestamp("trial_end_date").notNull(),
+  user_type: text("user_type", { enum: ["business", "vendor"] }).notNull(),
+  created_at: timestamp("created_at").defaultNow(),
+});
+
 export const usersRelations = relations(users, ({ many }) => ({
   leads: many(leads),
   products: many(products),
@@ -359,6 +374,13 @@ export const revenueAnalyticsRelations = relations(revenueAnalytics, ({ one }) =
   user: one(users, {
     fields: [revenueAnalytics.user_id],
     references: [users.id],
+  }),
+}));
+
+export const trialHistoryRelations = relations(trialHistory, ({ one }) => ({
+  user: one(users, {
+    fields: [trialHistory.email],
+    references: [users.email],
   }),
 }));
 
