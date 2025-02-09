@@ -133,6 +133,31 @@ export const notificationPreferences = pgTable("notification_preferences", {
   payment_failed: boolean("payment_failed").default(true),
 });
 
+export const vendorTransactions = pgTable("vendor_transactions", {
+  id: serial("id").primaryKey(),
+  vendor_id: integer("vendor_id").references(() => users.id).notNull(),
+  stripe_transfer_id: text("stripe_transfer_id").notNull(),
+  amount: integer("amount").notNull(),
+  status: text("status", {
+    enum: ["pending", "paid", "failed"]
+  }).notNull(),
+  currency: text("currency").notNull().default("gbp"),
+  transfer_date: timestamp("transfer_date"),
+  stripe_charge_id: text("stripe_charge_id"),
+  product_details: jsonb("product_details").$type<{
+    name: string;
+    quantity: number;
+    unit_price: number;
+  }>(),
+  customer_details: jsonb("customer_details").$type<{
+    email?: string;
+    name?: string;
+    location?: string;
+  }>(),
+  created_at: timestamp("created_at").defaultNow(),
+  updated_at: timestamp("updated_at").defaultNow(),
+});
+
 export const usersRelations = relations(users, ({ many }) => ({
   leads: many(leads),
   products: many(products),
@@ -142,6 +167,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   receivedMessages: many(messages, { relationName: "receivedMessages" }),
   invoices: many(invoices),
   notificationPreferences: many(notificationPreferences),
+  vendorTransactions: many(vendorTransactions),
 }));
 
 export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
@@ -209,6 +235,13 @@ export const notificationPreferencesRelations = relations(notificationPreference
   }),
 }));
 
+export const vendorTransactionsRelations = relations(vendorTransactions, ({ one }) => ({
+  vendor: one(users, {
+    fields: [vendorTransactions.vendor_id],
+    references: [users.id],
+  }),
+}));
+
 export const insertUserSchema = createInsertSchema(users, {
   email: z.string().email("Please enter a valid email address"),
   username: z.string().min(3, "Username must be at least 3 characters").max(30, "Username must be less than 30 characters"),
@@ -226,6 +259,8 @@ export const insertInvoiceSchema = createInsertSchema(invoices);
 export const selectInvoiceSchema = createSelectSchema(invoices);
 export const insertNotificationPreferencesSchema = createInsertSchema(notificationPreferences);
 export const selectNotificationPreferencesSchema = createSelectSchema(notificationPreferences);
+export const insertVendorTransactionSchema = createInsertSchema(vendorTransactions);
+export const selectVendorTransactionSchema = createSelectSchema(vendorTransactions);
 
 export type InsertUser = typeof users.$inferInsert;
 export type SelectUser = typeof users.$inferSelect;
@@ -240,3 +275,5 @@ export type InsertInvoice = typeof invoices.$inferInsert;
 export type SelectInvoice = typeof invoices.$inferSelect;
 export type InsertNotificationPreferences = typeof notificationPreferences.$inferInsert;
 export type SelectNotificationPreferences = typeof notificationPreferences.$inferSelect;
+export type InsertVendorTransaction = typeof vendorTransactions.$inferInsert;
+export type SelectVendorTransaction = typeof vendorTransactions.$inferSelect;
