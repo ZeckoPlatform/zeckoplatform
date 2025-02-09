@@ -12,7 +12,15 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { Shield, UserX, FileText, Archive } from "lucide-react";
+import { Shield, UserX, FileText, Archive, Users, Settings, BarChart4, Lock, KeyRound } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export default function AdminManagementPage() {
   const { user } = useAuth();
@@ -25,6 +33,17 @@ export default function AdminManagementPage() {
     return null;
   }
 
+  // Fetch all users for user management
+  const { data: users = [] } = useQuery({
+    queryKey: ["/api/users"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/users");
+      if (!response.ok) throw new Error("Failed to fetch users");
+      return response.json();
+    },
+  });
+
+  // Fetch current admins
   const { data: admins = [] } = useQuery({
     queryKey: ["/api/admins"],
     queryFn: async () => {
@@ -34,11 +53,22 @@ export default function AdminManagementPage() {
     },
   });
 
+  // Fetch documents for document management
   const { data: documents = [] } = useQuery({
     queryKey: ["/api/documents"],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/documents");
       if (!response.ok) throw new Error("Failed to fetch documents");
+      return response.json();
+    },
+  });
+
+  // Fetch application statistics
+  const { data: stats = {} } = useQuery({
+    queryKey: ["/api/admin/stats"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/admin/stats");
+      if (!response.ok) throw new Error("Failed to fetch statistics");
       return response.json();
     },
   });
@@ -87,60 +117,149 @@ export default function AdminManagementPage() {
     },
   });
 
+  const resetPasswordMutation = useMutation({
+    mutationFn: async (userId: number) => {
+      const response = await apiRequest("POST", `/api/admin/users/${userId}/reset-password`);
+      if (!response.ok) throw new Error("Failed to reset password");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Password Reset Successfully",
+        description: `New temporary password: ${data.temporaryPassword}`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Admin Management</h1>
-        <p className="text-sm text-muted-foreground">Super Admin Only</p>
+        <h1 className="text-3xl font-bold">Super Admin Dashboard</h1>
+        <p className="text-sm text-muted-foreground">Super Admin Controls</p>
       </div>
 
+      {/* Statistics Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalUsers || 0}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Active Documents</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalDocuments || 0}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">£{stats.totalRevenue || 0}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Active Subscriptions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.activeSubscriptions || 0}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* User Management */}
       <Card>
         <CardHeader>
-          <CardTitle>Current Admins</CardTitle>
+          <CardTitle>User Management</CardTitle>
           <CardDescription>
-            Manage administrator access for users
+            Manage all user accounts and permissions
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {admins.map((admin: any) => (
-              <div
-                key={admin.id}
-                className="flex items-center justify-between p-4 rounded-lg border"
-              >
-                <div>
-                  <h3 className="font-semibold">{admin.username}</h3>
-                  <p className="text-sm text-muted-foreground">{admin.email}</p>
-                </div>
-                {!admin.superAdmin && (
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => revokeAdminMutation.mutate(admin.id)}
-                    disabled={revokeAdminMutation.isPending}
-                  >
-                    <UserX className="w-4 h-4 mr-2" />
-                    Revoke Admin
-                  </Button>
-                )}
-                {admin.superAdmin && (
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <Shield className="w-4 h-4 mr-2" />
-                    Super Admin
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {admins.length === 0 && (
-              <p className="text-center text-muted-foreground py-8">
-                No administrators found
-              </p>
-            )}
-          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Username</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {users.map((user: any) => (
+                <TableRow key={user.id}>
+                  <TableCell>{user.username}</TableCell>
+                  <TableCell>{user.email}</TableCell>
+                  <TableCell>{user.userType}</TableCell>
+                  <TableCell>
+                    {user.superAdmin && <Shield className="w-4 h-4 text-primary inline mr-1" />}
+                    {user.userType === "admin" ? "Admin" : "Regular"}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setLocation(`/admin/users/${user.id}`)}
+                      >
+                        Edit
+                      </Button>
+                      {/* Reset Password Button */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (window.confirm(`Are you sure you want to reset the password for ${user.username}?`)) {
+                            resetPasswordMutation.mutate(user.id);
+                          }
+                        }}
+                      >
+                        <KeyRound className="w-4 h-4 mr-2" />
+                        Reset Password
+                      </Button>
+                      {!user.superAdmin && user.userType !== "admin" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => grantAdminMutation.mutate(user.id)}
+                        >
+                          Make Admin
+                        </Button>
+                      )}
+                      {user.userType === "admin" && !user.superAdmin && (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => revokeAdminMutation.mutate(user.id)}
+                        >
+                          Revoke Admin
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
+      {/* Document Management */}
       <Card>
         <CardHeader>
           <CardTitle>Document Management</CardTitle>
@@ -178,7 +297,7 @@ export default function AdminManagementPage() {
                     size="sm"
                     onClick={() => setLocation(`/documents/${doc.id}/access`)}
                   >
-                    <Shield className="w-4 h-4 mr-2" />
+                    <Lock className="w-4 h-4 mr-2" />
                     Manage Access
                   </Button>
                 </div>
@@ -190,6 +309,41 @@ export default function AdminManagementPage() {
                 No documents found
               </p>
             )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* System Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle>System Settings</CardTitle>
+          <CardDescription>
+            Configure global application settings
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <Button
+              variant="outline"
+              onClick={() => setLocation('/admin/settings/security')}
+            >
+              <Lock className="w-4 h-4 mr-2" />
+              Security Settings
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setLocation('/admin/settings/notifications')}
+            >
+              <Settings className="w-4 h-4 mr-2" />
+              Notification Settings
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setLocation('/admin/settings/analytics')}
+            >
+              <BarChart4 className="w-4 h-4 mr-2" />
+              Analytics Settings
+            </Button>
           </div>
         </CardContent>
       </Card>
