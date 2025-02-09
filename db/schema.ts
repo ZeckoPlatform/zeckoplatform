@@ -87,7 +87,7 @@ export const subscriptions = pgTable("subscriptions", {
   user_id: integer("user_id").references(() => users.id).notNull(),
   tier: text("tier", { enum: ["business", "vendor"] }).notNull(),
   status: text("status", {
-    enum: ["trial", "active", "cancelled", "expired"]
+    enum: ["trial", "active", "paused", "cancelled", "expired"]
   }).notNull(),
   payment_frequency: text("payment_frequency", {
     enum: ["monthly", "annual"]
@@ -100,6 +100,10 @@ export const subscriptions = pgTable("subscriptions", {
   end_date: timestamp("end_date").notNull(),
   auto_renew: boolean("auto_renew").default(true),
   price: integer("price").notNull(),
+  // Pause related fields
+  paused_at: timestamp("paused_at"),
+  pause_reason: text("pause_reason"),
+  resume_date: timestamp("resume_date"),
   // Direct debit specific fields
   bank_account_holder: text("bank_account_holder"),
   bank_sort_code: text("bank_sort_code"),

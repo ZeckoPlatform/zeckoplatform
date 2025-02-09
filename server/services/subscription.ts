@@ -119,6 +119,105 @@ export async function startSubscription({
   return true;
 }
 
+export async function pauseSubscription(
+  subscriptionId: number,
+  reason: string,
+  resumeDate?: Date
+): Promise<boolean> {
+  try {
+    const [subscription] = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.id, subscriptionId));
+
+    if (!subscription) {
+      throw new Error("Subscription not found");
+    }
+
+    if (subscription.status !== "active") {
+      throw new Error("Only active subscriptions can be paused");
+    }
+
+    if (subscription.payment_method === "stripe" && subscription.stripe_subscription_id) {
+      await stripe.subscriptions.update(subscription.stripe_subscription_id, {
+        pause_collection: {
+          behavior: "void",
+          resumes_at: resumeDate ? Math.floor(resumeDate.getTime() / 1000) : undefined,
+        },
+      });
+    }
+
+    // Update local subscription status
+    await db
+      .update(subscriptions)
+      .set({
+        status: "paused",
+        paused_at: new Date(),
+        pause_reason: reason,
+        resume_date: resumeDate,
+      })
+      .where(eq(subscriptions.id, subscriptionId));
+
+    // Update user subscription status
+    await db.update(users)
+      .set({
+        subscriptionActive: false,
+      })
+      .where(eq(users.id, subscription.user_id));
+
+    return true;
+  } catch (error) {
+    console.error("Error pausing subscription:", error);
+    throw error;
+  }
+}
+
+export async function resumeSubscription(subscriptionId: number): Promise<boolean> {
+  try {
+    const [subscription] = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.id, subscriptionId));
+
+    if (!subscription) {
+      throw new Error("Subscription not found");
+    }
+
+    if (subscription.status !== "paused") {
+      throw new Error("Only paused subscriptions can be resumed");
+    }
+
+    if (subscription.payment_method === "stripe" && subscription.stripe_subscription_id) {
+      await stripe.subscriptions.update(subscription.stripe_subscription_id, {
+        pause_collection: "",  // Remove pause
+      });
+    }
+
+    // Update local subscription status
+    await db
+      .update(subscriptions)
+      .set({
+        status: "active",
+        paused_at: null,
+        pause_reason: null,
+        resume_date: null,
+      })
+      .where(eq(subscriptions.id, subscriptionId));
+
+    // Update user subscription status
+    await db.update(users)
+      .set({
+        subscriptionActive: true,
+      })
+      .where(eq(users.id, subscription.user_id));
+
+    return true;
+  } catch (error) {
+    console.error("Error resuming subscription:", error);
+    throw error;
+  }
+}
+
 export async function handleTrialEnd(subscriptionId: number) {
   const [subscription] = await db
     .select()

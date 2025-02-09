@@ -118,3 +118,40 @@ export async function updatePaymentMethod(
     throw error;
   }
 }
+
+export async function pauseSubscription(
+  subscriptionId: number,
+  reason: string,
+  resumeDate?: Date
+): Promise<void> {
+  try {
+    const response = await apiRequest(
+      "POST",
+      `/api/subscriptions/${subscriptionId}/pause`,
+      { reason, resumeDate }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Failed to pause subscription");
+    }
+  } catch (error) {
+    throw error;
+  }
+}
+
+export async function resumeSubscription(subscriptionId: number): Promise<void> {
+  try {
+    const response = await apiRequest(
+      "POST",
+      `/api/subscriptions/${subscriptionId}/resume`
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Failed to resume subscription");
+    }
+  } catch (error) {
+    throw error;
+  }
+}
