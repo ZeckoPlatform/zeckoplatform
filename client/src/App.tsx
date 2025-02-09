@@ -14,6 +14,7 @@ import VendorDashboard from "@/pages/vendor-dashboard";
 import CartPage from "@/pages/cart-page";
 import Navbar from "@/components/navbar";
 import AnalyticsDashboard from "@/pages/analytics-dashboard";
+import AdminManagementPage from "@/pages/admin-management";
 
 function Router() {
   return (
@@ -40,6 +41,9 @@ function Router() {
         </Route>
         <Route path="/analytics">
           {() => <ProtectedRoute component={AnalyticsDashboard} />}
+        </Route>
+        <Route path="/admin-management">
+          {() => <ProtectedRoute component={AdminManagementPage} />}
         </Route>
         <Route component={NotFound} />
       </Switch>

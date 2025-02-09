@@ -7,7 +7,7 @@ import {
   NavigationMenuList,
 } from "@/components/ui/navigation-menu";
 import { Button } from "@/components/ui/button";
-import { UserCircle, ShoppingCart } from "lucide-react";
+import { UserCircle, ShoppingCart, Shield } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +31,8 @@ export default function Navbar() {
       case "business":
       case "free":
         return "/leads";
+      case "admin":
+        return user.superAdmin ? "/admin-management" : "/leads";
       default:
         return "/";
     }
@@ -79,6 +81,13 @@ export default function Navbar() {
                     </NavigationMenuItem>
                   </>
                 )}
+                {user?.superAdmin && (
+                  <NavigationMenuItem>
+                    <NavigationMenuLink asChild>
+                      <Link href="/admin-management">Admin Management</Link>
+                    </NavigationMenuLink>
+                  </NavigationMenuItem>
+                )}
               </NavigationMenuList>
             </NavigationMenu>
           </div>
@@ -102,6 +111,9 @@ export default function Navbar() {
                   <Button variant="ghost" className="flex items-center gap-2">
                     <UserCircle className="h-6 w-6" />
                     <span>{user.username}</span>
+                    {user.superAdmin && (
+                      <Shield className="h-4 w-4 text-primary" />
+                    )}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -117,6 +129,14 @@ export default function Navbar() {
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
                         <Link href="/analytics">Analytics</Link>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  {user.superAdmin && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <Link href="/admin-management">Admin Management</Link>
                       </DropdownMenuItem>
                     </>
                   )}
