@@ -47,11 +47,17 @@ export async function getSubscriptionStatus(): Promise<{
   }
 }
 
-export async function createCheckoutSession(tier: "business" | "vendor", paymentFrequency: "monthly" | "annual"): Promise<{ checkoutUrl: string }> {
+export async function createCheckoutSession(
+  tier: "business" | "vendor",
+  paymentFrequency: "monthly" | "annual"
+): Promise<{ checkoutUrl: string }> {
   try {
-    const response = await apiRequest("POST", "/api/subscriptions", {
+    const response = await apiRequest("POST", "/api/subscriptions/checkout", {
       tier,
       paymentFrequency,
+      trialPeriodDays: 30, // Explicitly specify trial period
+      successUrl: `${window.location.origin}/dashboard?subscription=success`,
+      cancelUrl: `${window.location.origin}/subscription?canceled=true`,
     });
 
     if (!response.ok) {

@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { apiRequest } from "@/lib/queryClient";
+import { createCheckoutSession } from "@/lib/subscription";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -40,22 +40,20 @@ export default function SubscriptionPage() {
     mutationFn: async (data: SubscriptionFormData) => {
       setIsLoading(true);
       try {
-        const res = await apiRequest("POST", "/api/subscriptions", {
-          tier: user?.userType,
-          paymentFrequency: data.paymentFrequency,
-        });
+        if (!user?.userType) throw new Error("User type not found");
 
-        if (!res.ok) {
-          const error = await res.json();
-          throw new Error(error.error || "Failed to start subscription");
-        }
+        const { checkoutUrl } = await createCheckoutSession(
+          user.userType as "business" | "vendor",
+          data.paymentFrequency
+        );
 
-        const responseData = await res.json();
-        if (responseData.checkoutUrl) {
-          window.location.href = responseData.checkoutUrl;
+        if (checkoutUrl) {
+          window.location.href = checkoutUrl;
           return;
         }
         throw new Error("No checkout URL received");
+      } catch (error) {
+        throw error;
       } finally {
         setIsLoading(false);
       }

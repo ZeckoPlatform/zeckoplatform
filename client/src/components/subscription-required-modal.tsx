@@ -18,6 +18,9 @@ export function SubscriptionRequiredModal({ isOpen, onClose, userType }: Subscri
     try {
       setIsLoading(true);
       const { checkoutUrl } = await createCheckoutSession(tier, frequency);
+      if (!checkoutUrl) {
+        throw new Error("No checkout URL received");
+      }
       window.location.href = checkoutUrl;
     } catch (error) {
       toast({
