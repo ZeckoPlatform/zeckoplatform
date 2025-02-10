@@ -6,14 +6,21 @@ import { useForm } from "react-hook-form";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { Shield, Key, Lock } from "lucide-react";
+import { useEffect } from "react";
 
 export default function SecuritySettingsPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
 
-  // Redirect if user is not a super admin
+  useEffect(() => {
+    // Redirect if user is not a super admin
+    if (!user?.superAdmin) {
+      setLocation("/");
+    }
+  }, [user, setLocation]);
+
+  // If user is not super admin, don't render anything
   if (!user?.superAdmin) {
-    setLocation("/");
     return null;
   }
 
