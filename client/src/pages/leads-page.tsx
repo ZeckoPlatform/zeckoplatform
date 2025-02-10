@@ -442,15 +442,12 @@ const BusinessLeadsView = ({
         {(!leads || leads.length === 0) && (
           <div className="space-y-6">
             {!user?.profile ? (
-              <>
-                <p className="text-muted-foreground text-center">
-                  Complete your business profile to start seeing relevant leads.
-                </p>
-                <BusinessProfileForm /> {/* Added BusinessProfileForm */}
-              </>
+              <p className="text-muted-foreground text-center py-8">
+                No matching leads found. Contact an administrator if you believe this is an error.
+              </p>
             ) : (
               <p className="text-muted-foreground text-center py-8">
-                No matching leads found. Update your business profile to see more relevant leads.
+                No matching leads found at this time. Check back later for new opportunities.
               </p>
             )}
           </div>

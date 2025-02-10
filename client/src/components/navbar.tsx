@@ -7,7 +7,7 @@ import {
   NavigationMenuList,
 } from "@/components/ui/navigation-menu";
 import { Button } from "@/components/ui/button";
-import { UserCircle, ShoppingCart, Shield, Settings } from "lucide-react";
+import { UserCircle, ShoppingCart, Shield, Bell } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,12 +18,21 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { useCart } from "@/hooks/use-cart";
+import { useQuery } from "@tanstack/react-query";
 
 export default function Navbar() {
   const { user, logoutMutation } = useAuth();
   const cart = useCart();
   const cartItemCount = cart.getItemCount();
   const [, setLocation] = useLocation();
+
+  // Fetch notifications
+  const { data: notifications = [] } = useQuery({
+    queryKey: ["/api/notifications"],
+    enabled: !!user,
+  });
+
+  const unreadCount = notifications.filter((n: any) => !n.read).length;
 
   const getDashboardLink = () => {
     if (!user) return "/";
@@ -118,6 +127,61 @@ export default function Navbar() {
             </NavigationMenu>
           </div>
           <div className="flex items-center gap-4">
+            {user && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="relative">
+                    <Bell className="h-5 w-5" />
+                    {unreadCount > 0 && (
+                      <Badge
+                        variant="destructive"
+                        className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
+                      >
+                        {unreadCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-80">
+                  <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {notifications.length === 0 ? (
+                    <div className="p-4 text-sm text-muted-foreground text-center">
+                      No notifications
+                    </div>
+                  ) : (
+                    notifications.map((notification: any) => (
+                      <DropdownMenuItem
+                        key={notification.id}
+                        className="p-4 cursor-pointer"
+                        onClick={() => {
+                          // Handle notification click
+                          if (notification.link) {
+                            handleNavigation(notification.link);
+                          }
+                        }}
+                      >
+                        <div className="space-y-1">
+                          <p className={notification.read ? "text-muted-foreground" : "font-medium"}>
+                            {notification.title}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {notification.message}
+                          </p>
+                        </div>
+                      </DropdownMenuItem>
+                    ))
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-center"
+                    onClick={() => handleNavigation("/notifications")}
+                  >
+                    View all notifications
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             <Link href="/cart">
               <Button variant="ghost" size="icon" className="relative">
                 <ShoppingCart className="h-5 w-5" />

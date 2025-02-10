@@ -32,9 +32,15 @@ router.get("/subscriptions/current", authenticateToken, async (req, res) => {
 
     console.log('Checking subscription status for user:', req.user.id);
 
-    // Get user data
+    // Get user data with explicit column selection
     const [user] = await db
-      .select()
+      .select({
+        id: users.id,
+        subscriptionActive: users.subscriptionActive,
+        subscriptionTier: users.subscriptionTier,
+        userType: users.userType,
+        subscriptionEndsAt: users.subscriptionEndsAt
+      })
       .from(users)
       .where(eq(users.id, req.user.id))
       .limit(1);
@@ -49,9 +55,15 @@ router.get("/subscriptions/current", authenticateToken, async (req, res) => {
       userType: user.userType
     });
 
-    // Get current active subscription
+    // Get current active subscription with explicit column selection
     const [currentSubscription] = await db
-      .select()
+      .select({
+        id: subscriptions.id,
+        status: subscriptions.status,
+        auto_renew: subscriptions.auto_renew,
+        start_date: subscriptions.start_date,
+        end_date: subscriptions.end_date
+      })
       .from(subscriptions)
       .where(and(
         eq(subscriptions.user_id, req.user.id),
