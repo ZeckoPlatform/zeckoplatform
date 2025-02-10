@@ -212,16 +212,18 @@ router.post("/admin/users/:userId/subscription", authenticateToken, checkSuperAd
       .set({ status: "cancelled" })
       .where(eq(subscriptions.user_id, userId));
 
+    const subscriptionEndDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+
     if (subscriptionType !== "free") {
       // Create subscription using only the existing columns in the schema
       const subscriptionData = {
         user_id: userId,
         tier: subscriptionType,
-        status: skipPayment ? "active" : "pending_payment",
+        status: "active", // Always set to active when granted by admin
         price: subscriptionType === "business" ? 2999 : 4999, // Price in pence
         start_date: new Date(),
-        end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-        auto_renew: false
+        end_date: subscriptionEndDate,
+        auto_renew: true
       };
 
       console.log('Creating new subscription:', subscriptionData);
@@ -237,8 +239,9 @@ router.post("/admin/users/:userId/subscription", authenticateToken, checkSuperAd
       .update(users)
       .set({ 
         userType: subscriptionType,
-        subscriptionActive: subscriptionType !== "free" && skipPayment,
-        subscriptionEndsAt: skipPayment ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null
+        subscriptionActive: subscriptionType !== "free", // Always active if not free
+        subscriptionTier: subscriptionType === "free" ? "none" : subscriptionType,
+        subscriptionEndsAt: subscriptionType !== "free" ? subscriptionEndDate : null
       })
       .where(eq(users.id, userId))
       .returning();
