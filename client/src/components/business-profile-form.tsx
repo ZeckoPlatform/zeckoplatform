@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useMutation } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
 
 const businessProfileSchema = z.object({
   name: z.string().min(2, "Business name must be at least 2 characters"),
@@ -34,14 +35,14 @@ export function BusinessProfileForm() {
       description: user?.profile?.description || "",
       categories: user?.profile?.categories?.join(", ") || "",
       location: user?.profile?.location || "",
-      budget: user?.profile?.budget?.toString() || "",
-      industries: user?.profile?.industries?.join(", ") || "",
+      budget: user?.profile?.matchPreferences?.budgetRange?.min?.toString() || "",
+      industries: user?.profile?.matchPreferences?.industries?.join(", ") || "",
     },
   });
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: BusinessProfileFormData) => {
-      const response = await apiRequest("PATCH", "/api/profile", {
+      const response = await apiRequest("POST", "/api/users/profile", {
         ...data,
         categories: data.categories.split(",").map(c => c.trim()),
         industries: data.industries.split(",").map(i => i.trim()),
@@ -53,7 +54,9 @@ export function BusinessProfileForm() {
       return response.json();
     },
     onSuccess: () => {
+      // Invalidate and refetch user data and leads
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       toast({
         title: "Success",
         description: "Your business profile has been updated.",
