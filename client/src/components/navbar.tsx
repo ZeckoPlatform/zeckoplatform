@@ -1,4 +1,4 @@
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import {
   NavigationMenu,
@@ -23,6 +23,7 @@ export default function Navbar() {
   const { user, logoutMutation } = useAuth();
   const cart = useCart();
   const cartItemCount = cart.getItemCount();
+  const [, navigate] = useLocation();
 
   const getDashboardLink = () => {
     switch (user?.userType) {
@@ -38,6 +39,11 @@ export default function Navbar() {
     }
   };
 
+  const handleNavigation = (path: string) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    navigate(path);
+  };
+
   return (
     <nav className="border-b">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -50,54 +56,60 @@ export default function Navbar() {
               <NavigationMenuList>
                 {user?.userType !== "vendor" && (
                   <NavigationMenuItem>
-                    <Link href="/leads">
-                      <NavigationMenuLink className="cursor-pointer">
-                        Leads
-                      </NavigationMenuLink>
-                    </Link>
+                    <NavigationMenuLink 
+                      className="cursor-pointer"
+                      onClick={handleNavigation("/leads")}
+                    >
+                      Leads
+                    </NavigationMenuLink>
                   </NavigationMenuItem>
                 )}
                 <NavigationMenuItem>
-                  <Link href="/marketplace">
-                    <NavigationMenuLink className="cursor-pointer">
-                      Marketplace
-                    </NavigationMenuLink>
-                  </Link>
+                  <NavigationMenuLink 
+                    className="cursor-pointer"
+                    onClick={handleNavigation("/marketplace")}
+                  >
+                    Marketplace
+                  </NavigationMenuLink>
                 </NavigationMenuItem>
                 {user?.userType === "vendor" && (
                   <NavigationMenuItem>
-                    <Link href="/vendor/dashboard">
-                      <NavigationMenuLink className="cursor-pointer">
-                        Vendor Dashboard
-                      </NavigationMenuLink>
-                    </Link>
+                    <NavigationMenuLink 
+                      className="cursor-pointer"
+                      onClick={handleNavigation("/vendor/dashboard")}
+                    >
+                      Vendor Dashboard
+                    </NavigationMenuLink>
                   </NavigationMenuItem>
                 )}
                 {user && user.userType !== "free" && (
                   <>
                     <NavigationMenuItem>
-                      <Link href="/subscription">
-                        <NavigationMenuLink className="cursor-pointer">
-                          Subscription
-                        </NavigationMenuLink>
-                      </Link>
+                      <NavigationMenuLink 
+                        className="cursor-pointer"
+                        onClick={handleNavigation("/subscription")}
+                      >
+                        Subscription
+                      </NavigationMenuLink>
                     </NavigationMenuItem>
                     <NavigationMenuItem>
-                      <Link href="/analytics">
-                        <NavigationMenuLink className="cursor-pointer">
-                          Analytics
-                        </NavigationMenuLink>
-                      </Link>
+                      <NavigationMenuLink 
+                        className="cursor-pointer"
+                        onClick={handleNavigation("/analytics")}
+                      >
+                        Analytics
+                      </NavigationMenuLink>
                     </NavigationMenuItem>
                   </>
                 )}
                 {user?.superAdmin && (
                   <NavigationMenuItem>
-                    <Link href="/admin-management">
-                      <NavigationMenuLink className="cursor-pointer">
-                        Admin Management
-                      </NavigationMenuLink>
-                    </Link>
+                    <NavigationMenuLink 
+                      className="cursor-pointer"
+                      onClick={handleNavigation("/admin-management")}
+                    >
+                      Admin Management
+                    </NavigationMenuLink>
                   </NavigationMenuItem>
                 )}
               </NavigationMenuList>
@@ -131,32 +143,32 @@ export default function Navbar() {
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href={getDashboardLink()}>Dashboard</Link>
+                  <DropdownMenuItem onClick={handleNavigation(getDashboardLink())}>
+                    Dashboard
                   </DropdownMenuItem>
                   {(user.userType === 'business' || user.userType === 'vendor') && (
-                    <DropdownMenuItem asChild>
-                      <Link href="/settings/business-profile">Business Profile</Link>
+                    <DropdownMenuItem onClick={handleNavigation("/settings/business-profile")}>
+                      Business Profile
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuItem asChild>
-                    <Link href="/settings/security">Security Settings</Link>
+                  <DropdownMenuItem onClick={handleNavigation("/settings/security")}>
+                    Security Settings
                   </DropdownMenuItem>
                   {user.userType !== "free" && (
                     <>
-                      <DropdownMenuItem asChild>
-                        <Link href="/subscription">Subscription</Link>
+                      <DropdownMenuItem onClick={handleNavigation("/subscription")}>
+                        Subscription
                       </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link href="/analytics">Analytics</Link>
+                      <DropdownMenuItem onClick={handleNavigation("/analytics")}>
+                        Analytics
                       </DropdownMenuItem>
                     </>
                   )}
                   {user.superAdmin && (
                     <>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem asChild>
-                        <Link href="/admin-management">Admin Management</Link>
+                      <DropdownMenuItem onClick={handleNavigation("/admin-management")}>
+                        Admin Management
                       </DropdownMenuItem>
                     </>
                   )}
