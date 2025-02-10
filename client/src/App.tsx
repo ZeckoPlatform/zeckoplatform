@@ -33,40 +33,15 @@ function Router() {
         <Route path="/cart" component={CartPage} />
 
         {/* Protected Routes */}
-        <Route path="/leads">
-          {() => <ProtectedRoute component={LeadsPage} />}
-        </Route>
-        <Route path="/marketplace">
-          {() => <ProtectedRoute component={MarketplacePage} />}
-        </Route>
-        <Route path="/subscription">
-          {() => <ProtectedRoute component={SubscriptionPage} />}
-        </Route>
-        <Route path="/vendor">
-          {() => <ProtectedRoute component={VendorDashboard} />}
-        </Route>
-        <Route path="/vendor/dashboard">
-          {() => <ProtectedRoute component={VendorDashboard} />}
-        </Route>
-        <Route path="/analytics">
-          {() => <ProtectedRoute component={AnalyticsDashboard} />}
-        </Route>
-        <Route path="/admin-management">
-          {() => <ProtectedRoute component={AdminManagementPage} />}
-        </Route>
+        <Route path="/leads" component={() => <ProtectedRoute component={LeadsPage} />} />
+        <Route path="/marketplace" component={() => <ProtectedRoute component={MarketplacePage} />} />
+        <Route path="/subscription" component={() => <ProtectedRoute component={SubscriptionPage} />} />
+        <Route path="/vendor" component={() => <ProtectedRoute component={VendorDashboard} />} />
+        <Route path="/vendor/dashboard" component={() => <ProtectedRoute component={VendorDashboard} />} />
+        <Route path="/analytics" component={() => <ProtectedRoute component={AnalyticsDashboard} />} />
+        <Route path="/admin-management" component={() => <ProtectedRoute component={AdminManagementPage} />} />
 
         {/* Settings Routes */}
-        <Route path="/settings">
-          {() => (
-            <ProtectedRoute
-              component={() => (
-                <SettingsLayout>
-                  <BusinessProfilePage />
-                </SettingsLayout>
-              )}
-            />
-          )}
-        </Route>
         <Route path="/settings/security">
           {() => (
             <ProtectedRoute
@@ -112,12 +87,10 @@ function Router() {
           )}
         </Route>
 
-        <Route path="/admin/users/edit/:id">
-          {() => <ProtectedRoute component={UserEditPage} />}
-        </Route>
-        <Route path="/admin/reviews">
-          {() => <ProtectedRoute component={ReviewModerationPage} />}
-        </Route>
+        {/* Admin Routes */}
+        <Route path="/admin/users/edit/:id" component={() => <ProtectedRoute component={UserEditPage} />} />
+        <Route path="/admin/reviews" component={() => <ProtectedRoute component={ReviewModerationPage} />} />
+
         <Route component={NotFound} />
       </Switch>
     </div>

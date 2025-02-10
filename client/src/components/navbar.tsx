@@ -23,25 +23,10 @@ export default function Navbar() {
   const { user, logoutMutation } = useAuth();
   const cart = useCart();
   const cartItemCount = cart.getItemCount();
-  const [, navigate] = useLocation();
+  const [, setLocation] = useLocation();
 
-  const getDashboardLink = () => {
-    switch (user?.userType) {
-      case "vendor":
-        return "/vendor/dashboard";
-      case "business":
-      case "free":
-        return "/leads";
-      case "admin":
-        return user.superAdmin ? "/admin-management" : "/leads";
-      default:
-        return "/";
-    }
-  };
-
-  const handleNavigation = (path: string) => (e: React.MouseEvent) => {
-    e.preventDefault();
-    navigate(path);
+  const handleNavigation = (path: string) => {
+    setLocation(path);
   };
 
   return (
@@ -56,27 +41,27 @@ export default function Navbar() {
               <NavigationMenuList>
                 {user?.userType !== "vendor" && (
                   <NavigationMenuItem>
-                    <NavigationMenuLink 
+                    <NavigationMenuLink
                       className="cursor-pointer"
-                      onClick={handleNavigation("/leads")}
+                      onClick={() => handleNavigation("/leads")}
                     >
                       Leads
                     </NavigationMenuLink>
                   </NavigationMenuItem>
                 )}
                 <NavigationMenuItem>
-                  <NavigationMenuLink 
+                  <NavigationMenuLink
                     className="cursor-pointer"
-                    onClick={handleNavigation("/marketplace")}
+                    onClick={() => handleNavigation("/marketplace")}
                   >
                     Marketplace
                   </NavigationMenuLink>
                 </NavigationMenuItem>
                 {user?.userType === "vendor" && (
                   <NavigationMenuItem>
-                    <NavigationMenuLink 
+                    <NavigationMenuLink
                       className="cursor-pointer"
-                      onClick={handleNavigation("/vendor/dashboard")}
+                      onClick={() => handleNavigation("/vendor/dashboard")}
                     >
                       Vendor Dashboard
                     </NavigationMenuLink>
@@ -85,17 +70,17 @@ export default function Navbar() {
                 {user && user.userType !== "free" && (
                   <>
                     <NavigationMenuItem>
-                      <NavigationMenuLink 
+                      <NavigationMenuLink
                         className="cursor-pointer"
-                        onClick={handleNavigation("/subscription")}
+                        onClick={() => handleNavigation("/subscription")}
                       >
                         Subscription
                       </NavigationMenuLink>
                     </NavigationMenuItem>
                     <NavigationMenuItem>
-                      <NavigationMenuLink 
+                      <NavigationMenuLink
                         className="cursor-pointer"
-                        onClick={handleNavigation("/analytics")}
+                        onClick={() => handleNavigation("/analytics")}
                       >
                         Analytics
                       </NavigationMenuLink>
@@ -104,9 +89,9 @@ export default function Navbar() {
                 )}
                 {user?.superAdmin && (
                   <NavigationMenuItem>
-                    <NavigationMenuLink 
+                    <NavigationMenuLink
                       className="cursor-pointer"
-                      onClick={handleNavigation("/admin-management")}
+                      onClick={() => handleNavigation("/admin-management")}
                     >
                       Admin Management
                     </NavigationMenuLink>
@@ -143,23 +128,23 @@ export default function Navbar() {
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleNavigation(getDashboardLink())}>
+                  <DropdownMenuItem onClick={() => handleNavigation("/dashboard")}>
                     Dashboard
                   </DropdownMenuItem>
-                  {(user.userType === 'business' || user.userType === 'vendor') && (
-                    <DropdownMenuItem onClick={handleNavigation("/settings/business-profile")}>
+                  {(user.userType === "business" || user.userType === "vendor") && (
+                    <DropdownMenuItem onClick={() => handleNavigation("/settings/business-profile")}>
                       Business Profile
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuItem onClick={handleNavigation("/settings/security")}>
+                  <DropdownMenuItem onClick={() => handleNavigation("/settings/security")}>
                     Security Settings
                   </DropdownMenuItem>
                   {user.userType !== "free" && (
                     <>
-                      <DropdownMenuItem onClick={handleNavigation("/subscription")}>
+                      <DropdownMenuItem onClick={() => handleNavigation("/subscription")}>
                         Subscription
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleNavigation("/analytics")}>
+                      <DropdownMenuItem onClick={() => handleNavigation("/analytics")}>
                         Analytics
                       </DropdownMenuItem>
                     </>
@@ -167,7 +152,7 @@ export default function Navbar() {
                   {user.superAdmin && (
                     <>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={handleNavigation("/admin-management")}>
+                      <DropdownMenuItem onClick={() => handleNavigation("/admin-management")}>
                         Admin Management
                       </DropdownMenuItem>
                     </>
