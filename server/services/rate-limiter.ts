@@ -63,16 +63,22 @@ export async function checkLoginAttempts(ip: string, email: string): Promise<{
 }
 
 export async function recordLoginAttempt(attempt: LoginAttempt) {
-  const logData = {
-    user_id: attempt.userId, // This will be undefined for failed attempts
-    event_type: "login",
-    ip_address: attempt.ip,
-    metadata: {
-      email: attempt.email,
-      successful: attempt.successful,
-    },
-    created_at: attempt.timestamp,
-  };
+  try {
+    const logEntry = {
+      user_id: attempt.successful ? attempt.userId : null,
+      event_type: "login",
+      ip_address: attempt.ip,
+      metadata: {
+        email: attempt.email,
+        successful: attempt.successful,
+      },
+      created_at: attempt.timestamp,
+    };
 
-  await db.insert(analyticsLogs).values(logData);
+    await db.insert(analyticsLogs).values(logEntry);
+  } catch (error) {
+    console.error('Error recording login attempt:', error);
+    // Don't throw the error - we don't want to break the login flow
+    // if analytics logging fails
+  }
 }

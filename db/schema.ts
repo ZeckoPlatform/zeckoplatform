@@ -204,7 +204,7 @@ export const vendorTransactions = pgTable("vendor_transactions", {
 
 export const analyticsLogs = pgTable("analytics_logs", {
   id: serial("id").primaryKey(),
-  user_id: integer("user_id").references(() => users.id), 
+  user_id: integer("user_id", { mode: 'number' }).references(() => users.id), 
   event_type: text("event_type", {
     enum: ["login", "lead_view", "lead_response", "message_sent", "subscription_changed"]
   }).notNull(),
@@ -518,7 +518,7 @@ export const documents = pgTable("documents", {
   description: text("description"),
   filePath: text("file_path").notNull(),
   fileType: text("file_type").notNull(),
-  fileSize: integer("file_size").notNull(), // in bytes
+  fileSize: integer("file_size").notNull(), 
   isPublic: boolean("is_public").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
