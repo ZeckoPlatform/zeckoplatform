@@ -16,9 +16,9 @@ import { fromZodError } from 'zod-validation-error';
 import authRoutes from './routes/auth';
 import analyticsRoutes from './routes/analytics';
 import notificationRoutes from './routes/notifications';
-import adminRoutes from './routes/admin';  // Import admin routes
-import documentRoutes from './routes/documents'; // Add this line with the other imports at the top
-import reviewRoutes from './routes/reviews';  // Add this line with other imports
+import adminRoutes from './routes/admin';
+import documentRoutes from './routes/documents';
+import reviewRoutes from './routes/reviews';
 
 interface User {
   id: number;
@@ -50,10 +50,16 @@ async function getUserByUsername(username: string): Promise<[User | null]> {
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
 
+  // Register auth routes before middleware
+  app.use('/api', authRoutes);
+
+  // Authentication middleware for protected routes
   app.use('/api', (req, res, next) => {
     if (req.path.endsWith('/login') ||
         req.path.endsWith('/register') ||
         req.path.endsWith('/auth/verify') ||
+        req.path.endsWith('/auth/reset-password') ||
+        req.path.endsWith('/auth/reset-password/confirm') ||
         req.path.endsWith('/vendor/stripe/account') ||
         req.path.endsWith('/vendor/stripe/account/status') ||
         req.method === 'OPTIONS') {
@@ -62,15 +68,14 @@ export function registerRoutes(app: Express): Server {
     authenticateToken(req, res, next);
   });
 
-  // Register all route modules
+  // Register all other route modules
   app.use('/api', subscriptionRoutes);
   app.use('/api', invoiceRoutes);
-  app.use('/api', authRoutes);
   app.use('/api', analyticsRoutes);
-  app.use('/api', notificationRoutes);  // Add notification routes
-  app.use('/api', adminRoutes);  // Add admin routes
-  app.use('/api', documentRoutes);  // Add document management routes
-  app.use('/api', reviewRoutes);  // Add this line to register review routes
+  app.use('/api', notificationRoutes);
+  app.use('/api', adminRoutes);
+  app.use('/api', documentRoutes);
+  app.use('/api', reviewRoutes);
 
   // DELETE /api/leads/:id - Delete a lead
   app.delete("/api/leads/:id", async (req, res) => {
@@ -291,6 +296,7 @@ export function registerRoutes(app: Express): Server {
       res.status(401).json({ authenticated: false });
     }
   });
+
 
 
   // POST /api/leads/:leadId/responses - Add subscription check
