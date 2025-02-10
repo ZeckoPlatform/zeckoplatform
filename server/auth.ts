@@ -37,7 +37,17 @@ async function getUserByEmail(email: string): Promise<SelectUser[]> {
   try {
     log(`Fetching user with email: ${email}`);
     const result = await db
-      .select()
+      .select({
+        id: users.id,
+        email: users.email,
+        username: users.username,
+        password: users.password,
+        userType: users.userType,
+        superAdmin: users.superAdmin,
+        subscriptionActive: users.subscriptionActive,
+        subscriptionTier: users.subscriptionTier,
+        active: users.active
+      })
       .from(users)
       .where(and(eq(users.email, email), eq(users.active, true)));
     log(`Found ${result.length} active users matching email: ${email}`);
@@ -91,12 +101,21 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
       }
 
       try {
-        const [user] = await db.select()
-          .from(users)
-          .where(and(
-            eq(users.id, decoded.id),
-            eq(users.active, true)
-          ));
+        const [user] = await db.select({
+          id: users.id,
+          email: users.email,
+          username: users.username,
+          userType: users.userType,
+          superAdmin: users.superAdmin,
+          subscriptionActive: users.subscriptionActive,
+          subscriptionTier: users.subscriptionTier,
+          active: users.active
+        })
+        .from(users)
+        .where(and(
+          eq(users.id, decoded.id),
+          eq(users.active, true)
+        ));
 
         if (!user) {
           log('User not found or account deactivated');
@@ -225,7 +244,6 @@ export function setupAuth(app: Express) {
           email,
           timestamp,
           successful: false
-          // No userId for failed attempts
         });
 
         log(`User not found or account inactive: ${email}`);
