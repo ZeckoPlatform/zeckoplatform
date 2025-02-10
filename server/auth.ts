@@ -389,9 +389,13 @@ export function setupAuth(app: Express) {
   app.post("/api/auth/reset-password", async (req, res) => {
     try {
       const { token, password } = req.body;
-      log(`Password reset attempt with token length: ${token?.length}`);
+
+      // Debug logging
+      log(`Password reset attempt - Token present: ${!!token}, Password present: ${!!password}`);
+      if (token) log(`Token length: ${token.length}`);
 
       if (!token || !password) {
+        log(`Missing required fields - Token: ${!!token}, Password: ${!!password}`);
         return res.status(400).json({ 
           message: "Token and new password are required",
           code: 'INVALID_RESET_REQUEST'

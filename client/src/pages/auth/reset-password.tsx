@@ -60,15 +60,27 @@ export default function ResetPasswordPage() {
 
     try {
       setIsResetting(true);
-      console.log('Attempting password reset with token:', params.token); // Debug log
 
-      const response = await apiRequest("POST", "/api/auth/reset-password", {
+      // Debug logs to verify the data being sent
+      console.log('Reset password attempt:', {
+        token: params.token,
+        passwordLength: data.password.length
+      });
+
+      // Create the payload explicitly
+      const payload = {
         token: params.token,
         password: data.password
-      });
+      };
+
+      const response = await apiRequest("POST", "/api/auth/reset-password", payload);
+
+      // Debug response
+      console.log('Reset password response status:', response.status);
 
       if (!response.ok) {
         const error = await response.json();
+        console.error('Reset password error response:', error);
         throw new Error(error.message || "Failed to reset password");
       }
 
@@ -111,6 +123,7 @@ export default function ResetPasswordPage() {
               type="password"
               {...form.register("password")}
               required
+              minLength={8}
             />
           </div>
           <div className="space-y-2">
@@ -120,6 +133,7 @@ export default function ResetPasswordPage() {
               type="password"
               {...form.register("confirmPassword")}
               required
+              minLength={8}
             />
           </div>
           <Button
