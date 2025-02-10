@@ -7,7 +7,7 @@ import {
   NavigationMenuList,
 } from "@/components/ui/navigation-menu";
 import { Button } from "@/components/ui/button";
-import { UserCircle, ShoppingCart, Shield } from "lucide-react";
+import { UserCircle, ShoppingCart, Shield, Settings } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -121,6 +121,14 @@ export default function Navbar() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
                     <Link href={getDashboardLink()}>Dashboard</Link>
+                  </DropdownMenuItem>
+                  {(user.userType === 'business' || user.userType === 'vendor') && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/settings/business-profile">Business Profile</Link>
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem asChild>
+                    <Link href="/settings/security">Security Settings</Link>
                   </DropdownMenuItem>
                   {user.userType !== "free" && (
                     <>
