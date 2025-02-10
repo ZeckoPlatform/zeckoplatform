@@ -8,11 +8,10 @@ import QRCode from "qrcode";
 import { checkTrialEligibility, recordTrialUsage, canDeleteAccount } from "../services/trial-verification";
 import { randomBytes } from "crypto";
 import { hashPassword } from "../auth";
-import sgMail from "@sendgrid/mail";
 
 const router = Router();
 
-// Password reset request (no auth required)
+// Password reset request (no auth required) - Temporary implementation without email
 router.post("/auth/reset-password", async (req, res) => {
   try {
     const { email } = req.body;
@@ -28,9 +27,10 @@ router.post("/auth/reset-password", async (req, res) => {
       .where(eq(users.email, email));
 
     if (!user) {
-      // For security, don't reveal if the email exists or not
-      return res.status(200).json({
-        message: "If an account exists with this email, you will receive password reset instructions."
+      // For security in production, don't reveal if the email exists
+      // For development, we'll return a clear message
+      return res.status(404).json({
+        message: "No account found with this email address"
       });
     }
 
@@ -47,25 +47,14 @@ router.post("/auth/reset-password", async (req, res) => {
       })
       .where(eq(users.id, user.id));
 
-    // Send reset email
-    const resetUrl = `${process.env.PUBLIC_URL || 'http://localhost:5000'}/reset-password?token=${resetToken}`;
-
-    await sgMail.send({
-      to: email,
-      from: 'noreply@zecko.com', // Update with your verified sender
-      subject: 'Reset Your Password',
-      text: `Click the following link to reset your password: ${resetUrl}`,
-      html: `
-        <p>You requested a password reset for your Zecko account.</p>
-        <p>Click the following link to reset your password:</p>
-        <a href="${resetUrl}">Reset Password</a>
-        <p>This link will expire in 1 hour.</p>
-        <p>If you didn't request this, please ignore this email.</p>
-      `
-    });
-
+    // In production, this token would be sent via email
+    // For development, we'll return it directly
     res.status(200).json({
-      message: "If an account exists with this email, you will receive password reset instructions."
+      message: "Password reset token generated successfully",
+      // TEMPORARY: Return token directly for development
+      resetToken: resetToken,
+      // Include instructions in the response
+      instructions: "Use this token with the /auth/reset-password/confirm endpoint to set a new password"
     });
   } catch (error) {
     console.error("Password reset request error:", error);

@@ -30,6 +30,8 @@ export const users = pgTable("users", {
   twoFactorEnabled: boolean("two_factor_enabled").default(false),
   twoFactorSecret: text("two_factor_secret"),
   backupCodes: jsonb("backup_codes").$type<string[]>(),
+  resetPasswordToken: text("reset_password_token"),
+  resetPasswordExpiry: timestamp("reset_password_expiry"),
   verificationDocuments: jsonb("verification_documents").$type<{
     companyDoc?: string;
     vatDoc?: string;
@@ -204,7 +206,7 @@ export const vendorTransactions = pgTable("vendor_transactions", {
 
 export const analyticsLogs = pgTable("analytics_logs", {
   id: serial("id").primaryKey(),
-  user_id: integer("user_id", { mode: 'number' }).references(() => users.id), 
+  user_id: integer("user_id", { mode: 'number' }).references(() => users.id),
   event_type: text("event_type", {
     enum: ["login", "lead_view", "lead_response", "message_sent", "subscription_changed"]
   }).notNull(),
@@ -479,6 +481,7 @@ export const selectNewsletterSchema = createSelectSchema(newsletters);
 export const insertNotificationSchema = createInsertSchema(notifications);
 export const selectNotificationSchema = createSelectSchema(notifications);
 
+
 export type InsertUser = typeof users.$inferInsert;
 export type SelectUser = typeof users.$inferSelect;
 export type InsertSubscription = typeof subscriptions.$inferInsert;
@@ -518,7 +521,7 @@ export const documents = pgTable("documents", {
   description: text("description"),
   filePath: text("file_path").notNull(),
   fileType: text("file_type").notNull(),
-  fileSize: integer("file_size").notNull(), 
+  fileSize: integer("file_size").notNull(),
   isPublic: boolean("is_public").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -601,7 +604,6 @@ export type SelectDocumentVersion = typeof documentVersions.$inferSelect;
 export type InsertDocumentAccess = typeof documentAccess.$inferInsert;
 export type SelectDocumentAccess = typeof documentAccess.$inferSelect;
 
-// Add these new tables after the existing tables
 export const reviews = pgTable("reviews", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").references(() => users.id).notNull(),
@@ -636,7 +638,6 @@ export const reputationScores = pgTable("reputation_scores", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Add relations
 export const reviewsRelations = relations(reviews, ({ one }) => ({
   author: one(users, {
     fields: [reviews.userId],
@@ -670,7 +671,6 @@ export const reputationScoresRelations = relations(reputationScores, ({ one }) =
   }),
 }));
 
-// Add Zod schemas
 export const insertReviewSchema = createInsertSchema(reviews);
 export const selectReviewSchema = createSelectSchema(reviews);
 export const insertReviewVoteSchema = createInsertSchema(reviewVotes);
@@ -678,7 +678,6 @@ export const selectReviewVoteSchema = createSelectSchema(reviewVotes);
 export const insertReputationScoreSchema = createInsertSchema(reputationScores);
 export const selectReputationScoreSchema = createSelectSchema(reputationScores);
 
-// Add types
 export type InsertReview = typeof reviews.$inferInsert;
 export type SelectReview = typeof reviews.$inferSelect;
 export type InsertReviewVote = typeof reviewVotes.$inferInsert;
