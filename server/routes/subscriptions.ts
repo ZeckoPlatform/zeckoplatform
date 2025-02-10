@@ -113,25 +113,22 @@ router.get("/subscriptions/current", authenticateToken, async (req, res) => {
     const [currentSubscription] = await db
       .select()
       .from(subscriptions)
-      .where(
-        and(
-          eq(subscriptions.user_id, req.user.id),
-          eq(subscriptions.status, "active")
-        )
-      )
+      .where(and(
+        eq(subscriptions.user_id, req.user.id),
+        eq(subscriptions.status, "active")
+      ))
       .orderBy(desc(subscriptions.start_date))
       .limit(1);
 
     console.log('Current subscription:', currentSubscription);
 
-    // Determine subscription status
-    const isActive = user.subscriptionActive || (currentSubscription?.status === "active");
-    const tier = user.subscriptionTier || (currentSubscription?.tier || "none");
+    // Ensure both user status and subscription record are checked
+    const isActive = user.userType === user.subscriptionTier && 
+                    (user.subscriptionActive || currentSubscription?.status === "active");
 
-    // Return subscription status
     return res.json({
       active: isActive,
-      tier: tier,
+      tier: user.subscriptionTier || "none",
       endsAt: user.subscriptionEndsAt || currentSubscription?.end_date,
       userType: user.userType,
       isAdminGranted: currentSubscription ? !currentSubscription.auto_renew : false

@@ -121,19 +121,19 @@ router.get("/admin/stats", authenticateToken, checkSuperAdminAccess, async (req,
       .select({ count: count() })
       .from(documents);
 
-    // Get active subscriptions count - only count paid ones
+    // Get active subscriptions count - include both paid and admin-granted
     const [subStats] = await db
       .select({ count: count() })
       .from(subscriptions)
       .where(eq(subscriptions.status, "active"));
 
-    // Calculate total revenue from paid subscriptions only
+    // Calculate total revenue from paid subscriptions only (exclude admin-granted ones)
     const [revenue] = await db
       .select({ total: sum(subscriptions.price) })
       .from(subscriptions)
       .where(and(
         eq(subscriptions.status, "active"),
-        eq(subscriptions.auto_renew, true) // Only count subscriptions that are set to auto-renew (paid)
+        eq(subscriptions.auto_renew, true) // Only count paid subscriptions
       ));
 
     const totalRevenue = revenue?.total ? Number(revenue.total) / 100 : 0;
