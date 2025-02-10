@@ -24,66 +24,6 @@ const SUBSCRIPTION_PRICES = {
   },
 } as const;
 
-router.post("/subscriptions/checkout", authenticateToken, async (req, res) => {
-  try {
-    console.log("Creating checkout session with body:", req.body);
-
-    const { tier, paymentFrequency } = req.body as {
-      tier: keyof typeof SUBSCRIPTION_PRICES;
-      paymentFrequency: "monthly" | "annual";
-    };
-
-    if (!tier || !paymentFrequency) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
-
-    const amount = SUBSCRIPTION_PRICES[tier][paymentFrequency];
-    const interval = paymentFrequency === 'annual' ? 'year' : 'month';
-
-    console.log(`Creating checkout session for ${tier} subscription with ${interval}ly billing`);
-
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
-      line_items: [{
-        price_data: {
-          currency: 'gbp',
-          product_data: {
-            name: `${tier.charAt(0).toUpperCase() + tier.slice(1)} Subscription`,
-          },
-          unit_amount: amount,
-          recurring: {
-            interval: interval,
-          },
-        },
-        quantity: 1,
-      }],
-      success_url: `${req.protocol}://${req.get("host")}/dashboard?subscription=success`,
-      cancel_url: `${req.protocol}://${req.get("host")}/subscription?canceled=true`,
-      customer_email: req.user?.email,
-      subscription_data: {
-        trial_period_days: 30,
-        metadata: {
-          userId: req.user?.id.toString(),
-          tier,
-        },
-      },
-    });
-
-    console.log("Checkout session created:", {
-      sessionId: session.id,
-      url: session.url
-    });
-
-    return res.json({ checkoutUrl: session.url });
-  } catch (error) {
-    console.error("Stripe session creation error:", error);
-    return res.status(500).json({
-      error: "Failed to create checkout session",
-      details: error instanceof Error ? error.message : "Unknown error"
-    });
-  }
-});
-
 router.get("/subscriptions/current", authenticateToken, async (req, res) => {
   try {
     if (!req.user) {
@@ -122,14 +62,16 @@ router.get("/subscriptions/current", authenticateToken, async (req, res) => {
 
     console.log('Current subscription:', currentSubscription);
 
-    // For admin-granted subscriptions, we primarily rely on the user's status
-    // For paid subscriptions, we check both user status and subscription record
-    const isActive = user.subscriptionActive || 
-                    (currentSubscription?.status === "active" && currentSubscription?.auto_renew);
+    // For admin-granted subscriptions or active user status
+    const isActive = Boolean(user.subscriptionActive || 
+                  (currentSubscription?.status === "active" && !currentSubscription?.auto_renew));
+
+    // If user has an admin-granted subscription, ensure we show correct status
+    const tier = user.subscriptionTier !== "none" ? user.subscriptionTier : "none";
 
     return res.json({
       active: isActive,
-      tier: user.subscriptionTier || "none",
+      tier: tier,
       endsAt: user.subscriptionEndsAt || currentSubscription?.end_date,
       userType: user.userType,
       isAdminGranted: currentSubscription ? !currentSubscription.auto_renew : false
