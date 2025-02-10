@@ -443,7 +443,7 @@ const BusinessLeadsView = ({
           <div className="space-y-6">
             {!user?.profile ? (
               <p className="text-muted-foreground text-center py-8">
-                No matching leads found. Contact an administrator if you believe this is an error.
+                Go to your business profile and complete it to start seeing leads.
               </p>
             ) : (
               <p className="text-muted-foreground text-center py-8">
