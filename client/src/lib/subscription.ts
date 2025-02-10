@@ -53,14 +53,26 @@ export async function getSubscriptionStatus(): Promise<{
   active: boolean;
   tier: string | null;
   endsAt: string | null;
+  isAdminGranted?: boolean;
 }> {
   try {
     const response = await apiRequest("GET", "/api/subscriptions/current");
     if (!response.ok) {
       throw new Error("Failed to fetch subscription status");
     }
-    return response.json();
+
+    const data = await response.json();
+    console.log("Subscription status response:", data);
+
+    // For admin-granted subscriptions, ensure we show the correct status
+    return {
+      active: data.active || data.isAdminGranted,
+      tier: data.tier,
+      endsAt: data.endsAt,
+      isAdminGranted: data.isAdminGranted
+    };
   } catch (error) {
+    console.error("Error fetching subscription status:", error);
     throw error;
   }
 }
