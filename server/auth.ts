@@ -389,31 +389,38 @@ export function setupAuth(app: Express) {
   app.post("/api/auth/reset-password", async (req, res) => {
     try {
       const { token, password } = req.body;
+      log(`Password reset attempt with token length: ${token?.length}`);
 
       if (!token || !password) {
         return res.status(400).json({ 
-          message: "Token and new password are required" 
+          message: "Token and new password are required",
+          code: 'INVALID_RESET_REQUEST'
         });
       }
 
+      // Find user with valid reset token
       const [user] = await db
         .select()
         .from(users)
         .where(and(
-          eq(users.reset_password_token, token),
+          eq(users.resetPasswordToken, token),
           eq(users.active, true)
         ));
 
       if (!user) {
+        log('No user found with provided reset token');
         return res.status(400).json({ 
-          message: "Password reset token is invalid or has expired" 
+          message: "Password reset token is invalid or has expired",
+          code: 'INVALID_TOKEN'
         });
       }
 
       // Check if token is expired
-      if (user.reset_password_expires && user.reset_password_expires < new Date()) {
+      if (user.resetPasswordExpiry && new Date(user.resetPasswordExpiry) < new Date()) {
+        log('Reset token has expired');
         return res.status(400).json({ 
-          message: "Password reset token has expired" 
+          message: "Password reset token has expired",
+          code: 'TOKEN_EXPIRED'
         });
       }
 
@@ -422,15 +429,20 @@ export function setupAuth(app: Express) {
         .update(users)
         .set({
           password: await hashPassword(password),
-          reset_password_token: null,
-          reset_password_expires: null
+          resetPasswordToken: null,
+          resetPasswordExpiry: null
         })
         .where(eq(users.id, user.id));
 
+      log(`Successfully reset password for user: ${user.id}`);
       res.json({ message: "Password has been reset successfully" });
     } catch (error) {
+      log(`Password reset error: ${error}`);
       console.error('Password reset error:', error);
-      res.status(500).json({ message: "Failed to reset password" });
+      res.status(500).json({ 
+        message: "Failed to reset password",
+        code: 'RESET_ERROR'
+      });
     }
   });
 }

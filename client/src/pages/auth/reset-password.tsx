@@ -60,7 +60,8 @@ export default function ResetPasswordPage() {
 
     try {
       setIsResetting(true);
-      console.log('Sending reset request with token:', params.token); // Debug log
+      console.log('Attempting password reset with token:', params.token); // Debug log
+
       const response = await apiRequest("POST", "/api/auth/reset-password", {
         token: params.token,
         password: data.password
@@ -77,8 +78,12 @@ export default function ResetPasswordPage() {
         description: result.message || "Your password has been reset successfully",
       });
 
-      setLocation("/auth");
+      // Redirect to login page after successful reset
+      setTimeout(() => {
+        setLocation("/auth");
+      }, 1500);
     } catch (error) {
+      console.error('Password reset error:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to reset password",
