@@ -15,9 +15,11 @@ import CartPage from "@/pages/cart-page";
 import Navbar from "@/components/navbar";
 import AnalyticsDashboard from "@/pages/analytics-dashboard";
 import AdminManagementPage from "@/pages/admin-management";
+import SettingsLayout from "@/pages/settings/layout";
 import SecuritySettingsPage from "@/pages/settings/security-settings";
 import NotificationSettingsPage from "@/pages/settings/notification-settings";
 import AnalyticsSettingsPage from "@/pages/settings/analytics-settings";
+import BusinessProfilePage from "@/pages/settings/business-profile";
 import UserEditPage from "@/pages/admin/user-edit";
 import ReviewModerationPage from "@/pages/admin/review-moderation";
 
@@ -29,6 +31,8 @@ function Router() {
         <Route path="/" component={HomePage} />
         <Route path="/auth" component={AuthPage} />
         <Route path="/cart" component={CartPage} />
+
+        {/* Protected Routes */}
         <Route path="/leads">
           {() => <ProtectedRoute component={LeadsPage} />}
         </Route>
@@ -50,15 +54,64 @@ function Router() {
         <Route path="/admin-management">
           {() => <ProtectedRoute component={AdminManagementPage} />}
         </Route>
-        <Route path="/admin/settings/security">
-          {() => <ProtectedRoute component={SecuritySettingsPage} />}
+
+        {/* Settings Routes */}
+        <Route path="/settings">
+          {() => (
+            <ProtectedRoute
+              component={() => (
+                <SettingsLayout>
+                  <BusinessProfilePage />
+                </SettingsLayout>
+              )}
+            />
+          )}
         </Route>
-        <Route path="/admin/settings/notifications">
-          {() => <ProtectedRoute component={NotificationSettingsPage} />}
+        <Route path="/settings/security">
+          {() => (
+            <ProtectedRoute
+              component={() => (
+                <SettingsLayout>
+                  <SecuritySettingsPage />
+                </SettingsLayout>
+              )}
+            />
+          )}
         </Route>
-        <Route path="/admin/settings/analytics">
-          {() => <ProtectedRoute component={AnalyticsSettingsPage} />}
+        <Route path="/settings/business-profile">
+          {() => (
+            <ProtectedRoute
+              component={() => (
+                <SettingsLayout>
+                  <BusinessProfilePage />
+                </SettingsLayout>
+              )}
+            />
+          )}
         </Route>
+        <Route path="/settings/notifications">
+          {() => (
+            <ProtectedRoute
+              component={() => (
+                <SettingsLayout>
+                  <NotificationSettingsPage />
+                </SettingsLayout>
+              )}
+            />
+          )}
+        </Route>
+        <Route path="/settings/analytics">
+          {() => (
+            <ProtectedRoute
+              component={() => (
+                <SettingsLayout>
+                  <AnalyticsSettingsPage />
+                </SettingsLayout>
+              )}
+            />
+          )}
+        </Route>
+
         <Route path="/admin/users/edit/:id">
           {() => <ProtectedRoute component={UserEditPage} />}
         </Route>
