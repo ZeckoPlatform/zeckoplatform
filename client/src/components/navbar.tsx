@@ -50,42 +50,54 @@ export default function Navbar() {
               <NavigationMenuList>
                 {user?.userType !== "vendor" && (
                   <NavigationMenuItem>
-                    <NavigationMenuLink asChild>
-                      <Link href="/leads">Leads</Link>
-                    </NavigationMenuLink>
+                    <Link href="/leads">
+                      <NavigationMenuLink className="cursor-pointer">
+                        Leads
+                      </NavigationMenuLink>
+                    </Link>
                   </NavigationMenuItem>
                 )}
                 <NavigationMenuItem>
-                  <NavigationMenuLink asChild>
-                    <Link href="/marketplace">Marketplace</Link>
-                  </NavigationMenuLink>
+                  <Link href="/marketplace">
+                    <NavigationMenuLink className="cursor-pointer">
+                      Marketplace
+                    </NavigationMenuLink>
+                  </Link>
                 </NavigationMenuItem>
                 {user?.userType === "vendor" && (
                   <NavigationMenuItem>
-                    <NavigationMenuLink asChild>
-                      <Link href="/vendor/dashboard">Vendor Dashboard</Link>
-                    </NavigationMenuLink>
+                    <Link href="/vendor/dashboard">
+                      <NavigationMenuLink className="cursor-pointer">
+                        Vendor Dashboard
+                      </NavigationMenuLink>
+                    </Link>
                   </NavigationMenuItem>
                 )}
                 {user && user.userType !== "free" && (
                   <>
                     <NavigationMenuItem>
-                      <NavigationMenuLink asChild>
-                        <Link href="/subscription">Subscription</Link>
-                      </NavigationMenuLink>
+                      <Link href="/subscription">
+                        <NavigationMenuLink className="cursor-pointer">
+                          Subscription
+                        </NavigationMenuLink>
+                      </Link>
                     </NavigationMenuItem>
                     <NavigationMenuItem>
-                      <NavigationMenuLink asChild>
-                        <Link href="/analytics">Analytics</Link>
-                      </NavigationMenuLink>
+                      <Link href="/analytics">
+                        <NavigationMenuLink className="cursor-pointer">
+                          Analytics
+                        </NavigationMenuLink>
+                      </Link>
                     </NavigationMenuItem>
                   </>
                 )}
                 {user?.superAdmin && (
                   <NavigationMenuItem>
-                    <NavigationMenuLink asChild>
-                      <Link href="/admin-management">Admin Management</Link>
-                    </NavigationMenuLink>
+                    <Link href="/admin-management">
+                      <NavigationMenuLink className="cursor-pointer">
+                        Admin Management
+                      </NavigationMenuLink>
+                    </Link>
                   </NavigationMenuItem>
                 )}
               </NavigationMenuList>
