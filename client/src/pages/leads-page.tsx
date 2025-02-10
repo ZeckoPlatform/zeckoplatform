@@ -440,9 +440,20 @@ const BusinessLeadsView = ({
           );
         })}
         {(!leads || leads.length === 0) && (
-          <p className="text-muted-foreground text-center py-8">
-            No matching leads found. Update your business profile to see more relevant leads.
-          </p>
+          <div className="space-y-6">
+            {!user?.profile ? (
+              <>
+                <p className="text-muted-foreground text-center">
+                  Complete your business profile to start seeing relevant leads.
+                </p>
+                <BusinessProfileForm /> {/* Added BusinessProfileForm */}
+              </>
+            ) : (
+              <p className="text-muted-foreground text-center py-8">
+                No matching leads found. Update your business profile to see more relevant leads.
+              </p>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -751,9 +762,50 @@ function MessageDialogContent({
   );
 }
 
+const BusinessProfileForm = () => {
+  const { user, setUser } = useAuth();
+  const { register, handleSubmit } = useForm<ProfileFormData>();
+
+  const onSubmit = async (data: ProfileFormData) => {
+    try {
+      await apiRequest('POST', '/api/users/profile', data);
+      // Update user data in auth context.  This assumes the useAuth hook manages user data.  Adjust as needed for your auth implementation.
+      setUser({...user, profile: data});
+      queryClient.invalidateQueries({queryKey: ['/api/leads']}); //Refetch leads after profile update
+
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      // Handle error appropriately
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <div>
+        <Label htmlFor="name">Name</Label>
+        <Input id="name" {...register('name')} />
+      </div>
+      <div>
+        <Label htmlFor="description">Description</Label>
+        <Textarea id="description" {...register('description')} />
+      </div>
+      <div>
+        <Label htmlFor="categories">Categories (comma-separated)</Label>
+        <Input id="categories" {...register('categories')} />
+      </div>
+      <div>
+        <Label htmlFor="location">Location</Label>
+        <Input id="location" {...register('location')} />
+      </div>
+      <Button type="submit">Save Profile</Button>
+    </form>
+  );
+};
+
+
 export default function LeadsPage() {
   // All hooks at the top level
-  const { user } = useAuth();
+  const { user, setUser } = useAuth(); // Added setUser
   const { toast } = useToast();
   const playNotification = useNotificationSound();
 
@@ -945,8 +997,7 @@ export default function LeadsPage() {
           proposalDialogOpen={proposalDialogOpen}
           setProposalDialogOpen={setProposalDialogOpen}
           toast={toast}
-          playNotification={playNotification}
-        />
+          playNotification={playNotification}        />
       ) : (
         <FreeUserLeadsView
           leads={leads}
