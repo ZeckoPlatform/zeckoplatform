@@ -2,7 +2,7 @@ import { Router } from "express";
 import Stripe from "stripe";
 import { users, subscriptions } from "@db/schema";
 import { db } from "@db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { authenticateToken } from "../auth";
 
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -10,7 +10,6 @@ if (!process.env.STRIPE_SECRET_KEY) {
 }
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-
 const router = Router();
 
 // Price configurations for different tiers and frequencies
@@ -91,7 +90,9 @@ router.get("/subscriptions/current", authenticateToken, async (req, res) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    // Get both user and latest subscription
+    console.log('Checking subscription status for user:', req.user.id);
+
+    // Get both user and active subscription
     const [user] = await db
       .select()
       .from(users)
@@ -102,18 +103,36 @@ router.get("/subscriptions/current", authenticateToken, async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
+    console.log('User subscription data:', {
+      subscriptionActive: user.subscriptionActive,
+      subscriptionTier: user.subscriptionTier,
+      userType: user.userType
+    });
+
+    // Get latest active subscription
     const [currentSubscription] = await db
       .select()
       .from(subscriptions)
-      .where(eq(subscriptions.user_id, req.user.id))
+      .where(
+        and(
+          eq(subscriptions.user_id, req.user.id),
+          eq(subscriptions.status, "active")
+        )
+      )
       .orderBy(desc(subscriptions.start_date))
       .limit(1);
 
+    console.log('Current subscription:', currentSubscription);
+
+    // Determine subscription status
+    const isActive = user.subscriptionActive || (currentSubscription?.status === "active");
+    const tier = user.subscriptionTier || (currentSubscription?.tier || "none");
+
     // Return subscription status
     return res.json({
-      active: user.subscriptionActive, // Use the user's subscriptionActive status directly
-      tier: user.subscriptionTier || "none",
-      endsAt: user.subscriptionEndsAt,
+      active: isActive,
+      tier: tier,
+      endsAt: user.subscriptionEndsAt || currentSubscription?.end_date,
       userType: user.userType,
       isAdminGranted: currentSubscription ? !currentSubscription.auto_renew : false
     });

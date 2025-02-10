@@ -239,39 +239,24 @@ router.post("/admin/users/:userId/subscription", authenticateToken, checkSuperAd
       .update(users)
       .set({
         userType: subscriptionType,
-        subscriptionActive: true, // Always set to true for admin-granted subscriptions
-        subscriptionTier: subscriptionType,
-        subscriptionEndsAt: subscriptionEndDate
+        subscriptionActive: subscriptionType !== "free", // Set true for business/vendor
+        subscriptionTier: subscriptionType === "free" ? "none" : subscriptionType,
+        subscriptionEndsAt: subscriptionType === "free" ? null : subscriptionEndDate
       })
       .where(eq(users.id, userId))
       .returning();
+
+    console.log('Updated user subscription status:', {
+      userType: updatedUser.userType,
+      subscriptionActive: updatedUser.subscriptionActive,
+      subscriptionTier: updatedUser.subscriptionTier,
+      subscriptionEndsAt: updatedUser.subscriptionEndsAt
+    });
 
     return res.json(updatedUser);
   } catch (error) {
     console.error("Error updating subscription:", error);
     return res.status(500).json({ error: "Failed to update subscription" });
-  }
-});
-
-// Product management routes
-router.post("/products", authenticateToken, checkSuperAdminAccess, async (req, res) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    const [product] = await db
-      .insert(products)
-      .values({
-        ...req.body,
-        vendor_id: req.user.id,
-      })
-      .returning();
-
-    return res.status(201).json(product);
-  } catch (error) {
-    console.error("Error creating product:", error);
-    return res.status(500).json({ error: "Failed to create product" });
   }
 });
 
