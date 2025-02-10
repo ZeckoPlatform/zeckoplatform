@@ -2,7 +2,7 @@ import { Router } from "express";
 import { authenticateToken } from "../auth";
 import { db } from "@db";
 import { users, documents, subscriptions, products, leads, messages } from "@db/schema";
-import { eq, and, count, sum, desc } from "drizzle-orm";
+import { eq, and, count, sum, desc, sql } from "drizzle-orm";
 import { z } from "zod";
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
@@ -121,17 +121,27 @@ router.get("/admin/stats", authenticateToken, checkSuperAdminAccess, async (req,
       .select({ count: count() })
       .from(documents);
 
-    // Get active subscriptions count
+    // Get active subscriptions count - only count paid ones
     const [subStats] = await db
       .select({ count: count() })
       .from(subscriptions)
-      .where(eq(subscriptions.status, "active"));
+      .where(
+        and(
+          eq(subscriptions.status, "active"),
+          sql`stripe_subscription_id IS NOT NULL` // Only count subscriptions that went through Stripe
+        )
+      );
 
-    // Calculate total revenue from active subscriptions
+    // Calculate total revenue from paid subscriptions only
     const [revenue] = await db
       .select({ total: sum(subscriptions.price) })
       .from(subscriptions)
-      .where(eq(subscriptions.status, "active"));
+      .where(
+        and(
+          eq(subscriptions.status, "active"),
+          sql`stripe_subscription_id IS NOT NULL` // Only count subscriptions that went through Stripe
+        )
+      );
 
     const totalRevenue = revenue?.total ? Number(revenue.total) / 100 : 0;
 
@@ -237,7 +247,7 @@ router.post("/admin/users/:userId/subscription", authenticateToken, checkSuperAd
     // Update user type and subscription status
     const [updatedUser] = await db
       .update(users)
-      .set({ 
+      .set({
         userType: subscriptionType,
         subscriptionActive: subscriptionType !== "free", // Always active if not free
         subscriptionTier: subscriptionType === "free" ? "none" : subscriptionType,
