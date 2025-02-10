@@ -60,15 +60,15 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
                 const Icon = item.icon;
                 return (
                   <Link key={item.name} href={item.href}>
-                    <a
+                    <div
                       className={cn(
-                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover:bg-accent",
+                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover:bg-accent cursor-pointer",
                         location === item.href ? "bg-accent" : "transparent"
                       )}
                     >
                       <Icon className="h-4 w-4" />
                       {item.name}
-                    </a>
+                    </div>
                   </Link>
                 );
               })}
