@@ -1,11 +1,11 @@
 import { Router } from "express";
 import { authenticateToken } from "../auth";
 import { db } from "@db";
-import { notifications, notificationPreferences, emailTemplates, newsletters } from "@db/schema";
+import { notifications, notificationPreferences, emailTemplates, newsletters, users } from "@db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { createNotification, markNotificationAsRead, getUnreadNotifications } from "../services/notifications";
-import { sendEmail, sendNewsletterToAllUsers, createNewsletterFromTemplate } from "../services/email";
+import { sendEmail } from "../services/email";
 
 const router = Router();
 
@@ -49,33 +49,38 @@ router.get("/email-templates", authenticateToken, checkAdminAccess, async (req, 
 // Newsletter routes - Admin only
 router.post("/newsletters", authenticateToken, checkAdminAccess, async (req, res) => {
   try {
-    const { templateId, ...newsletterData } = req.body;
-    let newNewsletterId;
+    const { templateId, subject, content, scheduledFor } = req.body;
 
-    if (templateId) {
-      newNewsletterId = await createNewsletterFromTemplate(
+    const [newsletter] = await db
+      .insert(newsletters)
+      .values({
+        subject,
+        content,
+        scheduledFor: scheduledFor ? new Date(scheduledFor) : null,
         templateId,
-        newsletterData.subject,
-        newsletterData.scheduledFor
-      );
-    } else {
-      const [newsletter] = await db
-        .insert(newsletters)
-        .values(newsletterData)
-        .returning();
-      newNewsletterId = newsletter.id;
-    }
-
-    if (!newNewsletterId) {
-      return res.status(400).json({ error: "Failed to create newsletter" });
-    }
+      })
+      .returning();
 
     if (req.body.sendNow) {
-      const result = await sendNewsletterToAllUsers(newNewsletterId);
-      return res.json(result);
+      // Send newsletter immediately to all active users
+      const activeUsers = await db
+        .select({
+          email: users.email,
+        })
+        .from(users)
+        .where(eq(users.active, true));
+
+      for (const user of activeUsers) {
+        await sendEmail({
+          to: user.email,
+          subject: newsletter.subject,
+          html: newsletter.content,
+          text: newsletter.content.replace(/<[^>]*>/g, ''), // Strip HTML tags for text version
+        });
+      }
     }
 
-    return res.status(201).json({ id: newNewsletterId });
+    return res.status(201).json(newsletter);
   } catch (error) {
     console.error("Error creating/sending newsletter:", error);
     return res.status(500).json({ error: "Failed to create/send newsletter" });
