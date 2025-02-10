@@ -188,9 +188,9 @@ router.get("/users/:userId", authenticateToken, checkSuperAdminAccess, async (re
 router.post("/admin/users/:userId/subscription", authenticateToken, checkSuperAdminAccess, async (req, res) => {
   try {
     const userId = parseInt(req.params.userId);
-    const { subscriptionType, skipPayment } = req.body;
+    const { subscriptionType } = req.body;
 
-    console.log('Updating subscription:', { userId, subscriptionType, skipPayment });
+    console.log('Updating subscription:', { userId, subscriptionType });
 
     if (!["free", "business", "vendor"].includes(subscriptionType)) {
       return res.status(400).json({ error: "Invalid subscription type" });
@@ -218,33 +218,30 @@ router.post("/admin/users/:userId/subscription", authenticateToken, checkSuperAd
     const subscriptionEndDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
 
     if (subscriptionType !== "free") {
-      // Create subscription using only the existing columns in the schema
+      // Create subscription
       const subscriptionData = {
         user_id: userId,
         tier: subscriptionType,
-        status: "active", // Always set to active when granted by admin
-        price: subscriptionType === "business" ? 2999 : 4999, // Price in pence
+        status: "active",
+        price: subscriptionType === "business" ? 2999 : 4999,
         start_date: new Date(),
         end_date: subscriptionEndDate,
-        auto_renew: true
+        auto_renew: false // Set to false for admin-granted subscriptions
       };
 
       console.log('Creating new subscription:', subscriptionData);
 
-      // Insert the new subscription
       await db.insert(subscriptions).values(subscriptionData);
-
-      console.log('Subscription created successfully');
     }
 
-    // Update user type and subscription status
+    // Update user subscription status
     const [updatedUser] = await db
       .update(users)
       .set({
         userType: subscriptionType,
-        subscriptionActive: subscriptionType !== "free", // Always active if not free
-        subscriptionTier: subscriptionType === "free" ? "none" : subscriptionType,
-        subscriptionEndsAt: subscriptionType !== "free" ? subscriptionEndDate : null
+        subscriptionActive: true, // Always set to true for admin-granted subscriptions
+        subscriptionTier: subscriptionType,
+        subscriptionEndsAt: subscriptionEndDate
       })
       .where(eq(users.id, userId))
       .returning();
@@ -252,7 +249,7 @@ router.post("/admin/users/:userId/subscription", authenticateToken, checkSuperAd
     return res.json(updatedUser);
   } catch (error) {
     console.error("Error updating subscription:", error);
-    return res.status(500).json({ error: "Failed to update subscription", details: error.message });
+    return res.status(500).json({ error: "Failed to update subscription" });
   }
 });
 

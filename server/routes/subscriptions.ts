@@ -91,7 +91,7 @@ router.get("/subscriptions/current", authenticateToken, async (req, res) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    // Get both user and latest active subscription
+    // Get both user and latest subscription
     const [user] = await db
       .select()
       .from(users)
@@ -109,14 +109,13 @@ router.get("/subscriptions/current", authenticateToken, async (req, res) => {
       .orderBy(desc(subscriptions.start_date))
       .limit(1);
 
-    // Return subscription status combining both user and subscription data
+    // Return subscription status
     return res.json({
-      active: user.subscriptionActive || (currentSubscription?.status === "active"),
-      tier: user.subscriptionTier || currentSubscription?.tier || "none",
-      endsAt: user.subscriptionEndsAt || currentSubscription?.end_date || null,
+      active: user.subscriptionActive, // Use the user's subscriptionActive status directly
+      tier: user.subscriptionTier || "none",
+      endsAt: user.subscriptionEndsAt,
       userType: user.userType,
-      // Include payment status to differentiate admin-granted from paid subscriptions
-      paymentStatus: currentSubscription?.auto_renew ? "paid" : "admin_granted"
+      isAdminGranted: currentSubscription ? !currentSubscription.auto_renew : false
     });
   } catch (error) {
     console.error("Error fetching subscription:", error);
