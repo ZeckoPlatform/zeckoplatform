@@ -99,16 +99,22 @@ router.get("/subscriptions/current", authenticateToken, async (req, res) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const [subscription] = await db
+    const [user] = await db
       .select()
       .from(users)
       .where(eq(users.id, req.user.id))
       .limit(1);
 
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Return full subscription status including userType for proper display
     return res.json({
-      active: subscription.subscriptionActive,
-      tier: subscription.subscriptionTier,
-      endsAt: subscription.subscriptionEndsAt,
+      active: user.subscriptionActive,
+      tier: user.subscriptionTier,
+      endsAt: user.subscriptionEndsAt,
+      userType: user.userType
     });
   } catch (error) {
     console.error("Error fetching subscription:", error);
