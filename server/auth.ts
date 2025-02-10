@@ -13,7 +13,7 @@ import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 const scryptAsync = promisify(scrypt);
 const JWT_SECRET = process.env.REPL_ID!;
 
-// Initialize AWS SES client
+// Initialize AWS SES client with better error handling
 const ses = new SESClient({
   region: process.env.AWS_REGION || 'us-east-1',
   credentials: {
@@ -339,36 +339,44 @@ export function setupAuth(app: Express) {
       await db
         .update(users)
         .set({
-          reset_password_token: resetToken,
-          reset_password_expires: resetExpires
+          resetPasswordToken: resetToken,
+          resetPasswordExpiry: resetExpires
         })
         .where(eq(users.id, user.id));
 
-      // Send reset email using AWS SES
-      const resetUrl = `${req.protocol}://${req.get('host')}/auth/reset-password/${resetToken}`;
-      const emailParams = {
-        Source: 'no-reply@yourdomain.com', // Update with your verified SES sender
-        Destination: {
-          ToAddresses: [email],
-        },
-        Message: {
-          Subject: {
-            Data: 'Password Reset Request',
+      try {
+        // Send reset email using AWS SES
+        const resetUrl = `${req.protocol}://${req.get('host')}/auth/reset-password/${resetToken}`;
+        const emailParams = {
+          Source: process.env.AWS_SES_VERIFIED_EMAIL || 'noreply@example.com', // Use environment variable
+          Destination: {
+            ToAddresses: [email],
           },
-          Body: {
-            Text: {
-              Data: `You are receiving this email because you (or someone else) requested a password reset.\n\n
-                     Please click on the following link to complete the process:\n\n
-                     ${resetUrl}\n\n
-                     This link will expire in 1 hour.\n\n
-                     If you did not request this, please ignore this email and your password will remain unchanged.`,
+          Message: {
+            Subject: {
+              Data: 'Password Reset Request',
+            },
+            Body: {
+              Text: {
+                Data: `You are receiving this email because you (or someone else) requested a password reset.\n\n
+                       Please click on the following link to complete the process:\n\n
+                       ${resetUrl}\n\n
+                       This link will expire in 1 hour.\n\n
+                       If you did not request this, please ignore this email and your password will remain unchanged.`,
+              },
             },
           },
-        },
-      };
+        };
 
-      await ses.send(new SendEmailCommand(emailParams));
+        await ses.send(new SendEmailCommand(emailParams));
 
+        log(`Password reset email sent successfully to ${email}`);
+      } catch (emailError) {
+        log(`Failed to send password reset email: ${emailError}`);
+        // Don't expose email sending errors to the client
+      }
+
+      // Always return success to prevent email enumeration
       res.status(200).json({
         message: "If an account exists with this email, a password reset link will be sent."
       });

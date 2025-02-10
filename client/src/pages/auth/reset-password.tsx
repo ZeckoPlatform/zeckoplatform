@@ -27,7 +27,7 @@ export default function ResetPasswordPage() {
     },
   });
 
-  if (!match || !params) {
+  if (!match || !params?.token) {
     return (
       <Card className="w-[400px] mx-auto mt-20">
         <CardHeader>
@@ -48,8 +48,6 @@ export default function ResetPasswordPage() {
     );
   }
 
-  const { token } = params;
-
   const onSubmit = async (data: ResetPasswordFormData) => {
     if (data.password !== data.confirmPassword) {
       toast({
@@ -62,9 +60,10 @@ export default function ResetPasswordPage() {
 
     try {
       setIsResetting(true);
+      console.log('Sending reset request with token:', params.token); // Debug log
       const response = await apiRequest("POST", "/api/auth/reset-password", {
-        token,
-        password: data.password,
+        token: params.token,
+        password: data.password
       });
 
       if (!response.ok) {
@@ -72,9 +71,10 @@ export default function ResetPasswordPage() {
         throw new Error(error.message || "Failed to reset password");
       }
 
+      const result = await response.json();
       toast({
         title: "Success",
-        description: "Your password has been reset successfully",
+        description: result.message || "Your password has been reset successfully",
       });
 
       setLocation("/auth");
