@@ -9,6 +9,7 @@ import { comparePasswords, hashPassword } from './auth';
 import fs from 'fs';
 import express from 'express';
 import { createConnectedAccount, retrieveConnectedAccount } from './stripe';
+import { sendEmail } from './services/email';
 import subscriptionRoutes from './routes/subscriptions';
 import invoiceRoutes from './routes/invoices';
 import { insertUserSchema } from "@db/schema";
@@ -296,7 +297,6 @@ export function registerRoutes(app: Express): Server {
       res.status(401).json({ authenticated: false });
     }
   });
-
 
 
   // POST /api/leads/:leadId/responses - Add subscription check
@@ -643,6 +643,52 @@ export function registerRoutes(app: Express): Server {
   });
 
 
+  // Add test email endpoint
+  app.post("/api/test-email", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      // Send a test email to the logged-in user
+      const success = await sendEmail({
+        to: req.user.email,
+        subject: "Test Email from Zecko",
+        html: `
+          <h1>Email Configuration Test</h1>
+          <p>Hello,</p>
+          <p>This is a test email to verify that your AWS SES configuration is working correctly.</p>
+          <p>If you received this email, your email service is properly configured!</p>
+          <br>
+          <p>Best regards,</p>
+          <p>Zecko Team</p>
+        `,
+        text: `
+          Email Configuration Test
+
+          Hello,
+
+          This is a test email to verify that your AWS SES configuration is working correctly.
+          If you received this email, your email service is properly configured!
+
+          Best regards,
+          Zecko Team
+        `
+      });
+
+      if (success) {
+        res.json({ message: "Test email sent successfully" });
+      } else {
+        res.status(500).json({ message: "Failed to send test email" });
+      }
+    } catch (error) {
+      console.error('Test email error:', error);
+      res.status(500).json({
+        message: "Failed to send test email",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
 
   app.patch("/api/user/password", async (req, res) => {
     try {
@@ -878,7 +924,7 @@ export function registerRoutes(app: Express): Server {
       log(`Updated product price: ${responseProduct.price} (converted from ${updatedProduct.price} cents)`);
       res.json(responseProduct);
     } catch (error) {
-      log(`Product update error: ${error instanceof Error ? error.message : String(error)}`);
+      log(`Product update error: ${error instanceof Error? error.message : String(error)}`);
       console.error('Full error:', error);
       res.status(500).json({
         message: "Failed to update product",

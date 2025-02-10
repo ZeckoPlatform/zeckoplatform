@@ -1,24 +1,29 @@
-import FormData from 'form-data';
-import Mailgun from 'mailgun.js';
+import { SESClient, SendEmailCommand, SendBulkTemplatedEmailCommand } from "@aws-sdk/client-ses";
 import { db } from '@db';
 import { users } from '@db/schema';
 import { eq } from 'drizzle-orm';
 
-if (!process.env.MAILGUN_API_KEY) {
-  throw new Error("MAILGUN_API_KEY environment variable must be set");
+if (!process.env.AWS_ACCESS_KEY_ID) {
+  throw new Error("AWS_ACCESS_KEY_ID environment variable must be set");
 }
 
-if (!process.env.MAILGUN_DOMAIN) {
-  throw new Error("MAILGUN_DOMAIN environment variable must be set");
+if (!process.env.AWS_SECRET_ACCESS_KEY) {
+  throw new Error("AWS_SECRET_ACCESS_KEY environment variable must be set");
 }
 
-const mailgun = new Mailgun(FormData);
-const mg = mailgun.client({
-  username: 'api',
-  key: process.env.MAILGUN_API_KEY,
+if (!process.env.AWS_REGION) {
+  throw new Error("AWS_REGION environment variable must be set");
+}
+
+const ses = new SESClient({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
 });
 
-const FROM_EMAIL = `noreply@${process.env.MAILGUN_DOMAIN}`;
+const FROM_EMAIL = 'noreply@zecko.app';
 
 interface EmailOptions {
   to: string;
@@ -30,17 +35,34 @@ interface EmailOptions {
 // Send a single email (for transactional emails like password reset)
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
   try {
-    await mg.messages.create(process.env.MAILGUN_DOMAIN!, {
-      from: FROM_EMAIL,
-      to: options.to,
-      subject: options.subject,
-      text: options.text,
-      html: options.html,
+    const command = new SendEmailCommand({
+      Source: FROM_EMAIL,
+      Destination: {
+        ToAddresses: [options.to],
+      },
+      Message: {
+        Subject: {
+          Data: options.subject,
+          Charset: 'UTF-8',
+        },
+        Body: {
+          Html: {
+            Data: options.html,
+            Charset: 'UTF-8',
+          },
+          Text: {
+            Data: options.text,
+            Charset: 'UTF-8',
+          },
+        },
+      },
     });
+
+    await ses.send(command);
     console.log(`Email sent successfully to ${options.to}`);
     return true;
   } catch (error) {
-    console.error('Mailgun email error:', error);
+    console.error('AWS SES email error:', error);
     return false;
   }
 }
@@ -64,26 +86,34 @@ export async function sendMassEmail(subject: string, htmlContent: string, textCo
     let successCount = 0;
     let errorCount = 0;
 
-    // Send emails in batches of 100 to avoid rate limits
-    const batchSize = 100;
+    // Send emails in batches of 50 to comply with SES limits
+    const batchSize = 50;
     for (let i = 0; i < activeUsers.length; i += batchSize) {
       const batch = activeUsers.slice(i, i + batchSize);
-      const recipients = batch.map(user => user.email).join(',');
 
       try {
-        await mg.messages.create(process.env.MAILGUN_DOMAIN!, {
-          from: FROM_EMAIL,
-          to: recipients,
-          subject: subject,
-          text: textContent,
-          html: htmlContent,
-          'recipient-variables': JSON.stringify(
-            batch.reduce((acc, user) => ({
-              ...acc,
-              [user.email]: { id: user.id }
-            }), {})
-          )
+        const command = new SendBulkTemplatedEmailCommand({
+          Source: FROM_EMAIL,
+          Template: 'AnnouncementTemplate',
+          Destinations: batch.map(user => ({
+            Destination: {
+              ToAddresses: [user.email],
+            },
+            ReplacementTemplateData: JSON.stringify({
+              subject,
+              htmlContent,
+              textContent,
+              userId: user.id,
+            }),
+          })),
+          DefaultTemplateData: JSON.stringify({
+            subject,
+            htmlContent,
+            textContent,
+          }),
         });
+
+        await ses.send(command);
         successCount += batch.length;
       } catch (error) {
         console.error(`Error sending batch email: ${error}`);
