@@ -3,14 +3,24 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { users, insertUserSchema, type SelectUser } from "@db/schema";
 import { db } from "@db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { fromZodError } from "zod-validation-error";
 import { log } from "./vite";
 import jwt from 'jsonwebtoken';
 import { checkLoginAttempts, recordLoginAttempt } from "./services/rate-limiter";
+import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 
 const scryptAsync = promisify(scrypt);
 const JWT_SECRET = process.env.REPL_ID!;
+
+// Initialize AWS SES client
+const ses = new SESClient({
+  region: process.env.AWS_REGION || 'us-east-1',
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!
+  }
+});
 
 declare global {
   namespace Express {
@@ -46,7 +56,9 @@ async function getUserByEmail(email: string): Promise<SelectUser[]> {
         superAdmin: users.superAdmin,
         subscriptionActive: users.subscriptionActive,
         subscriptionTier: users.subscriptionTier,
-        active: users.active
+        active: users.active,
+        reset_password_token: users.reset_password_token,
+        reset_password_expires: users.reset_password_expires
       })
       .from(users)
       .where(and(eq(users.email, email), eq(users.active, true)));
@@ -298,5 +310,119 @@ export function setupAuth(app: Express) {
 
   app.get("/api/user", authenticateToken, (req, res) => {
     res.json(req.user);
+  });
+
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, email));
+
+      if (!user) {
+        // Don't reveal whether a user was found or not
+        return res.status(200).json({
+          message: "If an account exists with this email, a password reset link will be sent."
+        });
+      }
+
+      // Generate reset token
+      const resetToken = randomBytes(32).toString('hex');
+      const resetExpires = new Date(Date.now() + 3600000); // 1 hour from now
+
+      // Update user with reset token
+      await db
+        .update(users)
+        .set({
+          reset_password_token: resetToken,
+          reset_password_expires: resetExpires
+        })
+        .where(eq(users.id, user.id));
+
+      // Send reset email using AWS SES
+      const resetUrl = `${req.protocol}://${req.get('host')}/auth/reset-password/${resetToken}`;
+      const emailParams = {
+        Source: 'no-reply@yourdomain.com', // Update with your verified SES sender
+        Destination: {
+          ToAddresses: [email],
+        },
+        Message: {
+          Subject: {
+            Data: 'Password Reset Request',
+          },
+          Body: {
+            Text: {
+              Data: `You are receiving this email because you (or someone else) requested a password reset.\n\n
+                     Please click on the following link to complete the process:\n\n
+                     ${resetUrl}\n\n
+                     This link will expire in 1 hour.\n\n
+                     If you did not request this, please ignore this email and your password will remain unchanged.`,
+            },
+          },
+        },
+      };
+
+      await ses.send(new SendEmailCommand(emailParams));
+
+      res.status(200).json({
+        message: "If an account exists with this email, a password reset link will be sent."
+      });
+    } catch (error) {
+      console.error('Password reset request error:', error);
+      res.status(500).json({ message: "Failed to process password reset request" });
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { token, password } = req.body;
+
+      if (!token || !password) {
+        return res.status(400).json({ 
+          message: "Token and new password are required" 
+        });
+      }
+
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(and(
+          eq(users.reset_password_token, token),
+          eq(users.active, true)
+        ));
+
+      if (!user) {
+        return res.status(400).json({ 
+          message: "Password reset token is invalid or has expired" 
+        });
+      }
+
+      // Check if token is expired
+      if (user.reset_password_expires && user.reset_password_expires < new Date()) {
+        return res.status(400).json({ 
+          message: "Password reset token has expired" 
+        });
+      }
+
+      // Update password and clear reset token
+      await db
+        .update(users)
+        .set({
+          password: await hashPassword(password),
+          reset_password_token: null,
+          reset_password_expires: null
+        })
+        .where(eq(users.id, user.id));
+
+      res.json({ message: "Password has been reset successfully" });
+    } catch (error) {
+      console.error('Password reset error:', error);
+      res.status(500).json({ message: "Failed to reset password" });
+    }
   });
 }
