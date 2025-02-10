@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Redirect, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Loader2 } from "lucide-react";
 
 const SUBSCRIPTION_PRICES = {
   business: {
@@ -66,13 +71,19 @@ const registerSchema = z.object({
   path: ["businessType"],
 });
 
+const resetPasswordSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+});
+
 type LoginFormData = z.infer<typeof loginSchema>;
 type RegisterFormData = z.infer<typeof registerSchema>;
+type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
+  const [showResetPassword, setShowResetPassword] = useState(false);
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -93,6 +104,37 @@ export default function AuthPage() {
       companyNumber: "",
       utrNumber: "",
       paymentFrequency: "monthly",
+    },
+  });
+
+  const resetPasswordForm = useForm<ResetPasswordFormData>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: {
+      email: "",
+    },
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async (data: ResetPasswordFormData) => {
+      const response = await apiRequest("POST", "/api/auth/reset-password", data);
+      if (!response.ok) {
+        throw new Error("Failed to send reset password email");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Reset Password Email Sent",
+        description: "Please check your email for instructions to reset your password.",
+      });
+      setShowResetPassword(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
@@ -199,13 +241,29 @@ export default function AuthPage() {
                       </p>
                     )}
                   </div>
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={loginMutation.isPending}
-                  >
-                    Login
-                  </Button>
+                  <div className="flex justify-between items-center">
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="px-0"
+                      onClick={() => setShowResetPassword(true)}
+                    >
+                      Forgot Password?
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={loginMutation.isPending}
+                    >
+                      {loginMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Logging in...
+                        </>
+                      ) : (
+                        "Login"
+                      )}
+                    </Button>
+                  </div>
                 </form>
               </TabsContent>
 
@@ -305,8 +363,8 @@ export default function AuthPage() {
                   )}
 
                   {/* Show company details for registered businesses and vendors */}
-                  {((registerForm.watch("userType") === "business" && 
-                     registerForm.watch("businessType") === "registered") || 
+                  {((registerForm.watch("userType") === "business" &&
+                    registerForm.watch("businessType") === "registered") ||
                     registerForm.watch("userType") === "vendor") && (
                     <>
                       <div>
@@ -339,22 +397,22 @@ export default function AuthPage() {
                   )}
 
                   {/* Show UTR number for self-employed businesses */}
-                  {registerForm.watch("userType") === "business" && 
-                   registerForm.watch("businessType") === "selfEmployed" && (
-                    <div>
-                      <Label htmlFor="utrNumber">UTR Number</Label>
-                      <Input
-                        id="utrNumber"
-                        {...registerForm.register("utrNumber")}
-                        placeholder="1234567890"
-                      />
-                      {registerForm.formState.errors.utrNumber && (
-                        <p className="text-sm text-destructive mt-1">
-                          {registerForm.formState.errors.utrNumber.message}
-                        </p>
-                      )}
-                    </div>
-                  )}
+                  {registerForm.watch("userType") === "business" &&
+                    registerForm.watch("businessType") === "selfEmployed" && (
+                      <div>
+                        <Label htmlFor="utrNumber">UTR Number</Label>
+                        <Input
+                          id="utrNumber"
+                          {...registerForm.register("utrNumber")}
+                          placeholder="1234567890"
+                        />
+                        {registerForm.formState.errors.utrNumber && (
+                          <p className="text-sm text-destructive mt-1">
+                            {registerForm.formState.errors.utrNumber.message}
+                          </p>
+                        )}
+                      </div>
+                    )}
 
                   {/* Show payment options for paid accounts */}
                   {registerForm.watch("userType") !== "free" && (
@@ -398,6 +456,52 @@ export default function AuthPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Password Reset Dialog */}
+      <Dialog open={showResetPassword} onOpenChange={setShowResetPassword}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+            <DialogDescription>
+              Enter your email address and we'll send you instructions to reset your password.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={resetPasswordForm.handleSubmit((data) =>
+              resetPasswordMutation.mutate(data)
+            )}
+            className="space-y-4"
+          >
+            <div>
+              <Label htmlFor="reset-email">Email</Label>
+              <Input
+                id="reset-email"
+                type="email"
+                {...resetPasswordForm.register("email")}
+              />
+              {resetPasswordForm.formState.errors.email && (
+                <p className="text-sm text-destructive mt-1">
+                  {resetPasswordForm.formState.errors.email.message}
+                </p>
+              )}
+            </div>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={resetPasswordMutation.isPending}
+            >
+              {resetPasswordMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                "Send Reset Instructions"
+              )}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
