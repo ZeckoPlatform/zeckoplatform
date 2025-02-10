@@ -1,8 +1,8 @@
 import { Router } from "express";
 import Stripe from "stripe";
-import { users } from "@db/schema";
+import { users, subscriptions } from "@db/schema";
 import { db } from "@db";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { authenticateToken } from "../auth";
 
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -75,14 +75,6 @@ router.post("/subscriptions/checkout", authenticateToken, async (req, res) => {
       url: session.url
     });
 
-    // Update user's subscription status to pending
-    await db
-      .update(users)
-      .set({
-        subscriptionTier: tier,
-      })
-      .where(eq(users.id, req.user!.id));
-
     return res.json({ checkoutUrl: session.url });
   } catch (error) {
     console.error("Stripe session creation error:", error);
@@ -99,6 +91,7 @@ router.get("/subscriptions/current", authenticateToken, async (req, res) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
+    // Get both user and latest active subscription
     const [user] = await db
       .select()
       .from(users)
@@ -109,12 +102,21 @@ router.get("/subscriptions/current", authenticateToken, async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Return full subscription status including userType for proper display
+    const [currentSubscription] = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.user_id, req.user.id))
+      .orderBy(desc(subscriptions.start_date))
+      .limit(1);
+
+    // Return subscription status combining both user and subscription data
     return res.json({
-      active: user.subscriptionActive,
-      tier: user.subscriptionTier,
-      endsAt: user.subscriptionEndsAt,
-      userType: user.userType
+      active: user.subscriptionActive || (currentSubscription?.status === "active"),
+      tier: user.subscriptionTier || currentSubscription?.tier || "none",
+      endsAt: user.subscriptionEndsAt || currentSubscription?.end_date || null,
+      userType: user.userType,
+      // Include payment status to differentiate admin-granted from paid subscriptions
+      paymentStatus: currentSubscription?.auto_renew ? "paid" : "admin_granted"
     });
   } catch (error) {
     console.error("Error fetching subscription:", error);
