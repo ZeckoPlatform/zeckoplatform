@@ -125,23 +125,16 @@ router.get("/admin/stats", authenticateToken, checkSuperAdminAccess, async (req,
     const [subStats] = await db
       .select({ count: count() })
       .from(subscriptions)
-      .where(
-        and(
-          eq(subscriptions.status, "active"),
-          sql`stripe_subscription_id IS NOT NULL` // Only count subscriptions that went through Stripe
-        )
-      );
+      .where(eq(subscriptions.status, "active"));
 
     // Calculate total revenue from paid subscriptions only
     const [revenue] = await db
       .select({ total: sum(subscriptions.price) })
       .from(subscriptions)
-      .where(
-        and(
-          eq(subscriptions.status, "active"),
-          sql`stripe_subscription_id IS NOT NULL` // Only count subscriptions that went through Stripe
-        )
-      );
+      .where(and(
+        eq(subscriptions.status, "active"),
+        eq(subscriptions.auto_renew, true) // Only count subscriptions that are set to auto-renew (paid)
+      ));
 
     const totalRevenue = revenue?.total ? Number(revenue.total) / 100 : 0;
 
