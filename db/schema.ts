@@ -90,29 +90,10 @@ export const subscriptions = pgTable("subscriptions", {
   status: text("status", {
     enum: ["trial", "active", "paused", "cancelled", "expired"]
   }).notNull(),
-  payment_frequency: text("payment_frequency", {
-    enum: ["monthly", "annual"]
-  }).notNull(),
-  payment_method: text("payment_method", {
-    enum: ["stripe", "direct_debit"]
-  }).notNull(),
   start_date: timestamp("start_date").notNull().defaultNow(),
-  trial_end_date: timestamp("trial_end_date"),
   end_date: timestamp("end_date").notNull(),
   auto_renew: boolean("auto_renew").default(true),
   price: integer("price").notNull(),
-  paused_at: timestamp("paused_at"),
-  pause_reason: text("pause_reason"),
-  resume_date: timestamp("resume_date"),
-  bank_account_holder: text("bank_account_holder"),
-  bank_sort_code: text("bank_sort_code"),
-  bank_account_number: text("bank_account_number"),
-  bank_mandate_reference: text("bank_mandate_reference"),
-  mandate_status: text("mandate_status", {
-    enum: ["pending", "active", "failed", "cancelled"]
-  }),
-  stripe_subscription_id: text("stripe_subscription_id"),
-  stripe_payment_method_id: text("stripe_payment_method_id"),
 });
 
 export const products = pgTable("products", {
@@ -223,7 +204,7 @@ export const vendorTransactions = pgTable("vendor_transactions", {
 
 export const analyticsLogs = pgTable("analytics_logs", {
   id: serial("id").primaryKey(),
-  user_id: integer("user_id").references(() => users.id),
+  user_id: integer("user_id").references(() => users.id), 
   event_type: text("event_type", {
     enum: ["login", "lead_view", "lead_response", "message_sent", "subscription_changed"]
   }).notNull(),
@@ -627,8 +608,8 @@ export const reviews = pgTable("reviews", {
   targetId: integer("target_id").references(() => users.id).notNull(),
   rating: integer("rating").notNull(),
   content: text("content").notNull(),
-  status: text("status", { 
-    enum: ["pending", "approved", "rejected"] 
+  status: text("status", {
+    enum: ["pending", "approved", "rejected"]
   }).default("pending"),
   moderatedBy: integer("moderated_by").references(() => users.id),
   moderationNotes: text("moderation_notes"),

@@ -41,7 +41,7 @@ export async function checkLoginAttempts(ip: string, email: string): Promise<{
   if (failedAttempts.length >= MAX_LOGIN_ATTEMPTS) {
     const mostRecentAttempt = failedAttempts[failedAttempts.length - 1];
     const lockoutEnd = new Date(
-      new Date(mostRecentAttempt.created_at).getTime() + LOCKOUT_DURATION
+      mostRecentAttempt.created_at.getTime() + LOCKOUT_DURATION
     );
 
     if (lockoutEnd > new Date()) {
@@ -63,8 +63,8 @@ export async function checkLoginAttempts(ip: string, email: string): Promise<{
 }
 
 export async function recordLoginAttempt(attempt: LoginAttempt) {
-  await db.insert(analyticsLogs).values({
-    user_id: attempt.userId,
+  const logData = {
+    user_id: attempt.userId, // This will be undefined for failed attempts
     event_type: "login",
     ip_address: attempt.ip,
     metadata: {
@@ -72,5 +72,7 @@ export async function recordLoginAttempt(attempt: LoginAttempt) {
       successful: attempt.successful,
     },
     created_at: attempt.timestamp,
-  });
+  };
+
+  await db.insert(analyticsLogs).values(logData);
 }
