@@ -6,8 +6,115 @@ import { eq } from "drizzle-orm";
 import { authenticator } from "otplib";
 import QRCode from "qrcode";
 import { checkTrialEligibility, recordTrialUsage, canDeleteAccount } from "../services/trial-verification";
+import { randomBytes } from "crypto";
+import { hashPassword } from "../auth";
+import sgMail from "@sendgrid/mail";
 
 const router = Router();
+
+// Password reset request (no auth required)
+router.post("/auth/reset-password", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    // Find user by email
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email));
+
+    if (!user) {
+      // For security, don't reveal if the email exists or not
+      return res.status(200).json({
+        message: "If an account exists with this email, you will receive password reset instructions."
+      });
+    }
+
+    // Generate reset token
+    const resetToken = randomBytes(32).toString('hex');
+    const resetExpiry = new Date(Date.now() + 3600000); // 1 hour from now
+
+    // Update user with reset token
+    await db
+      .update(users)
+      .set({
+        resetPasswordToken: resetToken,
+        resetPasswordExpiry: resetExpiry
+      })
+      .where(eq(users.id, user.id));
+
+    // Send reset email
+    const resetUrl = `${process.env.PUBLIC_URL || 'http://localhost:5000'}/reset-password?token=${resetToken}`;
+
+    await sgMail.send({
+      to: email,
+      from: 'noreply@zecko.com', // Update with your verified sender
+      subject: 'Reset Your Password',
+      text: `Click the following link to reset your password: ${resetUrl}`,
+      html: `
+        <p>You requested a password reset for your Zecko account.</p>
+        <p>Click the following link to reset your password:</p>
+        <a href="${resetUrl}">Reset Password</a>
+        <p>This link will expire in 1 hour.</p>
+        <p>If you didn't request this, please ignore this email.</p>
+      `
+    });
+
+    res.status(200).json({
+      message: "If an account exists with this email, you will receive password reset instructions."
+    });
+  } catch (error) {
+    console.error("Password reset request error:", error);
+    res.status(500).json({
+      message: "Failed to process password reset request",
+      error: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
+// Verify reset token and set new password (no auth required)
+router.post("/auth/reset-password/confirm", async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ message: "Token and new password are required" });
+    }
+
+    // Find user with valid reset token
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.resetPasswordToken, token));
+
+    if (!user || !user.resetPasswordExpiry || user.resetPasswordExpiry < new Date()) {
+      return res.status(400).json({ message: "Invalid or expired reset token" });
+    }
+
+    // Update password and clear reset token
+    const hashedPassword = await hashPassword(newPassword);
+    await db
+      .update(users)
+      .set({
+        password: hashedPassword,
+        resetPasswordToken: null,
+        resetPasswordExpiry: null
+      })
+      .where(eq(users.id, user.id));
+
+    res.json({ message: "Password reset successful" });
+  } catch (error) {
+    console.error("Password reset confirmation error:", error);
+    res.status(500).json({
+      message: "Failed to reset password",
+      error: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
 
 // Register new user with trial verification
 router.post("/auth/register", async (req, res) => {
