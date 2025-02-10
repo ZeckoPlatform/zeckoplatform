@@ -160,6 +160,12 @@ export default function SubscriptionPage() {
     );
   }
 
+  // Check if subscription is active (either paid or admin-granted)
+  const isSubscriptionActive = subscriptionData?.active || subscriptionData?.isAdminGranted;
+
+  // Determine if we should show subscription management options
+  const showSubscriptionControls = !subscriptionData?.isAdminGranted;
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <Card>
@@ -174,36 +180,108 @@ export default function SubscriptionPage() {
             <div>
               <h3 className="font-semibold">Status</h3>
               <p className="text-sm text-muted-foreground">
-                {subscriptionData?.status === "active"
-                  ? "Active"
-                  : subscriptionData?.status === "paused"
-                  ? "Paused"
+                {isSubscriptionActive 
+                  ? subscriptionData?.isAdminGranted 
+                    ? "Active (Admin Granted)" 
+                    : "Active"
                   : "Inactive"}
               </p>
             </div>
-            {subscriptionData?.status === "active" ? (
-              <Button
-                variant="outline"
-                onClick={() => setPauseDialogOpen(true)}
-                disabled={pauseMutation.isPending}
-              >
-                {pauseMutation.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            {/* Only show subscription management buttons for paid subscriptions */}
+            {showSubscriptionControls && (
+              <>
+                {subscriptionData?.status === "active" ? (
+                  <Button
+                    variant="outline"
+                    onClick={() => setPauseDialogOpen(true)}
+                    disabled={pauseMutation.isPending}
+                  >
+                    {pauseMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
+                    Pause Subscription
+                  </Button>
+                ) : subscriptionData?.status === "paused" ? (
+                  <Button
+                    onClick={() => resumeMutation.mutate()}
+                    disabled={resumeMutation.isPending}
+                  >
+                    {resumeMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
+                    Resume Subscription
+                  </Button>
                 ) : null}
-                Pause Subscription
-              </Button>
-            ) : subscriptionData?.status === "paused" ? (
-              <Button
-                onClick={() => resumeMutation.mutate()}
-                disabled={resumeMutation.isPending}
-              >
-                {resumeMutation.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                Resume Subscription
-              </Button>
-            ) : null}
+              </>
+            )}
           </div>
+
+          {/* Show subscription details for admin-granted subscriptions */}
+          {subscriptionData?.isAdminGranted && (
+            <div className="bg-muted p-4 rounded-lg">
+              <p className="text-sm text-muted-foreground">
+                This is an admin-granted subscription. Contact support for any changes.
+              </p>
+              {subscriptionData.endsAt && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  Valid until: {format(new Date(subscriptionData.endsAt), "PP")}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Only show billing options for non-admin-granted subscriptions */}
+          {!subscriptionData?.isAdminGranted && !isSubscriptionActive && (
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit((data) => subscribeMutation.mutate(data))}
+                    className="space-y-6">
+                <FormField
+                  control={form.control}
+                  name="paymentFrequency"
+                  render={({ field }) => (
+                    <FormItem className="space-y-3">
+                      <FormLabel>Billing Frequency</FormLabel>
+                      <FormControl>
+                        <RadioGroup
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          className="flex flex-col space-y-1"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <RadioGroupItem value="monthly" id="monthly" />
+                            <Label htmlFor="monthly">
+                              Monthly (£{monthlyPrice}/month)
+                            </Label>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <RadioGroupItem value="annual" id="annual" />
+                            <Label htmlFor="annual">
+                              Annual (£{annualPrice}/year - Save 10%)
+                            </Label>
+                          </div>
+                        </RadioGroup>
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={isLoading || subscribeMutation.isPending}
+                >
+                  {isLoading || subscribeMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Setting up subscription...
+                    </>
+                  ) : (
+                    'Start Free Trial'
+                  )}
+                </Button>
+              </form>
+            </Form>
+          )}
 
           {subscriptionData?.status === "paused" && (
             <div className="space-y-2">
@@ -223,55 +301,6 @@ export default function SubscriptionPage() {
               )}
             </div>
           )}
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit((data) => subscribeMutation.mutate(data))}
-                  className="space-y-6">
-              <FormField
-                control={form.control}
-                name="paymentFrequency"
-                render={({ field }) => (
-                  <FormItem className="space-y-3">
-                    <FormLabel>Billing Frequency</FormLabel>
-                    <FormControl>
-                      <RadioGroup
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        className="flex flex-col space-y-1"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <RadioGroupItem value="monthly" id="monthly" />
-                          <Label htmlFor="monthly">
-                            Monthly (£{monthlyPrice}/month)
-                          </Label>
-                        </div>
-                        <div className="flex items-center space-x-3">
-                          <RadioGroupItem value="annual" id="annual" />
-                          <Label htmlFor="annual">
-                            Annual (£{annualPrice}/year - Save 10%)
-                          </Label>
-                        </div>
-                      </RadioGroup>
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isLoading || subscribeMutation.isPending}
-              >
-                {isLoading || subscribeMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Setting up subscription...
-                  </>
-                ) : (
-                  'Start Free Trial'
-                )}
-              </Button>
-            </form>
-          </Form>
         </CardContent>
       </Card>
 
