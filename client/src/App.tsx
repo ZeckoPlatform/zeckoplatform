@@ -22,6 +22,7 @@ import AnalyticsSettingsPage from "@/pages/settings/analytics-settings";
 import BusinessProfilePage from "@/pages/settings/business-profile";
 import UserEditPage from "@/pages/admin/user-edit";
 import ReviewModerationPage from "@/pages/admin/review-moderation";
+import ResetPasswordPage from "@/pages/auth/reset-password";
 
 function Router() {
   return (
@@ -30,6 +31,7 @@ function Router() {
       <Switch>
         <Route path="/" component={HomePage} />
         <Route path="/auth" component={AuthPage} />
+        <Route path="/auth/reset-password/:token" component={ResetPasswordPage} />
         <Route path="/cart" component={CartPage} />
 
         {/* Protected Routes */}
@@ -88,8 +90,8 @@ function Router() {
         </Route>
 
         {/* Admin Routes */}
-        <Route path="/admin/users/edit/:id" component={() => <ProtectedRoute component={UserEditPage} />} />
-        <Route path="/admin/reviews" component={() => <ProtectedRoute component={ReviewModerationPage} />} />
+        <Route path="/admin/users/edit/:id" component={UserEditPage} />
+        <Route path="/admin/reviews" component={ReviewModerationPage} />
 
         <Route component={NotFound} />
       </Switch>
