@@ -92,7 +92,7 @@ router.get("/subscriptions/current", authenticateToken, async (req, res) => {
 
     console.log('Checking subscription status for user:', req.user.id);
 
-    // Get both user and active subscription
+    // Get user data
     const [user] = await db
       .select()
       .from(users)
@@ -109,7 +109,7 @@ router.get("/subscriptions/current", authenticateToken, async (req, res) => {
       userType: user.userType
     });
 
-    // Get latest active subscription
+    // Get current active subscription
     const [currentSubscription] = await db
       .select()
       .from(subscriptions)
@@ -122,9 +122,10 @@ router.get("/subscriptions/current", authenticateToken, async (req, res) => {
 
     console.log('Current subscription:', currentSubscription);
 
-    // Ensure both user status and subscription record are checked
-    const isActive = user.userType === user.subscriptionTier && 
-                    (user.subscriptionActive || currentSubscription?.status === "active");
+    // For admin-granted subscriptions, we primarily rely on the user's status
+    // For paid subscriptions, we check both user status and subscription record
+    const isActive = user.subscriptionActive || 
+                    (currentSubscription?.status === "active" && currentSubscription?.auto_renew);
 
     return res.json({
       active: isActive,

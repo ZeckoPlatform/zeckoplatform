@@ -133,7 +133,8 @@ router.get("/admin/stats", authenticateToken, checkSuperAdminAccess, async (req,
       .from(subscriptions)
       .where(and(
         eq(subscriptions.status, "active"),
-        eq(subscriptions.auto_renew, true) // Only count paid subscriptions
+        eq(subscriptions.auto_renew, true), // Only count paid subscriptions
+        sql`price > 0` // Additional check to ensure we only count paid subscriptions
       ));
 
     const totalRevenue = revenue?.total ? Number(revenue.total) / 100 : 0;
@@ -218,15 +219,15 @@ router.post("/admin/users/:userId/subscription", authenticateToken, checkSuperAd
     const subscriptionEndDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
 
     if (subscriptionType !== "free") {
-      // Create subscription
+      // Create subscription with auto_renew false to indicate admin-granted
       const subscriptionData = {
         user_id: userId,
         tier: subscriptionType,
         status: "active",
-        price: subscriptionType === "business" ? 2999 : 4999,
+        price: 0, // Set price to 0 for admin-granted subscriptions
         start_date: new Date(),
         end_date: subscriptionEndDate,
-        auto_renew: false // Set to false for admin-granted subscriptions
+        auto_renew: false
       };
 
       console.log('Creating new subscription:', subscriptionData);
@@ -239,7 +240,7 @@ router.post("/admin/users/:userId/subscription", authenticateToken, checkSuperAd
       .update(users)
       .set({
         userType: subscriptionType,
-        subscriptionActive: subscriptionType !== "free", // Set true for business/vendor
+        subscriptionActive: subscriptionType !== "free",
         subscriptionTier: subscriptionType === "free" ? "none" : subscriptionType,
         subscriptionEndsAt: subscriptionType === "free" ? null : subscriptionEndDate
       })
