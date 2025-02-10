@@ -25,6 +25,23 @@ export default function Navbar() {
   const cartItemCount = cart.getItemCount();
   const [, setLocation] = useLocation();
 
+  const getDashboardLink = () => {
+    if (!user) return "/";
+
+    switch (user.userType) {
+      case "vendor":
+        return "/vendor/dashboard";
+      case "business":
+        return "/leads";
+      case "admin":
+        return user.superAdmin ? "/admin-management" : "/leads";
+      case "free":
+        return "/leads";
+      default:
+        return "/";
+    }
+  };
+
   const handleNavigation = (path: string) => {
     setLocation(path);
   };
@@ -128,7 +145,7 @@ export default function Navbar() {
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => handleNavigation("/dashboard")}>
+                  <DropdownMenuItem onClick={() => handleNavigation(getDashboardLink())}>
                     Dashboard
                   </DropdownMenuItem>
                   {(user.userType === "business" || user.userType === "vendor") && (
