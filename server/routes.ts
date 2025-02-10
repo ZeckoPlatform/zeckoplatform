@@ -207,16 +207,56 @@ export function registerRoutes(app: Express): Server {
       if (req.user.userType === "free") {
         const userLeads = await db.query.leads.findMany({
           where: eq(leads.user_id, req.user.id),
+          columns: {
+            id: true,
+            title: true,
+            description: true,
+            category: true,
+            budget: true,
+            location: true,
+            status: true,
+            expires_at: true,
+            created_at: true,
+            user_id: true
+          },
           with: {
             responses: {
+              columns: {
+                id: true,
+                status: true,
+                created_at: true,
+                business_id: true
+              },
               with: {
-                business: true
+                business: {
+                  columns: {
+                    id: true,
+                    username: true,
+                    email: true,
+                    userType: true,
+                    profile: true
+                  }
+                }
               }
             },
             messages: {
               where: eq(messages.receiver_id, req.user.id),
+              columns: {
+                id: true,
+                content: true,
+                read: true,
+                created_at: true,
+                sender_id: true,
+                receiver_id: true
+              },
               with: {
-                sender: true
+                sender: {
+                  columns: {
+                    id: true,
+                    username: true,
+                    email: true
+                  }
+                }
               }
             }
           }
@@ -244,16 +284,56 @@ export function registerRoutes(app: Express): Server {
 
         const businessLeads = await db.query.leads.findMany({
           where: eq(leads.status, "open"),
+          columns: {
+            id: true,
+            title: true,
+            description: true,
+            category: true,
+            budget: true,
+            location: true,
+            status: true,
+            expires_at: true,
+            created_at: true,
+            user_id: true
+          },
           with: {
             responses: {
+              columns: {
+                id: true,
+                status: true,
+                created_at: true,
+                business_id: true
+              },
               with: {
-                business: true
+                business: {
+                  columns: {
+                    id: true,
+                    username: true,
+                    email: true,
+                    userType: true,
+                    profile: true
+                  }
+                }
               }
             },
             messages: {
               where: eq(messages.receiver_id, req.user.id),
+              columns: {
+                id: true,
+                content: true,
+                read: true,
+                created_at: true,
+                sender_id: true,
+                receiver_id: true
+              },
               with: {
-                sender: true
+                sender: {
+                  columns: {
+                    id: true,
+                    username: true,
+                    email: true
+                  }
+                }
               }
             }
           }
@@ -283,21 +363,6 @@ export function registerRoutes(app: Express): Server {
       });
     }
   });
-
-  app.get("/api/auth/verify", (req, res) => {
-    if (req.isAuthenticated() && req.user) {
-      log(`Verified auth for user: ${req.user.id}, Session: ${req.sessionID}`);
-      res.json({
-        authenticated: true,
-        user: req.user,
-        sessionId: req.sessionID
-      });
-    } else {
-      log(`Auth verification failed - Session: ${req.sessionID}`);
-      res.status(401).json({ authenticated: false });
-    }
-  });
-
 
   // POST /api/leads/:leadId/responses - Add subscription check
   app.post("/api/leads/:leadId/responses", async (req, res) => {
