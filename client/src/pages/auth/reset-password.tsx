@@ -84,7 +84,14 @@ export default function ResetPasswordPage() {
         password: data.password,
       };
 
-      // Remove any debugging that could expose sensitive data
+      // Debug log the form values and payload
+      console.log("Form values:", {
+        ...data,
+        passwordLength: data.password.length,
+        confirmPasswordLength: data.confirmPassword.length,
+        token: params.token,
+      });
+
       const response = await apiRequest("POST", "/api/auth/reset-password", resetPayload);
       const result = await response.json();
 
