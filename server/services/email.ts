@@ -2,15 +2,7 @@ import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { MailService } from '@sendgrid/mail';
 import { log } from "../vite";
 
-if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY || !process.env.AWS_REGION) {
-  log("AWS credentials are not properly configured");
-}
-
-if (!process.env.SENDGRID_API_KEY) {
-  log("SendGrid API key is not configured");
-}
-
-// Initialize AWS SES client
+// Initialize AWS SES client with proper configuration
 const ses = new SESClient({
   region: process.env.AWS_REGION || 'eu-west-2',
   credentials: {
@@ -19,7 +11,7 @@ const ses = new SESClient({
   }
 });
 
-// Initialize SendGrid client
+// Initialize SendGrid client as fallback
 const sendgrid = new MailService();
 if (process.env.SENDGRID_API_KEY) {
   sendgrid.setApiKey(process.env.SENDGRID_API_KEY);
@@ -34,6 +26,9 @@ interface EmailOptions {
 
 async function sendWithSES(options: EmailOptions): Promise<boolean> {
   try {
+    log(`[AWS SES] Attempting to send email to ${options.to}`);
+    log(`[AWS SES] Using sender email: ${process.env.AWS_SES_VERIFIED_EMAIL}`);
+
     const command = new SendEmailCommand({
       Source: process.env.AWS_SES_VERIFIED_EMAIL!,
       Destination: {
@@ -57,17 +52,31 @@ async function sendWithSES(options: EmailOptions): Promise<boolean> {
       },
     });
 
-    await ses.send(command);
-    log(`Email sent successfully via AWS SES to ${options.to}`);
+    log('[AWS SES] Sending email command...');
+    const result = await ses.send(command);
+    log(`[AWS SES] Email sent successfully. MessageId: ${result.MessageId}`);
     return true;
-  } catch (error) {
-    log(`AWS SES email error: ${error}`);
+  } catch (error: any) {
+    log(`[AWS SES] Email error: ${error.message}`);
+    if (error.Code) {
+      log(`[AWS SES] Error code: ${error.Code}`);
+    }
+    if (error.$metadata) {
+      log(`[AWS SES] Request ID: ${error.$metadata.requestId}`);
+      log(`[AWS SES] HTTP status code: ${error.$metadata.httpStatusCode}`);
+    }
     return false;
   }
 }
 
 async function sendWithSendGrid(options: EmailOptions): Promise<boolean> {
+  if (!process.env.SENDGRID_API_KEY) {
+    log('[SendGrid] API key is not configured');
+    return false;
+  }
+
   try {
+    log(`[SendGrid] Attempting to send email to ${options.to}`);
     await sendgrid.send({
       to: options.to,
       from: process.env.AWS_SES_VERIFIED_EMAIL!, // Using the same verified email
@@ -75,45 +84,63 @@ async function sendWithSendGrid(options: EmailOptions): Promise<boolean> {
       text: options.text,
       html: options.html,
     });
-    log(`Email sent successfully via SendGrid to ${options.to}`);
+    log(`[SendGrid] Email sent successfully to ${options.to}`);
     return true;
-  } catch (error) {
-    log(`SendGrid email error: ${error}`);
+  } catch (error: any) {
+    log(`[SendGrid] Email error: ${error.message}`);
+    if (error.response) {
+      log(`[SendGrid] Status code: ${error.response.status}`);
+      log(`[SendGrid] Response body: ${JSON.stringify(error.response.body)}`);
+    }
     return false;
   }
 }
 
-// Send email with fallback
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
+  // Validate required environment variables
+  if (!process.env.AWS_SES_VERIFIED_EMAIL) {
+    log('[Email Service] AWS SES verified email is not configured');
+    return false;
+  }
+
   try {
     // Try AWS SES first
-    if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && process.env.AWS_SES_VERIFIED_EMAIL) {
+    if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
+      log('[Email Service] Attempting to send via AWS SES');
       const sesResult = await sendWithSES(options);
-      if (sesResult) return true;
-      log("AWS SES failed, attempting SendGrid fallback");
+      if (sesResult) {
+        log('[Email Service] Successfully sent via AWS SES');
+        return true;
+      }
+      log("[Email Service] AWS SES failed, attempting SendGrid fallback");
+    } else {
+      log('[Email Service] AWS credentials not found, skipping SES');
     }
 
     // Fallback to SendGrid
-    if (process.env.SENDGRID_API_KEY) {
-      const sendgridResult = await sendWithSendGrid(options);
-      if (sendgridResult) return true;
+    log('[Email Service] Attempting to send via SendGrid');
+    const sendgridResult = await sendWithSendGrid(options);
+    if (sendgridResult) {
+      log('[Email Service] Successfully sent via SendGrid');
+      return true;
     }
 
     // Both services failed
-    log("All email services failed");
+    log("[Email Service] All email services failed");
     return false;
   } catch (error) {
-    log(`Email service error: ${error}`);
+    log(`[Email Service] Unexpected error: ${error}`);
     return false;
   }
 }
 
-// Send password reset email
 export async function sendPasswordResetEmail(
   email: string,
   resetToken: string,
   resetUrl: string
 ): Promise<boolean> {
+  log(`[Password Reset] Attempting to send password reset email to ${email}`);
+
   const htmlContent = `
     <h2>Password Reset Request</h2>
     <p>You have requested to reset your password. Click the link below to proceed:</p>

@@ -108,7 +108,7 @@ router.post("/auth/reset-password/confirm", async (req, res) => {
 
     res.json({ message: "Password has been reset successfully" });
   } catch (error) {
-    console.error("Password reset confirmation error:", error);
+    log("Password reset confirmation error:", error);
     res.status(500).json({
       message: "Unable to reset password. Please try again later or contact support."
     });
