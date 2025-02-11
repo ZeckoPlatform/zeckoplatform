@@ -3,18 +3,18 @@ import { authenticateToken } from "../auth";
 import { db } from "@db";
 import { users } from "@db/schema";
 import { eq } from "drizzle-orm";
-import { authenticator } from "otplib";
-import QRCode from "qrcode";
-import { checkTrialEligibility, recordTrialUsage, canDeleteAccount } from "../services/trial-verification";
 import { randomBytes } from "crypto";
 import { hashPassword } from "../auth";
+import { sendPasswordResetEmail } from "../services/email";
+import { log } from "../vite";
 
 const router = Router();
 
-// Password reset request (no auth required) - Temporary implementation without email
-router.post("/auth/reset-password", async (req, res) => {
+// Password reset request - Production implementation
+router.post("/auth/forgot-password", async (req, res) => {
   try {
     const { email } = req.body;
+    log(`Processing forgot password request for email: ${email}`);
 
     if (!email) {
       return res.status(400).json({ message: "Email is required" });
@@ -26,46 +26,57 @@ router.post("/auth/reset-password", async (req, res) => {
       .from(users)
       .where(eq(users.email, email));
 
+    // Always return the same message to prevent user enumeration
     if (!user) {
-      // For security in production, don't reveal if the email exists
-      // For development, we'll return a clear message
-      return res.status(404).json({
-        message: "No account found with this email address"
+      log(`No user found with email: ${email}`);
+      return res.status(200).json({
+        message: "If an account exists with this email, you will receive password reset instructions."
       });
     }
 
-    // Generate reset token
-    const resetToken = randomBytes(32).toString('hex');
-    const resetExpiry = new Date(Date.now() + 3600000); // 1 hour from now
+    try {
+      const resetToken = randomBytes(32).toString('hex');
+      const resetExpiry = new Date(Date.now() + 3600000); // 1 hour
 
-    // Update user with reset token
-    await db
-      .update(users)
-      .set({
-        resetPasswordToken: resetToken,
-        resetPasswordExpiry: resetExpiry
-      })
-      .where(eq(users.id, user.id));
+      // Update user with reset token
+      await db
+        .update(users)
+        .set({
+          resetPasswordToken: resetToken,
+          resetPasswordExpiry: resetExpiry
+        })
+        .where(eq(users.id, user.id));
 
-    // In production, this token would be sent via email
-    // For development, we'll return it directly
-    res.status(200).json({
-      message: "Password reset token generated successfully",
-      // TEMPORARY: Return token directly for development
-      resetToken: resetToken,
-      // Include instructions in the response
-      instructions: "Use this token with the /auth/reset-password/confirm endpoint to set a new password"
-    });
+      // Generate reset URL
+      const resetUrl = `https://${req.get('host')}/reset-password/${resetToken}`;
+
+      // Send email using the email service
+      const emailSent = await sendPasswordResetEmail(email, resetToken, resetUrl);
+
+      if (!emailSent) {
+        log(`Failed to send password reset email to ${email}`);
+        return res.status(500).json({
+          message: "Unable to send password reset email. Please try again later or contact support."
+        });
+      }
+
+      return res.status(200).json({
+        message: "If an account exists with this email, you will receive password reset instructions."
+      });
+
+    } catch (error) {
+      log(`Error in password reset process: ${error}`);
+      return res.status(500).json({
+        message: "Unable to process password reset request. Please try again later or contact support."
+      });
+    }
   } catch (error) {
-    console.error("Password reset request error:", error);
-    res.status(500).json({
-      message: "Failed to process password reset request",
-      error: error instanceof Error ? error.message : "Unknown error"
-    });
+    log(`Password reset request error: ${error}`);
+    return res.status(500).json({ message: "Failed to process password reset request" });
   }
 });
 
-// Verify reset token and set new password (no auth required)
+// Verify reset token and set new password
 router.post("/auth/reset-password/confirm", async (req, res) => {
   try {
     const { token, newPassword } = req.body;
@@ -95,12 +106,11 @@ router.post("/auth/reset-password/confirm", async (req, res) => {
       })
       .where(eq(users.id, user.id));
 
-    res.json({ message: "Password reset successful" });
+    res.json({ message: "Password has been reset successfully" });
   } catch (error) {
     console.error("Password reset confirmation error:", error);
     res.status(500).json({
-      message: "Failed to reset password",
-      error: error instanceof Error ? error.message : "Unknown error"
+      message: "Unable to reset password. Please try again later or contact support."
     });
   }
 });

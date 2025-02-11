@@ -13,9 +13,9 @@ import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 const scryptAsync = promisify(scrypt);
 const JWT_SECRET = process.env.REPL_ID!;
 
-// Initialize AWS SES client with explicit endpoint
+// Initialize AWS SES client
 const ses = new SESClient({
-  region: process.env.AWS_REGION || 'eu-west-2', // EU (London) region
+  region: process.env.AWS_REGION || 'eu-west-2',
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!
@@ -26,6 +26,56 @@ const ses = new SESClient({
 const isAwsConfigured = process.env.AWS_ACCESS_KEY_ID && 
                        process.env.AWS_SECRET_ACCESS_KEY && 
                        process.env.AWS_SES_VERIFIED_EMAIL;
+
+async function sendPasswordResetEmail(email: string, resetToken: string, req: Request): Promise<void> {
+  if (!isAwsConfigured) {
+    throw new Error('AWS SES is not properly configured');
+  }
+
+  const resetUrl = `https://${req.get('host')}/reset-password/${resetToken}`;
+
+  const emailParams = {
+    Source: process.env.AWS_SES_VERIFIED_EMAIL!,
+    Destination: {
+      ToAddresses: [email],
+    },
+    Message: {
+      Subject: {
+        Data: 'Password Reset Request - Zecko Marketplace',
+        Charset: 'UTF-8'
+      },
+      Body: {
+        Text: {
+          Data: `You are receiving this email because you requested a password reset.\n\n` +
+                `Please click on the following link to complete the process:\n\n` +
+                `${resetUrl}\n\n` +
+                `This link will expire in 1 hour.\n\n` +
+                `If you did not request this, please ignore this email.`,
+          Charset: 'UTF-8'
+        },
+        Html: {
+          Data: `
+            <h2>Password Reset Request</h2>
+            <p>You are receiving this email because you requested a password reset.</p>
+            <p>Please click on the following link to complete the process:</p>
+            <p><a href="${resetUrl}">${resetUrl}</a></p>
+            <p>This link will expire in 1 hour.</p>
+            <p>If you did not request this, please ignore this email.</p>
+          `,
+          Charset: 'UTF-8'
+        }
+      }
+    }
+  };
+
+  try {
+    await ses.send(new SendEmailCommand(emailParams));
+    log(`Password reset email sent successfully to ${email}`);
+  } catch (error) {
+    log(`Failed to send password reset email: ${error}`);
+    throw new Error('Failed to send password reset email');
+  }
+}
 
 export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
@@ -271,56 +321,8 @@ export function setupAuth(app: Express) {
         // Update user with reset token
         await updateUserResetToken(user.id, resetToken, resetExpires);
 
-        // Generate reset URL
-        const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-        const resetUrl = `${protocol}://${req.get('host')}/reset-password/${resetToken}`;
-
-        const emailParams = {
-          Source: process.env.AWS_SES_VERIFIED_EMAIL!,
-          Destination: {
-            ToAddresses: [email],
-          },
-          Message: {
-            Subject: {
-              Data: 'Password Reset Request - Zecko Marketplace',
-              Charset: 'UTF-8'
-            },
-            Body: {
-              Text: {
-                Data: `You are receiving this email because you requested a password reset.\n\n` +
-                      `Please click on the following link to complete the process:\n\n` +
-                      `${resetUrl}\n\n` +
-                      `This link will expire in 1 hour.\n\n` +
-                      `If you did not request this, please ignore this email.`,
-                Charset: 'UTF-8'
-              },
-              Html: {
-                Data: `
-                  <h2>Password Reset Request</h2>
-                  <p>You are receiving this email because you requested a password reset.</p>
-                  <p>Please click on the following link to complete the process:</p>
-                  <p><a href="${resetUrl}">${resetUrl}</a></p>
-                  <p>This link will expire in 1 hour.</p>
-                  <p>If you did not request this, please ignore this email.</p>
-                `,
-                Charset: 'UTF-8'
-              }
-            }
-          }
-        };
-
-        try {
-          await ses.send(new SendEmailCommand(emailParams));
-          log(`Password reset email sent successfully to ${email}`);
-        } catch (emailError) {
-          log(`AWS SES Error: ${emailError}`);
-          // In production, we should notify administrators about the email sending failure
-          if (process.env.NODE_ENV === 'production') {
-            // Here you might want to implement error reporting to your monitoring system
-            console.error('Production email sending failed:', emailError);
-          }
-          throw emailError; // Re-throw to be caught by outer try-catch
-        }
+        // Send email using the new function
+        await sendPasswordResetEmail(email, resetToken, req);
 
         return res.status(200).json({
           message: "If an account exists with this email, a password reset link will be sent."

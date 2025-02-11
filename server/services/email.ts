@@ -1,29 +1,29 @@
-import { SESClient, SendEmailCommand, SendBulkTemplatedEmailCommand } from "@aws-sdk/client-ses";
-import { db } from '@db';
-import { users } from '@db/schema';
-import { eq } from 'drizzle-orm';
+import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
+import { MailService } from '@sendgrid/mail';
+import { log } from "../vite";
 
-if (!process.env.AWS_ACCESS_KEY_ID) {
-  throw new Error("AWS_ACCESS_KEY_ID environment variable must be set");
+if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY || !process.env.AWS_REGION) {
+  log("AWS credentials are not properly configured");
 }
 
-if (!process.env.AWS_SECRET_ACCESS_KEY) {
-  throw new Error("AWS_SECRET_ACCESS_KEY environment variable must be set");
+if (!process.env.SENDGRID_API_KEY) {
+  log("SendGrid API key is not configured");
 }
 
-if (!process.env.AWS_REGION) {
-  throw new Error("AWS_REGION environment variable must be set");
-}
-
+// Initialize AWS SES client
 const ses = new SESClient({
-  region: process.env.AWS_REGION,
+  region: process.env.AWS_REGION || 'eu-west-2',
   credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  },
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!
+  }
 });
 
-const FROM_EMAIL = 'noreply@zecko.app';
+// Initialize SendGrid client
+const sendgrid = new MailService();
+if (process.env.SENDGRID_API_KEY) {
+  sendgrid.setApiKey(process.env.SENDGRID_API_KEY);
+}
 
 interface EmailOptions {
   to: string;
@@ -32,11 +32,10 @@ interface EmailOptions {
   text: string;
 }
 
-// Send a single email (for transactional emails like password reset)
-export async function sendEmail(options: EmailOptions): Promise<boolean> {
+async function sendWithSES(options: EmailOptions): Promise<boolean> {
   try {
     const command = new SendEmailCommand({
-      Source: FROM_EMAIL,
+      Source: process.env.AWS_SES_VERIFIED_EMAIL!,
       Destination: {
         ToAddresses: [options.to],
       },
@@ -59,12 +58,86 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     });
 
     await ses.send(command);
-    console.log(`Email sent successfully to ${options.to}`);
+    log(`Email sent successfully via AWS SES to ${options.to}`);
     return true;
   } catch (error) {
-    console.error('AWS SES email error:', error);
+    log(`AWS SES email error: ${error}`);
     return false;
   }
+}
+
+async function sendWithSendGrid(options: EmailOptions): Promise<boolean> {
+  try {
+    await sendgrid.send({
+      to: options.to,
+      from: process.env.AWS_SES_VERIFIED_EMAIL!, // Using the same verified email
+      subject: options.subject,
+      text: options.text,
+      html: options.html,
+    });
+    log(`Email sent successfully via SendGrid to ${options.to}`);
+    return true;
+  } catch (error) {
+    log(`SendGrid email error: ${error}`);
+    return false;
+  }
+}
+
+// Send email with fallback
+export async function sendEmail(options: EmailOptions): Promise<boolean> {
+  try {
+    // Try AWS SES first
+    if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && process.env.AWS_SES_VERIFIED_EMAIL) {
+      const sesResult = await sendWithSES(options);
+      if (sesResult) return true;
+      log("AWS SES failed, attempting SendGrid fallback");
+    }
+
+    // Fallback to SendGrid
+    if (process.env.SENDGRID_API_KEY) {
+      const sendgridResult = await sendWithSendGrid(options);
+      if (sendgridResult) return true;
+    }
+
+    // Both services failed
+    log("All email services failed");
+    return false;
+  } catch (error) {
+    log(`Email service error: ${error}`);
+    return false;
+  }
+}
+
+// Send password reset email
+export async function sendPasswordResetEmail(
+  email: string,
+  resetToken: string,
+  resetUrl: string
+): Promise<boolean> {
+  const htmlContent = `
+    <h2>Password Reset Request</h2>
+    <p>You have requested to reset your password. Click the link below to proceed:</p>
+    <p><a href="${resetUrl}">Reset Password</a></p>
+    <p>If you didn't request this, please ignore this email.</p>
+    <p>This link will expire in 1 hour.</p>
+  `;
+
+  const textContent = `
+    Password Reset Request
+
+    You have requested to reset your password. Click the link below to proceed:
+    ${resetUrl}
+
+    If you didn't request this, please ignore this email.
+    This link will expire in 1 hour.
+  `;
+
+  return sendEmail({
+    to: email,
+    subject: 'Password Reset Request - Zecko Marketplace',
+    html: htmlContent,
+    text: textContent,
+  });
 }
 
 // Send mass emails to all active users (for announcements)
@@ -138,36 +211,4 @@ export async function sendMassEmail(subject: string, htmlContent: string, textCo
       errors: 0,
     };
   }
-}
-
-// Send password reset email
-export async function sendPasswordResetEmail(
-  email: string,
-  resetToken: string,
-  resetUrl: string
-): Promise<boolean> {
-  const htmlContent = `
-    <h2>Password Reset Request</h2>
-    <p>You have requested to reset your password. Click the link below to proceed:</p>
-    <p><a href="${resetUrl}">Reset Password</a></p>
-    <p>If you didn't request this, please ignore this email.</p>
-    <p>This link will expire in 1 hour.</p>
-  `;
-
-  const textContent = `
-    Password Reset Request
-
-    You have requested to reset your password. Click the link below to proceed:
-    ${resetUrl}
-
-    If you didn't request this, please ignore this email.
-    This link will expire in 1 hour.
-  `;
-
-  return sendEmail({
-    to: email,
-    subject: 'Password Reset Request',
-    html: htmlContent,
-    text: textContent,
-  });
 }
