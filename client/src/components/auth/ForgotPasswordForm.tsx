@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
-import { apiRequest } from "@/lib/api";
+import { apiRequest } from "@/lib/queryClient";
 
 export function ForgotPasswordForm() {
   const [email, setEmail] = useState("");
@@ -20,7 +20,7 @@ export function ForgotPasswordForm() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message);
+        throw new Error(error.message || "Failed to process request");
       }
 
       toast({
@@ -52,6 +52,7 @@ export function ForgotPasswordForm() {
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Enter your email"
           required
+          disabled={isSubmitting}
         />
       </div>
       <Button
