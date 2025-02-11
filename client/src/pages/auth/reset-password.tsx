@@ -21,6 +21,11 @@ const resetPasswordSchema = z.object({
 
 type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
 
+interface ResetPasswordPayload {
+  token: string;
+  password: string;
+}
+
 export default function ResetPasswordPage() {
   const [, setLocation] = useLocation();
   const [match, params] = useRoute<{ token: string }>("/auth/reset-password/:token");
@@ -33,6 +38,7 @@ export default function ResetPasswordPage() {
       password: "",
       confirmPassword: "",
     },
+    mode: "onChange"
   });
 
   useEffect(() => {
@@ -69,12 +75,25 @@ export default function ResetPasswordPage() {
 
   const onSubmit = async (formData: ResetPasswordFormData) => {
     try {
+      console.log("Starting password reset with form data:", {
+        hasPassword: !!formData.password,
+        passwordLength: formData.password.length,
+        token: params.token
+      });
+
       setIsResetting(true);
 
-      const resetPayload = {
+      const resetPayload: ResetPasswordPayload = {
         token: params.token,
         password: formData.password
       };
+
+      console.log("Sending reset payload:", {
+        hasToken: !!resetPayload.token,
+        tokenLength: resetPayload.token.length,
+        hasPassword: !!resetPayload.password,
+        passwordLength: resetPayload.password.length
+      });
 
       const response = await apiRequest("POST", "/api/auth/reset-password", resetPayload);
       const result = await response.json();
@@ -88,6 +107,7 @@ export default function ResetPasswordPage() {
         setLocation("/auth");
       }, 1500);
     } catch (error) {
+      console.error("Reset password error:", error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to reset password",
@@ -133,7 +153,7 @@ export default function ResetPasswordPage() {
           <Button
             type="submit"
             className="w-full"
-            disabled={isResetting}
+            disabled={isResetting || !form.formState.isValid}
           >
             {isResetting ? (
               <>
