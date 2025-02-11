@@ -19,16 +19,23 @@ export function ForgotPasswordForm() {
       const response = await apiRequest("POST", "/api/auth/forgot-password", { email });
       const data = await response.json();
 
-      if (!response.ok) {
+      if (response.status === 400 && data.message.includes('needs to be verified')) {
+        // Show verification required message
+        toast({
+          title: "Verification Required",
+          description: data.message,
+          variant: "destructive",
+        });
+      } else if (!response.ok) {
         throw new Error(data.message || "Failed to process request");
+      } else {
+        // Success case
+        toast({
+          title: "Check your email",
+          description: "If an account exists with this email, you will receive password reset instructions.",
+        });
+        setEmail("");
       }
-
-      toast({
-        title: "Check your email",
-        description: "If an account exists with this email, you will receive password reset instructions.",
-      });
-
-      setEmail("");
     } catch (error) {
       console.error("Forgot password error:", error);
       toast({

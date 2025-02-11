@@ -18,7 +18,7 @@ interface EmailOptions {
   text: string;
 }
 
-async function sendWithSES(options: EmailOptions): Promise<boolean> {
+async function sendWithSES(options: EmailOptions): Promise<{ success: boolean; error?: string }> {
   try {
     log(`[AWS SES] Attempting to send email to ${options.to}`);
     log(`[AWS SES] Using sender email: ${process.env.AWS_SES_VERIFIED_EMAIL}`);
@@ -50,7 +50,7 @@ async function sendWithSES(options: EmailOptions): Promise<boolean> {
     log('[AWS SES] Sending email command...');
     const result = await ses.send(command);
     log(`[AWS SES] Email sent successfully. MessageId: ${result.MessageId}`);
-    return true;
+    return { success: true };
   } catch (error: any) {
     log(`[AWS SES] Email error: ${error.message}`);
     if (error.Code) {
@@ -60,7 +60,19 @@ async function sendWithSES(options: EmailOptions): Promise<boolean> {
       log(`[AWS SES] Request ID: ${error.$metadata.requestId}`);
       log(`[AWS SES] HTTP status code: ${error.$metadata.httpStatusCode}`);
     }
-    return false;
+
+    // Check for sandbox mode restrictions
+    if (error.message.includes('not verified')) {
+      return {
+        success: false,
+        error: "Your email address needs to be verified in AWS SES before receiving emails. Please contact support to verify your email address."
+      };
+    }
+
+    return { 
+      success: false,
+      error: "Failed to send email. Please try again later."
+    };
   }
 }
 
@@ -75,20 +87,23 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     // Try AWS SES
     if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
       log('[Email Service] Attempting to send via AWS SES');
-      const sesResult = await sendWithSES(options);
-      if (sesResult) {
+      const result = await sendWithSES(options);
+      if (result.success) {
         log('[Email Service] Successfully sent via AWS SES');
         return true;
       }
       log("[Email Service] AWS SES failed to send email");
+      if (result.error) {
+        throw new Error(result.error);
+      }
     } else {
       log('[Email Service] AWS credentials not found');
     }
 
     return false;
   } catch (error) {
-    log(`[Email Service] Unexpected error: ${error}`);
-    return false;
+    log(`[Email Service] Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw error; // Propagate the error with the custom message
   }
 }
 
