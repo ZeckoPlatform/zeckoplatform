@@ -65,7 +65,7 @@ async function sendWithSES(options: EmailOptions): Promise<{ success: boolean; e
     if (error.message.includes('not verified')) {
       return {
         success: false,
-        error: "Your email address needs to be verified in AWS SES before receiving emails. Please contact support to verify your email address."
+        error: "Your email address is not verified in our system. During the testing phase, please use zeckoinfo@gmail.com for password resets. For production use, we'll need to verify your email address first."
       };
     }
 

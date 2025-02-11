@@ -51,14 +51,18 @@ export async function updateUserResetToken(userId: number, token: string | null,
   try {
     log(`Updating reset token for user ${userId}`);
 
-    await db
+    const [updated] = await db
       .update(users)
       .set({
         resetPasswordToken: token,
         resetPasswordExpiry: expiry
       })
       .where(eq(users.id, userId))
-      .execute();
+      .returning();
+
+    if (!updated) {
+      throw new Error('Failed to update user reset token');
+    }
 
     log(`Successfully updated reset token for user ${userId}`);
     return true;
@@ -255,19 +259,28 @@ export function setupAuth(app: Express) {
         const host = req.get('host');
         const resetUrl = `${protocol}://${host}/reset-password/${resetToken}`;
 
-        // Send email
-        const emailSent = await sendPasswordResetEmail(email, resetToken, resetUrl);
+        try {
+          // Send email
+          await sendPasswordResetEmail(email, resetToken, resetUrl);
 
-        if (!emailSent) {
-          log(`Failed to send password reset email to ${email}`);
-          return res.status(500).json({
+          return res.status(200).json({
+            message: "If an account exists with this email, a password reset link will be sent."
+          });
+
+        } catch (error: any) {
+          log(`Failed to send password reset email: ${error.message}`);
+
+          // Check if it's a verification error
+          if (error.message?.includes('needs to be verified')) {
+            return res.status(400).json({
+              message: error.message
+            });
+          }
+
+          return res.status(500).json({ 
             message: "Unable to send password reset email. Please try again later or contact support."
           });
         }
-
-        return res.status(200).json({
-          message: "If an account exists with this email, a password reset link will be sent."
-        });
 
       } catch (error) {
         log(`Error in password reset process: ${error}`);
