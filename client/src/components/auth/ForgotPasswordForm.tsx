@@ -23,15 +23,6 @@ export function ForgotPasswordForm() {
         throw new Error(data.message || "Failed to process request");
       }
 
-      // Development mode: Show reset token if provided
-      if (data.resetToken) {
-        toast({
-          title: "Development Mode - Password Reset Token",
-          description: `Use this token to reset your password: ${data.resetToken}`,
-          duration: 10000, // Show for 10 seconds
-        });
-      }
-
       toast({
         title: "Check your email",
         description: "If an account exists with this email, you will receive password reset instructions.",
@@ -81,11 +72,6 @@ export function ForgotPasswordForm() {
       </Button>
       <p className="text-sm text-muted-foreground text-center mt-2">
         We'll send you an email with instructions to reset your password.
-        {import.meta.env.DEV && (
-          <span className="block mt-1 text-yellow-600">
-            Note: In development mode, the reset token will be displayed here.
-          </span>
-        )}
       </p>
     </form>
   );

@@ -19,9 +19,13 @@ const ses = new SESClient({
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!
-  },
-  endpoint: `https://email.${process.env.AWS_REGION || 'eu-west-2'}.amazonaws.com` // Explicit regional endpoint
+  }
 });
+
+// Check if required AWS configuration is present
+const isAwsConfigured = process.env.AWS_ACCESS_KEY_ID && 
+                       process.env.AWS_SECRET_ACCESS_KEY && 
+                       process.env.AWS_SES_VERIFIED_EMAIL;
 
 export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
@@ -242,6 +246,14 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ message: "Email is required" });
       }
 
+      // Verify AWS SES configuration in production
+      if (process.env.NODE_ENV === 'production' && !isAwsConfigured) {
+        log('AWS SES is not properly configured in production');
+        return res.status(500).json({ 
+          message: "Email service is not properly configured. Please contact support." 
+        });
+      }
+
       const [user] = await getUserByEmail(email);
 
       // Don't reveal if user exists
@@ -263,10 +275,8 @@ export function setupAuth(app: Express) {
         const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
         const resetUrl = `${protocol}://${req.get('host')}/reset-password/${resetToken}`;
 
-        log(`Attempting to send email via SES to ${email}`);
-
         const emailParams = {
-          Source: process.env.AWS_SES_VERIFIED_EMAIL,
+          Source: process.env.AWS_SES_VERIFIED_EMAIL!,
           Destination: {
             ToAddresses: [email],
           },
@@ -304,22 +314,25 @@ export function setupAuth(app: Express) {
           log(`Password reset email sent successfully to ${email}`);
         } catch (emailError) {
           log(`AWS SES Error: ${emailError}`);
-          // For development purposes, log the token since email sending failed
-          log(`Development only - Reset token: ${resetToken}`);
+          // In production, we should notify administrators about the email sending failure
+          if (process.env.NODE_ENV === 'production') {
+            // Here you might want to implement error reporting to your monitoring system
+            console.error('Production email sending failed:', emailError);
+          }
+          throw emailError; // Re-throw to be caught by outer try-catch
         }
 
-        // Always return success to avoid user enumeration
         return res.status(200).json({
-          message: "If an account exists with this email, a password reset link will be sent.",
-          // For development only, include the token in the response
-          resetToken: process.env.NODE_ENV === 'production' ? undefined : resetToken
+          message: "If an account exists with this email, a password reset link will be sent."
         });
 
       } catch (error) {
         log(`Error in password reset process: ${error}`);
         // Don't leak error details to the client
-        return res.status(200).json({
-          message: "If an account exists with this email, a password reset link will be sent."
+        return res.status(500).json({ 
+          message: process.env.NODE_ENV === 'production' 
+            ? "Unable to process password reset request. Please try again later or contact support."
+            : "Failed to process password reset request" 
         });
       }
     } catch (error) {
