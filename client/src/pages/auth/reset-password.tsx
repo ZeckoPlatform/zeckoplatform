@@ -61,16 +61,23 @@ export default function ResetPasswordPage() {
   }
 
   const onSubmit = async (data: ResetPasswordFormData) => {
-    if (data.password !== data.confirmPassword) {
-      toast({
-        title: "Error",
-        description: "Passwords do not match",
-        variant: "destructive",
-      });
-      return;
-    }
+    // Add debug logging to trace the execution flow
+    console.log("Form submission started", { 
+      formData: data,
+      token: params.token,
+      hasToken: !!params.token
+    });
 
     try {
+      if (data.password !== data.confirmPassword) {
+        toast({
+          title: "Error",
+          description: "Passwords do not match",
+          variant: "destructive",
+        });
+        return;
+      }
+
       setIsResetting(true);
 
       // Validate token and password before making request
@@ -78,18 +85,17 @@ export default function ResetPasswordPage() {
         throw new Error("Missing required fields");
       }
 
-      // Construct payload for password reset
+      // Explicitly construct payload for password reset
       const resetPayload = {
         token: params.token,
         password: data.password,
       };
 
-      // Debug log the form values and payload
-      console.log("Form values:", {
-        ...data,
-        passwordLength: data.password.length,
-        confirmPasswordLength: data.confirmPassword.length,
-        token: params.token,
+      console.log("Sending reset password request with payload", {
+        hasToken: !!resetPayload.token,
+        hasPassword: !!resetPayload.password,
+        tokenLength: resetPayload.token.length,
+        passwordLength: resetPayload.password.length
       });
 
       const response = await apiRequest("POST", "/api/auth/reset-password", resetPayload);
@@ -100,7 +106,6 @@ export default function ResetPasswordPage() {
         description: result.message || "Your password has been reset successfully",
       });
 
-      // Redirect to login page after successful reset
       setTimeout(() => {
         setLocation("/auth");
       }, 1500);
