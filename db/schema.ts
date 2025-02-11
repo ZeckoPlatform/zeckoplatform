@@ -420,101 +420,6 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
   }),
 }));
 
-export const insertUserSchema = createInsertSchema(users, {
-  email: z.string().email("Please enter a valid email address"),
-  username: z.string().min(3, "Username must be at least 3 characters").max(30, "Username must be less than 30 characters"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-  userType: z.enum(["free", "business", "vendor", "admin"]),
-  businessName: z.string().optional(),
-  companyNumber: z.string()
-    .regex(/^[A-Z0-9]{8}$/, "Invalid company registration number format")
-    .optional(),
-  vatNumber: z.string()
-    .regex(/^GB[0-9]{9}$/, "Invalid UK VAT number format")
-    .optional(),
-  utrNumber: z.string()
-    .regex(/^[0-9]{10}$/, "Invalid UTR number format")
-    .optional(),
-  twoFactorEnabled: z.boolean().optional(),
-}).refine((data) => {
-  if (data.userType === "business") {
-    return data.businessName && data.companyNumber;
-  }
-  if (data.userType === "vendor") {
-    return data.businessName && data.utrNumber;
-  }
-  return true;
-}, {
-  message: (data) =>
-    data.userType === "business"
-      ? "Business accounts require business name and company number"
-      : "Vendor accounts require business name and UTR number",
-});
-
-export const selectUserSchema = createSelectSchema(users);
-export const insertSubscriptionSchema = createInsertSchema(subscriptions);
-export const selectSubscriptionSchema = createSelectSchema(subscriptions);
-export const insertLeadSchema = createInsertSchema(leads);
-export const selectLeadSchema = createSelectSchema(leads);
-export const insertMessageSchema = createInsertSchema(messages);
-export const selectMessageSchema = createSelectSchema(messages);
-export const insertInvoiceSchema = createInsertSchema(invoices);
-export const selectInvoiceSchema = createSelectSchema(invoices);
-export const insertNotificationPreferencesSchema = createInsertSchema(notificationPreferences);
-export const selectNotificationPreferencesSchema = createSelectSchema(notificationPreferences);
-export const insertVendorTransactionSchema = createInsertSchema(vendorTransactions);
-export const selectVendorTransactionSchema = createSelectSchema(vendorTransactions);
-
-export const insertAnalyticsLogSchema = createInsertSchema(analyticsLogs);
-export const selectAnalyticsLogSchema = createSelectSchema(analyticsLogs);
-export const insertLeadAnalyticsSchema = createInsertSchema(leadAnalytics);
-export const selectLeadAnalyticsSchema = createSelectSchema(leadAnalytics);
-export const insertBusinessAnalyticsSchema = createInsertSchema(businessAnalytics);
-export const selectBusinessAnalyticsSchema = createSelectSchema(businessAnalytics);
-export const insertRevenueAnalyticsSchema = createInsertSchema(revenueAnalytics);
-export const selectRevenueAnalyticsSchema = createSelectSchema(revenueAnalytics);
-
-export const insertEmailTemplateSchema = createInsertSchema(emailTemplates);
-export const selectEmailTemplateSchema = createSelectSchema(emailTemplates);
-export const insertNewsletterSchema = createInsertSchema(newsletters);
-export const selectNewsletterSchema = createSelectSchema(newsletters);
-export const insertNotificationSchema = createInsertSchema(notifications);
-export const selectNotificationSchema = createSelectSchema(notifications);
-
-
-
-export type InsertUser = typeof users.$inferInsert;
-export type SelectUser = typeof users.$inferSelect;
-export type InsertSubscription = typeof subscriptions.$inferInsert;
-export type SelectSubscription = typeof subscriptions.$inferSelect;
-export type InsertLead = typeof leads.$inferInsert;
-export type SelectLead = typeof leads.$inferSelect;
-export type InsertMessage = typeof messages.$inferInsert;
-export type SelectMessage = typeof messages.$inferSelect;
-export type SubscriptionWithPayment = typeof subscriptions.$inferSelect;
-export type InsertInvoice = typeof invoices.$inferInsert;
-export type SelectInvoice = typeof invoices.$inferSelect;
-export type InsertNotificationPreferences = typeof notificationPreferences.$inferInsert;
-export type SelectNotificationPreferences = typeof notificationPreferences.$inferSelect;
-export type InsertVendorTransaction = typeof vendorTransactions.$inferInsert;
-export type SelectVendorTransaction = typeof vendorTransactions.$inferSelect;
-export type InsertAnalyticsLog = typeof analyticsLogs.$inferInsert;
-export type SelectAnalyticsLog = typeof analyticsLogs.$inferSelect;
-export type InsertLeadAnalytics = typeof leadAnalytics.$inferInsert;
-export type SelectLeadAnalytics = typeof leadAnalytics.$inferSelect;
-export type InsertBusinessAnalytics = typeof businessAnalytics.$inferInsert;
-export type SelectBusinessAnalytics = typeof businessAnalytics.$inferSelect;
-export type InsertRevenueAnalytics = typeof revenueAnalytics.$inferInsert;
-export type SelectRevenueAnalytics = typeof revenueAnalytics.$inferSelect;
-
-export type InsertEmailTemplate = typeof emailTemplates.$inferInsert;
-export type SelectEmailTemplate = typeof emailTemplates.$inferSelect;
-export type InsertNewsletter = typeof newsletters.$inferInsert;
-export type SelectNewsletter = typeof newsletters.$inferSelect;
-export type InsertNotification = typeof notifications.$inferInsert;
-export type SelectNotification = typeof notifications.$inferSelect;
-
-
 export const documents = pgTable("documents", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").references(() => users.id).notNull(),
@@ -611,9 +516,15 @@ export const reviews = pgTable("reviews", {
   targetId: integer("target_id").references(() => users.id).notNull(),
   rating: integer("rating").notNull(),
   content: text("content").notNull(),
+  targetType: text("target_type", {
+    enum: ["business", "vendor", "product"]
+  }).notNull(),
   status: text("status", {
     enum: ["pending", "approved", "rejected"]
   }).default("pending"),
+  reply: text("reply"),
+  repliedAt: timestamp("replied_at"),
+  repliedBy: integer("replied_by").references(() => users.id),
   moderatedBy: integer("moderated_by").references(() => users.id),
   moderationNotes: text("moderation_notes"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -652,6 +563,10 @@ export const reviewsRelations = relations(reviews, ({ one }) => ({
     fields: [reviews.moderatedBy],
     references: [users.id],
   }),
+  replyAuthor: one(users, {
+    fields: [reviews.repliedBy],
+    references: [users.id],
+  }),
 }));
 
 export const reviewVotesRelations = relations(reviewVotes, ({ one }) => ({
@@ -685,3 +600,96 @@ export type InsertReviewVote = typeof reviewVotes.$inferInsert;
 export type SelectReviewVote = typeof reviewVotes.$inferSelect;
 export type InsertReputationScore = typeof reputationScores.$inferInsert;
 export type SelectReputationScore = typeof reputationScores.$inferSelect;
+
+export const insertUserSchema = createInsertSchema(users, {
+  email: z.string().email("Please enter a valid email address"),
+  username: z.string().min(3, "Username must be at least 3 characters").max(30, "Username must be less than 30 characters"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  userType: z.enum(["free", "business", "vendor", "admin"]),
+  businessName: z.string().optional(),
+  companyNumber: z.string()
+    .regex(/^[A-Z0-9]{8}$/, "Invalid company registration number format")
+    .optional(),
+  vatNumber: z.string()
+    .regex(/^GB[0-9]{9}$/, "Invalid UK VAT number format")
+    .optional(),
+  utrNumber: z.string()
+    .regex(/^[0-9]{10}$/, "Invalid UTR number format")
+    .optional(),
+  twoFactorEnabled: z.boolean().optional(),
+}).refine((data) => {
+  if (data.userType === "business") {
+    return data.businessName && data.companyNumber;
+  }
+  if (data.userType === "vendor") {
+    return data.businessName && data.utrNumber;
+  }
+  return true;
+}, {
+  message: (data) =>
+    data.userType === "business"
+      ? "Business accounts require business name and company number"
+      : "Vendor accounts require business name and UTR number",
+});
+
+export const selectUserSchema = createSelectSchema(users);
+export const insertSubscriptionSchema = createInsertSchema(subscriptions);
+export const selectSubscriptionSchema = createSelectSchema(subscriptions);
+export const insertLeadSchema = createInsertSchema(leads);
+export const selectLeadSchema = createSelectSchema(leads);
+export const insertMessageSchema = createInsertSchema(messages);
+export const selectMessageSchema = createSelectSchema(messages);
+export const insertInvoiceSchema = createInsertSchema(invoices);
+export const selectInvoiceSchema = createSelectSchema(invoices);
+export const insertNotificationPreferencesSchema = createInsertSchema(notificationPreferences);
+export const selectNotificationPreferencesSchema = createSelectSchema(notificationPreferences);
+export const insertVendorTransactionSchema = createInsertSchema(vendorTransactions);
+export const selectVendorTransactionSchema = createSelectSchema(vendorTransactions);
+
+export const insertAnalyticsLogSchema = createInsertSchema(analyticsLogs);
+export const selectAnalyticsLogSchema = createSelectSchema(analyticsLogs);
+export const insertLeadAnalyticsSchema = createInsertSchema(leadAnalytics);
+export const selectLeadAnalyticsSchema = createSelectSchema(leadAnalytics);
+export const insertBusinessAnalyticsSchema = createInsertSchema(businessAnalytics);
+export const selectBusinessAnalyticsSchema = createSelectSchema(businessAnalytics);
+export const insertRevenueAnalyticsSchema = createInsertSchema(revenueAnalytics);
+export const selectRevenueAnalyticsSchema = createSelectSchema(revenueAnalytics);
+
+export const insertEmailTemplateSchema = createInsertSchema(emailTemplates);
+export const selectEmailTemplateSchema = createSelectSchema(emailTemplates);
+export const insertNewsletterSchema = createInsertSchema(newsletters);
+export const selectNewsletterSchema = createSelectSchema(newsletters);
+export const insertNotificationSchema = createInsertSchema(notifications);
+export const selectNotificationSchema = createSelectSchema(notifications);
+
+
+export type InsertUser = typeof users.$inferInsert;
+export type SelectUser = typeof users.$inferSelect;
+export type InsertSubscription = typeof subscriptions.$inferInsert;
+export type SelectSubscription = typeof subscriptions.$inferSelect;
+export type InsertLead = typeof leads.$inferInsert;
+export type SelectLead = typeof leads.$inferSelect;
+export type InsertMessage = typeof messages.$inferInsert;
+export type SelectMessage = typeof messages.$inferSelect;
+export type SubscriptionWithPayment = typeof subscriptions.$inferSelect;
+export type InsertInvoice = typeof invoices.$inferInsert;
+export type SelectInvoice = typeof invoices.$inferSelect;
+export type InsertNotificationPreferences = typeof notificationPreferences.$inferInsert;
+export type SelectNotificationPreferences = typeof notificationPreferences.$inferSelect;
+export type InsertVendorTransaction = typeof vendorTransactions.$inferInsert;
+export type SelectVendorTransaction = typeof vendorTransactions.$inferSelect;
+export type InsertAnalyticsLog = typeof analyticsLogs.$inferInsert;
+export type SelectAnalyticsLog = typeof analyticsLogs.$inferSelect;
+export type InsertLeadAnalytics = typeof leadAnalytics.$inferInsert;
+export type SelectLeadAnalytics = typeof leadAnalytics.$inferSelect;
+export type InsertBusinessAnalytics = typeof businessAnalytics.$inferInsert;
+export type SelectBusinessAnalytics = typeof businessAnalytics.$inferSelect;
+export type InsertRevenueAnalytics = typeof revenueAnalytics.$inferInsert;
+export type SelectRevenueAnalytics = typeof revenueAnalytics.$inferSelect;
+
+export type InsertEmailTemplate = typeof emailTemplates.$inferInsert;
+export type SelectEmailTemplate = typeof emailTemplates.$inferSelect;
+export type InsertNewsletter = typeof newsletters.$inferInsert;
+export type SelectNewsletter = typeof newsletters.$inferSelect;
+export type InsertNotification = typeof notifications.$inferInsert;
+export type SelectNotification = typeof notifications.$inferSelect;
