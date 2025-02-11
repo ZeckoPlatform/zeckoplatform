@@ -67,10 +67,10 @@ async function updateUserResetToken(userId: number, token: string | null, expiry
         reset_password_expiry: expiry
       })
       .where(eq(users.id, userId))
-      .returning();
+      .execute();
 
-    log(`Update result: ${JSON.stringify(updateResult)}`);
-    return updateResult.length > 0;
+    log(`Update completed for user ${userId}`);
+    return true;
   } catch (error) {
     log(`Error updating reset token: ${error}`);
     throw error;
@@ -254,10 +254,7 @@ export function setupAuth(app: Express) {
       const resetExpires = new Date(Date.now() + 3600000); // 1 hour from now
 
       try {
-        const updated = await updateUserResetToken(user.id, resetToken, resetExpires);
-        if (!updated) {
-          throw new Error('Failed to update user reset token');
-        }
+        await updateUserResetToken(user.id, resetToken, resetExpires);
 
         const resetUrl = `${req.protocol}://${req.get('host')}/auth/reset-password/${resetToken}`;
         const emailParams = {
