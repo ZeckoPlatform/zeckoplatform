@@ -390,16 +390,9 @@ export function setupAuth(app: Express) {
     try {
       const { token, password } = req.body;
 
-      // Debug logging
-      log(`Password reset attempt - Token present: ${!!token}, Password present: ${!!password}`);
-      if (token) log(`Token length: ${token.length}`);
-
+      // Validate token and password before making request
       if (!token || !password) {
-        log(`Missing required fields - Token: ${!!token}, Password: ${!!password}`);
-        return res.status(400).json({ 
-          message: "Token and new password are required",
-          code: 'INVALID_RESET_REQUEST'
-        });
+        throw new Error("Missing token or password");
       }
 
       // Find user with valid reset token
@@ -442,9 +435,8 @@ export function setupAuth(app: Express) {
       res.json({ message: "Password has been reset successfully" });
     } catch (error) {
       log(`Password reset error: ${error}`);
-      console.error('Password reset error:', error);
       res.status(500).json({ 
-        message: "Failed to reset password",
+        message: error instanceof Error ? error.message : "Failed to reset password",
         code: 'RESET_ERROR'
       });
     }

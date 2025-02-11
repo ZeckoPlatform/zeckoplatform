@@ -78,17 +78,13 @@ export default function ResetPasswordPage() {
         throw new Error("Missing required fields");
       }
 
-      // Explicitly construct the request payload
+      // Construct payload for password reset
       const resetPayload = {
         token: params.token,
         password: data.password,
       };
 
-      console.log("Reset password attempt payload:", {
-        tokenLength: resetPayload.token.length,
-        passwordLength: resetPayload.password.length,
-      });
-
+      // Remove any debugging that could expose sensitive data
       const response = await apiRequest("POST", "/api/auth/reset-password", resetPayload);
       const result = await response.json();
 
@@ -102,7 +98,6 @@ export default function ResetPasswordPage() {
         setLocation("/auth");
       }, 1500);
     } catch (error) {
-      console.error("Password reset error:", error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to reset password",
