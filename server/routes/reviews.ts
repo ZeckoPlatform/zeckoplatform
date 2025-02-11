@@ -176,6 +176,71 @@ router.get("/reputation/:userId", async (req, res) => {
   }
 });
 
+// Get reviews written by a user
+router.get("/reviews/written", authenticateToken, async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const userReviews = await db.query.reviews.findMany({
+      where: eq(reviews.userId, req.user.id),
+      with: {
+        target: true,
+      },
+      orderBy: (reviews, { desc }) => [desc(reviews.createdAt)],
+    });
+
+    res.json(userReviews);
+  } catch (error) {
+    console.error("Reviews fetch error:", error);
+    res.status(500).json({ message: "Failed to fetch reviews" });
+  }
+});
+
+// Reply to a review
+router.post("/reviews/:reviewId/reply", authenticateToken, async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const { reply } = req.body;
+    const reviewId = parseInt(req.params.reviewId);
+
+    // Get the review to check if the user is authorized to reply
+    const [review] = await db
+      .select()
+      .from(reviews)
+      .where(eq(reviews.id, reviewId));
+
+    if (!review) {
+      return res.status(404).json({ message: "Review not found" });
+    }
+
+    // Only allow the target user (business/vendor) to reply
+    if (review.targetId !== req.user.id) {
+      return res.status(403).json({ message: "Not authorized to reply to this review" });
+    }
+
+    // Update the review with the reply
+    const [updatedReview] = await db
+      .update(reviews)
+      .set({
+        reply,
+        repliedAt: new Date(),
+        repliedBy: req.user.id,
+      })
+      .where(eq(reviews.id, reviewId))
+      .returning();
+
+    res.json(updatedReview);
+  } catch (error) {
+    console.error("Review reply error:", error);
+    res.status(500).json({ message: "Failed to reply to review" });
+  }
+});
+
 // Helper function to update reputation score
 async function updateReputationScore(userId: number) {
   try {

@@ -15,6 +15,7 @@ import { Store, Package, Settings, Edit, Trash2, Loader2, Upload, AlertCircle, C
 import { ProductForm } from "@/components/ProductForm";
 import { UserReviews } from "@/components/reviews/UserReviews";
 import { format } from 'date-fns'
+import { ReviewsTab } from "@/components/reviews/ReviewsTab";
 
 interface Product {
   id: number;
@@ -565,17 +566,7 @@ export default function VendorDashboard() {
         </TabsContent>
 
         <TabsContent value="reviews">
-          <Card>
-            <CardHeader>
-              <CardTitle>Store Reviews</CardTitle>
-              <CardDescription>
-                View and manage customer reviews for your store
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {user && <UserReviews userId={user.id} showForm={false} />}
-            </CardContent>
-          </Card>
+          <ReviewsTab />
         </TabsContent>
 
         <TabsContent value="settings">
