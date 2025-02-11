@@ -4,25 +4,25 @@ import { log } from "../vite";
 async function testSESConfiguration() {
   try {
     log('Starting AWS SES Configuration Test');
-    
+
     // Log environment variables (partial values for security)
     const envCheck = {
-      region: process.env.AWS_REGION || 'not set',
+      region: 'eu-north-1', // Explicitly set region to Stockholm
       accessKeyId: process.env.AWS_ACCESS_KEY_ID ? `${process.env.AWS_ACCESS_KEY_ID.substring(0, 5)}...` : 'not set',
       secretKey: process.env.AWS_SECRET_ACCESS_KEY ? 'present (hidden)' : 'not set',
       senderEmail: process.env.AWS_SES_VERIFIED_EMAIL || 'not set'
     };
-    
+
     log('Environment Variables Check:', JSON.stringify(envCheck, null, 2));
 
     // Initialize SES Client
     const ses = new SESClient({
-      region: process.env.AWS_REGION || 'eu-west-2',
+      region: 'eu-north-1',
       credentials: {
         accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!
       },
-      endpoint: `https://email.${process.env.AWS_REGION || 'eu-west-2'}.amazonaws.com`
+      endpoint: `https://email.eu-north-1.amazonaws.com`
     });
 
     log('SES Client initialized');

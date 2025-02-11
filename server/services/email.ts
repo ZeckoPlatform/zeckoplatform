@@ -3,12 +3,12 @@ import { log } from "../vite";
 
 // Initialize AWS SES client with proper configuration
 const ses = new SESClient({
-  region: process.env.AWS_REGION || 'eu-west-2',
+  region: 'eu-north-1', // Explicitly set region to Stockholm
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!
   },
-  endpoint: `https://email.${process.env.AWS_REGION || 'eu-west-2'}.amazonaws.com`
+  endpoint: `https://email.eu-north-1.amazonaws.com`
 });
 
 interface EmailOptions {
@@ -22,7 +22,7 @@ async function sendWithSES(options: EmailOptions): Promise<boolean> {
   try {
     log(`[AWS SES] Attempting to send email to ${options.to}`);
     log(`[AWS SES] Using sender email: ${process.env.AWS_SES_VERIFIED_EMAIL}`);
-    log(`[AWS SES] Using AWS region: ${process.env.AWS_REGION || 'eu-west-2'}`);
+    log(`[AWS SES] Using AWS region: eu-north-1`);
 
     const command = new SendEmailCommand({
       Source: process.env.AWS_SES_VERIFIED_EMAIL!,
