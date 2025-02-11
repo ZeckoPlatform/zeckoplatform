@@ -8,11 +8,18 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
+import * as z from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 
-interface ResetPasswordFormData {
-  password: string;
-  confirmPassword: string;
-}
+const resetPasswordSchema = z.object({
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  confirmPassword: z.string()
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
+
+type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
 
 export default function ResetPasswordPage() {
   const [, setLocation] = useLocation();
@@ -21,6 +28,7 @@ export default function ResetPasswordPage() {
   const [isResetting, setIsResetting] = useState(false);
 
   const form = useForm<ResetPasswordFormData>({
+    resolver: zodResolver(resetPasswordSchema),
     defaultValues: {
       password: "",
       confirmPassword: "",
@@ -61,25 +69,11 @@ export default function ResetPasswordPage() {
 
   const onSubmit = async (formData: ResetPasswordFormData) => {
     try {
-      // Initial validation
-      if (!params.token) {
-        throw new Error("Reset token is missing");
-      }
-
-      if (!formData.password) {
-        throw new Error("Password is required");
-      }
-
-      if (formData.password !== formData.confirmPassword) {
-        throw new Error("Passwords do not match");
-      }
-
       setIsResetting(true);
 
-      // Create the reset payload
       const resetPayload = {
         token: params.token,
-        password: formData.password,
+        password: formData.password
       };
 
       const response = await apiRequest("POST", "/api/auth/reset-password", resetPayload);
@@ -119,28 +113,22 @@ export default function ResetPasswordPage() {
             <Input
               id="password"
               type="password"
-              {...form.register("password", {
-                required: "Password is required",
-                minLength: {
-                  value: 8,
-                  message: "Password must be at least 8 characters",
-                },
-              })}
+              {...form.register("password")}
             />
+            {form.formState.errors.password && (
+              <p className="text-sm text-red-500">{form.formState.errors.password.message}</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="confirmPassword">Confirm New Password</Label>
             <Input
               id="confirmPassword"
               type="password"
-              {...form.register("confirmPassword", {
-                required: "Please confirm your password",
-                minLength: {
-                  value: 8,
-                  message: "Password must be at least 8 characters",
-                },
-              })}
+              {...form.register("confirmPassword")}
             />
+            {form.formState.errors.confirmPassword && (
+              <p className="text-sm text-red-500">{form.formState.errors.confirmPassword.message}</p>
+            )}
           </div>
           <Button
             type="submit"
