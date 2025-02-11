@@ -74,8 +74,8 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "returnNull" }),
       refetchInterval: false,
       refetchOnWindowFocus: true,
-      staleTime: 0, // Set staleTime to 0 to always refetch
-      cacheTime: 5 * 60 * 1000, // Cache for 5 minutes
+      staleTime: 0,
+      gcTime: 5 * 60 * 1000, // Cache for 5 minutes
       retry: (failureCount, error: any) => {
         if (error?.name === "AuthenticationError" || error?.name === "SubscriptionRequiredError") return false;
         return failureCount < 3;
@@ -92,18 +92,25 @@ export async function apiRequest(
 ): Promise<Response> {
   try {
     console.log(`API Request - ${method} ${url}`);
-    const token = localStorage.getItem("token");
+    console.log('Request payload:', data); // Add debug logging
 
+    const token = localStorage.getItem("token");
     const fetchOptions: RequestInit = {
       method,
       credentials: 'include',
       headers: {
-        ...(data ? { "Content-Type": "application/json" } : {}),
+        "Content-Type": "application/json",
         "Accept": "application/json",
         ...(token ? { "Authorization": `Bearer ${token}` } : {}),
       },
       body: data ? JSON.stringify(data) : undefined,
     };
+
+    console.log('Request options:', {
+      method: fetchOptions.method,
+      headers: fetchOptions.headers,
+      bodyLength: fetchOptions.body ? fetchOptions.body.length : 0
+    });
 
     const res = await fetch(url, fetchOptions);
     console.log(`Response status: ${res.status}`);
@@ -117,6 +124,8 @@ export async function apiRequest(
 
     if (!res.ok) {
       const text = await res.text();
+      console.log('Error response text:', text);
+
       let errorMessage: string;
       try {
         const json = JSON.parse(text);

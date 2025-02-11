@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface ResetPasswordFormData {
   password: string;
@@ -26,6 +26,18 @@ export default function ResetPasswordPage() {
       confirmPassword: "",
     },
   });
+
+  // Validate token on mount
+  useEffect(() => {
+    if (!match || !params?.token) {
+      toast({
+        title: "Invalid Reset Link",
+        description: "The password reset link is invalid or has expired.",
+        variant: "destructive",
+      });
+      setTimeout(() => setLocation("/auth"), 1500);
+    }
+  }, [match, params?.token, setLocation, toast]);
 
   if (!match || !params?.token) {
     return (
@@ -61,30 +73,25 @@ export default function ResetPasswordPage() {
     try {
       setIsResetting(true);
 
-      // Debug logs to verify the data being sent
-      console.log('Reset password attempt:', {
-        token: params.token,
-        passwordLength: data.password.length
-      });
-
-      // Create the payload explicitly
-      const payload = {
-        token: params.token,
-        password: data.password
-      };
-
-      const response = await apiRequest("POST", "/api/auth/reset-password", payload);
-
-      // Debug response
-      console.log('Reset password response status:', response.status);
-
-      if (!response.ok) {
-        const error = await response.json();
-        console.error('Reset password error response:', error);
-        throw new Error(error.message || "Failed to reset password");
+      // Validate token and password before making request
+      if (!params.token || !data.password) {
+        throw new Error("Missing required fields");
       }
 
+      // Explicitly construct the request payload
+      const resetPayload = {
+        token: params.token,
+        password: data.password,
+      };
+
+      console.log("Reset password attempt payload:", {
+        tokenLength: resetPayload.token.length,
+        passwordLength: resetPayload.password.length,
+      });
+
+      const response = await apiRequest("POST", "/api/auth/reset-password", resetPayload);
       const result = await response.json();
+
       toast({
         title: "Success",
         description: result.message || "Your password has been reset successfully",
@@ -95,7 +102,7 @@ export default function ResetPasswordPage() {
         setLocation("/auth");
       }, 1500);
     } catch (error) {
-      console.error('Password reset error:', error);
+      console.error("Password reset error:", error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to reset password",
@@ -121,9 +128,13 @@ export default function ResetPasswordPage() {
             <Input
               id="password"
               type="password"
-              {...form.register("password")}
-              required
-              minLength={8}
+              {...form.register("password", {
+                required: "Password is required",
+                minLength: {
+                  value: 8,
+                  message: "Password must be at least 8 characters",
+                },
+              })}
             />
           </div>
           <div className="space-y-2">
@@ -131,9 +142,13 @@ export default function ResetPasswordPage() {
             <Input
               id="confirmPassword"
               type="password"
-              {...form.register("confirmPassword")}
-              required
-              minLength={8}
+              {...form.register("confirmPassword", {
+                required: "Please confirm your password",
+                minLength: {
+                  value: 8,
+                  message: "Password must be at least 8 characters",
+                },
+              })}
             />
           </div>
           <Button
