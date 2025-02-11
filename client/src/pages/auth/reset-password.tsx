@@ -21,11 +21,6 @@ const resetPasswordSchema = z.object({
 
 type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
 
-interface ResetPasswordPayload {
-  token: string;
-  password: string;
-}
-
 export default function ResetPasswordPage() {
   const [, setLocation] = useLocation();
   const [match, params] = useRoute<{ token: string }>("/auth/reset-password/:token");
@@ -48,54 +43,51 @@ export default function ResetPasswordPage() {
         description: "The password reset link is invalid or has expired.",
         variant: "destructive",
       });
-      setTimeout(() => setLocation("/auth"), 1500);
+      setLocation("/auth");
     }
   }, [match, params?.token, setLocation, toast]);
 
   if (!match || !params?.token) {
-    return (
-      <Card className="w-[400px] mx-auto mt-20">
-        <CardHeader>
-          <CardTitle>Invalid Reset Link</CardTitle>
-          <CardDescription>
-            This password reset link is invalid or has expired.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button
-            className="w-full"
-            onClick={() => setLocation("/auth")}
-          >
-            Return to Login
-          </Button>
-        </CardContent>
-      </Card>
-    );
+    return null;
   }
 
-  const onSubmit = async (formData: ResetPasswordFormData) => {
+  const handleSubmit = async (formData: ResetPasswordFormData) => {
     try {
-      console.log("Starting password reset with form data:", {
-        hasPassword: !!formData.password,
-        passwordLength: formData.password.length,
-        token: params.token
-      });
-
       setIsResetting(true);
 
-      const resetPayload: ResetPasswordPayload = {
-        token: params.token,
-        password: formData.password
-      };
-
-      console.log("Sending reset payload:", {
-        hasToken: !!resetPayload.token,
-        tokenLength: resetPayload.token.length,
-        hasPassword: !!resetPayload.password,
-        passwordLength: resetPayload.password.length
+      // Log the token and form data separately
+      console.log("Reset token:", params.token);
+      console.log("Form data:", {
+        password: "REDACTED",
+        passwordLength: formData.password.length
       });
 
-      const response = await apiRequest("POST", "/api/auth/reset-password", resetPayload);
+      // Construct payload
+      const payload = JSON.stringify({
+        token: params.token,
+        password: formData.password
+      });
+
+      console.log("Request payload structure:", {
+        hasToken: !!params.token,
+        tokenLength: params.token.length,
+        hasPassword: !!formData.password,
+        payloadKeys: Object.keys(JSON.parse(payload))
+      });
+
+      const response = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: payload
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to reset password");
+      }
+
       const result = await response.json();
 
       toast({
@@ -127,7 +119,7 @@ export default function ResetPasswordPage() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="password">New Password</Label>
             <Input
