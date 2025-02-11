@@ -27,7 +27,6 @@ export default function ResetPasswordPage() {
     },
   });
 
-  // Validate token on mount
   useEffect(() => {
     if (!match || !params?.token) {
       toast({
@@ -60,43 +59,28 @@ export default function ResetPasswordPage() {
     );
   }
 
-  const onSubmit = async (data: ResetPasswordFormData) => {
-    // Add debug logging to trace the execution flow
-    console.log("Form submission started", { 
-      formData: data,
-      token: params.token,
-      hasToken: !!params.token
-    });
-
+  const onSubmit = async (formData: ResetPasswordFormData) => {
     try {
-      if (data.password !== data.confirmPassword) {
-        toast({
-          title: "Error",
-          description: "Passwords do not match",
-          variant: "destructive",
-        });
-        return;
+      // Initial validation
+      if (!params.token) {
+        throw new Error("Reset token is missing");
+      }
+
+      if (!formData.password) {
+        throw new Error("Password is required");
+      }
+
+      if (formData.password !== formData.confirmPassword) {
+        throw new Error("Passwords do not match");
       }
 
       setIsResetting(true);
 
-      // Validate token and password before making request
-      if (!params.token || !data.password) {
-        throw new Error("Missing required fields");
-      }
-
-      // Explicitly construct payload for password reset
+      // Create the reset payload
       const resetPayload = {
         token: params.token,
-        password: data.password,
+        password: formData.password,
       };
-
-      console.log("Sending reset password request with payload", {
-        hasToken: !!resetPayload.token,
-        hasPassword: !!resetPayload.password,
-        tokenLength: resetPayload.token.length,
-        passwordLength: resetPayload.password.length
-      });
 
       const response = await apiRequest("POST", "/api/auth/reset-password", resetPayload);
       const result = await response.json();
