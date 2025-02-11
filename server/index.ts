@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { testSESConfiguration } from "./services/test-ses";
 
 const app = express();
 const isProd = app.get('env') === 'production';
@@ -48,6 +49,16 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 (async () => {
   try {
     log('Initializing server...');
+
+    // Test AWS SES Configuration
+    log('Testing AWS SES Configuration...');
+    const sesConfigValid = await testSESConfiguration();
+    if (!sesConfigValid) {
+      log('Warning: AWS SES configuration test failed. Email functionality may be limited.');
+    } else {
+      log('AWS SES configuration test passed successfully.');
+    }
+
     const server = registerRoutes(app);
 
     if (app.get("env") === "development") {

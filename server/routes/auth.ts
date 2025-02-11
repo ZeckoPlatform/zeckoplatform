@@ -48,13 +48,23 @@ router.post("/auth/forgot-password", async (req, res) => {
         .where(eq(users.id, user.id));
 
       // Generate reset URL
-      const resetUrl = `https://${req.get('host')}/reset-password/${resetToken}`;
+      const protocol = req.protocol;
+      const host = req.get('host');
+      const resetUrl = `${protocol}://${host}/reset-password/${resetToken}`;
 
       // Send email using the email service
       const emailSent = await sendPasswordResetEmail(email, resetToken, resetUrl);
 
       if (!emailSent) {
         log(`Failed to send password reset email to ${email}`);
+        // Check AWS SES environment variables
+        const awsConfig = {
+          region: process.env.AWS_REGION,
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID?.substring(0, 5) + '...',
+          sesEmail: process.env.AWS_SES_VERIFIED_EMAIL,
+        };
+        log(`AWS Configuration: ${JSON.stringify(awsConfig, null, 2)}`);
+
         return res.status(500).json({
           message: "Unable to send password reset email. Please try again later or contact support."
         });

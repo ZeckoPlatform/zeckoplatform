@@ -6,7 +6,7 @@ import { eq, and, count, sum, desc, sql } from "drizzle-orm";
 import { z } from "zod";
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
-import sgMail from "@sendgrid/mail";
+import { sendEmail } from "../services/email";
 
 const router = Router();
 const scryptAsync = promisify(scrypt);
@@ -420,7 +420,7 @@ router.delete("/users/:userId", authenticateToken, checkSuperAdminAccess, async 
   }
 });
 
-// Send mass email to all users
+// Update the mass email endpoint to use AWS SES
 router.post("/admin/mass-email", authenticateToken, checkSuperAdminAccess, async (req, res) => {
   try {
     const { subject, message } = req.body;
@@ -437,27 +437,33 @@ router.post("/admin/mass-email", authenticateToken, checkSuperAdminAccess, async
       })
       .from(users);
 
+    console.log(`Attempting to send mass email to ${allUsers.length} users`);
+
     const emailPromises = allUsers.map(user => {
-      return sgMail.send({
+      const personalizedHtml = message.replace(/\n/g, '<br>')
+        .replace('{{username}}', user.username);
+
+      return sendEmail({
         to: user.email,
-        from: "noreply@zecko.com", // Replace with your verified sender
         subject: subject,
-        text: message,
-        html: message.replace(/\n/g, '<br>'),
-        personalizations: [{
-          to: [{ email: user.email }],
-          dynamicTemplateData: {
-            username: user.username
-          }
-        }]
+        text: message.replace('{{username}}', user.username),
+        html: personalizedHtml
       });
     });
 
-    await Promise.all(emailPromises);
+    // Wait for all emails to be sent
+    const results = await Promise.allSettled(emailPromises);
+
+    const successCount = results.filter(r => r.status === 'fulfilled' && r.value).length;
+    const failureCount = allUsers.length - successCount;
+
+    console.log(`Mass email sending complete - Success: ${successCount}, Failed: ${failureCount}`);
 
     return res.json({
-      message: "Mass email sent successfully",
-      recipientCount: allUsers.length
+      message: "Mass email operation completed",
+      totalRecipients: allUsers.length,
+      successCount,
+      failureCount
     });
   } catch (error) {
     console.error("Error sending mass email:", error);
