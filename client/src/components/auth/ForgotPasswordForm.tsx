@@ -17,10 +17,10 @@ export function ForgotPasswordForm() {
 
     try {
       const response = await apiRequest("POST", "/api/auth/forgot-password", { email });
+      const data = await response.json();
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to process request");
+        throw new Error(data.message || "Failed to process request");
       }
 
       toast({
@@ -42,17 +42,18 @@ export function ForgotPasswordForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4 max-w-md mx-auto">
       <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="email">Email address</Label>
         <Input
           id="email"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="Enter your email"
+          placeholder="Enter your email address"
           required
           disabled={isSubmitting}
+          className="w-full"
         />
       </div>
       <Button
@@ -69,6 +70,9 @@ export function ForgotPasswordForm() {
           'Send Reset Link'
         )}
       </Button>
+      <p className="text-sm text-muted-foreground text-center mt-2">
+        We'll send you an email with instructions to reset your password.
+      </p>
     </form>
   );
 }

@@ -58,18 +58,18 @@ async function getUserByEmail(email: string): Promise<SelectUser[]> {
 
 async function updateUserResetToken(userId: number, token: string | null, expiry: Date | null) {
   try {
-    log(`Updating reset token for user ${userId} with token ${token?.substring(0, 8)}...`);
+    log(`Updating reset token for user ${userId}`);
 
-    const updateResult = await db
+    await db
       .update(users)
       .set({
-        reset_password_token: token,
-        reset_password_expiry: expiry
+        resetPasswordToken: token,
+        resetPasswordExpiry: expiry
       })
       .where(eq(users.id, userId))
       .execute();
 
-    log(`Update completed for user ${userId}`);
+    log(`Successfully updated reset token for user ${userId}`);
     return true;
   } catch (error) {
     log(`Error updating reset token: ${error}`);
@@ -250,10 +250,10 @@ export function setupAuth(app: Express) {
         });
       }
 
-      const resetToken = randomBytes(32).toString('hex');
-      const resetExpires = new Date(Date.now() + 3600000); // 1 hour from now
-
       try {
+        const resetToken = randomBytes(32).toString('hex');
+        const resetExpires = new Date(Date.now() + 3600000); // 1 hour
+
         await updateUserResetToken(user.id, resetToken, resetExpires);
 
         const resetUrl = `${req.protocol}://${req.get('host')}/auth/reset-password/${resetToken}`;
@@ -268,11 +268,11 @@ export function setupAuth(app: Express) {
             },
             Body: {
               Text: {
-                Data: `You are receiving this email because you (or someone else) requested a password reset.\n\n
-                      Please click on the following link to complete the process:\n\n
-                      ${resetUrl}\n\n
-                      This link will expire in 1 hour.\n\n
-                      If you did not request this, please ignore this email and your password will remain unchanged.`,
+                Data: `You are receiving this email because you requested a password reset.\n\n
+                       Please click on the following link to complete the process:\n\n
+                       ${resetUrl}\n\n
+                       This link will expire in 1 hour.\n\n
+                       If you did not request this, please ignore this email.`,
               },
             },
           },
@@ -281,7 +281,7 @@ export function setupAuth(app: Express) {
         await ses.send(new SendEmailCommand(emailParams));
         log(`Password reset email sent successfully to ${email}`);
 
-        res.status(200).json({
+        return res.status(200).json({
           message: "If an account exists with this email, a password reset link will be sent."
         });
       } catch (error) {
@@ -290,7 +290,7 @@ export function setupAuth(app: Express) {
       }
     } catch (error) {
       log(`Password reset request error: ${error}`);
-      res.status(500).json({ message: "Failed to process password reset request" });
+      return res.status(500).json({ message: "Failed to process password reset request" });
     }
   });
 
@@ -305,10 +305,10 @@ export function setupAuth(app: Express) {
       const [user] = await db
         .select()
         .from(users)
-        .where(eq(users.reset_password_token, token))
+        .where(eq(users.resetPasswordToken, token))
         .limit(1);
 
-      if (!user || !user.reset_password_expiry || new Date(user.reset_password_expiry) < new Date()) {
+      if (!user || !user.resetPasswordExpiry || new Date(user.resetPasswordExpiry) < new Date()) {
         return res.status(400).json({ message: "Invalid or expired reset token" });
       }
 
@@ -316,16 +316,17 @@ export function setupAuth(app: Express) {
         .update(users)
         .set({
           password: await hashPassword(password),
-          reset_password_token: null,
-          reset_password_expiry: null
+          resetPasswordToken: null,
+          resetPasswordExpiry: null
         })
-        .where(eq(users.id, user.id));
+        .where(eq(users.id, user.id))
+        .execute();
 
       log(`Successfully reset password for user: ${user.id}`);
-      res.json({ message: "Password has been reset successfully" });
+      return res.json({ message: "Password has been reset successfully" });
     } catch (error) {
       log(`Password reset error: ${error}`);
-      res.status(500).json({ message: "Failed to reset password" });
+      return res.status(500).json({ message: "Failed to reset password" });
     }
   });
 
