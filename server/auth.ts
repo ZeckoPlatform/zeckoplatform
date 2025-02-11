@@ -13,14 +13,6 @@ import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 const scryptAsync = promisify(scrypt);
 const JWT_SECRET = process.env.REPL_ID!;
 
-declare global {
-  namespace Express {
-    interface Request {
-      user?: SelectUser;
-    }
-  }
-}
-
 // Initialize AWS SES client
 const ses = new SESClient({
   region: process.env.AWS_REGION || 'us-east-1',
@@ -49,10 +41,11 @@ async function getUserByEmail(email: string): Promise<SelectUser[]> {
   }
 
   try {
+    log(`Attempting to find user with email: ${email}`);
     const result = await db
       .select()
       .from(users)
-      .where(and(eq(users.email, email), eq(users.active, true)))
+      .where(eq(users.email, email))
       .limit(1);
 
     log(`Found ${result.length} users with email ${email}`);
@@ -63,7 +56,23 @@ async function getUserByEmail(email: string): Promise<SelectUser[]> {
   }
 }
 
-function generateToken(user: SelectUser) {
+async function updateUserResetToken(userId: number, token: string | null, expiry: Date | null) {
+  try {
+    await db
+      .update(users)
+      .set({
+        resetPasswordToken: token,
+        resetPasswordExpiry: expiry
+      })
+      .where(eq(users.id, userId));
+    return true;
+  } catch (error) {
+    log(`Error updating reset token: ${error}`);
+    return false;
+  }
+}
+
+export function generateToken(user: SelectUser) {
   return jwt.sign(
     { 
       id: user.id, 
@@ -229,6 +238,8 @@ export function setupAuth(app: Express) {
   app.post("/api/auth/forgot-password", async (req, res) => {
     try {
       const { email } = req.body;
+      log(`Processing forgot password request for email: ${email}`);
+
       if (!email) {
         return res.status(400).json({ message: "Email is required" });
       }
@@ -247,19 +258,17 @@ export function setupAuth(app: Express) {
       const resetExpires = new Date(Date.now() + 3600000); // 1 hour from now
 
       // Update user with reset token
-      await db
-        .update(users)
-        .set({
-          resetPasswordToken: resetToken,
-          resetPasswordExpiry: resetExpires
-        })
-        .where(eq(users.id, user.id));
+      const updated = await updateUserResetToken(user.id, resetToken, resetExpires);
+
+      if (!updated) {
+        log(`Failed to update reset token for user: ${user.id}`);
+        return res.status(500).json({ message: "Failed to process password reset request" });
+      }
 
       try {
-        // Send reset email using AWS SES
         const resetUrl = `${req.protocol}://${req.get('host')}/auth/reset-password/${resetToken}`;
         const emailParams = {
-          Source: process.env.AWS_SES_VERIFIED_EMAIL || 'noreply@example.com',
+          Source: process.env.AWS_SES_VERIFIED_EMAIL!,
           Destination: {
             ToAddresses: [email],
           },
@@ -283,9 +292,9 @@ export function setupAuth(app: Express) {
         log(`Password reset email sent successfully to ${email}`);
       } catch (emailError) {
         log(`Failed to send password reset email: ${emailError}`);
+        // Don't return an error to prevent email enumeration
       }
 
-      // Always return success to prevent email enumeration
       res.status(200).json({
         message: "If an account exists with this email, a password reset link will be sent."
       });
