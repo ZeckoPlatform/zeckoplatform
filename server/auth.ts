@@ -58,17 +58,22 @@ async function getUserByEmail(email: string): Promise<SelectUser[]> {
 
 async function updateUserResetToken(userId: number, token: string | null, expiry: Date | null) {
   try {
-    await db
+    log(`Updating reset token for user ${userId} with token ${token?.substring(0, 8)}...`);
+
+    const updateResult = await db
       .update(users)
       .set({
         reset_password_token: token,
         reset_password_expiry: expiry
       })
-      .where(eq(users.id, userId));
-    return true;
+      .where(eq(users.id, userId))
+      .returning();
+
+    log(`Update result: ${JSON.stringify(updateResult)}`);
+    return updateResult.length > 0;
   } catch (error) {
     log(`Error updating reset token: ${error}`);
-    return false;
+    throw error;
   }
 }
 
@@ -239,6 +244,7 @@ export function setupAuth(app: Express) {
       const [user] = await getUserByEmail(email);
 
       if (!user) {
+        log(`No user found with email: ${email}`);
         return res.status(200).json({
           message: "If an account exists with this email, a password reset link will be sent."
         });
@@ -247,14 +253,12 @@ export function setupAuth(app: Express) {
       const resetToken = randomBytes(32).toString('hex');
       const resetExpires = new Date(Date.now() + 3600000); // 1 hour from now
 
-      const updated = await updateUserResetToken(user.id, resetToken, resetExpires);
-
-      if (!updated) {
-        log(`Failed to update reset token for user: ${user.id}`);
-        return res.status(500).json({ message: "Failed to process password reset request" });
-      }
-
       try {
+        const updated = await updateUserResetToken(user.id, resetToken, resetExpires);
+        if (!updated) {
+          throw new Error('Failed to update user reset token');
+        }
+
         const resetUrl = `${req.protocol}://${req.get('host')}/auth/reset-password/${resetToken}`;
         const emailParams = {
           Source: process.env.AWS_SES_VERIFIED_EMAIL!,
@@ -279,13 +283,14 @@ export function setupAuth(app: Express) {
 
         await ses.send(new SendEmailCommand(emailParams));
         log(`Password reset email sent successfully to ${email}`);
-      } catch (emailError) {
-        log(`Failed to send password reset email: ${emailError}`);
-      }
 
-      res.status(200).json({
-        message: "If an account exists with this email, a password reset link will be sent."
-      });
+        res.status(200).json({
+          message: "If an account exists with this email, a password reset link will be sent."
+        });
+      } catch (error) {
+        log(`Error in password reset process: ${error}`);
+        throw error;
+      }
     } catch (error) {
       log(`Password reset request error: ${error}`);
       res.status(500).json({ message: "Failed to process password reset request" });
