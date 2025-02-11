@@ -61,8 +61,8 @@ async function updateUserResetToken(userId: number, token: string | null, expiry
     await db
       .update(users)
       .set({
-        resetPasswordToken: token,
-        resetPasswordExpiry: expiry
+        reset_password_token: token,
+        reset_password_expiry: expiry
       })
       .where(eq(users.id, userId));
     return true;
@@ -227,14 +227,6 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/logout", (req, res) => {
-    res.json({ message: "Logged out successfully" });
-  });
-
-  app.get("/api/user", authenticateToken, (req, res) => {
-    res.json(req.user);
-  });
-
   app.post("/api/auth/forgot-password", async (req, res) => {
     try {
       const { email } = req.body;
@@ -247,17 +239,14 @@ export function setupAuth(app: Express) {
       const [user] = await getUserByEmail(email);
 
       if (!user) {
-        // Don't reveal whether a user was found or not
         return res.status(200).json({
           message: "If an account exists with this email, a password reset link will be sent."
         });
       }
 
-      // Generate reset token
       const resetToken = randomBytes(32).toString('hex');
       const resetExpires = new Date(Date.now() + 3600000); // 1 hour from now
 
-      // Update user with reset token
       const updated = await updateUserResetToken(user.id, resetToken, resetExpires);
 
       if (!updated) {
@@ -279,10 +268,10 @@ export function setupAuth(app: Express) {
             Body: {
               Text: {
                 Data: `You are receiving this email because you (or someone else) requested a password reset.\n\n
-                       Please click on the following link to complete the process:\n\n
-                       ${resetUrl}\n\n
-                       This link will expire in 1 hour.\n\n
-                       If you did not request this, please ignore this email and your password will remain unchanged.`,
+                      Please click on the following link to complete the process:\n\n
+                      ${resetUrl}\n\n
+                      This link will expire in 1 hour.\n\n
+                      If you did not request this, please ignore this email and your password will remain unchanged.`,
               },
             },
           },
@@ -292,7 +281,6 @@ export function setupAuth(app: Express) {
         log(`Password reset email sent successfully to ${email}`);
       } catch (emailError) {
         log(`Failed to send password reset email: ${emailError}`);
-        // Don't return an error to prevent email enumeration
       }
 
       res.status(200).json({
@@ -315,13 +303,10 @@ export function setupAuth(app: Express) {
       const [user] = await db
         .select()
         .from(users)
-        .where(and(
-          eq(users.resetPasswordToken, token),
-          eq(users.active, true)
-        ))
+        .where(eq(users.reset_password_token, token))
         .limit(1);
 
-      if (!user || !user.resetPasswordExpiry || new Date(user.resetPasswordExpiry) < new Date()) {
+      if (!user || !user.reset_password_expiry || new Date(user.reset_password_expiry) < new Date()) {
         return res.status(400).json({ message: "Invalid or expired reset token" });
       }
 
@@ -329,8 +314,8 @@ export function setupAuth(app: Express) {
         .update(users)
         .set({
           password: await hashPassword(password),
-          resetPasswordToken: null,
-          resetPasswordExpiry: null
+          reset_password_token: null,
+          reset_password_expiry: null
         })
         .where(eq(users.id, user.id));
 
@@ -340,5 +325,13 @@ export function setupAuth(app: Express) {
       log(`Password reset error: ${error}`);
       res.status(500).json({ message: "Failed to reset password" });
     }
+  });
+
+  app.post("/api/logout", (req, res) => {
+    res.json({ message: "Logged out successfully" });
+  });
+
+  app.get("/api/user", authenticateToken, (req, res) => {
+    res.json(req.user);
   });
 }
