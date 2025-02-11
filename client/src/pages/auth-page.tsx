@@ -8,23 +8,23 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useForm } from "react-hook-form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { ForgotPasswordForm } from "@/components/auth/ForgotPasswordForm";
 
 const SUBSCRIPTION_PRICES = {
   business: {
     monthly: 29.99,
-    annual: (29.99 * 12 * 0.9).toFixed(2), // 10% annual discount
+    annual: (29.99 * 12 * 0.9).toFixed(2),
   },
   vendor: {
     monthly: 49.99,
-    annual: (49.99 * 12 * 0.9).toFixed(2), // 10% annual discount
+    annual: (49.99 * 12 * 0.9).toFixed(2),
   }
 };
 
@@ -36,6 +36,7 @@ const loginSchema = z.object({
 const registerSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(8, "Password must be at least 8 characters"),
+  username: z.string().min(3, "Username must be at least 3 characters"),
   userType: z.enum(["free", "business", "vendor"]),
   businessType: z.enum(["registered", "selfEmployed"]).optional(),
   businessName: z.string().min(2, "Company name must be at least 2 characters").optional(),
@@ -60,24 +61,12 @@ const registerSchema = z.object({
   }
   return true;
 }, {
-  message: (data) => {
-    if (data.userType === "business") {
-      return data.businessType === "registered"
-        ? "Company name and Companies House number are required for registered businesses"
-        : "UTR number is required for self-employed businesses";
-    }
-    return "Company name and Companies House number are required for vendor registration";
-  },
+  message: "Please fill in all required business information",
   path: ["businessType"],
-});
-
-const resetPasswordSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
 type RegisterFormData = z.infer<typeof registerSchema>;
-type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
@@ -98,6 +87,7 @@ export default function AuthPage() {
     defaultValues: {
       email: "",
       password: "",
+      username: "",
       userType: "free",
       businessType: "registered",
       businessName: "",
@@ -107,66 +97,26 @@ export default function AuthPage() {
     },
   });
 
-  const resetPasswordForm = useForm<ResetPasswordFormData>({
-    resolver: zodResolver(resetPasswordSchema),
-    defaultValues: {
-      email: "",
-    },
-  });
-
-  const resetPasswordMutation = useMutation({
-    mutationFn: async (data: ResetPasswordFormData) => {
-      const response = await apiRequest("POST", "/api/auth/reset-password", data);
-      if (!response.ok) {
-        throw new Error("Failed to send reset password email");
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Reset Password Email Sent",
-        description: "Please check your email for instructions to reset your password.",
-      });
-      setShowResetPassword(false);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
   const onLoginSuccess = (data: any) => {
     switch (data.userType) {
-      case "free":
-        setLocation("/leads");
-        break;
-      case "business":
-        setLocation("/leads");
-        break;
       case "vendor":
         setLocation("/vendor");
+        break;
+      case "business":
+      case "free":
+        setLocation("/leads");
         break;
       default:
         setLocation("/");
     }
   };
 
-  const onRegisterSuccess = async (data: any) => {
+  const onRegisterSuccess = (data: any) => {
     if (data.userType !== "free") {
       setLocation("/subscription");
     } else {
       setLocation("/leads");
     }
-  };
-
-  const getSubscriptionPrice = () => {
-    const userType = registerForm.watch("userType");
-    if (userType === "free" || !SUBSCRIPTION_PRICES[userType]) return null;
-    const frequency = registerForm.watch("paymentFrequency") || "monthly";
-    return SUBSCRIPTION_PRICES[userType][frequency];
   };
 
   if (user) {
@@ -176,11 +126,6 @@ export default function AuthPage() {
   return (
     <div className="min-h-screen grid md:grid-cols-2">
       <div className="hidden md:block relative">
-        <img
-          src="https://images.unsplash.com/photo-1513530534585-c7b1394c6d51"
-          alt="Business"
-          className="absolute inset-0 h-full w-full object-cover"
-        />
         <div className="absolute inset-0 bg-gradient-to-t from-background/90 to-background/50" />
         <div className="absolute inset-0 flex items-center justify-center p-8">
           <div className="max-w-md text-white">
@@ -290,6 +235,19 @@ export default function AuthPage() {
                     )}
                   </div>
                   <div>
+                    <Label htmlFor="username">Username</Label>
+                    <Input
+                      id="username"
+                      type="text"
+                      {...registerForm.register("username")}
+                    />
+                    {registerForm.formState.errors.username && (
+                      <p className="text-sm text-destructive mt-1">
+                        {registerForm.formState.errors.username.message}
+                      </p>
+                    )}
+                  </div>
+                  <div>
                     <Label htmlFor="reg-password">Password</Label>
                     <Input
                       id="reg-password"
@@ -309,7 +267,6 @@ export default function AuthPage() {
                       defaultValue="free"
                       onValueChange={(value) => {
                         registerForm.setValue("userType", value as "free" | "business" | "vendor");
-                        // Reset values when changing user type
                         registerForm.setValue("businessName", "");
                         registerForm.setValue("companyNumber", "");
                         registerForm.setValue("utrNumber", "");
@@ -344,7 +301,6 @@ export default function AuthPage() {
                         defaultValue="registered"
                         onValueChange={(value) => {
                           registerForm.setValue("businessType", value as "registered" | "selfEmployed");
-                          // Reset values when changing business type
                           registerForm.setValue("businessName", "");
                           registerForm.setValue("companyNumber", "");
                           registerForm.setValue("utrNumber", "");
@@ -362,7 +318,6 @@ export default function AuthPage() {
                     </div>
                   )}
 
-                  {/* Show company details for registered businesses and vendors */}
                   {((registerForm.watch("userType") === "business" &&
                     registerForm.watch("businessType") === "registered") ||
                     registerForm.watch("userType") === "vendor") && (
@@ -396,25 +351,23 @@ export default function AuthPage() {
                     </>
                   )}
 
-                  {/* Show UTR number for self-employed businesses */}
                   {registerForm.watch("userType") === "business" &&
                     registerForm.watch("businessType") === "selfEmployed" && (
-                      <div>
-                        <Label htmlFor="utrNumber">UTR Number</Label>
-                        <Input
-                          id="utrNumber"
-                          {...registerForm.register("utrNumber")}
-                          placeholder="1234567890"
-                        />
-                        {registerForm.formState.errors.utrNumber && (
-                          <p className="text-sm text-destructive mt-1">
-                            {registerForm.formState.errors.utrNumber.message}
-                          </p>
-                        )}
-                      </div>
-                    )}
+                    <div>
+                      <Label htmlFor="utrNumber">UTR Number</Label>
+                      <Input
+                        id="utrNumber"
+                        {...registerForm.register("utrNumber")}
+                        placeholder="1234567890"
+                      />
+                      {registerForm.formState.errors.utrNumber && (
+                        <p className="text-sm text-destructive mt-1">
+                          {registerForm.formState.errors.utrNumber.message}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
-                  {/* Show payment options for paid accounts */}
                   {registerForm.watch("userType") !== "free" && (
                     <div className="space-y-4 mt-4">
                       <Label>Payment Preferences</Label>
@@ -429,7 +382,7 @@ export default function AuthPage() {
                           <div className="flex items-center space-x-2">
                             <RadioGroupItem value="monthly" id="monthly" />
                             <Label htmlFor="monthly">
-                              Monthly (£{getSubscriptionPrice()}/month)
+                              Monthly (£{SUBSCRIPTION_PRICES[registerForm.watch("userType")]?.monthly}/month)
                             </Label>
                           </div>
                           <div className="flex items-center space-x-2">
@@ -448,7 +401,14 @@ export default function AuthPage() {
                     className="w-full"
                     disabled={registerMutation.isPending}
                   >
-                    Register
+                    {registerMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Registering...
+                      </>
+                    ) : (
+                      'Register'
+                    )}
                   </Button>
                 </form>
               </TabsContent>
@@ -457,7 +417,6 @@ export default function AuthPage() {
         </Card>
       </div>
 
-      {/* Password Reset Dialog */}
       <Dialog open={showResetPassword} onOpenChange={setShowResetPassword}>
         <DialogContent>
           <DialogHeader>
@@ -466,40 +425,7 @@ export default function AuthPage() {
               Enter your email address and we'll send you instructions to reset your password.
             </DialogDescription>
           </DialogHeader>
-          <form
-            onSubmit={resetPasswordForm.handleSubmit((data) =>
-              resetPasswordMutation.mutate(data)
-            )}
-            className="space-y-4"
-          >
-            <div>
-              <Label htmlFor="reset-email">Email</Label>
-              <Input
-                id="reset-email"
-                type="email"
-                {...resetPasswordForm.register("email")}
-              />
-              {resetPasswordForm.formState.errors.email && (
-                <p className="text-sm text-destructive mt-1">
-                  {resetPasswordForm.formState.errors.email.message}
-                </p>
-              )}
-            </div>
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={resetPasswordMutation.isPending}
-            >
-              {resetPasswordMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Sending...
-                </>
-              ) : (
-                "Send Reset Instructions"
-              )}
-            </Button>
-          </form>
+          <ForgotPasswordForm />
         </DialogContent>
       </Dialog>
     </div>

@@ -1,4 +1,4 @@
-import { useForm } from "react-hook-form";
+import { useState } from "react";
 import { useLocation, useRoute } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,9 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
-import { useState, useEffect } from "react";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
 
 const resetPasswordSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
@@ -35,19 +35,26 @@ export default function ResetPasswordPage() {
     mode: "onChange"
   });
 
-  useEffect(() => {
-    if (!match || !params?.token) {
-      toast({
-        title: "Invalid Reset Link",
-        description: "The password reset link is invalid or has expired.",
-        variant: "destructive",
-      });
-      setLocation("/auth");
-    }
-  }, [match, params?.token, setLocation, toast]);
-
+  // Return early if no token is present
   if (!match || !params?.token) {
-    return null;
+    return (
+      <Card className="w-[400px] mx-auto mt-20">
+        <CardHeader>
+          <CardTitle>Invalid Reset Link</CardTitle>
+          <CardDescription>
+            This password reset link is invalid or has expired.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            className="w-full"
+            onClick={() => setLocation("/auth")}
+          >
+            Return to Login
+          </Button>
+        </CardContent>
+      </Card>
+    );
   }
 
   const handleSubmit = async (formData: ResetPasswordFormData) => {
@@ -70,16 +77,13 @@ export default function ResetPasswordPage() {
         throw new Error(error.message || "Failed to reset password");
       }
 
-      const result = await response.json();
-
       toast({
         title: "Success",
-        description: result.message || "Your password has been reset successfully",
+        description: "Your password has been reset successfully.",
       });
 
-      setTimeout(() => {
-        setLocation("/auth");
-      }, 1500);
+      // Redirect to login page after successful reset
+      setTimeout(() => setLocation("/auth"), 1500);
     } catch (error) {
       console.error("Reset password error:", error);
       toast({
