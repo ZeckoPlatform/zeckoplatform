@@ -46,22 +46,16 @@ export async function comparePasswords(supplied: string, stored: string) {
 async function getUserByEmail(email: string): Promise<SelectUser[]> {
   try {
     log(`Fetching user with email: ${email}`);
+    if (!email) {
+      throw new Error('Email is required');
+    }
+
     const result = await db
-      .select({
-        id: users.id,
-        email: users.email,
-        username: users.username,
-        password: users.password,
-        userType: users.userType,
-        superAdmin: users.superAdmin,
-        subscriptionActive: users.subscriptionActive,
-        subscriptionTier: users.subscriptionTier,
-        active: users.active,
-        reset_password_token: users.reset_password_token,
-        reset_password_expires: users.reset_password_expires
-      })
+      .select()
       .from(users)
-      .where(and(eq(users.email, email), eq(users.active, true)));
+      .where(and(eq(users.email, email), eq(users.active, true)))
+      .limit(1);
+
     log(`Found ${result.length} active users matching email: ${email}`);
     return result;
   } catch (error) {

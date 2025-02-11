@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
 import { Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import * as z from "zod";
@@ -55,32 +54,15 @@ export default function ResetPasswordPage() {
     try {
       setIsResetting(true);
 
-      // Log the token and form data separately
-      console.log("Reset token:", params.token);
-      console.log("Form data:", {
-        password: "REDACTED",
-        passwordLength: formData.password.length
-      });
-
-      // Construct payload
-      const payload = JSON.stringify({
-        token: params.token,
-        password: formData.password
-      });
-
-      console.log("Request payload structure:", {
-        hasToken: !!params.token,
-        tokenLength: params.token.length,
-        hasPassword: !!formData.password,
-        payloadKeys: Object.keys(JSON.parse(payload))
-      });
-
       const response = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
-        body: payload
+        body: JSON.stringify({
+          token: params.token,
+          password: formData.password
+        })
       });
 
       if (!response.ok) {
