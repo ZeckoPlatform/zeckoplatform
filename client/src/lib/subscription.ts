@@ -64,7 +64,6 @@ export async function getSubscriptionStatus(): Promise<{
     const data = await response.json();
     console.log("Subscription status response:", data);
 
-    // For admin-granted subscriptions, ensure we show the correct status
     return {
       active: data.active || data.isAdminGranted,
       tier: data.tier,
@@ -85,7 +84,12 @@ export async function cancelSubscription(subscriptionId: number): Promise<void> 
       const error = await response.json();
       throw new Error(error.message || "Failed to cancel subscription");
     }
+
+    // Return the success message from the server
+    const data = await response.json();
+    return data;
   } catch (error) {
+    console.error("Error cancelling subscription:", error);
     throw error;
   }
 }
