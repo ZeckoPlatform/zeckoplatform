@@ -24,6 +24,7 @@ import {
   pauseSubscription,
   resumeSubscription,
   cancelSubscription,
+  getSubscriptionStatus,
 } from "@/lib/subscription";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
@@ -35,7 +36,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 const subscriptionFormSchema = z.object({
-  paymentFrequency: z.enum(["monthly", "annual"]),
+  paymentFrequency: z.enum(["monthly", "annual"])
 });
 
 type SubscriptionFormData = z.infer<typeof subscriptionFormSchema>;
@@ -48,9 +49,17 @@ export default function SubscriptionPage() {
   const [resumeDate, setResumeDate] = useState<Date>();
   const [isLoading, setIsLoading] = useState(false);
 
+  const form = useForm<SubscriptionFormData>({
+    resolver: zodResolver(subscriptionFormSchema),
+    defaultValues: {
+      paymentFrequency: "monthly"
+    }
+  });
+
   // Get current subscription status
   const { data: subscriptionData, refetch: refetchSubscription } = useQuery({
     queryKey: ["/api/subscriptions/current"],
+    queryFn: getSubscriptionStatus,
     enabled: !!user && user.userType !== "free",
   });
 
@@ -258,7 +267,7 @@ export default function SubscriptionPage() {
                       <FormControl>
                         <RadioGroup
                           onValueChange={field.onChange}
-                          defaultValue={field.value}
+                          value={field.value}
                           className="flex flex-col space-y-1"
                         >
                           <div className="flex items-center space-x-3">
