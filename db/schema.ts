@@ -179,6 +179,7 @@ export const notifications = pgTable("notifications", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Updated vendorTransactions table
 export const vendorTransactions = pgTable("vendor_transactions", {
   id: serial("id").primaryKey(),
   vendor_id: integer("vendor_id").references(() => users.id).notNull(),
@@ -194,11 +195,28 @@ export const vendorTransactions = pgTable("vendor_transactions", {
     name: string;
     quantity: number;
     unit_price: number;
+    category?: string;
+    sku?: string;
+    inventory_count?: number;
   }>(),
   customer_details: jsonb("customer_details").$type<{
     email?: string;
     name?: string;
     location?: string;
+    purchase_history?: number;
+    customer_segment?: string;
+  }>(),
+  sale_metrics: jsonb("sale_metrics").$type<{
+    profit_margin?: number;
+    conversion_rate?: number;
+    return_rate?: number;
+    repeat_purchase_rate?: number;
+  }>(),
+  market_insights: jsonb("market_insights").$type<{
+    category_avg_price?: number;
+    competitive_position?: string;
+    price_trend?: string;
+    market_share?: number;
   }>(),
   created_at: timestamp("created_at").defaultNow(),
   updated_at: timestamp("updated_at").defaultNow(),
@@ -232,15 +250,16 @@ export const leadAnalytics = pgTable("lead_analytics", {
   updated_at: timestamp("updated_at").defaultNow(),
 });
 
+// Updated businessAnalytics table
 export const businessAnalytics = pgTable("business_analytics", {
   id: serial("id").primaryKey(),
   business_id: integer("business_id").references(() => users.id).notNull(),
   total_leads_viewed: integer("total_leads_viewed").default(0),
   total_responses: integer("total_responses").default(0),
   successful_conversions: integer("successful_conversions").default(0),
-  total_revenue: numeric("total_revenue").default(0),
+  total_revenue: numeric("total_revenue").default("0"),
   avg_response_time: integer("avg_response_time"),
-  rating: numeric("rating").default(0),
+  rating: numeric("rating").default("0"),
   activity_score: integer("activity_score").default(0),
   period_start: timestamp("period_start").notNull(),
   period_end: timestamp("period_end").notNull(),
@@ -249,6 +268,39 @@ export const businessAnalytics = pgTable("business_analytics", {
     conversion_rate: number;
     revenue_growth: number;
     customer_satisfaction: number;
+    avg_order_value?: number;
+    customer_lifetime_value?: number;
+    churn_rate?: number;
+    inventory_turnover?: number;
+  }>(),
+  performance_metrics: jsonb("performance_metrics").$type<{
+    daily_sales?: number;
+    weekly_sales?: number;
+    monthly_sales?: number;
+    year_over_year_growth?: number;
+    seasonal_trends?: Record<string, number>;
+  }>(),
+  customer_insights: jsonb("customer_insights").$type<{
+    segments?: Record<string, number>;
+    acquisition_channels?: Record<string, number>;
+    retention_rate?: number;
+    engagement_score?: number;
+  }>(),
+  inventory_analytics: jsonb("inventory_analytics").$type<{
+    stock_levels?: Record<string, number>;
+    reorder_points?: Record<string, number>;
+    stockout_frequency?: number;
+    holding_costs?: number;
+  }>(),
+  market_position: jsonb("market_position").$type<{
+    category_ranking?: number;
+    price_competitiveness?: number;
+    market_share?: number;
+    competitor_analysis?: Array<{
+      name: string;
+      price_difference: number;
+      market_share: number;
+    }>;
   }>(),
 });
 
