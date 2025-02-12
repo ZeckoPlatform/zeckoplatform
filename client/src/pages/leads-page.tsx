@@ -35,7 +35,12 @@ export const BUSINESS_CATEGORIES = {
     "Cybersecurity",
     "AI & Machine Learning",
     "Blockchain Development",
-    "Quality Assurance"
+    "Quality Assurance",
+    "ERP Implementation",
+    "IT Support & Maintenance",
+    "Network Solutions",
+    "Custom Software Development",
+    "System Integration"
   ],
   "Marketing & Advertising": [
     "Digital Marketing",
@@ -47,7 +52,12 @@ export const BUSINESS_CATEGORIES = {
     "Market Research",
     "Public Relations",
     "Video Marketing",
-    "Influencer Marketing"
+    "Influencer Marketing",
+    "PPC Advertising",
+    "Marketing Analytics",
+    "Affiliate Marketing",
+    "Local Marketing",
+    "Marketing Automation"
   ],
   "Business Services": [
     "Business Consulting",
@@ -59,7 +69,12 @@ export const BUSINESS_CATEGORIES = {
     "Business Analysis",
     "Strategic Planning",
     "Risk Management",
-    "Operations Management"
+    "Operations Management",
+    "Data Analysis",
+    "Virtual Assistant Services",
+    "Business Process Outsourcing",
+    "Supply Chain Management",
+    "Quality Management"
   ],
   "Creative & Design": [
     "Graphic Design",
@@ -71,19 +86,46 @@ export const BUSINESS_CATEGORIES = {
     "Animation",
     "Illustration",
     "3D Modeling",
-    "Print Design"
+    "Print Design",
+    "Package Design",
+    "Web Design",
+    "Art Direction",
+    "Product Design",
+    "Exhibition Design"
   ],
-  "Construction & Trade": [
+  "Construction & Building": [
     "General Construction",
     "Electrical Services",
     "Plumbing",
     "HVAC",
     "Carpentry",
     "Painting",
-    "Landscaping",
     "Roofing",
-    "Interior Design",
-    "Architecture"
+    "Foundation Work",
+    "Building Renovation",
+    "Commercial Construction",
+    "Residential Construction",
+    "Steel Construction",
+    "Construction Management",
+    "Building Maintenance",
+    "Architectural Services"
+  ],
+  "Cleaning & Maintenance": [
+    "Commercial Cleaning",
+    "Industrial Cleaning",
+    "Office Cleaning",
+    "Residential Cleaning",
+    "Specialized Cleaning",
+    "Window Cleaning",
+    "Carpet & Upholstery Cleaning",
+    "Post-construction Cleaning",
+    "Sanitization Services",
+    "Waste Management",
+    "Janitorial Services",
+    "Equipment Cleaning",
+    "Facilities Maintenance",
+    "Green Cleaning Services",
+    "Emergency Cleaning"
   ],
   "Professional Services": [
     "Accounting",
@@ -95,7 +137,12 @@ export const BUSINESS_CATEGORIES = {
     "Writing & Editing",
     "Training & Education",
     "Career Coaching",
-    "Virtual Assistance"
+    "Virtual Assistance",
+    "Notary Services",
+    "Financial Planning",
+    "Business Registration",
+    "Patent Services",
+    "Corporate Training"
   ],
   "Health & Wellness": [
     "Healthcare Services",
@@ -107,7 +154,12 @@ export const BUSINESS_CATEGORIES = {
     "Wellness Coaching",
     "Medical Equipment",
     "Healthcare Technology",
-    "Telehealth Services"
+    "Telehealth Services",
+    "Dental Services",
+    "Chiropractic Care",
+    "Sports Medicine",
+    "Occupational Health",
+    "Health Education"
   ],
   "Retail & E-commerce": [
     "Online Retail",
@@ -119,7 +171,12 @@ export const BUSINESS_CATEGORIES = {
     "Inventory Management",
     "Supply Chain",
     "Customer Service",
-    "Payment Solutions"
+    "Payment Solutions",
+    "Order Fulfillment",
+    "Product Sourcing",
+    "Retail Analytics",
+    "Store Design",
+    "Visual Merchandising"
   ],
   "Manufacturing & Industrial": [
     "Product Manufacturing",
@@ -131,7 +188,12 @@ export const BUSINESS_CATEGORIES = {
     "Material Handling",
     "Packaging Solutions",
     "Industrial Safety",
-    "Logistics Services"
+    "Logistics Services",
+    "Metal Fabrication",
+    "Plastic Manufacturing",
+    "Food Processing",
+    "Chemical Manufacturing",
+    "Electronics Manufacturing"
   ],
   "Events & Entertainment": [
     "Event Planning",
@@ -143,7 +205,80 @@ export const BUSINESS_CATEGORIES = {
     "Catering Services",
     "Event Marketing",
     "Virtual Events",
-    "Event Technology"
+    "Event Technology",
+    "Festival Management",
+    "Conference Planning",
+    "Exhibition Services",
+    "Event Staffing",
+    "Event Production"
+  ],
+  "Landscaping & Outdoor": [
+    "Landscape Design",
+    "Garden Maintenance",
+    "Tree Services",
+    "Irrigation Systems",
+    "Hardscaping",
+    "Lawn Care",
+    "Outdoor Lighting",
+    "Pool Services",
+    "Pest Control",
+    "Snow Removal",
+    "Sports Field Maintenance",
+    "Green Infrastructure",
+    "Artificial Turf Installation",
+    "Water Features",
+    "Ecological Services"
+  ],
+  "Automotive & Transportation": [
+    "Auto Repair",
+    "Fleet Management",
+    "Vehicle Maintenance",
+    "Car Detailing",
+    "Towing Services",
+    "Transport Services",
+    "Logistics Planning",
+    "Freight Services",
+    "Courier Services",
+    "Moving Services",
+    "Vehicle Customization",
+    "Parts Supply",
+    "Driver Services",
+    "Storage Solutions",
+    "Vehicle Inspection"
+  ],
+  "Education & Training": [
+    "Academic Tutoring",
+    "Professional Training",
+    "Language Teaching",
+    "Skills Development",
+    "Online Courses",
+    "Corporate Training",
+    "Educational Consulting",
+    "Test Preparation",
+    "Vocational Training",
+    "Special Education",
+    "Music Education",
+    "Art Education",
+    "Technical Training",
+    "Safety Training",
+    "Educational Technology"
+  ],
+  "Security Services": [
+    "Physical Security",
+    "Cybersecurity Services",
+    "Security Systems",
+    "Surveillance",
+    "Access Control",
+    "Security Consulting",
+    "Event Security",
+    "Security Training",
+    "Risk Assessment",
+    "Emergency Response",
+    "Security Equipment",
+    "Data Protection",
+    "Personal Security",
+    "Security Auditing",
+    "Investigation Services"
   ]
 } as const;
 
@@ -639,7 +774,7 @@ const FreeUserLeadsView = ({
       title: editingLead?.title || "",
       description: editingLead?.description || "",
       category: editingLead?.category || "",
-      subcategory: editingLead?.subcategory || "", // Added subcategory
+      subcategory: editingLead?.subcategory || "",
       budget: editingLead?.budget?.toString() || "",
       location: editingLead?.location || "",
     },
@@ -705,13 +840,13 @@ const FreeUserLeadsView = ({
                               />
                             </div>
                             <div>
-                              <Label htmlFor="edit-subcategory">Subcategory</Label> {/* Added subcategory field */}
+                              <Label htmlFor="edit-subcategory">Subcategory</Label>
                               <Input
                                 id="edit-subcategory"
                                 {...editForm.register("subcategory")}
                                 required
                               />
-                            </div> {/* Added subcategory field */}
+                            </div>
                             <div>
                               <Label htmlFor="edit-budget">Budget (£)</Label>
                               <Input
@@ -943,13 +1078,11 @@ const BusinessProfileForm = () => {
   const onSubmit = async (data: ProfileFormData) => {
     try {
       await apiRequest('POST', '/api/users/profile', data);
-      // Update user data in auth context.  This assumes the useAuth hook manages user data.  Adjust as needed for your auth implementation.
       setUser({...user, profile: data});
-      queryClient.invalidateQueries({queryKey: ['/api/leads']}); //Refetch leads after profile update
+      queryClient.invalidateQueries({queryKey: ['/api/leads']});
 
     } catch (error) {
       console.error("Error updating profile:", error);
-      // Handle error appropriately
     }
   };
 
@@ -978,12 +1111,10 @@ const BusinessProfileForm = () => {
 
 
 export default function LeadsPage() {
-  // All hooks at the top level
-  const { user, setUser } = useAuth(); // Added setUser
+  const { user, setUser } = useAuth();
   const { toast } = useToast();
   const playNotification = useNotificationSound();
 
-  // State hooks
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [editingLead, setEditingLead] = useState<LeadWithUnreadCount | null>(null);
   const [selectedLead, setSelectedLead] = useState<SelectLead | null>(null);
@@ -991,7 +1122,6 @@ export default function LeadsPage() {
   const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
   const [selectedResponse, setSelectedResponse] = useState<any>(null);
 
-  // Form hooks
   const profileForm = useForm<ProfileFormData>({
     defaultValues: {
       name: user?.profile?.name || "",
@@ -1015,12 +1145,10 @@ export default function LeadsPage() {
     },
   });
 
-  // Early return for unauthenticated users
   if (!user) {
     return <Redirect to="/auth" />;
   }
 
-  // Query setup
   const {
     data: leads = [],
     isLoading: isLoadingLeads,
@@ -1050,7 +1178,6 @@ export default function LeadsPage() {
     retry: false
   });
 
-  // Mutations
   const createLeadMutation = useMutation({
     mutationFn: async (data: LeadFormData) => {
       const res = await apiRequest("POST", "/api/leads", {
@@ -1075,7 +1202,6 @@ export default function LeadsPage() {
     },
   });
 
-  // Update lead mutation
   const updateLeadMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: LeadFormData }) => {
       const res = await apiRequest("PATCH", `/api/leads/${id}`, {
@@ -1146,7 +1272,6 @@ export default function LeadsPage() {
     }
   });
 
-  // Loading state
   if (isLoadingLeads) {
     return (
       <div className="flex items-center justify-center min-h-screen">
