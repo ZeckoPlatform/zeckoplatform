@@ -8,12 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, AlertTriangle } from "lucide-react";
-import { getSubscriptionStatus, cancelSubscription } from "@/lib/subscription";
+import { Loader2 } from "lucide-react";
 
 const businessProfileSchema = z.object({
   name: z.string().min(2, "Business name must be at least 2 characters"),
@@ -30,31 +29,6 @@ export default function BusinessProfilePage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-
-  // Get current subscription status
-  const { data: subscription } = useQuery({
-    queryKey: ["/api/subscriptions/current"],
-    queryFn: getSubscriptionStatus,
-  });
-
-  // Subscription cancellation mutation
-  const cancelSubscriptionMutation = useMutation({
-    mutationFn: cancelSubscription,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/subscriptions/current"] });
-      toast({
-        title: "Success",
-        description: "Your subscription has been cancelled successfully.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
 
   // Redirect if user is not a business or vendor
   if (!user || (user.userType !== 'business' && user.userType !== 'vendor')) {
@@ -83,7 +57,7 @@ export default function BusinessProfilePage() {
         matchPreferences: {
           budgetRange: {
             min: parseInt(data.budget),
-            max: parseInt(data.budget) * 2, // This is just an example, adjust as needed
+            max: parseInt(data.budget) * 2,
           },
           industries: data.industries.split(",").map(i => i.trim()),
         },
@@ -119,45 +93,6 @@ export default function BusinessProfilePage() {
           Back to Settings
         </Button>
       </div>
-
-      {subscription?.active && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Subscription Status</CardTitle>
-            <CardDescription>
-              Manage your current subscription
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <p className="font-medium">Current Plan: {subscription.tier}</p>
-                <p className="text-sm text-muted-foreground">
-                  {subscription.endDate ? `Renews on ${new Date(subscription.endDate).toLocaleDateString()}` : 'No renewal date'}
-                </p>
-              </div>
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  if (window.confirm('Are you sure you want to cancel your subscription? This will take effect at the end of your current billing period.')) {
-                    cancelSubscriptionMutation.mutate();
-                  }
-                }}
-                disabled={cancelSubscriptionMutation.isPending}
-              >
-                {cancelSubscriptionMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Cancelling...
-                  </>
-                ) : (
-                  'Cancel Subscription'
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       <Card>
         <CardHeader>

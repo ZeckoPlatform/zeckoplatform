@@ -148,7 +148,6 @@ export default function SubscriptionPage() {
           throw new Error("No checkout URL received");
         }
 
-        // Use window.location.href for the redirect
         window.location.href = checkoutUrl;
       } catch (error) {
         console.error("Subscription error:", error);
