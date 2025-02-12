@@ -22,11 +22,136 @@ import { Badge } from "@/components/ui/badge";
 import { useNotificationSound } from "@/lib/useNotificationSound";
 import { MessageDialog } from "@/components/MessageDialog";
 import { SubscriptionRequiredModal } from "@/components/subscription-required-modal";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+export const BUSINESS_CATEGORIES = {
+  "IT & Software Development": [
+    "Web Development",
+    "Mobile App Development",
+    "Cloud Services",
+    "DevOps & Infrastructure",
+    "Software Architecture",
+    "Database Development",
+    "Cybersecurity",
+    "AI & Machine Learning",
+    "Blockchain Development",
+    "Quality Assurance"
+  ],
+  "Marketing & Advertising": [
+    "Digital Marketing",
+    "Content Marketing",
+    "Social Media Marketing",
+    "SEO & SEM",
+    "Email Marketing",
+    "Brand Strategy",
+    "Market Research",
+    "Public Relations",
+    "Video Marketing",
+    "Influencer Marketing"
+  ],
+  "Business Services": [
+    "Business Consulting",
+    "Financial Services",
+    "Legal Services",
+    "HR & Recruitment",
+    "Administrative Support",
+    "Project Management",
+    "Business Analysis",
+    "Strategic Planning",
+    "Risk Management",
+    "Operations Management"
+  ],
+  "Creative & Design": [
+    "Graphic Design",
+    "UI/UX Design",
+    "Brand Design",
+    "Motion Graphics",
+    "Video Production",
+    "Photography",
+    "Animation",
+    "Illustration",
+    "3D Modeling",
+    "Print Design"
+  ],
+  "Construction & Trade": [
+    "General Construction",
+    "Electrical Services",
+    "Plumbing",
+    "HVAC",
+    "Carpentry",
+    "Painting",
+    "Landscaping",
+    "Roofing",
+    "Interior Design",
+    "Architecture"
+  ],
+  "Professional Services": [
+    "Accounting",
+    "Tax Services",
+    "Legal Consulting",
+    "Insurance Services",
+    "Real Estate Services",
+    "Translation Services",
+    "Writing & Editing",
+    "Training & Education",
+    "Career Coaching",
+    "Virtual Assistance"
+  ],
+  "Health & Wellness": [
+    "Healthcare Services",
+    "Mental Health Services",
+    "Fitness & Training",
+    "Nutrition Services",
+    "Alternative Medicine",
+    "Physical Therapy",
+    "Wellness Coaching",
+    "Medical Equipment",
+    "Healthcare Technology",
+    "Telehealth Services"
+  ],
+  "Retail & E-commerce": [
+    "Online Retail",
+    "Brick & Mortar Retail",
+    "Wholesale",
+    "Dropshipping",
+    "Marketplace Management",
+    "E-commerce Consulting",
+    "Inventory Management",
+    "Supply Chain",
+    "Customer Service",
+    "Payment Solutions"
+  ],
+  "Manufacturing & Industrial": [
+    "Product Manufacturing",
+    "Custom Fabrication",
+    "Industrial Design",
+    "Quality Control",
+    "Process Automation",
+    "Equipment Maintenance",
+    "Material Handling",
+    "Packaging Solutions",
+    "Industrial Safety",
+    "Logistics Services"
+  ],
+  "Events & Entertainment": [
+    "Event Planning",
+    "Wedding Services",
+    "Corporate Events",
+    "Audio/Visual Services",
+    "Entertainment Services",
+    "Venue Management",
+    "Catering Services",
+    "Event Marketing",
+    "Virtual Events",
+    "Event Technology"
+  ]
+} as const;
 
 interface LeadFormData {
   title: string;
   description: string;
   category: string;
+  subcategory: string;
   budget: string;
   location: string;
 }
@@ -65,11 +190,13 @@ interface LeadWithUnreadCount extends SelectLead {
 }
 
 const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
   const form = useForm<LeadFormData>({
     defaultValues: {
       title: "",
       description: "",
       category: "",
+      subcategory: "",
       budget: "",
       location: "",
     },
@@ -89,9 +216,50 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
           required
         />
       </div>
-      <div>
-        <Label htmlFor="category">Category</Label>
-        <Input id="category" {...form.register("category")} required />
+      <div className="space-y-4">
+        <div>
+          <Label htmlFor="category">Main Category</Label>
+          <Select
+            onValueChange={(value) => {
+              setSelectedCategory(value);
+              form.setValue("category", value);
+              form.setValue("subcategory", ""); // Reset subcategory when main category changes
+            }}
+            defaultValue={form.getValues("category")}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select a main category" />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.keys(BUSINESS_CATEGORIES).map((category) => (
+                <SelectItem key={category} value={category}>
+                  {category}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {selectedCategory && (
+          <div>
+            <Label htmlFor="subcategory">Subcategory</Label>
+            <Select
+              onValueChange={(value) => form.setValue("subcategory", value)}
+              defaultValue={form.getValues("subcategory")}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a subcategory" />
+              </SelectTrigger>
+              <SelectContent>
+                {BUSINESS_CATEGORIES[selectedCategory as keyof typeof BUSINESS_CATEGORIES].map((subcategory) => (
+                  <SelectItem key={subcategory} value={subcategory}>
+                    {subcategory}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
       <div>
         <Label htmlFor="budget">Budget (£)</Label>
@@ -471,6 +639,7 @@ const FreeUserLeadsView = ({
       title: editingLead?.title || "",
       description: editingLead?.description || "",
       category: editingLead?.category || "",
+      subcategory: editingLead?.subcategory || "", // Added subcategory
       budget: editingLead?.budget?.toString() || "",
       location: editingLead?.location || "",
     },
@@ -535,6 +704,14 @@ const FreeUserLeadsView = ({
                                 required
                               />
                             </div>
+                            <div>
+                              <Label htmlFor="edit-subcategory">Subcategory</Label> {/* Added subcategory field */}
+                              <Input
+                                id="edit-subcategory"
+                                {...editForm.register("subcategory")}
+                                required
+                              />
+                            </div> {/* Added subcategory field */}
                             <div>
                               <Label htmlFor="edit-budget">Budget (£)</Label>
                               <Input
@@ -863,7 +1040,7 @@ export default function LeadsPage() {
         return await response.json();
       } catch (error: any) {
         if (error.subscriptionRequired ||
-            (error.response && error.response.status === 403 && error.response.data?.subscriptionRequired)) {
+          (error.response && error.response.status === 403 && error.response.data?.subscriptionRequired)) {
           setShowSubscriptionModal(true);
         }
         throw error;
@@ -994,7 +1171,8 @@ export default function LeadsPage() {
           proposalDialogOpen={proposalDialogOpen}
           setProposalDialogOpen={setProposalDialogOpen}
           toast={toast}
-          playNotification={playNotification}        />
+          playNotification={playNotification}
+        />
       ) : (
         <FreeUserLeadsView
           leads={leads}

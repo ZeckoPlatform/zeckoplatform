@@ -13,11 +13,15 @@ import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { BUSINESS_CATEGORIES } from "../leads-page";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useState } from "react";
 
 const businessProfileSchema = z.object({
   name: z.string().min(2, "Business name must be at least 2 characters"),
   description: z.string().min(10, "Description must be at least 10 characters"),
-  categories: z.string(),
+  category: z.string().min(1, "Please select a category"),
+  subcategory: z.string().min(1, "Please select a subcategory"),
   location: z.string().min(2, "Location must be at least 2 characters"),
   budget: z.string(),
   industries: z.string(),
@@ -29,6 +33,7 @@ export default function BusinessProfilePage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [selectedCategory, setSelectedCategory] = useState<string>(user?.profile?.categories?.[0] || "");
 
   // Redirect if user is not a business or vendor
   if (!user || (user.userType !== 'business' && user.userType !== 'vendor')) {
@@ -36,12 +41,13 @@ export default function BusinessProfilePage() {
     return null;
   }
 
-  const { register, handleSubmit, formState: { errors } } = useForm<BusinessProfileFormData>({
+  const { register, handleSubmit, formState: { errors }, setValue, getValues } = useForm<BusinessProfileFormData>({
     resolver: zodResolver(businessProfileSchema),
     defaultValues: {
       name: user?.profile?.name || "",
       description: user?.profile?.description || "",
-      categories: user?.profile?.categories?.join(", ") || "",
+      category: user?.profile?.categories?.[0] || "",
+      subcategory: user?.profile?.categories?.[1] || "",
       location: user?.profile?.location || "",
       budget: user?.profile?.matchPreferences?.budgetRange?.min?.toString() || "",
       industries: user?.profile?.matchPreferences?.industries?.join(", ") || "",
@@ -52,7 +58,7 @@ export default function BusinessProfilePage() {
     mutationFn: async (data: BusinessProfileFormData) => {
       const response = await apiRequest("POST", "/api/users/profile", {
         ...data,
-        categories: data.categories.split(",").map(c => c.trim()),
+        categories: [data.category, data.subcategory],
         industries: data.industries.split(",").map(i => i.trim()),
         matchPreferences: {
           budgetRange: {
@@ -108,7 +114,6 @@ export default function BusinessProfilePage() {
               <Input
                 id="name"
                 {...register("name")}
-                error={errors.name?.message}
               />
               {errors.name && (
                 <p className="text-sm text-destructive">{errors.name.message}</p>
@@ -120,20 +125,62 @@ export default function BusinessProfilePage() {
               <Textarea
                 id="description"
                 {...register("description")}
-                error={errors.description?.message}
               />
               {errors.description && (
                 <p className="text-sm text-destructive">{errors.description.message}</p>
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="categories">Categories (comma-separated)</Label>
-              <Input
-                id="categories"
-                {...register("categories")}
-                placeholder="e.g. IT Services, Consulting, Marketing"
-              />
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="category">Main Category</Label>
+                <Select
+                  onValueChange={(value) => {
+                    setSelectedCategory(value);
+                    setValue("category", value);
+                    setValue("subcategory", ""); // Reset subcategory when main category changes
+                  }}
+                  defaultValue={getValues("category")}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a main category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.keys(BUSINESS_CATEGORIES).map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.category && (
+                  <p className="text-sm text-destructive">{errors.category.message}</p>
+                )}
+              </div>
+
+              {selectedCategory && (
+                <div>
+                  <Label htmlFor="subcategory">Subcategory</Label>
+                  <Select
+                    onValueChange={(value) => setValue("subcategory", value)}
+                    defaultValue={getValues("subcategory")}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a subcategory" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {BUSINESS_CATEGORIES[selectedCategory as keyof typeof BUSINESS_CATEGORIES].map((subcategory) => (
+                        <SelectItem key={subcategory} value={subcategory}>
+                          {subcategory}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.subcategory && (
+                    <p className="text-sm text-destructive">{errors.subcategory.message}</p>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -141,7 +188,6 @@ export default function BusinessProfilePage() {
               <Input
                 id="location"
                 {...register("location")}
-                error={errors.location?.message}
               />
               {errors.location && (
                 <p className="text-sm text-destructive">{errors.location.message}</p>
