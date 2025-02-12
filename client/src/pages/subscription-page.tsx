@@ -23,6 +23,7 @@ import {
   createCheckoutSession,
   pauseSubscription,
   resumeSubscription,
+  cancelSubscription,
 } from "@/lib/subscription";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
@@ -47,16 +48,32 @@ export default function SubscriptionPage() {
   const [resumeDate, setResumeDate] = useState<Date>();
   const [isLoading, setIsLoading] = useState(false);
 
-  const form = useForm<SubscriptionFormData>({
-    resolver: zodResolver(subscriptionFormSchema),
-    defaultValues: {
-      paymentFrequency: "monthly",
-    },
-  });
-
+  // Get current subscription status
   const { data: subscriptionData, refetch: refetchSubscription } = useQuery({
     queryKey: ["/api/subscriptions/current"],
     enabled: !!user && user.userType !== "free",
+  });
+
+  // Cancel subscription mutation
+  const cancelSubscriptionMutation = useMutation({
+    mutationFn: async () => {
+      if (!subscriptionData?.id) return;
+      await cancelSubscription(subscriptionData.id);
+    },
+    onSuccess: () => {
+      refetchSubscription();
+      toast({
+        title: "Subscription cancelled",
+        description: "Your subscription has been cancelled successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to cancel subscription",
+        variant: "destructive",
+      });
+    },
   });
 
   const pauseMutation = useMutation({
@@ -163,9 +180,6 @@ export default function SubscriptionPage() {
   // Check if subscription is active (either paid or admin-granted)
   const isSubscriptionActive = subscriptionData?.active || subscriptionData?.isAdminGranted;
 
-  // Determine if we should show subscription management options
-  const showSubscriptionControls = !subscriptionData?.isAdminGranted;
-
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <Card>
@@ -180,58 +194,58 @@ export default function SubscriptionPage() {
             <div>
               <h3 className="font-semibold">Status</h3>
               <p className="text-sm text-muted-foreground">
-                {isSubscriptionActive 
-                  ? subscriptionData?.isAdminGranted 
-                    ? "Active (Admin Granted)" 
+                {isSubscriptionActive
+                  ? subscriptionData?.isAdminGranted
+                    ? "Active (Admin Granted)"
                     : "Active"
                   : "Inactive"}
               </p>
-            </div>
-            {/* Only show subscription management buttons for paid subscriptions */}
-            {showSubscriptionControls && (
-              <>
-                {subscriptionData?.status === "active" ? (
-                  <Button
-                    variant="outline"
-                    onClick={() => setPauseDialogOpen(true)}
-                    disabled={pauseMutation.isPending}
-                  >
-                    {pauseMutation.isPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : null}
-                    Pause Subscription
-                  </Button>
-                ) : subscriptionData?.status === "paused" ? (
-                  <Button
-                    onClick={() => resumeMutation.mutate()}
-                    disabled={resumeMutation.isPending}
-                  >
-                    {resumeMutation.isPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : null}
-                    Resume Subscription
-                  </Button>
-                ) : null}
-              </>
-            )}
-          </div>
-
-          {/* Show subscription details for admin-granted subscriptions */}
-          {subscriptionData?.isAdminGranted && (
-            <div className="bg-muted p-4 rounded-lg">
-              <p className="text-sm text-muted-foreground">
-                This is an admin-granted subscription. Contact support for any changes.
-              </p>
-              {subscriptionData.endsAt && (
-                <p className="text-sm text-muted-foreground mt-2">
-                  Valid until: {format(new Date(subscriptionData.endsAt), "PP")}
+              {subscriptionData?.isAdminGranted ? (
+                <p className="text-sm text-muted-foreground mt-1">
+                  This subscription was granted by an administrator
+                  {subscriptionData.endsAt && ` and is valid until ${format(new Date(subscriptionData.endsAt), "PP")}`}
+                </p>
+              ) : subscriptionData?.status === "active" && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Next billing date: {subscriptionData.current_period_end ?
+                    format(new Date(subscriptionData.current_period_end), "PP") :
+                    "Not available"}
                 </p>
               )}
             </div>
-          )}
+            {/* Only show subscription management buttons for paid subscriptions */}
+            {!subscriptionData?.isAdminGranted && isSubscriptionActive && (
+              <div className="space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setPauseDialogOpen(true)}
+                  disabled={pauseMutation.isPending}
+                >
+                  {pauseMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  Pause Subscription
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to cancel your subscription? This will take effect at the end of your current billing period.')) {
+                      cancelSubscriptionMutation.mutate();
+                    }
+                  }}
+                  disabled={cancelSubscriptionMutation.isPending}
+                >
+                  {cancelSubscriptionMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  Cancel Subscription
+                </Button>
+              </div>
+            )}
+          </div>
 
-          {/* Only show billing options for non-admin-granted subscriptions */}
-          {!subscriptionData?.isAdminGranted && !isSubscriptionActive && (
+          {/* Show subscription options for inactive subscriptions */}
+          {!isSubscriptionActive && (
             <Form {...form}>
               <form onSubmit={form.handleSubmit((data) => subscribeMutation.mutate(data))}
                     className="space-y-6">
@@ -281,25 +295,6 @@ export default function SubscriptionPage() {
                 </Button>
               </form>
             </Form>
-          )}
-
-          {subscriptionData?.status === "paused" && (
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">
-                Paused on: {format(new Date(subscriptionData.paused_at!), "PP")}
-              </p>
-              {subscriptionData.resume_date && (
-                <p className="text-sm text-muted-foreground">
-                  Scheduled to resume on:{" "}
-                  {format(new Date(subscriptionData.resume_date), "PP")}
-                </p>
-              )}
-              {subscriptionData.pause_reason && (
-                <p className="text-sm text-muted-foreground">
-                  Reason: {subscriptionData.pause_reason}
-                </p>
-              )}
-            </div>
           )}
         </CardContent>
       </Card>
