@@ -189,7 +189,7 @@ export default function SubscriptionPage() {
   const isSubscriptionActive = subscriptionData?.active || subscriptionData?.isAdminGranted;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
+    <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
       <Card>
         <CardHeader>
           <CardTitle>Subscription Management</CardTitle>
