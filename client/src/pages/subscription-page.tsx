@@ -28,7 +28,7 @@ import {
 } from "@/lib/subscription";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
@@ -66,8 +66,7 @@ export default function SubscriptionPage() {
   // Cancel subscription mutation
   const cancelSubscriptionMutation = useMutation({
     mutationFn: async () => {
-      if (!subscriptionData?.id) return;
-      await cancelSubscription(subscriptionData.id);
+      await cancelSubscription();
     },
     onSuccess: () => {
       refetchSubscription();
@@ -87,8 +86,7 @@ export default function SubscriptionPage() {
 
   const pauseMutation = useMutation({
     mutationFn: async () => {
-      if (!subscriptionData?.id) return;
-      await pauseSubscription(subscriptionData.id, pauseReason, resumeDate);
+      await pauseSubscription(pauseReason, resumeDate);
     },
     onSuccess: () => {
       setPauseDialogOpen(false);
@@ -111,8 +109,7 @@ export default function SubscriptionPage() {
 
   const resumeMutation = useMutation({
     mutationFn: async () => {
-      if (!subscriptionData?.id) return;
-      await resumeSubscription(subscriptionData.id);
+      await resumeSubscription();
     },
     onSuccess: () => {
       refetchSubscription();
@@ -213,31 +210,34 @@ export default function SubscriptionPage() {
                   This subscription was granted by an administrator
                   {subscriptionData.endsAt && ` and is valid until ${format(new Date(subscriptionData.endsAt), "PP")}`}
                 </p>
-              ) : subscriptionData?.status === "active" && (
+              ) : subscriptionData?.current_period_end && (
                 <p className="text-sm text-muted-foreground mt-1">
-                  Next billing date: {subscriptionData.current_period_end ?
-                    format(new Date(subscriptionData.current_period_end), "PP") :
-                    "Not available"}
+                  Next billing date: {format(new Date(subscriptionData.current_period_end), "PP")}
                 </p>
               )}
             </div>
-            {/* Only show subscription management buttons for paid subscriptions */}
-            {!subscriptionData?.isAdminGranted && isSubscriptionActive && (
+            {/* Show subscription management buttons for all active subscriptions */}
+            {isSubscriptionActive && (
               <div className="space-x-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setPauseDialogOpen(true)}
-                  disabled={pauseMutation.isPending}
-                >
-                  {pauseMutation.isPending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : null}
-                  Pause Subscription
-                </Button>
+                {!subscriptionData?.isAdminGranted && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setPauseDialogOpen(true)}
+                    disabled={pauseMutation.isPending}
+                  >
+                    {pauseMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
+                    Pause Subscription
+                  </Button>
+                )}
                 <Button
                   variant="destructive"
                   onClick={() => {
-                    if (window.confirm('Are you sure you want to cancel your subscription? This will take effect at the end of your current billing period.')) {
+                    if (window.confirm('Are you sure you want to cancel your subscription?' + 
+                      (subscriptionData?.isAdminGranted 
+                        ? ' This will immediately end your admin-granted subscription.'
+                        : ' This will take effect at the end of your current billing period.'))) {
                       cancelSubscriptionMutation.mutate();
                     }
                   }}
