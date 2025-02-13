@@ -25,30 +25,31 @@ import ReviewModerationPage from "@/pages/admin/review-moderation";
 import ResetPasswordPage from "@/pages/auth/reset-password";
 import ReviewsDashboard from "@/pages/reviews-dashboard";
 import NotificationsPage from "@/pages/notifications-page";
+import EarlyBirdLanding from "@/pages/early-bird-landing";
 
 function Router() {
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
       <Switch>
-        <Route path="/" component={HomePage} />
+        {/* Pre-launch Routes */}
+        <Route path="/" component={EarlyBirdLanding} />
         <Route path="/auth" component={AuthPage} />
         <Route path="/auth/reset-password/:token" component={ResetPasswordPage} />
-        <Route path="/cart" component={CartPage} />
 
-        {/* Protected Routes */}
-        <Route path="/leads" component={() => <ProtectedRoute component={LeadsPage} />} />
-        <Route path="/marketplace" component={() => <ProtectedRoute component={MarketplacePage} />} />
-        <Route path="/subscription" component={() => <ProtectedRoute component={SubscriptionPage} />} />
-        <Route path="/vendor" component={() => <ProtectedRoute component={VendorDashboard} />} />
-        <Route path="/vendor/dashboard" component={() => <ProtectedRoute component={VendorDashboard} />} />
-        <Route path="/analytics" component={() => <ProtectedRoute component={AnalyticsDashboard} />} />
-        <Route path="/admin-management" component={() => <ProtectedRoute component={AdminManagementPage} />} />
-        <Route path="/reviews" component={() => <ProtectedRoute component={ReviewsDashboard} />} />
-        <Route path="/notifications" component={() => <ProtectedRoute component={NotificationsPage} />} />
+        {/* Protected Routes - These will be accessible after launch */}
+        <Route path="/app" component={() => <ProtectedRoute component={HomePage} />} />
+        <Route path="/app/leads" component={() => <ProtectedRoute component={LeadsPage} />} />
+        <Route path="/app/marketplace" component={() => <ProtectedRoute component={MarketplacePage} />} />
+        <Route path="/app/subscription" component={() => <ProtectedRoute component={SubscriptionPage} />} />
+        <Route path="/app/vendor" component={() => <ProtectedRoute component={VendorDashboard} />} />
+        <Route path="/app/vendor/dashboard" component={() => <ProtectedRoute component={VendorDashboard} />} />
+        <Route path="/app/analytics" component={() => <ProtectedRoute component={AnalyticsDashboard} />} />
+        <Route path="/app/admin-management" component={() => <ProtectedRoute component={AdminManagementPage} />} />
+        <Route path="/app/reviews" component={() => <ProtectedRoute component={ReviewsDashboard} />} />
+        <Route path="/app/notifications" component={() => <ProtectedRoute component={NotificationsPage} />} />
 
         {/* Settings Routes */}
-        <Route path="/settings/security">
+        <Route path="/app/settings/security">
           {() => (
             <ProtectedRoute
               component={() => (
@@ -59,7 +60,7 @@ function Router() {
             />
           )}
         </Route>
-        <Route path="/settings/business-profile">
+        <Route path="/app/settings/business-profile">
           {() => (
             <ProtectedRoute
               component={() => (
@@ -70,7 +71,7 @@ function Router() {
             />
           )}
         </Route>
-        <Route path="/settings/notifications">
+        <Route path="/app/settings/notifications">
           {() => (
             <ProtectedRoute
               component={() => (
@@ -81,7 +82,7 @@ function Router() {
             />
           )}
         </Route>
-        <Route path="/settings/analytics">
+        <Route path="/app/settings/analytics">
           {() => (
             <ProtectedRoute
               component={() => (
@@ -94,8 +95,8 @@ function Router() {
         </Route>
 
         {/* Admin Routes */}
-        <Route path="/admin/users/edit/:id" component={UserEditPage} />
-        <Route path="/admin/reviews" component={ReviewModerationPage} />
+        <Route path="/app/admin/users/edit/:id" component={UserEditPage} />
+        <Route path="/app/admin/reviews" component={ReviewModerationPage} />
 
         <Route component={NotFound} />
       </Switch>

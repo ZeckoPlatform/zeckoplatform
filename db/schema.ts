@@ -283,6 +283,36 @@ export const trialHistory = pgTable("trial_history", {
   created_at: timestamp("created_at").defaultNow(),
 });
 
+export const earlyBirdRegistrations = pgTable("early_bird_registrations", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  companyName: text("company_name").notNull(),
+  companyNumber: text("company_number")
+    .unique(),
+  vatNumber: text("vat_number")
+    .unique(),
+  userType: text("user_type", { enum: ["business", "vendor"] }).notNull(),
+  status: text("status", {
+    enum: ["pending", "approved", "rejected"]
+  }).default("pending"),
+  registeredAt: timestamp("registered_at").defaultNow(),
+  approvedAt: timestamp("approved_at"),
+  metadata: jsonb("metadata").$type<{
+    industry?: string;
+    size?: string;
+    preferences?: {
+      notifications?: boolean;
+      marketing?: boolean;
+    };
+  }>(),
+});
+
+export const insertEarlyBirdSchema = createInsertSchema(earlyBirdRegistrations);
+export const selectEarlyBirdSchema = createSelectSchema(earlyBirdRegistrations);
+
+export type InsertEarlyBird = typeof earlyBirdRegistrations.$inferInsert;
+export type SelectEarlyBird = typeof earlyBirdRegistrations.$inferSelect;
+
 export const usersRelations = relations(users, ({ many }) => ({
   leads: many(leads),
   products: many(products),
