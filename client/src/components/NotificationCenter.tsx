@@ -17,10 +17,12 @@ import { ScrollArea } from "./ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
+import { useLocation } from "wouter";
 
 export default function NotificationCenter() {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const { data: notifications = [] } = useQuery({
     queryKey: ["/api/notifications"],
@@ -92,6 +94,11 @@ export default function NotificationCenter() {
     updatePreferencesMutation.mutate({ ...preferences, [key]: value });
   };
 
+  const handleViewAll = () => {
+    setOpen(false); // Close the notification sheet
+    setLocation("/notifications"); // Navigate to notifications page
+  };
+
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
@@ -106,7 +113,12 @@ export default function NotificationCenter() {
       </SheetTrigger>
       <SheetContent>
         <SheetHeader>
-          <SheetTitle>Notifications</SheetTitle>
+          <div className="flex justify-between items-center">
+            <SheetTitle>Notifications</SheetTitle>
+            <Button variant="outline" size="sm" onClick={handleViewAll}>
+              View All
+            </Button>
+          </div>
         </SheetHeader>
         <Tabs defaultValue="notifications" className="mt-4">
           <TabsList className="grid w-full grid-cols-2">
