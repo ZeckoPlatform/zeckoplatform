@@ -17,10 +17,26 @@ const earlyBirdSchema = z.object({
   companyNumber: z.string()
     .regex(/^[A-Z0-9]{8}$/, "Invalid company registration number format")
     .optional(),
-  vatNumber: z.string()
-    .regex(/^GB[0-9]{9}$/, "Invalid UK VAT number format")
+  utrNumber: z.string()
+    .regex(/^[0-9]{10}$/, "Invalid UTR number format")
     .optional(),
   userType: z.enum(["business", "vendor"]),
+}).superRefine((data, ctx) => {
+  if (data.userType === "vendor" && !data.companyNumber) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Company registration number is required for vendors",
+      path: ["companyNumber"]
+    });
+  }
+  if (data.userType === "business" && !data.companyNumber && !data.utrNumber) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Either company registration number or UTR number is required for businesses",
+      path: ["companyNumber"]
+    });
+  }
+  return true;
 });
 
 type EarlyBirdFormData = z.infer<typeof earlyBirdSchema>;
@@ -187,11 +203,12 @@ export default function EarlyBirdLanding() {
                   </div>
                 </div>
 
-                {userType === "business" && (
+                {userType === "vendor" && (
                   <div className="space-y-2">
-                    <Label htmlFor="companyNumber">Company Registration Number</Label>
+                    <Label htmlFor="companyNumber">Company Registration Number (Required)</Label>
                     <Input
                       id="companyNumber"
+                      placeholder="e.g., AB123456"
                       {...register("companyNumber")}
                     />
                     {errors.companyNumber && (
@@ -200,17 +217,31 @@ export default function EarlyBirdLanding() {
                   </div>
                 )}
 
-                {userType === "vendor" && (
-                  <div className="space-y-2">
-                    <Label htmlFor="vatNumber">VAT Number</Label>
-                    <Input
-                      id="vatNumber"
-                      {...register("vatNumber")}
-                    />
-                    {errors.vatNumber && (
-                      <p className="text-sm text-destructive">{errors.vatNumber.message}</p>
-                    )}
-                  </div>
+                {userType === "business" && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="companyNumber">Company Registration Number (Optional if UTR provided)</Label>
+                      <Input
+                        id="companyNumber"
+                        placeholder="e.g., AB123456"
+                        {...register("companyNumber")}
+                      />
+                      {errors.companyNumber && (
+                        <p className="text-sm text-destructive">{errors.companyNumber.message}</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="utrNumber">UTR Number (Optional if Company Number provided)</Label>
+                      <Input
+                        id="utrNumber"
+                        placeholder="e.g., 1234567890"
+                        {...register("utrNumber")}
+                      />
+                      {errors.utrNumber && (
+                        <p className="text-sm text-destructive">{errors.utrNumber.message}</p>
+                      )}
+                    </div>
+                  </>
                 )}
 
                 <Button

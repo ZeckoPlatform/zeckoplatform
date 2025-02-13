@@ -22,7 +22,6 @@ export const users = pgTable("users", {
   businessVerified: boolean("business_verified").default(false),
   businessName: text("business_name"),
   companyNumber: text("company_number").unique(),
-  vatNumber: text("vat_number").unique(),
   utrNumber: text("utr_number").unique(),
   verificationStatus: text("verification_status", {
     enum: ["pending", "verified", "rejected"]
@@ -289,7 +288,7 @@ export const earlyBirdRegistrations = pgTable("early_bird_registrations", {
   companyName: text("company_name").notNull(),
   companyNumber: text("company_number")
     .unique(),
-  vatNumber: text("vat_number")
+  utrNumber: text("utr_number")
     .unique(),
   userType: text("user_type", { enum: ["business", "vendor"] }).notNull(),
   status: text("status", {
