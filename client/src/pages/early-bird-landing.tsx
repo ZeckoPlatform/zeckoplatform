@@ -78,6 +78,13 @@ export default function EarlyBirdLanding() {
   const createCheckoutSession = useMutation({
     mutationFn: async (data: EarlyBirdFormData) => {
       const hostUrl = window.location.origin;
+      console.log('Submitting data to /api/early-bird/create-checkout:', {
+        ...data,
+        hostUrl,
+        price: SUBSCRIPTION_PRICES[data.userType][data.billingFrequency],
+        frequency: data.billingFrequency
+      });
+
       const response = await apiRequest("POST", "/api/early-bird/create-checkout", {
         ...data,
         hostUrl,
@@ -87,16 +94,20 @@ export default function EarlyBirdLanding() {
 
       if (!response.ok) {
         const error = await response.json();
+        console.error('Checkout session creation failed:', error);
         throw new Error(error.message || "Failed to create checkout session");
       }
 
       const { url } = await response.json();
+      console.log('Received checkout URL:', url);
       return url;
     },
     onSuccess: (url: string) => {
+      console.log('Redirecting to Stripe checkout:', url);
       window.location.href = url;
     },
     onError: (error: Error) => {
+      console.error('Mutation error:', error);
       toast({
         title: "Error",
         description: error.message,
@@ -109,6 +120,12 @@ export default function EarlyBirdLanding() {
   const userType = form.watch("userType");
   const businessType = form.watch("businessType");
   const billingFrequency = form.watch("billingFrequency");
+
+  const onSubmit = async (data: EarlyBirdFormData) => {
+    console.log('Form submitted with data:', data);
+    setSubmitted(true);
+    createCheckoutSession.mutate(data);
+  };
 
   if (submitted) {
     return (
@@ -190,10 +207,7 @@ export default function EarlyBirdLanding() {
             <CardContent>
               <form
                 className="space-y-4"
-                onSubmit={form.handleSubmit((data) => {
-                  setSubmitted(true);
-                  createCheckoutSession.mutate(data);
-                })}
+                onSubmit={form.handleSubmit(onSubmit)}
               >
                 <div>
                   <Label htmlFor="email">Email</Label>
@@ -305,7 +319,6 @@ export default function EarlyBirdLanding() {
                 {((userType === "business" &&
                   businessType === "registered") ||
                   userType === "vendor") && (
-                  <>
                     <div>
                       <Label htmlFor="companyNumber">Companies House Number</Label>
                       <Input
@@ -319,30 +332,29 @@ export default function EarlyBirdLanding() {
                         </p>
                       )}
                     </div>
-                  </>
-                )}
+                  )}
 
                 {userType === "business" &&
                   businessType === "selfEmployed" && (
-                  <div>
-                    <Label htmlFor="utrNumber">UTR Number</Label>
-                    <Input
-                      id="utrNumber"
-                      {...form.register("utrNumber")}
-                      placeholder="1234567890"
-                    />
-                    {form.formState.errors.utrNumber && (
-                      <p className="text-sm text-destructive mt-1">
-                        {form.formState.errors.utrNumber.message}
-                      </p>
-                    )}
-                  </div>
-                )}
+                    <div>
+                      <Label htmlFor="utrNumber">UTR Number</Label>
+                      <Input
+                        id="utrNumber"
+                        {...form.register("utrNumber")}
+                        placeholder="1234567890"
+                      />
+                      {form.formState.errors.utrNumber && (
+                        <p className="text-sm text-destructive mt-1">
+                          {form.formState.errors.utrNumber.message}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={createCheckoutSession.isPending}
+                  disabled={createCheckoutSession.isPending || form.formState.isSubmitting}
                 >
                   {createCheckoutSession.isPending ? (
                     <>
