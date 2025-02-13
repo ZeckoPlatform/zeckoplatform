@@ -29,12 +29,21 @@ const earlyBirdSchema = z.object({
       path: ["companyNumber"]
     });
   }
-  if (data.userType === "business" && !data.companyNumber && !data.utrNumber) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Either company registration number or UTR number is required for businesses",
-      path: ["companyNumber"]
-    });
+  if (data.userType === "business") {
+    if (data.companyNumber && data.utrNumber) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Please provide either company registration number OR UTR number, not both",
+        path: ["companyNumber"]
+      });
+    }
+    if (!data.companyNumber && !data.utrNumber) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Please provide either company registration number (if registered company) or UTR number (if self-employed)",
+        path: ["companyNumber"]
+      });
+    }
   }
   return true;
 });
@@ -218,30 +227,37 @@ export default function EarlyBirdLanding() {
                 )}
 
                 {userType === "business" && (
-                  <>
-                    <div className="space-y-2">
-                      <Label htmlFor="companyNumber">Company Registration Number (Optional if UTR provided)</Label>
-                      <Input
-                        id="companyNumber"
-                        placeholder="e.g., AB123456"
-                        {...register("companyNumber")}
-                      />
-                      {errors.companyNumber && (
-                        <p className="text-sm text-destructive">{errors.companyNumber.message}</p>
-                      )}
+                  <div className="space-y-2">
+                    <Label>Business Identification</Label>
+                    <CardDescription className="mb-4">
+                      Please provide either your Company Registration Number (if you're a registered company) 
+                      or your UTR Number (if you're self-employed). Do not provide both.
+                    </CardDescription>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="companyNumber">Company Registration Number</Label>
+                        <Input
+                          id="companyNumber"
+                          placeholder="e.g., AB123456"
+                          {...register("companyNumber")}
+                        />
+                      </div>
+                      <div className="text-center text-sm text-muted-foreground">OR</div>
+                      <div className="space-y-2">
+                        <Label htmlFor="utrNumber">UTR Number (for self-employed)</Label>
+                        <Input
+                          id="utrNumber"
+                          placeholder="e.g., 1234567890"
+                          {...register("utrNumber")}
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="utrNumber">UTR Number (Optional if Company Number provided)</Label>
-                      <Input
-                        id="utrNumber"
-                        placeholder="e.g., 1234567890"
-                        {...register("utrNumber")}
-                      />
-                      {errors.utrNumber && (
-                        <p className="text-sm text-destructive">{errors.utrNumber.message}</p>
-                      )}
-                    </div>
-                  </>
+                    {(errors.companyNumber || errors.utrNumber) && (
+                      <p className="text-sm text-destructive mt-2">
+                        {errors.companyNumber?.message || errors.utrNumber?.message}
+                      </p>
+                    )}
+                  </div>
                 )}
 
                 <Button
