@@ -20,6 +20,7 @@ import notificationRoutes from './routes/notifications';
 import adminRoutes from './routes/admin';
 import documentRoutes from './routes/documents';
 import reviewRoutes from './routes/reviews';
+import Stripe from 'stripe'; // Added Stripe import
 
 interface User {
   id: number;
@@ -708,6 +709,7 @@ export function registerRoutes(app: Express): Server {
   });
 
 
+
   app.patch("/api/user/password", async (req, res) => {
     try {
       if (!req.user) {
@@ -945,8 +947,7 @@ export function registerRoutes(app: Express): Server {
       log(`Product update error: ${error instanceof Error? error.message : String(error)}`);
       console.error('Full error:', error);
       res.status(500).json({
-        message: "Failed to update product",
-        error: error instanceof Error ? error.message : "Unknown error"
+        message: "Failed to update product",        error: error instanceof Error ? error.message : "Unknown error"
       });
     }
   });
@@ -1071,6 +1072,116 @@ export function registerRoutes(app: Express): Server {
         error: "Registration failed",
         message: error instanceof Error ? error.message : "Unknown error"
       });
+    }
+  });
+
+  app.post("/api/early-bird/create-checkout", async (req, res) => {
+    try {
+      const { email, companyName, userType, businessType, companyNumber, utrNumber, priceId } = req.body;
+
+      if (!process.env.STRIPE_SECRET_KEY) {
+        throw new Error("STRIPE_SECRET_KEY is required");
+      }
+
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+      // Create a checkout session
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price_data: {
+              currency: 'gbp',
+              product_data: {
+                name: userType === 'business' ? 'Business Early Access' : 'Vendor Early Access',
+                description: `Early bird access to Zecko - ${userType} account`,
+              },
+              unit_amount: Math.round(priceId * 100), // Convert to cents
+              recurring: {
+                interval: 'month',
+              },
+            },
+            quantity: 1,
+          },
+        ],
+        mode: 'subscription',
+        success_url: `${process.env.HOST_URL}/early-bird/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.HOST_URL}/early-bird`,
+        customer_email: email,
+        metadata: {
+          userType,
+          companyName,
+          businessType: businessType || null,
+          companyNumber: companyNumber || null,
+          utrNumber: utrNumber || null,
+        },
+      });
+
+      res.json({ url: session.url });
+    } catch (error) {
+      console.error('Error creating checkout session:', error);
+      res.status(500).json({
+        message: error instanceof Error ? error.message : 'Failed to create checkout session',
+      });
+    }
+  });
+
+  app.get("/api/early-bird/success", async (req, res) => {
+    try {
+      const { session_id } = req.query;
+
+      if (!session_id || typeof session_id !== 'string') {
+        throw new Error('Invalid session ID');
+      }
+
+      if (!process.env.STRIPE_SECRET_KEY) {
+        throw new Error("STRIPE_SECRET_KEY is required");
+      }
+
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+      // Retrieve the checkout session
+      const session = await stripe.checkout.sessions.retrieve(session_id);
+      const metadata = session.metadata;
+
+      if (!session?.metadata || !session.customer_email) {
+        throw new Error('Invalid session data');
+      }
+
+      // Create the user account
+      const [user] = await db.insert(users)
+        .values({
+          email: session.customer_email,
+          username: session.customer_email.split('@')[0],
+          userType: metadata.userType as 'business' | 'vendor',
+          password: await hashPassword(Math.random().toString(36).slice(-8)),
+          stripeCustomerId: session.customer as string,
+          profile: {
+            companyName: metadata.companyName,
+            businessType: metadata.businessType,
+            companyNumber: metadata.companyNumber,
+            utrNumber: metadata.utrNumber,
+          },
+          subscriptionActive: true,
+          subscriptionTier: metadata.userType,
+        })
+        .returning();
+
+      // Create subscription record
+      await db.insert(subscriptions)
+        .values({
+          user_id: user.id,
+          stripe_subscription_id: session.subscription as string,
+          status: 'active',
+          tier: metadata.userType,
+          start_date: new Date(),
+          auto_renew: true,
+        });
+
+      res.redirect('/auth/login?registered=true');
+    } catch (error) {
+      console.error('Error processing successful payment:', error);
+      res.redirect('/early-bird?error=registration-failed');
     }
   });
 

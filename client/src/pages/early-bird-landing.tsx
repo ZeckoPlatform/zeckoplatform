@@ -11,6 +11,18 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Check, Mail, Building2, Receipt } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { useLocation } from "wouter";
+
+const EARLY_BIRD_PRICES = {
+  business: {
+    price: 19.99, // Early bird discount from regular 29.99
+    description: "Business Early Access",
+  },
+  vendor: {
+    price: 34.99, // Early bird discount from regular 49.99
+    description: "Vendor Early Access",
+  },
+};
 
 const earlyBirdSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -45,6 +57,7 @@ type EarlyBirdFormData = z.infer<typeof earlyBirdSchema>;
 
 export default function EarlyBirdLanding() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [submitted, setSubmitted] = useState(false);
 
   const form = useForm<EarlyBirdFormData>({
@@ -59,25 +72,29 @@ export default function EarlyBirdLanding() {
     }
   });
 
-  const earlyBirdMutation = useMutation({
+  const createCheckoutSession = useMutation({
     mutationFn: async (data: EarlyBirdFormData) => {
-      const response = await apiRequest("POST", "/api/early-bird/register", data);
+      const response = await apiRequest("POST", "/api/early-bird/create-checkout", {
+        ...data,
+        priceId: EARLY_BIRD_PRICES[data.userType].price,
+        userType: data.userType,
+      });
+
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || "Failed to register for early access");
+        throw new Error(error.message || "Failed to create checkout session");
       }
-      return response.json();
+
+      const { url } = await response.json();
+      return url;
     },
-    onSuccess: () => {
-      setSubmitted(true);
-      toast({
-        title: "Success",
-        description: "Thank you for registering! We'll notify you when we launch.",
-      });
+    onSuccess: (url: string) => {
+      // Redirect to Stripe Checkout
+      window.location.href = url;
     },
     onError: (error: Error) => {
       toast({
-        title: "Registration Failed",
+        title: "Error",
         description: error.message,
         variant: "destructive",
       });
@@ -94,10 +111,10 @@ export default function EarlyBirdLanding() {
           <CardHeader>
             <CardTitle className="flex items-center justify-center gap-2">
               <Check className="h-6 w-6 text-green-500" />
-              Registration Successful!
+              Processing Your Registration
             </CardTitle>
             <CardDescription>
-              Thank you for registering for early access to Zecko. We'll notify you when we launch!
+              You will be redirected to complete your early access payment.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -168,7 +185,8 @@ export default function EarlyBirdLanding() {
               <form
                 className="space-y-4"
                 onSubmit={form.handleSubmit((data) => {
-                  earlyBirdMutation.mutate(data);
+                  setSubmitted(true);
+                  createCheckoutSession.mutate(data);
                 })}
               >
                 <div>
@@ -214,11 +232,15 @@ export default function EarlyBirdLanding() {
                   >
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="business" id="business" />
-                      <Label htmlFor="business">Business</Label>
+                      <Label htmlFor="business">
+                        Business (£{EARLY_BIRD_PRICES.business.price}/month)
+                      </Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="vendor" id="vendor" />
-                      <Label htmlFor="vendor">Vendor</Label>
+                      <Label htmlFor="vendor">
+                        Vendor (£{EARLY_BIRD_PRICES.vendor.price}/month)
+                      </Label>
                     </div>
                   </RadioGroup>
                 </div>
@@ -292,15 +314,15 @@ export default function EarlyBirdLanding() {
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={earlyBirdMutation.isPending}
+                  disabled={createCheckoutSession.isPending}
                 >
-                  {earlyBirdMutation.isPending ? (
+                  {createCheckoutSession.isPending ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Registering...
+                      Processing...
                     </>
                   ) : (
-                    "Register for Early Access"
+                    `Register Now - £${EARLY_BIRD_PRICES[userType].price}/month`
                   )}
                 </Button>
               </form>
