@@ -29,8 +29,11 @@ export default function EarlyBirdLanding() {
   const { toast } = useToast();
   const [submitted, setSubmitted] = useState(false);
 
-  const { register, handleSubmit, formState: { errors }, watch } = useForm<EarlyBirdFormData>({
+  const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<EarlyBirdFormData>({
     resolver: zodResolver(earlyBirdSchema),
+    defaultValues: {
+      userType: "business"
+    }
   });
 
   const earlyBirdMutation = useMutation({
@@ -169,10 +172,7 @@ export default function EarlyBirdLanding() {
                       type="button"
                       variant={userType === "business" ? "default" : "outline"}
                       className="w-full"
-                      onClick={() => {
-                        const { setValue } = register("userType");
-                        setValue("business");
-                      }}
+                      onClick={() => setValue("userType", "business")}
                     >
                       Business
                     </Button>
@@ -180,10 +180,7 @@ export default function EarlyBirdLanding() {
                       type="button"
                       variant={userType === "vendor" ? "default" : "outline"}
                       className="w-full"
-                      onClick={() => {
-                        const { setValue } = register("userType");
-                        setValue("vendor");
-                      }}
+                      onClick={() => setValue("userType", "vendor")}
                     >
                       Vendor
                     </Button>
