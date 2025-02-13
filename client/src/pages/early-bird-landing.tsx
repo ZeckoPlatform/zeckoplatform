@@ -15,7 +15,7 @@ const earlyBirdSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   companyName: z.string().min(2, "Company name must be at least 2 characters"),
   companyNumber: z.string()
-    .regex(/^(?:[A-Za-z0-9]{6,8}|[A-Za-z]{2}[0-9]{6})$/, "Please enter a valid company registration number")
+    .regex(/^(?:[0-9]{8}|[A-Za-z]{2}[0-9]{6})$/, "Please enter a valid company number (8 digits or 2 letters followed by 6 digits)")
     .optional(),
   utrNumber: z.string()
     .regex(/^\d{10}$/, "UTR number must be exactly 10 digits")
