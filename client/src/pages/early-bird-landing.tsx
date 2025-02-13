@@ -23,36 +23,22 @@ const earlyBirdSchema = z.object({
     .optional(),
   userType: z.enum(["business", "vendor"]),
   businessType: z.enum(["registered", "selfEmployed"]).optional(),
-}).superRefine((data, ctx) => {
-  if (data.userType === "vendor" && !data.companyNumber) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Company registration number is required for vendors",
-      path: ["companyNumber"]
-    });
-  }
+}).refine((data) => {
   if (data.userType === "business") {
-    if (!data.businessType) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Please select your business type",
-        path: ["businessType"]
-      });
-    } else if (data.businessType === "registered" && !data.companyNumber) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Company registration number is required for registered businesses",
-        path: ["companyNumber"]
-      });
-    } else if (data.businessType === "selfEmployed" && !data.utrNumber) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "UTR number is required for self-employed businesses",
-        path: ["utrNumber"]
-      });
+    if (data.businessType === "registered") {
+      return !!data.companyName && !!data.companyNumber; //Corrected this line
+    }
+    if (data.businessType === "selfEmployed") {
+      return !!data.utrNumber;
     }
   }
+  if (data.userType === "vendor") {
+    return !!data.companyName && !!data.companyNumber; //Corrected this line
+  }
   return true;
+}, {
+  message: "Please fill in all required business information",
+  path: ["businessType"],
 });
 
 type EarlyBirdFormData = z.infer<typeof earlyBirdSchema>;
@@ -179,48 +165,50 @@ export default function EarlyBirdLanding() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit((data) => {
-                console.log("Form data:", data); 
-                earlyBirdMutation.mutate(data);
-              })} className="space-y-6">
-                <div className="space-y-2">
+              <form
+                className="space-y-4"
+                onSubmit={handleSubmit((data) => {
+                  earlyBirdMutation.mutate(data);
+                })}
+              >
+                <div>
                   <Label htmlFor="email">Email Address</Label>
                   <Input
                     id="email"
                     type="email"
-                    placeholder="your.email@company.com"
                     {...register("email")}
                   />
                   {errors.email && (
-                    <p className="text-sm text-destructive">{errors.email.message}</p>
+                    <p className="text-sm text-destructive mt-1">
+                      {errors.email.message}
+                    </p>
                   )}
                 </div>
 
-                <div className="space-y-2">
+                <div>
                   <Label htmlFor="companyName">Company Name</Label>
                   <Input
                     id="companyName"
-                    placeholder="Your Company Ltd"
                     {...register("companyName")}
                   />
                   {errors.companyName && (
-                    <p className="text-sm text-destructive">{errors.companyName.message}</p>
+                    <p className="text-sm text-destructive mt-1">
+                      {errors.companyName.message}
+                    </p>
                   )}
                 </div>
 
-                <div className="space-y-2">
+                <div>
                   <Label>Account Type</Label>
                   <RadioGroup
                     defaultValue="business"
                     onValueChange={(value) => {
                       setValue("userType", value as "business" | "vendor");
-                      if (value === "vendor") {
-                        setValue("businessType", undefined);
-                        setValue("utrNumber", undefined);
-                      } else {
+                      setValue("companyName", "");
+                      setValue("companyNumber", "");
+                      setValue("utrNumber", "");
+                      if (value === "business") {
                         setValue("businessType", "registered");
-                        setValue("companyNumber", undefined);
-                        setValue("utrNumber", undefined);
                       }
                     }}
                   >
@@ -242,11 +230,9 @@ export default function EarlyBirdLanding() {
                       defaultValue="registered"
                       onValueChange={(value) => {
                         setValue("businessType", value as "registered" | "selfEmployed");
-                        if (value === "registered") {
-                          setValue("utrNumber", undefined);
-                        } else {
-                          setValue("companyNumber", undefined);
-                        }
+                        setValue("companyName", "");
+                        setValue("companyNumber", "");
+                        setValue("utrNumber", "");
                       }}
                     >
                       <div className="flex items-center space-x-2">
@@ -259,41 +245,46 @@ export default function EarlyBirdLanding() {
                       </div>
                     </RadioGroup>
                     {errors.businessType && (
-                      <p className="text-sm text-destructive">{errors.businessType.message}</p>
+                      <p className="text-sm text-destructive mt-1">
+                        {errors.businessType.message}
+                      </p>
                     )}
                   </div>
                 )}
 
-                {((userType === "business" && businessType === "registered") || userType === "vendor") && (
-                  <div className="space-y-2">
-                    <Label htmlFor="companyNumber">Company Registration Number</Label>
-                    <Input
-                      id="companyNumber"
-                      placeholder="e.g., 12345678 or SC123456"
-                      {...register("companyNumber")}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Enter your 8-digit Companies House registration number
-                    </p>
-                    {errors.companyNumber && (
-                      <p className="text-sm text-destructive">{errors.companyNumber.message}</p>
-                    )}
-                  </div>
+                {((userType === "business" &&
+                  businessType === "registered") ||
+                  userType === "vendor") && (
+                  <>
+                    <div>
+                      <Label htmlFor="companyNumber">Companies House Number</Label>
+                      <Input
+                        id="companyNumber"
+                        {...register("companyNumber")}
+                        placeholder="12345678"
+                      />
+                      {errors.companyNumber && (
+                        <p className="text-sm text-destructive mt-1">
+                          {errors.companyNumber.message}
+                        </p>
+                      )}
+                    </div>
+                  </>
                 )}
 
-                {userType === "business" && businessType === "selfEmployed" && (
-                  <div className="space-y-2">
+                {userType === "business" &&
+                  businessType === "selfEmployed" && (
+                  <div>
                     <Label htmlFor="utrNumber">UTR Number</Label>
                     <Input
                       id="utrNumber"
-                      placeholder="e.g., 1234567890"
                       {...register("utrNumber")}
+                      placeholder="1234567890"
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Enter your 10-digit Unique Taxpayer Reference number
-                    </p>
                     {errors.utrNumber && (
-                      <p className="text-sm text-destructive">{errors.utrNumber.message}</p>
+                      <p className="text-sm text-destructive mt-1">
+                        {errors.utrNumber.message}
+                      </p>
                     )}
                   </div>
                 )}
