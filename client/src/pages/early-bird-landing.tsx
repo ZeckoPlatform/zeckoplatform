@@ -10,6 +10,7 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Check, Mail, Building2, Receipt } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 const earlyBirdSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -21,7 +22,7 @@ const earlyBirdSchema = z.object({
     .regex(/^\d{10}$/, "UTR number must be exactly 10 digits")
     .optional(),
   userType: z.enum(["business", "vendor"]),
-  businessType: z.enum(["registered", "self-employed"]).optional(),
+  businessType: z.enum(["registered", "selfEmployed"]).optional(),
 }).superRefine((data, ctx) => {
   if (data.userType === "vendor" && !data.companyNumber) {
     ctx.addIssue({
@@ -43,7 +44,7 @@ const earlyBirdSchema = z.object({
         message: "Company registration number is required for registered businesses",
         path: ["companyNumber"]
       });
-    } else if (data.businessType === "self-employed" && !data.utrNumber) {
+    } else if (data.businessType === "selfEmployed" && !data.utrNumber) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "UTR number is required for self-employed businesses",
@@ -63,7 +64,12 @@ export default function EarlyBirdLanding() {
   const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<EarlyBirdFormData>({
     resolver: zodResolver(earlyBirdSchema),
     defaultValues: {
-      userType: "business"
+      email: "",
+      companyName: "",
+      userType: "business",
+      businessType: "registered",
+      companyNumber: "",
+      utrNumber: "",
     }
   });
 
@@ -201,106 +207,61 @@ export default function EarlyBirdLanding() {
 
                 <div className="space-y-2">
                   <Label>Account Type</Label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <Button
-                      type="button"
-                      variant={userType === "business" ? "default" : "outline"}
-                      className="w-full"
-                      onClick={() => {
-                        setValue("userType", "business");
+                  <RadioGroup
+                    defaultValue="business"
+                    onValueChange={(value) => {
+                      setValue("userType", value as "business" | "vendor");
+                      if (value === "vendor") {
                         setValue("businessType", undefined);
+                        setValue("utrNumber", undefined);
+                      } else {
+                        setValue("businessType", "registered");
                         setValue("companyNumber", undefined);
                         setValue("utrNumber", undefined);
-                      }}
-                    >
-                      Business
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={userType === "vendor" ? "default" : "outline"}
-                      className="w-full"
-                      onClick={() => {
-                        setValue("userType", "vendor");
-                        setValue("businessType", undefined);
-                        setValue("companyNumber", undefined);
-                        setValue("utrNumber", undefined);
-                      }}
-                    >
-                      Vendor
-                    </Button>
-                  </div>
+                      }
+                    }}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="business" id="business" />
+                      <Label htmlFor="business">Business</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="vendor" id="vendor" />
+                      <Label htmlFor="vendor">Vendor</Label>
+                    </div>
+                  </RadioGroup>
                 </div>
 
                 {userType === "business" && (
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Business Type</Label>
-                      <div className="grid grid-cols-2 gap-4">
-                        <Button
-                          type="button"
-                          variant={businessType === "registered" ? "default" : "outline"}
-                          className="w-full"
-                          onClick={() => {
-                            setValue("businessType", "registered");
-                            setValue("utrNumber", undefined);
-                          }}
-                        >
-                          Registered Business
-                        </Button>
-                        <Button
-                          type="button"
-                          variant={businessType === "self-employed" ? "default" : "outline"}
-                          className="w-full"
-                          onClick={() => {
-                            setValue("businessType", "self-employed");
-                            setValue("companyNumber", undefined);
-                          }}
-                        >
-                          Self-employed
-                        </Button>
+                  <div>
+                    <Label>Business Type</Label>
+                    <RadioGroup
+                      defaultValue="registered"
+                      onValueChange={(value) => {
+                        setValue("businessType", value as "registered" | "selfEmployed");
+                        if (value === "registered") {
+                          setValue("utrNumber", undefined);
+                        } else {
+                          setValue("companyNumber", undefined);
+                        }
+                      }}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="registered" id="registered" />
+                        <Label htmlFor="registered">Registered Company</Label>
                       </div>
-                      {errors.businessType && (
-                        <p className="text-sm text-destructive">{errors.businessType.message}</p>
-                      )}
-                    </div>
-
-                    {businessType === "registered" && (
-                      <div className="space-y-2">
-                        <Label htmlFor="companyNumber">Company Registration Number</Label>
-                        <Input
-                          id="companyNumber"
-                          placeholder="e.g., 12345678 or SC123456"
-                          {...register("companyNumber")}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Enter your 8-digit Companies House registration number
-                        </p>
-                        {errors.companyNumber && (
-                          <p className="text-sm text-destructive">{errors.companyNumber.message}</p>
-                        )}
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="selfEmployed" id="selfEmployed" />
+                        <Label htmlFor="selfEmployed">Self-employed</Label>
                       </div>
-                    )}
-
-                    {businessType === "self-employed" && (
-                      <div className="space-y-2">
-                        <Label htmlFor="utrNumber">UTR Number</Label>
-                        <Input
-                          id="utrNumber"
-                          placeholder="e.g., 1234567890"
-                          {...register("utrNumber")}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Enter your 10-digit Unique Taxpayer Reference number
-                        </p>
-                        {errors.utrNumber && (
-                          <p className="text-sm text-destructive">{errors.utrNumber.message}</p>
-                        )}
-                      </div>
+                    </RadioGroup>
+                    {errors.businessType && (
+                      <p className="text-sm text-destructive">{errors.businessType.message}</p>
                     )}
                   </div>
                 )}
 
-                {userType === "vendor" && (
+                {((userType === "business" && businessType === "registered") || userType === "vendor") && (
                   <div className="space-y-2">
                     <Label htmlFor="companyNumber">Company Registration Number</Label>
                     <Input
@@ -313,6 +274,23 @@ export default function EarlyBirdLanding() {
                     </p>
                     {errors.companyNumber && (
                       <p className="text-sm text-destructive">{errors.companyNumber.message}</p>
+                    )}
+                  </div>
+                )}
+
+                {userType === "business" && businessType === "selfEmployed" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="utrNumber">UTR Number</Label>
+                    <Input
+                      id="utrNumber"
+                      placeholder="e.g., 1234567890"
+                      {...register("utrNumber")}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Enter your 10-digit Unique Taxpayer Reference number
+                    </p>
+                    {errors.utrNumber && (
+                      <p className="text-sm text-destructive">{errors.utrNumber.message}</p>
                     )}
                   </div>
                 )}
