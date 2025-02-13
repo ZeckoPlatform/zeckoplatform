@@ -16,24 +16,24 @@ const earlyBirdSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   companyName: z.string().min(2, "Company name must be at least 2 characters"),
   companyNumber: z.string()
-    .regex(/^(?:[0-9]{8}|[A-Za-z]{2}[0-9]{6})$/, "Please enter a valid company number (8 digits or 2 letters followed by 6 digits)")
+    .regex(/^[0-9]{8}$/, "Please enter a valid 8-character Companies House number")
     .optional(),
   utrNumber: z.string()
-    .regex(/^\d{10}$/, "UTR number must be exactly 10 digits")
+    .regex(/^[0-9]{10}$/, "Please enter a valid 10-digit UTR number")
     .optional(),
   userType: z.enum(["business", "vendor"]),
   businessType: z.enum(["registered", "selfEmployed"]).optional(),
 }).refine((data) => {
   if (data.userType === "business") {
     if (data.businessType === "registered") {
-      return !!data.companyName && !!data.companyNumber; //Corrected this line
+      return !!data.businessName && !!data.companyNumber;
     }
     if (data.businessType === "selfEmployed") {
       return !!data.utrNumber;
     }
   }
   if (data.userType === "vendor") {
-    return !!data.companyName && !!data.companyNumber; //Corrected this line
+    return !!data.businessName && !!data.companyNumber;
   }
   return true;
 }, {
@@ -47,7 +47,7 @@ export default function EarlyBirdLanding() {
   const { toast } = useToast();
   const [submitted, setSubmitted] = useState(false);
 
-  const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<EarlyBirdFormData>({
+  const form = useForm<EarlyBirdFormData>({
     resolver: zodResolver(earlyBirdSchema),
     defaultValues: {
       email: "",
@@ -64,14 +64,14 @@ export default function EarlyBirdLanding() {
       const response = await apiRequest("POST", "/api/early-bird/register", data);
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || "Registration failed");
+        throw new Error(error.message || "Failed to register for early access");
       }
       return response.json();
     },
     onSuccess: () => {
       setSubmitted(true);
       toast({
-        title: "Registration Successful",
+        title: "Success",
         description: "Thank you for registering! We'll notify you when we launch.",
       });
     },
@@ -84,8 +84,8 @@ export default function EarlyBirdLanding() {
     },
   });
 
-  const userType = watch("userType");
-  const businessType = watch("businessType");
+  const userType = form.watch("userType");
+  const businessType = form.watch("businessType");
 
   if (submitted) {
     return (
@@ -167,20 +167,20 @@ export default function EarlyBirdLanding() {
             <CardContent>
               <form
                 className="space-y-4"
-                onSubmit={handleSubmit((data) => {
+                onSubmit={form.handleSubmit((data) => {
                   earlyBirdMutation.mutate(data);
                 })}
               >
                 <div>
-                  <Label htmlFor="email">Email Address</Label>
+                  <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
                     type="email"
-                    {...register("email")}
+                    {...form.register("email")}
                   />
-                  {errors.email && (
+                  {form.formState.errors.email && (
                     <p className="text-sm text-destructive mt-1">
-                      {errors.email.message}
+                      {form.formState.errors.email.message}
                     </p>
                   )}
                 </div>
@@ -189,11 +189,11 @@ export default function EarlyBirdLanding() {
                   <Label htmlFor="companyName">Company Name</Label>
                   <Input
                     id="companyName"
-                    {...register("companyName")}
+                    {...form.register("companyName")}
                   />
-                  {errors.companyName && (
+                  {form.formState.errors.companyName && (
                     <p className="text-sm text-destructive mt-1">
-                      {errors.companyName.message}
+                      {form.formState.errors.companyName.message}
                     </p>
                   )}
                 </div>
@@ -203,12 +203,12 @@ export default function EarlyBirdLanding() {
                   <RadioGroup
                     defaultValue="business"
                     onValueChange={(value) => {
-                      setValue("userType", value as "business" | "vendor");
-                      setValue("companyName", "");
-                      setValue("companyNumber", "");
-                      setValue("utrNumber", "");
+                      form.setValue("userType", value as "business" | "vendor");
+                      form.setValue("companyName", "");
+                      form.setValue("companyNumber", "");
+                      form.setValue("utrNumber", "");
                       if (value === "business") {
-                        setValue("businessType", "registered");
+                        form.setValue("businessType", "registered");
                       }
                     }}
                   >
@@ -229,10 +229,10 @@ export default function EarlyBirdLanding() {
                     <RadioGroup
                       defaultValue="registered"
                       onValueChange={(value) => {
-                        setValue("businessType", value as "registered" | "selfEmployed");
-                        setValue("companyName", "");
-                        setValue("companyNumber", "");
-                        setValue("utrNumber", "");
+                        form.setValue("businessType", value as "registered" | "selfEmployed");
+                        form.setValue("companyName", "");
+                        form.setValue("companyNumber", "");
+                        form.setValue("utrNumber", "");
                       }}
                     >
                       <div className="flex items-center space-x-2">
@@ -244,9 +244,9 @@ export default function EarlyBirdLanding() {
                         <Label htmlFor="selfEmployed">Self-employed</Label>
                       </div>
                     </RadioGroup>
-                    {errors.businessType && (
+                    {form.formState.errors.businessType && (
                       <p className="text-sm text-destructive mt-1">
-                        {errors.businessType.message}
+                        {form.formState.errors.businessType.message}
                       </p>
                     )}
                   </div>
@@ -260,12 +260,12 @@ export default function EarlyBirdLanding() {
                       <Label htmlFor="companyNumber">Companies House Number</Label>
                       <Input
                         id="companyNumber"
-                        {...register("companyNumber")}
+                        {...form.register("companyNumber")}
                         placeholder="12345678"
                       />
-                      {errors.companyNumber && (
+                      {form.formState.errors.companyNumber && (
                         <p className="text-sm text-destructive mt-1">
-                          {errors.companyNumber.message}
+                          {form.formState.errors.companyNumber.message}
                         </p>
                       )}
                     </div>
@@ -278,12 +278,12 @@ export default function EarlyBirdLanding() {
                     <Label htmlFor="utrNumber">UTR Number</Label>
                     <Input
                       id="utrNumber"
-                      {...register("utrNumber")}
+                      {...form.register("utrNumber")}
                       placeholder="1234567890"
                     />
-                    {errors.utrNumber && (
+                    {form.formState.errors.utrNumber && (
                       <p className="text-sm text-destructive mt-1">
-                        {errors.utrNumber.message}
+                        {form.formState.errors.utrNumber.message}
                       </p>
                     )}
                   </div>
