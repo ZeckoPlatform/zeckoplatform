@@ -24,6 +24,7 @@ import UserEditPage from "@/pages/admin/user-edit";
 import ReviewModerationPage from "@/pages/admin/review-moderation";
 import ResetPasswordPage from "@/pages/auth/reset-password";
 import ReviewsDashboard from "@/pages/reviews-dashboard";
+import NotificationsPage from "@/pages/notifications-page";
 
 function Router() {
   return (
@@ -44,7 +45,7 @@ function Router() {
         <Route path="/analytics" component={() => <ProtectedRoute component={AnalyticsDashboard} />} />
         <Route path="/admin-management" component={() => <ProtectedRoute component={AdminManagementPage} />} />
         <Route path="/reviews" component={() => <ProtectedRoute component={ReviewsDashboard} />} />
-        <Route path="/notifications" component={() => <ProtectedRoute component={NotificationSettingsPage} />} />
+        <Route path="/notifications" component={() => <ProtectedRoute component={NotificationsPage} />} />
 
         {/* Settings Routes */}
         <Route path="/settings/security">
