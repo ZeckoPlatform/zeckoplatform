@@ -22,6 +22,21 @@ import documentRoutes from './routes/documents';
 import reviewRoutes from './routes/reviews';
 import Stripe from 'stripe'; // Added Stripe import
 
+const EARLY_BIRD_PRODUCTS = {
+  business: {
+    id: 'early_bird_business',
+    name: 'Business Early Access',
+    description: 'Early bird access to Zecko - Business account',
+    price: 1999, // £19.99 in pence
+  },
+  vendor: {
+    id: 'early_bird_vendor',
+    name: 'Vendor Early Access',
+    description: 'Early bird access to Zecko - Vendor account',
+    price: 3499, // £34.99 in pence
+  },
+};
+
 interface User {
   id: number;
   email: string;
@@ -932,8 +947,7 @@ export function registerRoutes(app: Express): Server {
 
       const [updatedProduct] = await db.update(products)
         .set(updateData)
-        .where(eq(products.id, productId))
-        .returning();
+        .where(eq(products.id, productId))        .returning();
 
       // Convert price back to decimal for response
       const responseProduct = {
@@ -1077,30 +1091,67 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/early-bird/create-checkout", async (req, res) => {
     try {
-      const { email, companyName, userType, businessType, companyNumber, utrNumber, priceId } = req.body;
+      const { email, companyName, userType, businessType, companyNumber, utrNumber } = req.body;
+
+      console.log('Creating early bird checkout session:', {
+        email,
+        userType,
+        businessType,
+        companyNumber,
+        utrNumber,
+      });
 
       if (!process.env.STRIPE_SECRET_KEY) {
         throw new Error("STRIPE_SECRET_KEY is required");
       }
 
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+      const productConfig = EARLY_BIRD_PRODUCTS[userType];
+
+      // Ensure the product exists in Stripe
+      let product;
+      try {
+        product = await stripe.products.retrieve(productConfig.id);
+      } catch (error) {
+        console.log('Creating new Stripe product for:', userType);
+        product = await stripe.products.create({
+          id: productConfig.id,
+          name: productConfig.name,
+          description: productConfig.description,
+        });
+      }
+
+      // Create or retrieve the price
+      let price;
+      const prices = await stripe.prices.list({
+        product: product.id,
+        active: true,
+        type: 'recurring',
+        recurring: { interval: 'month' },
+      });
+
+      if (prices.data.length > 0) {
+        price = prices.data[0];
+      } else {
+        console.log('Creating new Stripe price for:', userType);
+        price = await stripe.prices.create({
+          product: product.id,
+          unit_amount: productConfig.price,
+          currency: 'gbp',
+          recurring: {
+            interval: 'month',
+          },
+        });
+      }
+
+      console.log('Creating checkout session with price:', price.id);
 
       // Create a checkout session
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
         line_items: [
           {
-            price_data: {
-              currency: 'gbp',
-              product_data: {
-                name: userType === 'business' ? 'Business Early Access' : 'Vendor Early Access',
-                description: `Early bird access to Zecko - ${userType} account`,
-              },
-              unit_amount: Math.round(priceId * 100), // Convert to cents
-              recurring: {
-                interval: 'month',
-              },
-            },
+            price: price.id,
             quantity: 1,
           },
         ],
@@ -1117,6 +1168,7 @@ export function registerRoutes(app: Express): Server {
         },
       });
 
+      console.log('Checkout session created:', session.id);
       res.json({ url: session.url });
     } catch (error) {
       console.error('Error creating checkout session:', error);

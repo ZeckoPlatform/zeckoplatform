@@ -74,6 +74,8 @@ export default function EarlyBirdLanding() {
 
   const createCheckoutSession = useMutation({
     mutationFn: async (data: EarlyBirdFormData) => {
+      console.log("Creating checkout session with data:", data);
+
       const response = await apiRequest("POST", "/api/early-bird/create-checkout", {
         ...data,
         priceId: EARLY_BIRD_PRICES[data.userType].price,
@@ -86,18 +88,21 @@ export default function EarlyBirdLanding() {
       }
 
       const { url } = await response.json();
+      console.log("Received checkout URL:", url);
       return url;
     },
     onSuccess: (url: string) => {
-      // Redirect to Stripe Checkout
+      console.log("Redirecting to Stripe checkout:", url);
       window.location.href = url;
     },
     onError: (error: Error) => {
+      console.error("Checkout session creation failed:", error);
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
+      setSubmitted(false); // Reset submitted state on error
     },
   });
 
@@ -185,6 +190,7 @@ export default function EarlyBirdLanding() {
               <form
                 className="space-y-4"
                 onSubmit={form.handleSubmit((data) => {
+                  console.log("Form submitted with data:", data);
                   setSubmitted(true);
                   createCheckoutSession.mutate(data);
                 })}
