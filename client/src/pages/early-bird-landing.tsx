@@ -15,7 +15,7 @@ const earlyBirdSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   companyName: z.string().min(2, "Company name must be at least 2 characters"),
   companyNumber: z.string()
-    .regex(/^[A-Z0-9]{1,8}$/i, "Company registration number should be up to 8 alphanumeric characters")
+    .regex(/^(?:[A-Za-z0-9]{6,8}|[A-Za-z]{2}[0-9]{6})$/, "Please enter a valid company registration number")
     .optional(),
   utrNumber: z.string()
     .regex(/^\d{10}$/, "UTR number must be exactly 10 digits")
@@ -179,6 +179,7 @@ export default function EarlyBirdLanding() {
                   <Input
                     id="email"
                     type="email"
+                    placeholder="your.email@company.com"
                     {...register("email")}
                   />
                   {errors.email && (
@@ -190,6 +191,7 @@ export default function EarlyBirdLanding() {
                   <Label htmlFor="companyName">Company Name</Label>
                   <Input
                     id="companyName"
+                    placeholder="Your Company Ltd"
                     {...register("companyName")}
                   />
                   {errors.companyName && (
@@ -220,6 +222,7 @@ export default function EarlyBirdLanding() {
                       onClick={() => {
                         setValue("userType", "vendor");
                         setValue("businessType", undefined);
+                        setValue("companyNumber", undefined);
                         setValue("utrNumber", undefined);
                       }}
                     >
@@ -266,9 +269,12 @@ export default function EarlyBirdLanding() {
                         <Label htmlFor="companyNumber">Company Registration Number</Label>
                         <Input
                           id="companyNumber"
-                          placeholder="e.g., AB123456"
+                          placeholder="e.g., 12345678 or SC123456"
                           {...register("companyNumber")}
                         />
+                        <p className="text-xs text-muted-foreground">
+                          Enter your 8-digit Companies House registration number
+                        </p>
                         {errors.companyNumber && (
                           <p className="text-sm text-destructive">{errors.companyNumber.message}</p>
                         )}
@@ -283,6 +289,9 @@ export default function EarlyBirdLanding() {
                           placeholder="e.g., 1234567890"
                           {...register("utrNumber")}
                         />
+                        <p className="text-xs text-muted-foreground">
+                          Enter your 10-digit Unique Taxpayer Reference number
+                        </p>
                         {errors.utrNumber && (
                           <p className="text-sm text-destructive">{errors.utrNumber.message}</p>
                         )}
@@ -293,12 +302,15 @@ export default function EarlyBirdLanding() {
 
                 {userType === "vendor" && (
                   <div className="space-y-2">
-                    <Label htmlFor="companyNumber">Company Registration Number (Required)</Label>
+                    <Label htmlFor="companyNumber">Company Registration Number</Label>
                     <Input
                       id="companyNumber"
-                      placeholder="e.g., AB123456"
+                      placeholder="e.g., 12345678 or SC123456"
                       {...register("companyNumber")}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Enter your 8-digit Companies House registration number
+                    </p>
                     {errors.companyNumber && (
                       <p className="text-sm text-destructive">{errors.companyNumber.message}</p>
                     )}
