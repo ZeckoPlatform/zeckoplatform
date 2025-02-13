@@ -23,8 +23,7 @@ import BusinessProfilePage from "@/pages/settings/business-profile";
 import UserEditPage from "@/pages/admin/user-edit";
 import ReviewModerationPage from "@/pages/admin/review-moderation";
 import ResetPasswordPage from "@/pages/auth/reset-password";
-import ReviewsDashboard from "@/pages/reviews-dashboard"; // Added import
-
+import ReviewsDashboard from "@/pages/reviews-dashboard";
 
 function Router() {
   return (
@@ -44,8 +43,8 @@ function Router() {
         <Route path="/vendor/dashboard" component={() => <ProtectedRoute component={VendorDashboard} />} />
         <Route path="/analytics" component={() => <ProtectedRoute component={AnalyticsDashboard} />} />
         <Route path="/admin-management" component={() => <ProtectedRoute component={AdminManagementPage} />} />
-        <Route path="/reviews" component={() => <ProtectedRoute component={ReviewsDashboard} />} /> {/* Added route */}
-
+        <Route path="/reviews" component={() => <ProtectedRoute component={ReviewsDashboard} />} />
+        <Route path="/notifications" component={() => <ProtectedRoute component={NotificationSettingsPage} />} />
 
         {/* Settings Routes */}
         <Route path="/settings/security">
