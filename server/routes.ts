@@ -1093,7 +1093,7 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/early-bird/create-checkout", async (req, res) => {
     try {
-      const { email, companyName, userType, businessType, companyNumber, utrNumber, frequency } = req.body;
+      const { email, companyName, userType, businessType, companyNumber, utrNumber, frequency, hostUrl } = req.body;
 
       console.log('Creating early bird checkout session:', {
         email,
@@ -1102,16 +1102,21 @@ export function registerRoutes(app: Express): Server {
         companyNumber,
         utrNumber,
         frequency,
+        hostUrl,
       });
 
       if (!process.env.STRIPE_SECRET_KEY) {
         throw new Error("STRIPE_SECRET_KEY is required");
       }
 
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-      const productConfig = EARLY_BIRD_PRODUCTS[userType];
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+        apiVersion: '2023-10-16'
+      });
 
-      // Ensure the product exists in Stripe
+      const productConfig = EARLY_BIRD_PRODUCTS[userType];
+      const priceAmount = productConfig[frequency];
+
+      // Create or retrieve the product
       let product;
       try {
         product = await stripe.products.retrieve(productConfig.id);
@@ -1125,7 +1130,6 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Create or retrieve the price based on frequency
-      const priceAmount = frequency === 'monthly' ? productConfig.monthly : productConfig.annual;
       const interval = frequency === 'monthly' ? 'month' : 'year';
 
       let price;
@@ -1150,9 +1154,7 @@ export function registerRoutes(app: Express): Server {
         });
       }
 
-      console.log('Creating checkout session with price:', price.id);
-
-      // Create a checkout session
+      // Create checkout session
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
         line_items: [
@@ -1162,8 +1164,8 @@ export function registerRoutes(app: Express): Server {
           },
         ],
         mode: 'subscription',
-        success_url: `${process.env.HOST_URL}/early-bird/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.HOST_URL}/early-bird`,
+        success_url: `${hostUrl}/early-bird/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${hostUrl}/early-bird`,
         customer_email: email,
         metadata: {
           userType,

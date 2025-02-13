@@ -77,8 +77,10 @@ export default function EarlyBirdLanding() {
 
   const createCheckoutSession = useMutation({
     mutationFn: async (data: EarlyBirdFormData) => {
+      const hostUrl = window.location.origin;
       const response = await apiRequest("POST", "/api/early-bird/create-checkout", {
         ...data,
+        hostUrl,
         price: SUBSCRIPTION_PRICES[data.userType][data.billingFrequency],
         frequency: data.billingFrequency
       });
