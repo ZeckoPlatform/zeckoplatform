@@ -26,14 +26,14 @@ const earlyBirdSchema = z.object({
 }).refine((data) => {
   if (data.userType === "business") {
     if (data.businessType === "registered") {
-      return !!data.businessName && !!data.companyNumber;
+      return !!data.companyName && !!data.companyNumber;
     }
     if (data.businessType === "selfEmployed") {
       return !!data.utrNumber;
     }
   }
   if (data.userType === "vendor") {
-    return !!data.businessName && !!data.companyNumber;
+    return !!data.companyName && !!data.companyNumber;
   }
   return true;
 }, {
