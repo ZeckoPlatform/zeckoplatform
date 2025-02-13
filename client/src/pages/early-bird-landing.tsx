@@ -77,8 +77,8 @@ export default function EarlyBirdLanding() {
     mutationFn: async (data: EarlyBirdFormData) => {
       const response = await apiRequest("POST", "/api/early-bird/register", data);
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error);
+        const error = await response.json();
+        throw new Error(error.message || "Registration failed");
       }
       return response.json();
     },
@@ -179,7 +179,10 @@ export default function EarlyBirdLanding() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit((data) => earlyBirdMutation.mutate(data))} className="space-y-6">
+              <form onSubmit={handleSubmit((data) => {
+                console.log("Form data:", data); 
+                earlyBirdMutation.mutate(data);
+              })} className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email Address</Label>
                   <Input
