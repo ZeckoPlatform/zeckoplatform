@@ -21,6 +21,7 @@ const earlyBirdSchema = z.object({
     .regex(/^[0-9]{10}$/, "Invalid UTR number format")
     .optional(),
   userType: z.enum(["business", "vendor"]),
+  businessType: z.enum(["registered", "self-employed"]).optional(),
 }).superRefine((data, ctx) => {
   if (data.userType === "vendor" && !data.companyNumber) {
     ctx.addIssue({
@@ -30,18 +31,23 @@ const earlyBirdSchema = z.object({
     });
   }
   if (data.userType === "business") {
-    if (data.companyNumber && data.utrNumber) {
+    if (!data.businessType) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Please provide either company registration number OR UTR number, not both",
+        message: "Please select your business type",
+        path: ["businessType"]
+      });
+    } else if (data.businessType === "registered" && !data.companyNumber) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Company registration number is required for registered businesses",
         path: ["companyNumber"]
       });
-    }
-    if (!data.companyNumber && !data.utrNumber) {
+    } else if (data.businessType === "self-employed" && !data.utrNumber) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Please provide either company registration number (if registered company) or UTR number (if self-employed)",
-        path: ["companyNumber"]
+        message: "UTR number is required for self-employed businesses",
+        path: ["utrNumber"]
       });
     }
   }
@@ -87,6 +93,7 @@ export default function EarlyBirdLanding() {
   });
 
   const userType = watch("userType");
+  const businessType = watch("businessType");
 
   if (submitted) {
     return (
@@ -197,7 +204,12 @@ export default function EarlyBirdLanding() {
                       type="button"
                       variant={userType === "business" ? "default" : "outline"}
                       className="w-full"
-                      onClick={() => setValue("userType", "business")}
+                      onClick={() => {
+                        setValue("userType", "business");
+                        setValue("businessType", undefined);
+                        setValue("companyNumber", undefined);
+                        setValue("utrNumber", undefined);
+                      }}
                     >
                       Business
                     </Button>
@@ -205,12 +217,79 @@ export default function EarlyBirdLanding() {
                       type="button"
                       variant={userType === "vendor" ? "default" : "outline"}
                       className="w-full"
-                      onClick={() => setValue("userType", "vendor")}
+                      onClick={() => {
+                        setValue("userType", "vendor");
+                        setValue("businessType", undefined);
+                        setValue("utrNumber", undefined);
+                      }}
                     >
                       Vendor
                     </Button>
                   </div>
                 </div>
+
+                {userType === "business" && (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Business Type</Label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <Button
+                          type="button"
+                          variant={businessType === "registered" ? "default" : "outline"}
+                          className="w-full"
+                          onClick={() => {
+                            setValue("businessType", "registered");
+                            setValue("utrNumber", undefined);
+                          }}
+                        >
+                          Registered Business
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={businessType === "self-employed" ? "default" : "outline"}
+                          className="w-full"
+                          onClick={() => {
+                            setValue("businessType", "self-employed");
+                            setValue("companyNumber", undefined);
+                          }}
+                        >
+                          Self-employed
+                        </Button>
+                      </div>
+                      {errors.businessType && (
+                        <p className="text-sm text-destructive">{errors.businessType.message}</p>
+                      )}
+                    </div>
+
+                    {businessType === "registered" && (
+                      <div className="space-y-2">
+                        <Label htmlFor="companyNumber">Company Registration Number</Label>
+                        <Input
+                          id="companyNumber"
+                          placeholder="e.g., AB123456"
+                          {...register("companyNumber")}
+                        />
+                        {errors.companyNumber && (
+                          <p className="text-sm text-destructive">{errors.companyNumber.message}</p>
+                        )}
+                      </div>
+                    )}
+
+                    {businessType === "self-employed" && (
+                      <div className="space-y-2">
+                        <Label htmlFor="utrNumber">UTR Number</Label>
+                        <Input
+                          id="utrNumber"
+                          placeholder="e.g., 1234567890"
+                          {...register("utrNumber")}
+                        />
+                        {errors.utrNumber && (
+                          <p className="text-sm text-destructive">{errors.utrNumber.message}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {userType === "vendor" && (
                   <div className="space-y-2">
@@ -222,40 +301,6 @@ export default function EarlyBirdLanding() {
                     />
                     {errors.companyNumber && (
                       <p className="text-sm text-destructive">{errors.companyNumber.message}</p>
-                    )}
-                  </div>
-                )}
-
-                {userType === "business" && (
-                  <div className="space-y-2">
-                    <Label>Business Identification</Label>
-                    <CardDescription className="mb-4">
-                      Please provide either your Company Registration Number (if you're a registered company) 
-                      or your UTR Number (if you're self-employed). Do not provide both.
-                    </CardDescription>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="companyNumber">Company Registration Number</Label>
-                        <Input
-                          id="companyNumber"
-                          placeholder="e.g., AB123456"
-                          {...register("companyNumber")}
-                        />
-                      </div>
-                      <div className="text-center text-sm text-muted-foreground">OR</div>
-                      <div className="space-y-2">
-                        <Label htmlFor="utrNumber">UTR Number (for self-employed)</Label>
-                        <Input
-                          id="utrNumber"
-                          placeholder="e.g., 1234567890"
-                          {...register("utrNumber")}
-                        />
-                      </div>
-                    </div>
-                    {(errors.companyNumber || errors.utrNumber) && (
-                      <p className="text-sm text-destructive mt-2">
-                        {errors.companyNumber?.message || errors.utrNumber?.message}
-                      </p>
                     )}
                   </div>
                 )}
