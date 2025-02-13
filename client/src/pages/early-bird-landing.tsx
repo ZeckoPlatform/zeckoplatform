@@ -16,11 +16,11 @@ import { useLocation } from "wouter";
 // Price configurations for different tiers and frequencies
 const SUBSCRIPTION_PRICES = {
   business: {
-    monthly: 2999, // in cents
+    monthly: 2999, // £29.99 in pence
     annual: 32389, // in cents (29.99 * 12 * 0.9)
   },
   vendor: {
-    monthly: 4999, // in cents
+    monthly: 4999, // £49.99 in pence
     annual: 53989, // in cents (49.99 * 12 * 0.9)
   },
 } as const;
@@ -121,10 +121,27 @@ export default function EarlyBirdLanding() {
   const businessType = form.watch("businessType");
   const billingFrequency = form.watch("billingFrequency");
 
-  const onSubmit = async (data: EarlyBirdFormData) => {
-    console.log('Form submitted with data:', data);
-    setSubmitted(true);
-    createCheckoutSession.mutate(data);
+  const handleSubmit = async (data: EarlyBirdFormData) => {
+    try {
+      console.log('Form submitted with data:', data);
+      setSubmitted(true);
+
+      const result = await createCheckoutSession.mutateAsync(data);
+
+      if (typeof result === 'string' && result.startsWith('http')) {
+        window.location.href = result;
+      } else {
+        throw new Error('Invalid checkout URL received');
+      }
+    } catch (error) {
+      console.error('Form submission error:', error);
+      setSubmitted(false);
+      toast({
+        title: "Registration Error",
+        description: error instanceof Error ? error.message : "Failed to process registration",
+        variant: "destructive",
+      });
+    }
   };
 
   if (submitted) {
@@ -207,7 +224,7 @@ export default function EarlyBirdLanding() {
             <CardContent>
               <form
                 className="space-y-4"
-                onSubmit={form.handleSubmit(onSubmit)}
+                onSubmit={form.handleSubmit(handleSubmit)}
               >
                 <div>
                   <Label htmlFor="email">Email</Label>
@@ -355,6 +372,7 @@ export default function EarlyBirdLanding() {
                   type="submit"
                   className="w-full"
                   disabled={createCheckoutSession.isPending || form.formState.isSubmitting}
+                  onClick={() => form.handleSubmit(handleSubmit)()}
                 >
                   {createCheckoutSession.isPending ? (
                     <>

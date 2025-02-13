@@ -942,14 +942,14 @@ export function registerRoutes(app: Express): Server {
         if (isNaN(priceInDollars)) {
           return res.status(400).json({ message: "Invalid price format" });
         }
-        // Convert dollars to cents (e.g., 3.90 -> 390)
-        updateData.price = Math.round(priceInDollars * 100);
+        // Convert dollars to cents (e.g., 3.90 -> 390)        updateData.price = Math.round(priceInDollars * 100);
         log(`Converting price from ${priceInDollars} dollars to${updateData.price} cents`);
       }
 
       const [updatedProduct] = await db.update(products)
         .set(updateData)
-        .where(eq(products.id, productId))        .returning();
+        .where(eq(products.id, productId))
+        .returning();
 
       // Convert price back to decimal for response
       const responseProduct = {
@@ -960,10 +960,11 @@ export function registerRoutes(app: Express): Server {
       log(`Updated product price: ${responseProduct.price} (converted from ${updatedProduct.price} cents)`);
       res.json(responseProduct);
     } catch (error) {
-      log(`Product update error: ${error instanceof Error? error.message : String(error)}`);
+      log(`Product update error: ${error instanceof Error ? error.message : String(error)}`);
       console.error('Full error:', error);
       res.status(500).json({
-        message: "Failed to update product",        error: error instanceof Error ? error.message : "Unknown error"
+        message: "Failed to update product",
+        error: error instanceof Error ? error.message : "Unknown error"
       });
     }
   });
@@ -1005,13 +1006,14 @@ export function registerRoutes(app: Express): Server {
       }
 
       if (!req.user.stripeAccountId) {
-        return res.status(404).json({ message: "No Stripe account found" });      }
+        return res.status(404).json({ message: "No Stripe account found" });
+      }
 
       const account = await retrieveConnectedAccount(req.user.stripeAccountId);
 
       // Update local status if needed
       if (account.charges_enabled && req.user.stripeAccountStatus !== "enabled") {
-                await db.update(users)
+        await db.update(users)
           .set({ stripeAccountStatus: "enabled" })
           .where(eq(users.id, req.user.id));
       }
@@ -1027,7 +1029,7 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       log(`Stripe account status check error: ${error instanceof Error ? error.message : String(error)}`);
       res.status(500).json({
-        message: "Failedto check Stripe account status",
+        message: "Failed to check Stripe account status",
         error: error instanceof Error ? error.message : "Unknown error"
       });
     }
@@ -1097,6 +1099,7 @@ export function registerRoutes(app: Express): Server {
 
       console.log('Creating early bird checkout session:', {
         email,
+        companyName,
         userType,
         businessType,
         companyNumber,
@@ -1113,76 +1116,104 @@ export function registerRoutes(app: Express): Server {
         apiVersion: '2023-10-16'
       });
 
-      const productConfig = EARLY_BIRD_PRODUCTS[userType];
-      const priceAmount = productConfig[frequency];
-
-      // Create or retrieve the product
-      let product;
       try {
-        product = await stripe.products.retrieve(productConfig.id);
-      } catch (error) {
-        console.log('Creating new Stripe product for:', userType);
-        product = await stripe.products.create({
-          id: productConfig.id,
-          name: productConfig.name,
-          description: productConfig.description,
-        });
-      }
+        // Create a temporary password that will be updated after payment
+        const tempPassword = `temp_${Math.random().toString(36).slice(-8)}`;
+        const hashedPassword = await hashPassword(tempPassword);
 
-      // Create or retrieve the price based on frequency
-      const interval = frequency === 'monthly' ? 'month' : 'year';
+        // Create the user in our database first
+        const [user] = await db.insert(users)
+          .values({
+            email,
+            username: email.split('@')[0],
+            password: hashedPassword,
+            userType: userType,
+            companyNumber: companyNumber || null,
+            utrNumber: utrNumber || null,
+            profile: {
+              companyName,
+              businessType: businessType || null,
+            },
+            subscriptionActive: false, // Will be updated after successful payment
+          })
+          .returning();
 
-      let price;
-      const prices = await stripe.prices.list({
-        product: product.id,
-        active: true,
-        type: 'recurring',
-        recurring: { interval },
-      });
+        console.log('Created user:', user.id);
 
-      price = prices.data.find(p => p.unit_amount === priceAmount);
+        const productConfig = EARLY_BIRD_PRODUCTS[userType];
+        const interval = frequency === 'monthly' ? 'month' : 'year';
+        const priceAmount = productConfig[frequency];
 
-      if (!price) {
-        console.log(`Creating new Stripe price for ${userType} (${frequency}):`, priceAmount);
-        price = await stripe.prices.create({
+        // Create or retrieve the product
+        let product;
+        try {
+          product = await stripe.products.retrieve(productConfig.id);
+        } catch {
+          product = await stripe.products.create({
+            id: productConfig.id,
+            name: productConfig.name,
+            description: productConfig.description,
+          });
+        }
+
+        // Create or retrieve the price
+        let price;
+        const prices = await stripe.prices.list({
           product: product.id,
-          unit_amount: priceAmount,
-          currency: 'gbp',
-          recurring: {
-            interval,
+          active: true,
+          type: 'recurring',
+          recurring: { interval },
+        });
+
+        price = prices.data.find(p => p.unit_amount === priceAmount);
+
+        if (!price) {
+          console.log(`Creating new Stripe price for ${userType} (${frequency}):`, priceAmount);
+          price = await stripe.prices.create({
+            product: product.id,
+            unit_amount: priceAmount,
+            currency: 'gbp',
+            recurring: {
+              interval,
+            },
+          });
+        }
+
+        // Create checkout session
+        const session = await stripe.checkout.sessions.create({
+          payment_method_types: ['card'],
+          line_items: [
+            {
+              price: price.id,
+              quantity: 1,
+            },
+          ],
+          mode: 'subscription',
+          success_url: `${hostUrl}/auth?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${hostUrl}/early-bird`,
+          customer_email: email,
+          metadata: {
+            userId: user.id.toString(),
+            userType,
+            companyName,
+            businessType: businessType || null,
+            companyNumber: companyNumber || null,
+            utrNumber: utrNumber || null,
+            billingFrequency: frequency,
           },
         });
+
+        res.json({ url: session.url });
+      } catch (err) {
+        console.error('Stripe API error:', err);
+        res.status(500).json({
+          message: err instanceof Error ? err.message : "Error creating checkout session",
+        });
       }
-
-      // Create checkout session
-      const session = await stripe.checkout.sessions.create({
-        payment_method_types: ['card'],
-        line_items: [
-          {
-            price: price.id,
-            quantity: 1,
-          },
-        ],
-        mode: 'subscription',
-        success_url: `${hostUrl}/early-bird/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${hostUrl}/early-bird`,
-        customer_email: email,
-        metadata: {
-          userType,
-          companyName,
-          businessType: businessType || null,
-          companyNumber: companyNumber || null,
-          utrNumber: utrNumber || null,
-          billingFrequency: frequency,
-        },
-      });
-
-      console.log('Checkout session created:', session.id);
-      res.json({ url: session.url });
     } catch (error) {
-      console.error('Error creating checkout session:', error);
+      console.error('Error in early bird checkout:', error);
       res.status(500).json({
-        message: error instanceof Error ? error.message : 'Failed to create checkout session',
+        message: error instanceof Error ? error.message : "Failed to process registration",
       });
     }
   });
