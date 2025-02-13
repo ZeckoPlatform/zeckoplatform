@@ -27,13 +27,15 @@ const EARLY_BIRD_PRODUCTS = {
     id: 'early_bird_business',
     name: 'Business Early Access',
     description: 'Early bird access to Zecko - Business account',
-    price: 1999, // £19.99 in pence
+    monthly: 2999, // £29.99 in pence
+    annual: 32389, // £323.89 in pence (29.99 * 12 * 0.9)
   },
   vendor: {
     id: 'early_bird_vendor',
     name: 'Vendor Early Access',
     description: 'Early bird access to Zecko - Vendor account',
-    price: 3499, // £34.99 in pence
+    monthly: 4999, // £49.99 in pence
+    annual: 53989, // £539.89 in pence (49.99 * 12 * 0.9)
   },
 };
 
@@ -942,7 +944,7 @@ export function registerRoutes(app: Express): Server {
         }
         // Convert dollars to cents (e.g., 3.90 -> 390)
         updateData.price = Math.round(priceInDollars * 100);
-        log(`Converting price from ${priceInDollars} dollars to ${updateData.price} cents`);
+        log(`Converting price from ${priceInDollars} dollars to${updateData.price} cents`);
       }
 
       const [updatedProduct] = await db.update(products)
@@ -1091,7 +1093,7 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/early-bird/create-checkout", async (req, res) => {
     try {
-      const { email, companyName, userType, businessType, companyNumber, utrNumber } = req.body;
+      const { email, companyName, userType, businessType, companyNumber, utrNumber, frequency } = req.body;
 
       console.log('Creating early bird checkout session:', {
         email,
@@ -1099,6 +1101,7 @@ export function registerRoutes(app: Express): Server {
         businessType,
         companyNumber,
         utrNumber,
+        frequency,
       });
 
       if (!process.env.STRIPE_SECRET_KEY) {
@@ -1121,25 +1124,28 @@ export function registerRoutes(app: Express): Server {
         });
       }
 
-      // Create or retrieve the price
+      // Create or retrieve the price based on frequency
+      const priceAmount = frequency === 'monthly' ? productConfig.monthly : productConfig.annual;
+      const interval = frequency === 'monthly' ? 'month' : 'year';
+
       let price;
       const prices = await stripe.prices.list({
         product: product.id,
         active: true,
         type: 'recurring',
-        recurring: { interval: 'month' },
+        recurring: { interval },
       });
 
-      if (prices.data.length > 0) {
-        price = prices.data[0];
-      } else {
-        console.log('Creating new Stripe price for:', userType);
+      price = prices.data.find(p => p.unit_amount === priceAmount);
+
+      if (!price) {
+        console.log(`Creating new Stripe price for ${userType} (${frequency}):`, priceAmount);
         price = await stripe.prices.create({
           product: product.id,
-          unit_amount: productConfig.price,
+          unit_amount: priceAmount,
           currency: 'gbp',
           recurring: {
-            interval: 'month',
+            interval,
           },
         });
       }
@@ -1165,6 +1171,7 @@ export function registerRoutes(app: Express): Server {
           businessType: businessType || null,
           companyNumber: companyNumber || null,
           utrNumber: utrNumber || null,
+          billingFrequency: frequency,
         },
       });
 

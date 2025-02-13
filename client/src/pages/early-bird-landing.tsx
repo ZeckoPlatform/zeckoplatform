@@ -13,16 +13,17 @@ import { Loader2, Check, Mail, Building2, Receipt } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useLocation } from "wouter";
 
-const EARLY_BIRD_PRICES = {
+// Price configurations for different tiers and frequencies
+const SUBSCRIPTION_PRICES = {
   business: {
-    price: 19.99, // Early bird discount from regular 29.99
-    description: "Business Early Access",
+    monthly: 2999, // in cents
+    annual: 32389, // in cents (29.99 * 12 * 0.9)
   },
   vendor: {
-    price: 34.99, // Early bird discount from regular 49.99
-    description: "Vendor Early Access",
+    monthly: 4999, // in cents
+    annual: 53989, // in cents (49.99 * 12 * 0.9)
   },
-};
+} as const;
 
 const earlyBirdSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -35,6 +36,7 @@ const earlyBirdSchema = z.object({
     .optional(),
   userType: z.enum(["business", "vendor"]),
   businessType: z.enum(["registered", "selfEmployed"]).optional(),
+  billingFrequency: z.enum(["monthly", "annual"]),
 }).refine((data) => {
   if (data.userType === "business") {
     if (data.businessType === "registered") {
@@ -69,17 +71,16 @@ export default function EarlyBirdLanding() {
       businessType: "registered",
       companyNumber: "",
       utrNumber: "",
+      billingFrequency: "monthly",
     }
   });
 
   const createCheckoutSession = useMutation({
     mutationFn: async (data: EarlyBirdFormData) => {
-      console.log("Creating checkout session with data:", data);
-
       const response = await apiRequest("POST", "/api/early-bird/create-checkout", {
         ...data,
-        priceId: EARLY_BIRD_PRICES[data.userType].price,
-        userType: data.userType,
+        price: SUBSCRIPTION_PRICES[data.userType][data.billingFrequency],
+        frequency: data.billingFrequency
       });
 
       if (!response.ok) {
@@ -88,26 +89,24 @@ export default function EarlyBirdLanding() {
       }
 
       const { url } = await response.json();
-      console.log("Received checkout URL:", url);
       return url;
     },
     onSuccess: (url: string) => {
-      console.log("Redirecting to Stripe checkout:", url);
       window.location.href = url;
     },
     onError: (error: Error) => {
-      console.error("Checkout session creation failed:", error);
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
-      setSubmitted(false); // Reset submitted state on error
+      setSubmitted(false);
     },
   });
 
   const userType = form.watch("userType");
   const businessType = form.watch("businessType");
+  const billingFrequency = form.watch("billingFrequency");
 
   if (submitted) {
     return (
@@ -190,7 +189,6 @@ export default function EarlyBirdLanding() {
               <form
                 className="space-y-4"
                 onSubmit={form.handleSubmit((data) => {
-                  console.log("Form submitted with data:", data);
                   setSubmitted(true);
                   createCheckoutSession.mutate(data);
                 })}
@@ -239,14 +237,36 @@ export default function EarlyBirdLanding() {
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="business" id="business" />
                       <Label htmlFor="business">
-                        Business (£{EARLY_BIRD_PRICES.business.price}/month)
+                        Business (£{(SUBSCRIPTION_PRICES.business[billingFrequency] / 100).toFixed(2)}/{billingFrequency === "monthly" ? "month" : "year"}*)
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="vendor" id="vendor" />
                       <Label htmlFor="vendor">
-                        Vendor (£{EARLY_BIRD_PRICES.vendor.price}/month)
+                        Vendor (£{(SUBSCRIPTION_PRICES.vendor[billingFrequency] / 100).toFixed(2)}/{billingFrequency === "monthly" ? "month" : "year"}*)
                       </Label>
+                    </div>
+                  </RadioGroup>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    *Save 10% with annual billing
+                  </p>
+                </div>
+
+                <div>
+                  <Label>Billing Frequency</Label>
+                  <RadioGroup
+                    defaultValue="monthly"
+                    onValueChange={(value) => {
+                      form.setValue("billingFrequency", value as "monthly" | "annual");
+                    }}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="monthly" id="monthly" />
+                      <Label htmlFor="monthly">Monthly</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="annual" id="annual" />
+                      <Label htmlFor="annual">Annual (Save 10%)</Label>
                     </div>
                   </RadioGroup>
                 </div>
@@ -328,7 +348,7 @@ export default function EarlyBirdLanding() {
                       Processing...
                     </>
                   ) : (
-                    `Register Now - £${EARLY_BIRD_PRICES[userType].price}/month`
+                    `Register Now - £${(SUBSCRIPTION_PRICES[userType][billingFrequency] / 100).toFixed(2)}/${billingFrequency === "monthly" ? "month" : "year"}`
                   )}
                 </Button>
               </form>
