@@ -232,15 +232,16 @@ export const leadAnalytics = pgTable("lead_analytics", {
   updated_at: timestamp("updated_at").defaultNow(),
 });
 
+// Fix numeric fields to use proper SQL type
 export const businessAnalytics = pgTable("business_analytics", {
   id: serial("id").primaryKey(),
   business_id: integer("business_id").references(() => users.id).notNull(),
   total_leads_viewed: integer("total_leads_viewed").default(0),
   total_responses: integer("total_responses").default(0),
   successful_conversions: integer("successful_conversions").default(0),
-  total_revenue: numeric("total_revenue").default(0),
-  avg_response_time: integer("avg_response_time"),
-  rating: numeric("rating").default(0),
+  total_revenue: text("total_revenue").default('0'),
+  avg_response_time: text("avg_response_time"),
+  rating: text("rating").default('0'),
   activity_score: integer("activity_score").default(0),
   period_start: timestamp("period_start").notNull(),
   period_end: timestamp("period_end").notNull(),
@@ -601,6 +602,7 @@ export type SelectReviewVote = typeof reviewVotes.$inferSelect;
 export type InsertReputationScore = typeof reputationScores.$inferInsert;
 export type SelectReputationScore = typeof reputationScores.$inferSelect;
 
+// Fix user schema refinement
 export const insertUserSchema = createInsertSchema(users, {
   email: z.string().email("Please enter a valid email address"),
   username: z.string().min(3, "Username must be at least 3 characters").max(30, "Username must be less than 30 characters"),
@@ -617,19 +619,22 @@ export const insertUserSchema = createInsertSchema(users, {
     .regex(/^[0-9]{10}$/, "Invalid UTR number format")
     .optional(),
   twoFactorEnabled: z.boolean().optional(),
-}).refine((data) => {
-  if (data.userType === "business") {
-    return data.businessName && data.companyNumber;
+}).superRefine((data, ctx) => {
+  if (data.userType === "business" && (!data.businessName || !data.companyNumber)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Business accounts require business name and company number",
+      path: ["userType"]
+    });
   }
-  if (data.userType === "vendor") {
-    return data.businessName && data.utrNumber;
+  if (data.userType === "vendor" && (!data.businessName || !data.utrNumber)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Vendor accounts require business name and UTR number",
+      path: ["userType"]
+    });
   }
   return true;
-}, {
-  message: (data) =>
-    data.userType === "business"
-      ? "Business accounts require business name and company number"
-      : "Vendor accounts require business name and UTR number",
 });
 
 export const selectUserSchema = createSelectSchema(users);
