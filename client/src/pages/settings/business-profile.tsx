@@ -12,7 +12,7 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, ChevronLeft } from "lucide-react";
 import { BUSINESS_CATEGORIES } from "../leads-page";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
@@ -31,12 +31,18 @@ const PHONE_COUNTRY_CODES = {
   }
 };
 
+const COUNTRIES = {
+  GB: "United Kingdom",
+  US: "United States"
+};
+
 const businessProfileSchema = z.object({
   name: z.string().min(2, "Business name must be at least 2 characters"),
   description: z.string().min(10, "Description must be at least 10 characters"),
   category: z.string().min(1, "Please select a category"),
   subcategory: z.string().min(1, "Please select a subcategory"),
   location: z.string().min(2, "Location must be at least 2 characters"),
+  country: z.enum(["GB", "US"]),
   phoneNumber: z.string().min(10, "Phone number must be at least 10 digits"),
   budget: z.string(),
   industries: z.string(),
@@ -49,6 +55,7 @@ export default function BusinessProfilePage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [selectedCategory, setSelectedCategory] = useState<string>(user?.profile?.categories?.[0] || "");
+  const [selectedCountry, setSelectedCountry] = useState<"GB" | "US">(user?.countryCode as "GB" | "US" || "GB");
 
   // Redirect if user is not a business or vendor
   if (!user || (user.userType !== 'business' && user.userType !== 'vendor')) {
@@ -56,9 +63,9 @@ export default function BusinessProfilePage() {
     return null;
   }
 
-  const formatPhoneNumber = (value: string) => {
+  const formatPhoneNumber = (value: string, country: "GB" | "US") => {
     const digits = value.replace(/\D/g, "");
-    if (user?.countryCode === "US") {
+    if (country === "US") {
       if (digits.length <= 3) return `+1 (${digits}`;
       if (digits.length <= 6) return `+1 (${digits.slice(0, 3)}) ${digits.slice(3)}`;
       return `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
@@ -76,6 +83,7 @@ export default function BusinessProfilePage() {
       category: user?.profile?.categories?.[0] || "",
       subcategory: user?.profile?.categories?.[1] || "",
       location: user?.profile?.location || "",
+      country: user?.countryCode as "GB" | "US" || "GB",
       phoneNumber: user?.profile?.phoneNumber || "",
       budget: user?.profile?.matchPreferences?.budgetRange?.min?.toString() || "",
       industries: user?.profile?.matchPreferences?.industries?.join(", ") || "",
@@ -125,8 +133,9 @@ export default function BusinessProfilePage() {
     <div className="container mx-auto py-8 space-y-8">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Business Profile</h1>
-        <Button variant="outline" onClick={() => setLocation("/settings/business-profile")}>
-          Back to Settings
+        <Button variant="ghost" onClick={() => window.history.back()}>
+          <ChevronLeft className="h-4 w-4 mr-2" />
+          Back
         </Button>
       </div>
 
@@ -134,7 +143,7 @@ export default function BusinessProfilePage() {
         <CardHeader>
           <CardTitle>Profile Information</CardTitle>
           <CardDescription>
-            Update your business profile to help us match you with relevant leads
+            Update your {user?.userType === 'business' ? 'business' : 'vendor'} profile to help us match you with relevant opportunities
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -224,20 +233,45 @@ export default function BusinessProfilePage() {
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="phoneNumber">Phone Number</Label>
-              <Input
-                id="phoneNumber"
-                {...register("phoneNumber")}
-                placeholder={PHONE_COUNTRY_CODES[user?.countryCode || "GB"].format}
-                onChange={(e) => {
-                  const formatted = formatPhoneNumber(e.target.value);
-                  form.setValue("phoneNumber", formatted);
-                }}
-              />
-              {errors.phoneNumber && (
-                <p className="text-sm text-destructive">{errors.phoneNumber.message}</p>
-              )}
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="country">Country</Label>
+                <Select
+                  onValueChange={(value: "GB" | "US") => {
+                    setSelectedCountry(value);
+                    setValue("country", value);
+                    setValue("phoneNumber", ""); // Reset phone number when country changes
+                  }}
+                  defaultValue={selectedCountry}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select country" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(COUNTRIES).map(([code, name]) => (
+                      <SelectItem key={code} value={code}>
+                        {name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="phoneNumber">Phone Number</Label>
+                <Input
+                  id="phoneNumber"
+                  {...register("phoneNumber")}
+                  placeholder={PHONE_COUNTRY_CODES[selectedCountry].format}
+                  onChange={(e) => {
+                    const formatted = formatPhoneNumber(e.target.value, selectedCountry);
+                    form.setValue("phoneNumber", formatted);
+                  }}
+                />
+                {errors.phoneNumber && (
+                  <p className="text-sm text-destructive">{errors.phoneNumber.message}</p>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">
