@@ -56,26 +56,26 @@ const SUBSCRIPTION_PRICES = {
   US: {
     business: {
       monthly: {
-        base: 34.99,
+        base: 37.99,  // ~£29.99 * 1.26
         tax: 0,
-        total: 34.99
+        total: 37.99
       },
       annual: {
-        base: (34.99 * 12 * 0.9),
+        base: (37.99 * 12 * 0.9),
         tax: 0,
-        total: (34.99 * 12 * 0.9)
+        total: (37.99 * 12 * 0.9)
       },
     },
     vendor: {
       monthly: {
-        base: 54.99,
+        base: 62.99,  // ~£49.99 * 1.26
         tax: 0,
-        total: 54.99
+        total: 62.99
       },
       annual: {
-        base: (54.99 * 12 * 0.9),
+        base: (62.99 * 12 * 0.9),
         tax: 0,
-        total: (54.99 * 12 * 0.9)
+        total: (62.99 * 12 * 0.9)
       },
     }
   }
@@ -84,6 +84,7 @@ const SUBSCRIPTION_PRICES = {
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(8, "Password must be at least 8 characters"),
+  username: z.string().min(3, "Username must be at least 3 characters"),
 });
 
 const registerSchema = z.object({
@@ -171,6 +172,7 @@ export default function AuthPage() {
     defaultValues: {
       email: "",
       password: "",
+      username: "", // Added username field
     },
   });
 
@@ -294,6 +296,19 @@ export default function AuthPage() {
                     {loginForm.formState.errors.password && (
                       <p className="text-sm text-destructive mt-1">
                         {loginForm.formState.errors.password.message}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="username">Username</Label>
+                    <Input
+                      id="username"
+                      type="text"
+                      {...loginForm.register("username")}
+                    />
+                    {loginForm.formState.errors.username && (
+                      <p className="text-sm text-destructive mt-1">
+                        {loginForm.formState.errors.username.message}
                       </p>
                     )}
                   </div>
