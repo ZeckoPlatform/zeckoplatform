@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import type { SelectUser, InsertUser } from "@db/schema";
 
-type LoginData = Pick<InsertUser, "username" | "password">;
+type LoginData = Pick<InsertUser, "email" | "password">;
 
 export const AuthContext = createContext<ReturnType<typeof useAuthState> | null>(null);
 
@@ -67,7 +67,7 @@ function useAuthState() {
       queryClient.setQueryData(["/api/user"], user);
       toast({
         title: "Welcome back!",
-        description: `Logged in as ${user.username}`,
+        description: `Logged in successfully`,
       });
 
       // Redirect based on user type
