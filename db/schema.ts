@@ -61,7 +61,8 @@ export const leads = pgTable("leads", {
   location: text("location"),
   status: text("status", { enum: ["open", "closed", "in_progress"] }).default("open"),
   created_at: timestamp("created_at").defaultNow(),
-  expires_at: timestamp("expires_at"),
+  expires_at: timestamp("expires_at").notNull(), 
+  archived: boolean("archived").default(false),
 });
 
 export const leadResponses = pgTable("lead_responses", {
@@ -232,7 +233,6 @@ export const leadAnalytics = pgTable("lead_analytics", {
   updated_at: timestamp("updated_at").defaultNow(),
 });
 
-// Fix numeric fields to use proper SQL type
 export const businessAnalytics = pgTable("business_analytics", {
   id: serial("id").primaryKey(),
   business_id: integer("business_id").references(() => users.id).notNull(),
@@ -602,7 +602,6 @@ export type SelectReviewVote = typeof reviewVotes.$inferSelect;
 export type InsertReputationScore = typeof reputationScores.$inferInsert;
 export type SelectReputationScore = typeof reputationScores.$inferSelect;
 
-// Fix user schema refinement
 export const insertUserSchema = createInsertSchema(users, {
   email: z.string().email("Please enter a valid email address"),
   username: z.string().min(3, "Username must be at least 3 characters").max(30, "Username must be less than 30 characters"),

@@ -20,6 +20,7 @@ import notificationRoutes from './routes/notifications';
 import adminRoutes from './routes/admin';
 import documentRoutes from './routes/documents';
 import reviewRoutes from './routes/reviews';
+import { cleanupExpiredLeads } from './services/cleanup';
 
 interface User {
   id: number;
@@ -174,6 +175,7 @@ export function registerRoutes(app: Express): Server {
         location: req.body.location,
         status: "open" as const,
         expires_at: expiresAt,
+        archived: false
       };
 
       log(`Attempting to create lead: ${JSON.stringify(newLead)}`);
@@ -203,10 +205,16 @@ export function registerRoutes(app: Express): Server {
 
       log(`User type: ${req.user.userType}, Subscription active: ${req.user.subscriptionActive}`);
 
-      // For free users, only show their own leads
+      const now = new Date();
+
+      // For free users, only show their own active leads
       if (req.user.userType === "free") {
         const userLeads = await db.query.leads.findMany({
-          where: eq(leads.user_id, req.user.id),
+          where: and(
+            eq(leads.user_id, req.user.id),
+            gt(leads.expires_at, now), // Only return non-expired leads
+            eq(leads.archived, false)
+          ),
           columns: {
             id: true,
             title: true,
@@ -271,7 +279,7 @@ export function registerRoutes(app: Express): Server {
         return res.json(processedLeads);
       }
 
-      // For business users, check subscription
+      // For business users with active subscription
       if (req.user.userType === "business") {
         if (!req.user.subscriptionActive) {
           log(`Business user ${req.user.id} attempted to access leads without active subscription`);
@@ -283,7 +291,11 @@ export function registerRoutes(app: Express): Server {
         }
 
         const businessLeads = await db.query.leads.findMany({
-          where: eq(leads.status, "open"),
+          where: and(
+            eq(leads.status, "open"),
+            gt(leads.expires_at, now), // Only return non-expired leads
+            eq(leads.archived, false)
+          ),
           columns: {
             id: true,
             title: true,
@@ -348,12 +360,8 @@ export function registerRoutes(app: Express): Server {
         return res.json(processedLeads);
       }
 
-      // For vendors, return an empty array as they don't need to see leads
-      if (req.user.userType === "vendor") {
-        return res.json([]);
-      }
-
-      res.json([]);
+      // For vendors, return an empty array
+      return res.json([]);
     } catch (error) {
       log(`Leads fetch error: ${error instanceof Error ? error.message : String(error)}`);
       console.error('Full error:', error);
@@ -942,7 +950,7 @@ export function registerRoutes(app: Express): Server {
       log(`Updated product price: ${responseProduct.price} (converted from ${updatedProduct.price} cents)`);
       res.json(responseProduct);
     } catch (error) {
-      log(`Product update error: ${error instanceof Error? error.message : String(error)}`);
+      log(`Product updateerror: ${error instanceof Error? error.message : String(error)}`);
       console.error('Full error:', error);
       res.status(500).json({
         message: "Failed to update product",
@@ -1073,6 +1081,9 @@ export function registerRoutes(app: Express): Server {
       });
     }
   });
+
+  // Add cleanup scheduler - runs every hour
+  setInterval(cleanupExpiredLeads, 60 * 60 * 1000);
 
   const httpServer = createServer(app);
   return httpServer;
