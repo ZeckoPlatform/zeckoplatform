@@ -41,6 +41,17 @@ const subscriptionFormSchema = z.object({
 
 type SubscriptionFormData = z.infer<typeof subscriptionFormSchema>;
 
+// Add VAT calculation helper
+const calculatePriceWithVAT = (basePrice: number) => {
+  const vatRate = 0.20; // 20% VAT rate for UK
+  const vat = basePrice * vatRate;
+  return {
+    basePrice,
+    vat,
+    total: basePrice + vat
+  };
+};
+
 export default function SubscriptionPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -163,9 +174,10 @@ export default function SubscriptionPage() {
     },
   });
 
-  const basePrice = user?.userType === "business" ? 29.99 : 49.99;
-  const monthlyPrice = basePrice;
-  const annualPrice = (basePrice * 12 * 0.9).toFixed(2); // 10% discount
+  const basePrice = user?.userType === 'business' ? 29.99 : 49.99;
+  const monthlyPrice = calculatePriceWithVAT(basePrice);
+  const annualBasePrice = (basePrice * 12 * 0.9); // 10% discount
+  const annualPrice = calculatePriceWithVAT(annualBasePrice);
 
   if (!user || user.userType === "free") {
     return (
@@ -272,13 +284,13 @@ export default function SubscriptionPage() {
                           <div className="flex items-center space-x-3">
                             <RadioGroupItem value="monthly" id="monthly" />
                             <Label htmlFor="monthly">
-                              Monthly (£{monthlyPrice}/month)
+                              Monthly (£{monthlyPrice.basePrice.toFixed(2)} + VAT = £{monthlyPrice.total.toFixed(2)}/month)
                             </Label>
                           </div>
                           <div className="flex items-center space-x-3">
                             <RadioGroupItem value="annual" id="annual" />
                             <Label htmlFor="annual">
-                              Annual (£{annualPrice}/year - Save 10%)
+                              Annual (£{annualPrice.basePrice.toFixed(2)} + VAT = £{annualPrice.total.toFixed(2)}/year - Save 10%)
                             </Label>
                           </div>
                         </RadioGroup>

@@ -7,10 +7,21 @@ let stripe: Stripe | null = null;
 export function getStripeClient() {
   if (!stripe && env.STRIPE_SECRET_KEY) {
     stripe = new Stripe(env.STRIPE_SECRET_KEY, {
-      apiVersion: '2023-10-16', // Using latest stable version
+      apiVersion: '2023-10-16',
     });
   }
   return stripe;
+}
+
+// Helper function to calculate price with VAT
+export function calculatePriceWithVAT(baseAmount: number) {
+  const vatRate = 0.20; // 20% VAT for UK
+  const vatAmount = Math.round(baseAmount * vatRate);
+  return {
+    baseAmount,
+    vatAmount,
+    totalAmount: baseAmount + vatAmount
+  };
 }
 
 export async function createConnectedAccount(email: string) {
@@ -28,6 +39,9 @@ export async function createConnectedAccount(email: string) {
         card_payments: { requested: true },
         transfers: { requested: true },
       },
+      tax_id_collection: {
+        enabled: true // Enable tax ID collection for VAT
+      }
     });
 
     // Create an account link for onboarding
@@ -63,20 +77,31 @@ export async function retrieveConnectedAccount(accountId: string) {
   }
 }
 
-export async function createPaymentIntent(amount: number, vendorStripeAccountId: string) {
+export async function createPaymentIntent(baseAmount: number, vendorStripeAccountId: string) {
   const stripe = getStripeClient();
   if (!stripe) {
     throw new Error('Stripe client not initialized');
   }
 
   try {
+    // Calculate amount including VAT
+    const { totalAmount } = calculatePriceWithVAT(baseAmount);
+
     const paymentIntent = await stripe.paymentIntents.create({
-      amount,
+      amount: totalAmount,
       currency: 'gbp',
-      application_fee_amount: Math.round(amount * 0.05), // 5% platform fee
+      application_fee_amount: Math.round(baseAmount * 0.05), // 5% platform fee on base amount
       transfer_data: {
         destination: vendorStripeAccountId,
       },
+      metadata: {
+        baseAmount: baseAmount,
+        vatAmount: totalAmount - baseAmount,
+      },
+      automatic_tax: {
+        enabled: true, // Enable automatic tax calculation
+      },
+      tax_rates: ['txr_1234'], // Replace with your actual VAT tax rate ID from Stripe
     });
 
     return paymentIntent;

@@ -13,17 +13,28 @@ if (!process.env.STRIPE_SECRET_KEY) {
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const router = Router();
 
-// Price configurations for different tiers and frequencies
+// Price configurations for different tiers and frequencies (in pence, excluding VAT)
 const SUBSCRIPTION_PRICES = {
   business: {
-    monthly: 2999, // in cents
-    annual: 32389, // in cents (29.99 * 12 * 0.9)
+    monthly: 2999, // £29.99 ex VAT
+    annual: 32389, // £323.89 ex VAT (29.99 * 12 * 0.9)
   },
   vendor: {
-    monthly: 4999, // in cents
-    annual: 53989, // in cents (49.99 * 12 * 0.9)
+    monthly: 4999, // £49.99 ex VAT
+    annual: 53989, // £539.89 ex VAT (49.99 * 12 * 0.9)
   },
 } as const;
+
+// Calculate price with VAT for display
+function calculatePriceWithVAT(baseAmount: number) {
+  const vatRate = 0.20; // 20% VAT rate for UK
+  const vatAmount = Math.round(baseAmount * vatRate);
+  return {
+    baseAmount,
+    vatAmount,
+    totalAmount: baseAmount + vatAmount
+  };
+}
 
 // Webhook endpoint to handle Stripe events
 router.post('/subscriptions/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
@@ -236,6 +247,55 @@ router.post("/subscriptions/:id/cancel", authenticateToken, async (req, res) => 
   } catch (error) {
     console.error("Error cancelling subscription:", error);
     return res.status(500).json({ error: "Failed to cancel subscription" });
+  }
+});
+
+// Create checkout session
+router.post("/subscriptions/create-checkout", authenticateToken, async (req, res) => {
+  try {
+    const { frequency } = req.body;
+    const userType = req.user?.userType;
+
+    if (!userType || !['business', 'vendor'].includes(userType)) {
+      return res.status(400).json({ error: "Invalid user type" });
+    }
+
+    if (!frequency || !['monthly', 'annual'].includes(frequency)) {
+      return res.status(400).json({ error: "Invalid frequency" });
+    }
+
+    const basePrice = SUBSCRIPTION_PRICES[userType][frequency];
+    const { totalAmount } = calculatePriceWithVAT(basePrice);
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      mode: 'subscription',
+      line_items: [
+        {
+          price_data: {
+            currency: 'gbp',
+            product_data: {
+              name: `${userType.charAt(0).toUpperCase() + userType.slice(1)} ${frequency} Subscription`,
+              description: `${frequency.charAt(0).toUpperCase() + frequency.slice(1)} subscription for ${userType}s (+ VAT)`,
+            },
+            unit_amount: basePrice,
+            tax_behavior: 'exclusive', // This tells Stripe to handle VAT separately
+          },
+          quantity: 1,
+        },
+      ],
+      automatic_tax: {
+        enabled: true,
+      },
+      customer_email: req.user?.email,
+      success_url: `${process.env.HOST_URL}/subscription?success=true`,
+      cancel_url: `${process.env.HOST_URL}/subscription?cancelled=true`,
+    });
+
+    return res.json({ checkoutUrl: session.url });
+  } catch (error) {
+    console.error('Error creating checkout session:', error);
+    return res.status(500).json({ error: 'Failed to create checkout session' });
   }
 });
 
