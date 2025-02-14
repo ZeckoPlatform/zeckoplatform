@@ -24,6 +24,25 @@ import { MessageDialog } from "@/components/MessageDialog";
 import { SubscriptionRequiredModal } from "@/components/subscription-required-modal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+const PHONE_COUNTRY_CODES = {
+  GB: {
+    code: "44",
+    format: "+44 XXXX XXXXXX",
+    pattern: /^\+44\s\d{4}\s\d{6}$/
+  },
+  US: {
+    code: "1",
+    format: "+1 (XXX) XXX-XXXX",
+    pattern: /^\+1\s\(\d{3}\)\s\d{3}-\d{4}$/
+  }
+};
+
+const COUNTRIES = {
+  "GB": "United Kingdom",
+  "US": "United States"
+};
+
+
 export const BUSINESS_CATEGORIES = {
   "IT & Software Development": [
     "Web Development",
@@ -289,6 +308,7 @@ interface LeadFormData {
   subcategory: string;
   budget: string;
   location: string;
+  phoneNumber?: string; // Added phone number field
 }
 
 interface ProfileFormData {
@@ -326,6 +346,8 @@ interface LeadWithUnreadCount extends SelectLead {
 
 const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [selectedCountry, setSelectedCountry] = useState<"GB" | "US">("GB");
+
   const form = useForm<LeadFormData>({
     defaultValues: {
       title: "",
@@ -334,8 +356,22 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
       subcategory: "",
       budget: "",
       location: "",
+      phoneNumber: "",
     },
   });
+
+  const formatPhoneNumber = (value: string, country: "GB" | "US") => {
+    const digits = value.replace(/\D/g, "");
+
+    if (country === "US") {
+      if (digits.length <= 3) return `+1 (${digits}`;
+      if (digits.length <= 6) return `+1 (${digits.slice(0, 3)}) ${digits.slice(3)}`;
+      return `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+    } else {
+      if (digits.length <= 4) return `+44 ${digits}`;
+      return `+44 ${digits.slice(0, 4)} ${digits.slice(4, 10)}`;
+    }
+  };
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -358,7 +394,7 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
             onValueChange={(value) => {
               setSelectedCategory(value);
               form.setValue("category", value);
-              form.setValue("subcategory", ""); // Reset subcategory when main category changes
+              form.setValue("subcategory", "");
             }}
             defaultValue={form.getValues("category")}
           >
@@ -408,6 +444,42 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
       <div>
         <Label htmlFor="location">Location</Label>
         <Input id="location" {...form.register("location")} required />
+      </div>
+      <div className="space-y-4">
+        <div>
+          <Label htmlFor="phoneCountry">Phone Country</Label>
+          <Select
+            onValueChange={(value: "GB" | "US") => {
+              setSelectedCountry(value);
+              form.setValue("phoneNumber", "");
+            }}
+            defaultValue={selectedCountry}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select country code" />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(COUNTRIES).map(([code, name]) => (
+                <SelectItem key={code} value={code}>
+                  {name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label htmlFor="phoneNumber">Phone Number (Optional)</Label>
+          <Input
+            id="phoneNumber"
+            {...form.register("phoneNumber")}
+            placeholder={PHONE_COUNTRY_CODES[selectedCountry].format}
+            onChange={(e) => {
+              const formatted = formatPhoneNumber(e.target.value, selectedCountry);
+              form.setValue("phoneNumber", formatted);
+            }}
+          />
+        </div>
       </div>
       <Button
         type="submit"
@@ -777,6 +849,7 @@ const FreeUserLeadsView = ({
       subcategory: editingLead?.subcategory || "",
       budget: editingLead?.budget?.toString() || "",
       location: editingLead?.location || "",
+      phoneNumber: editingLead?.phoneNumber || "" //Added phone number to default values
     },
   });
 
@@ -862,6 +935,13 @@ const FreeUserLeadsView = ({
                                 id="edit-location"
                                 {...editForm.register("location")}
                                 required
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="edit-phoneNumber">Phone Number (Optional)</Label>
+                              <Input
+                                id="edit-phoneNumber"
+                                {...editForm.register("phoneNumber")}
                               />
                             </div>
                             <Button
