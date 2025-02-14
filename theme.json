@@ -1,6 +1,27 @@
 {
-  "variant": "professional",
-  "primary": "hsl(222.2 47.4% 11.2%)",
-  "appearance": "light",
-  "radius": 0.5
+  "primary": "#FF6B2C",
+  "variant": "vibrant",
+  "appearance": "system",
+  "radius": 0.5,
+  "base": {
+    "background": "#1E293B",
+    "foreground": "#ffffff",
+    "card": "#ffffff",
+    "card-foreground": "#1E293B",
+    "popover": "#ffffff",
+    "popover-foreground": "#1E293B",
+    "primary": "#FF6B2C",
+    "primary-foreground": "#ffffff",
+    "secondary": "#4A90E2",
+    "secondary-foreground": "#ffffff",
+    "muted": "#f1f5f9",
+    "muted-foreground": "#64748b",
+    "accent": "#4A90E2",
+    "accent-foreground": "#ffffff",
+    "destructive": "#ff0000",
+    "destructive-foreground": "#ffffff",
+    "border": "#e2e8f0",
+    "input": "#e2e8f0",
+    "ring": "#FF6B2C"
+  }
 }
