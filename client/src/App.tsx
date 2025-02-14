@@ -15,7 +15,6 @@ import CartPage from "@/pages/cart-page";
 import Navbar from "@/components/navbar";
 import AnalyticsDashboard from "@/pages/analytics-dashboard";
 import AdminManagement from "@/pages/admin/admin-management";
-import ThemeManager from "@/pages/admin/theme-manager";
 import SettingsLayout from "@/pages/settings/layout";
 import SecuritySettingsPage from "@/pages/settings/security-settings";
 import NotificationSettingsPage from "@/pages/settings/notification-settings";
@@ -47,27 +46,9 @@ function Router() {
         <Route path="/reviews" component={() => <ProtectedRoute component={ReviewsDashboard} />} />
         <Route path="/notifications" component={() => <ProtectedRoute component={NotificationsPage} />} />
 
-        {/* Admin Routes */}
-        <Route path="/admin">
+        {/* Admin Routes - Single parent route */}
+        <Route path="/admin/:page*">
           {() => <ProtectedRoute component={AdminManagement} adminRequired />}
-        </Route>
-        <Route path="/admin/dashboard">
-          {() => <ProtectedRoute component={AdminManagement} adminRequired />}
-        </Route>
-        <Route path="/admin/themes">
-          {() => <ProtectedRoute component={ThemeManager} adminRequired />}
-        </Route>
-        <Route path="/admin/users">
-          {() => <ProtectedRoute component={AdminManagement} adminRequired />}
-        </Route>
-        <Route path="/admin/settings">
-          {() => <ProtectedRoute component={AdminManagement} adminRequired />}
-        </Route>
-        <Route path="/admin/users/edit/:id">
-          {() => <ProtectedRoute component={UserEditPage} adminRequired />}
-        </Route>
-        <Route path="/admin/reviews">
-          {() => <ProtectedRoute component={ReviewModerationPage} adminRequired />}
         </Route>
 
         {/* Settings Routes */}

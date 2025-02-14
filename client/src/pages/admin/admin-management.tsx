@@ -4,7 +4,7 @@ import ThemeManager from "./theme-manager";
 
 export default function AdminManagement() {
   const [location] = useLocation();
-  const currentPath = location.split("/").pop() || "dashboard";
+  const currentPath = location.split("/admin/")[1] || "dashboard";
 
   return (
     <div className="container py-8">
@@ -33,7 +33,8 @@ export default function AdminManagement() {
 
       {currentPath === "dashboard" && <div>Admin Dashboard</div>}
       {currentPath === "themes" && <ThemeManager />}
-      {/* Other admin sections render here based on currentPath */}
+      {currentPath === "users" && <div>User Management Content</div>}
+      {currentPath === "settings" && <div>Admin Settings Content</div>}
     </div>
   );
 }
