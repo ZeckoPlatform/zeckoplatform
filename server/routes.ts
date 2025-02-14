@@ -20,7 +20,33 @@ import notificationRoutes from './routes/notifications';
 import adminRoutes from './routes/admin';
 import documentRoutes from './routes/documents';
 import reviewRoutes from './routes/reviews';
-import Stripe from 'stripe'; // Added Stripe import
+
+interface User {
+  id: number;
+  email: string;
+  userType: string;
+  subscriptionActive: boolean;
+  stripeAccountId?: string;
+  stripeAccountStatus?: string;
+  profile?: any;
+}
+
+declare global {
+  namespace Express {
+    interface Request {
+      user?: User;
+      login: any;
+      isAuthenticated(): boolean;
+      sessionID: string;
+    }
+  }
+}
+
+// Placeholder function - needs actual implementation
+async function getUserByUsername(username: string): Promise<[User | null]> {
+  const [user] = await db.select().from(users).where(eq(users.username, username));
+  return [user || null];
+}
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
@@ -682,7 +708,6 @@ export function registerRoutes(app: Express): Server {
   });
 
 
-
   app.patch("/api/user/password", async (req, res) => {
     try {
       if (!req.user) {
@@ -898,8 +923,9 @@ export function registerRoutes(app: Express): Server {
         if (isNaN(priceInDollars)) {
           return res.status(400).json({ message: "Invalid price format" });
         }
-        // Convert dollars to cents (e.g., 3.90 -> 390)        updateData.price = Math.round(priceInDollars * 100);
-        log(`Converting price from ${priceInDollars} dollars to${updateData.price} cents`);
+        // Convert dollars to cents (e.g., 3.90 -> 390)
+        updateData.price = Math.round(priceInDollars * 100);
+        log(`Converting price from ${priceInDollars} dollars to ${updateData.price} cents`);
       }
 
       const [updatedProduct] = await db.update(products)
@@ -916,7 +942,7 @@ export function registerRoutes(app: Express): Server {
       log(`Updated product price: ${responseProduct.price} (converted from ${updatedProduct.price} cents)`);
       res.json(responseProduct);
     } catch (error) {
-      log(`Product update error: ${error instanceof Error ? error.message : String(error)}`);
+      log(`Product update error: ${error instanceof Error? error.message : String(error)}`);
       console.error('Full error:', error);
       res.status(500).json({
         message: "Failed to update product",
@@ -962,14 +988,13 @@ export function registerRoutes(app: Express): Server {
       }
 
       if (!req.user.stripeAccountId) {
-        return res.status(404).json({ message: "No Stripe account found" });
-      }
+        return res.status(404).json({ message: "No Stripe account found" });      }
 
       const account = await retrieveConnectedAccount(req.user.stripeAccountId);
 
       // Update local status if needed
       if (account.charges_enabled && req.user.stripeAccountStatus !== "enabled") {
-        await db.update(users)
+                await db.update(users)
           .set({ stripeAccountStatus: "enabled" })
           .where(eq(users.id, req.user.id));
       }
@@ -985,7 +1010,7 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       log(`Stripe account status check error: ${error instanceof Error ? error.message : String(error)}`);
       res.status(500).json({
-        message: "Failed to check Stripe account status",
+        message: "Failedto check Stripe account status",
         error: error instanceof Error ? error.message : "Unknown error"
       });
     }
