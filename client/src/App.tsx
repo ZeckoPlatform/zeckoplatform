@@ -14,7 +14,7 @@ import VendorDashboard from "@/pages/vendor-dashboard";
 import CartPage from "@/pages/cart-page";
 import Navbar from "@/components/navbar";
 import AnalyticsDashboard from "@/pages/analytics-dashboard";
-import AdminManagement from "@/pages/admin/admin-management";
+import AdminManagementPage from "@/pages/admin-management";
 import SettingsLayout from "@/pages/settings/layout";
 import SecuritySettingsPage from "@/pages/settings/security-settings";
 import NotificationSettingsPage from "@/pages/settings/notification-settings";
@@ -43,11 +43,9 @@ function Router() {
         <Route path="/vendor" component={() => <ProtectedRoute component={VendorDashboard} />} />
         <Route path="/vendor/dashboard" component={() => <ProtectedRoute component={VendorDashboard} />} />
         <Route path="/analytics" component={() => <ProtectedRoute component={AnalyticsDashboard} />} />
+        <Route path="/admin-management" component={() => <ProtectedRoute component={AdminManagementPage} />} />
         <Route path="/reviews" component={() => <ProtectedRoute component={ReviewsDashboard} />} />
         <Route path="/notifications" component={() => <ProtectedRoute component={NotificationsPage} />} />
-
-        {/* Admin Routes */}
-        <Route path="/admin/:page*" component={() => <ProtectedRoute component={AdminManagement} adminRequired />} />
 
         {/* Settings Routes */}
         <Route path="/settings/security">
@@ -94,6 +92,10 @@ function Router() {
             />
           )}
         </Route>
+
+        {/* Admin Routes */}
+        <Route path="/admin/users/edit/:id" component={UserEditPage} />
+        <Route path="/admin/reviews" component={ReviewModerationPage} />
 
         <Route component={NotFound} />
       </Switch>

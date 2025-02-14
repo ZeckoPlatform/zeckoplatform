@@ -61,7 +61,7 @@ export const leads = pgTable("leads", {
   location: text("location"),
   status: text("status", { enum: ["open", "closed", "in_progress"] }).default("open"),
   created_at: timestamp("created_at").defaultNow(),
-  expires_at: timestamp("expires_at").notNull(),
+  expires_at: timestamp("expires_at").notNull(), 
   archived: boolean("archived").default(false),
 });
 
@@ -283,123 +283,6 @@ export const trialHistory = pgTable("trial_history", {
   created_at: timestamp("created_at").defaultNow(),
 });
 
-export const reviews = pgTable("reviews", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  targetId: integer("target_id").references(() => users.id).notNull(),
-  rating: integer("rating").notNull(),
-  content: text("content").notNull(),
-  targetType: text("target_type", {
-    enum: ["business", "vendor", "product"]
-  }).notNull(),
-  status: text("status", {
-    enum: ["pending", "approved", "rejected"]
-  }).default("pending"),
-  reply: text("reply"),
-  repliedAt: timestamp("replied_at"),
-  repliedBy: integer("replied_by").references(() => users.id),
-  moderatedBy: integer("moderated_by").references(() => users.id),
-  moderationNotes: text("moderation_notes"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-export const reviewVotes = pgTable("review_votes", {
-  id: serial("id").primaryKey(),
-  reviewId: integer("review_id").references(() => reviews.id).notNull(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  voteType: text("vote_type", { enum: ["helpful", "unhelpful"] }).notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const reputationScores = pgTable("reputation_scores", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  overallScore: numeric("overall_score").notNull().default("0"),
-  totalReviews: integer("total_reviews").notNull().default(0),
-  averageRating: numeric("average_rating").notNull().default("0"),
-  responseRate: numeric("response_rate").notNull().default("0"),
-  completionRate: numeric("completion_rate").notNull().default("0"),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-export const documents = pgTable("documents", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  title: text("title").notNull(),
-  description: text("description"),
-  filePath: text("file_path").notNull(),
-  fileType: text("file_type").notNull(),
-  fileSize: integer("file_size").notNull(),
-  isPublic: boolean("is_public").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-  metadata: jsonb("metadata").$type<{
-    originalName: string;
-    contentType: string;
-    tags?: string[];
-  }>(),
-});
-
-export const documentVersions = pgTable("document_versions", {
-  id: serial("id").primaryKey(),
-  documentId: integer("document_id").references(() => documents.id).notNull(),
-  version: integer("version").notNull(),
-  filePath: text("file_path").notNull(),
-  fileSize: integer("file_size").notNull(),
-  createdBy: integer("created_by").references(() => users.id).notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-  changeLog: text("change_log"),
-});
-
-export const documentAccess = pgTable("document_access", {
-  id: serial("id").primaryKey(),
-  documentId: integer("document_id").references(() => documents.id).notNull(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  accessLevel: text("access_level", {
-    enum: ["view", "edit", "admin"]
-  }).notNull(),
-  grantedBy: integer("granted_by").references(() => users.id).notNull(),
-  grantedAt: timestamp("granted_at").defaultNow(),
-  expiresAt: timestamp("expires_at"),
-});
-
-export const themes = pgTable("themes", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  isActive: boolean("is_active").default(false),
-  colors: jsonb("colors").$type<{
-    primary: string;
-    variant: "professional" | "tint" | "vibrant";
-    appearance: "light" | "dark" | "system";
-    radius: number;
-    base: {
-      background: string;
-      foreground: string;
-      card: string;
-      "card-foreground": string;
-      popover: string;
-      "popover-foreground": string;
-      primary: string;
-      "primary-foreground": string;
-      secondary: string;
-      "secondary-foreground": string;
-      muted: string;
-      "muted-foreground": string;
-      accent: string;
-      "accent-foreground": string;
-      destructive: string;
-      "destructive-foreground": string;
-      border: string;
-      input: string;
-      ring: string;
-    };
-  }>().notNull(),
-  createdBy: integer("created_by").references(() => users.id).notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
 export const usersRelations = relations(users, ({ many }) => ({
   leads: many(leads),
   products: many(products),
@@ -538,6 +421,47 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
   }),
 }));
 
+export const documents = pgTable("documents", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  filePath: text("file_path").notNull(),
+  fileType: text("file_type").notNull(),
+  fileSize: integer("file_size").notNull(),
+  isPublic: boolean("is_public").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  metadata: jsonb("metadata").$type<{
+    originalName: string;
+    contentType: string;
+    tags?: string[];
+  }>(),
+});
+
+export const documentVersions = pgTable("document_versions", {
+  id: serial("id").primaryKey(),
+  documentId: integer("document_id").references(() => documents.id).notNull(),
+  version: integer("version").notNull(),
+  filePath: text("file_path").notNull(),
+  fileSize: integer("file_size").notNull(),
+  createdBy: integer("created_by").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  changeLog: text("change_log"),
+});
+
+export const documentAccess = pgTable("document_access", {
+  id: serial("id").primaryKey(),
+  documentId: integer("document_id").references(() => documents.id).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  accessLevel: text("access_level", {
+    enum: ["view", "edit", "admin"]
+  }).notNull(),
+  grantedBy: integer("granted_by").references(() => users.id).notNull(),
+  grantedAt: timestamp("granted_at").defaultNow(),
+  expiresAt: timestamp("expires_at"),
+});
+
 export const documentsRelations = relations(documents, ({ one, many }) => ({
   owner: one(users, {
     fields: [documents.userId],
@@ -572,6 +496,60 @@ export const documentAccessRelations = relations(documentAccess, ({ one }) => ({
     references: [users.id],
   }),
 }));
+
+export const insertDocumentSchema = createInsertSchema(documents);
+export const selectDocumentSchema = createSelectSchema(documents);
+export const insertDocumentVersionSchema = createInsertSchema(documentVersions);
+export const selectDocumentVersionSchema = createSelectSchema(documentVersions);
+export const insertDocumentAccessSchema = createInsertSchema(documentAccess);
+export const selectDocumentAccessSchema = createSelectSchema(documentAccess);
+
+export type InsertDocument = typeof documents.$inferInsert;
+export type SelectDocument = typeof documents.$inferSelect;
+export type InsertDocumentVersion = typeof documentVersions.$inferInsert;
+export type SelectDocumentVersion = typeof documentVersions.$inferSelect;
+export type InsertDocumentAccess = typeof documentAccess.$inferInsert;
+export type SelectDocumentAccess = typeof documentAccess.$inferSelect;
+
+export const reviews = pgTable("reviews", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  targetId: integer("target_id").references(() => users.id).notNull(),
+  rating: integer("rating").notNull(),
+  content: text("content").notNull(),
+  targetType: text("target_type", {
+    enum: ["business", "vendor", "product"]
+  }).notNull(),
+  status: text("status", {
+    enum: ["pending", "approved", "rejected"]
+  }).default("pending"),
+  reply: text("reply"),
+  repliedAt: timestamp("replied_at"),
+  repliedBy: integer("replied_by").references(() => users.id),
+  moderatedBy: integer("moderated_by").references(() => users.id),
+  moderationNotes: text("moderation_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const reviewVotes = pgTable("review_votes", {
+  id: serial("id").primaryKey(),
+  reviewId: integer("review_id").references(() => reviews.id).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  voteType: text("vote_type", { enum: ["helpful", "unhelpful"] }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const reputationScores = pgTable("reputation_scores", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  overallScore: numeric("overall_score").notNull().default("0"),
+  totalReviews: integer("total_reviews").notNull().default(0),
+  averageRating: numeric("average_rating").notNull().default("0"),
+  responseRate: numeric("response_rate").notNull().default("0"),
+  completionRate: numeric("completion_rate").notNull().default("0"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
 
 export const reviewsRelations = relations(reviews, ({ one }) => ({
   author: one(users, {
@@ -610,27 +588,19 @@ export const reputationScoresRelations = relations(reputationScores, ({ one }) =
   }),
 }));
 
-export const themesRelations = relations(themes, ({ one }) => ({
-  creator: one(users, {
-    fields: [themes.createdBy],
-    references: [users.id],
-  }),
-}));
-
-
-export const insertDocumentSchema = createInsertSchema(documents);
-export const selectDocumentSchema = createSelectSchema(documents);
-export const insertDocumentVersionSchema = createInsertSchema(documentVersions);
-export const selectDocumentVersionSchema = createSelectSchema(documentVersions);
-export const insertDocumentAccessSchema = createInsertSchema(documentAccess);
-export const selectDocumentAccessSchema = createSelectSchema(documentAccess);
-
 export const insertReviewSchema = createInsertSchema(reviews);
 export const selectReviewSchema = createSelectSchema(reviews);
 export const insertReviewVoteSchema = createInsertSchema(reviewVotes);
 export const selectReviewVoteSchema = createSelectSchema(reviewVotes);
 export const insertReputationScoreSchema = createInsertSchema(reputationScores);
 export const selectReputationScoreSchema = createSelectSchema(reputationScores);
+
+export type InsertReview = typeof reviews.$inferInsert;
+export type SelectReview = typeof reviews.$inferSelect;
+export type InsertReviewVote = typeof reviewVotes.$inferInsert;
+export type SelectReviewVote = typeof reviewVotes.$inferSelect;
+export type InsertReputationScore = typeof reputationScores.$inferInsert;
+export type SelectReputationScore = typeof reputationScores.$inferSelect;
 
 export const insertUserSchema = createInsertSchema(users, {
   email: z.string().email("Please enter a valid email address"),
@@ -696,8 +666,6 @@ export const selectNewsletterSchema = createSelectSchema(newsletters);
 export const insertNotificationSchema = createInsertSchema(notifications);
 export const selectNotificationSchema = createSelectSchema(notifications);
 
-export const insertThemeSchema = createInsertSchema(themes);
-export const selectThemeSchema = createSelectSchema(themes);
 
 export type InsertUser = typeof users.$inferInsert;
 export type SelectUser = typeof users.$inferSelect;
@@ -729,6 +697,3 @@ export type InsertNewsletter = typeof newsletters.$inferInsert;
 export type SelectNewsletter = typeof newsletters.$inferSelect;
 export type InsertNotification = typeof notifications.$inferInsert;
 export type SelectNotification = typeof notifications.$inferSelect;
-
-export type InsertTheme = typeof themes.$inferInsert;
-export type SelectTheme = typeof themes.$inferSelect;
