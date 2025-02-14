@@ -25,18 +25,17 @@ import ReviewModerationPage from "@/pages/admin/review-moderation";
 import ResetPasswordPage from "@/pages/auth/reset-password";
 import ReviewsDashboard from "@/pages/reviews-dashboard";
 import NotificationsPage from "@/pages/notifications-page";
-import EarlyBirdLanding from "@/pages/early-bird-landing";
 
 function Router() {
   return (
     <div className="min-h-screen bg-background">
       <Switch>
-        {/* Pre-launch Routes */}
-        <Route path="/" component={EarlyBirdLanding} />
+        {/* Public Routes */}
+        <Route path="/" component={AuthPage} />
         <Route path="/auth" component={AuthPage} />
         <Route path="/auth/reset-password/:token" component={ResetPasswordPage} />
 
-        {/* Protected Routes - These will be accessible after launch */}
+        {/* Protected Routes */}
         <Route path="/app" component={() => <ProtectedRoute component={HomePage} />} />
         <Route path="/app/leads" component={() => <ProtectedRoute component={LeadsPage} />} />
         <Route path="/app/marketplace" component={() => <ProtectedRoute component={MarketplacePage} />} />
