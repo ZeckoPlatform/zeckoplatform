@@ -84,13 +84,11 @@ const SUBSCRIPTION_PRICES = {
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(8, "Password must be at least 8 characters"),
-  username: z.string().min(3, "Username must be at least 3 characters"),
 });
 
 const registerSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(8, "Password must be at least 8 characters"),
-  username: z.string().min(3, "Username must be at least 3 characters"),
   userType: z.enum(["free", "business", "vendor"]),
   countryCode: z.enum(["GB", "US"]),
   businessName: z.string().min(2, "Company name must be at least 2 characters").optional(),
@@ -172,7 +170,6 @@ export default function AuthPage() {
     defaultValues: {
       email: "",
       password: "",
-      username: "", // Added username field
     },
   });
 
@@ -181,7 +178,6 @@ export default function AuthPage() {
     defaultValues: {
       email: "",
       password: "",
-      username: "",
       userType: "free",
       countryCode: "GB",
       businessName: "",
@@ -299,19 +295,6 @@ export default function AuthPage() {
                       </p>
                     )}
                   </div>
-                  <div>
-                    <Label htmlFor="username">Username</Label>
-                    <Input
-                      id="username"
-                      type="text"
-                      {...loginForm.register("username")}
-                    />
-                    {loginForm.formState.errors.username && (
-                      <p className="text-sm text-destructive mt-1">
-                        {loginForm.formState.errors.username.message}
-                      </p>
-                    )}
-                  </div>
                   <div className="flex justify-between items-center">
                     <Button
                       type="button"
@@ -357,20 +340,6 @@ export default function AuthPage() {
                     {registerForm.formState.errors.email && (
                       <p className="text-sm text-destructive mt-1">
                         {registerForm.formState.errors.email.message}
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="username">Username</Label>
-                    <Input
-                      id="username"
-                      type="text"
-                      {...registerForm.register("username")}
-                    />
-                    {registerForm.formState.errors.username && (
-                      <p className="text-sm text-destructive mt-1">
-                        {registerForm.formState.errors.username.message}
                       </p>
                     )}
                   </div>

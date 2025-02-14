@@ -6,7 +6,6 @@ import { z } from "zod";
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   email: text("email").unique().notNull(),
-  username: text("username").unique().notNull(),
   password: text("password").notNull(),
   userType: text("user_type", { enum: ["free", "business", "vendor", "admin"] }).notNull().default("free"),
   superAdmin: boolean("super_admin").default(false),
@@ -34,10 +33,8 @@ export const users = pgTable("users", {
     enum: ["pending", "verified", "rejected"]
   }).default("pending"),
   profile: jsonb("profile").$type<{
-    name?: string;
     description?: string;
     categories?: string[];
-    location?: string;
     address?: {
       street: string;
       city: string;
@@ -45,27 +42,12 @@ export const users = pgTable("users", {
       postalCode: string;
       country: string;
     };
-    vendorDetails?: {
-      serviceAreas?: string[];
-      specializations?: string[];
-      yearsInBusiness?: number;
-      insuranceNumber?: string;
-      certifications?: string[];
-    };
-    matchPreferences?: {
-      preferredCategories?: string[];
-      locationPreference?: string[];
-      budgetRange?: { min: number; max: number };
-      industries?: string[];
-    };
   }>(),
 });
 
-// Rest of the schema.ts file remains unchanged
-
+// Create the insert schema for user registration
 export const insertUserSchema = createInsertSchema(users, {
   email: z.string().email("Please enter a valid email address"),
-  username: z.string().min(3, "Username must be at least 3 characters").max(30, "Username must be less than 30 characters"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   userType: z.enum(["free", "business", "vendor", "admin"]),
   countryCode: z.enum(["GB", "US"]).default("GB"),
@@ -87,7 +69,6 @@ export const insertUserSchema = createInsertSchema(users, {
   stateRegistrationNumber: z.string().optional(),
   registeredState: z.string().optional(),
 }).superRefine((data, ctx) => {
-  // Business account validation
   if (data.userType === "business") {
     if (data.countryCode === "GB" && !data.companyNumber) {
       ctx.addIssue({
@@ -105,7 +86,6 @@ export const insertUserSchema = createInsertSchema(users, {
     }
   }
 
-  // Vendor account validation
   if (data.userType === "vendor") {
     if (!data.businessName) {
       ctx.addIssue({
