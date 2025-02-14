@@ -75,7 +75,7 @@ export default function BusinessProfilePage() {
     }
   };
 
-  const { register, handleSubmit, formState: { errors }, setValue, getValues, form } = useForm<BusinessProfileFormData>({
+  const methods = useForm<BusinessProfileFormData>({
     resolver: zodResolver(businessProfileSchema),
     defaultValues: {
       name: user?.profile?.name || "",
@@ -89,6 +89,8 @@ export default function BusinessProfilePage() {
       industries: user?.profile?.matchPreferences?.industries?.join(", ") || "",
     },
   });
+
+  const { register, handleSubmit, formState: { errors }, setValue, getValues } = methods;
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: BusinessProfileFormData) => {
@@ -117,7 +119,7 @@ export default function BusinessProfilePage() {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       toast({
         title: "Success",
-        description: "Your business profile has been updated.",
+        description: "Your profile has been updated.",
       });
     },
     onError: (error: Error) => {
@@ -265,7 +267,7 @@ export default function BusinessProfilePage() {
                   placeholder={PHONE_COUNTRY_CODES[selectedCountry].format}
                   onChange={(e) => {
                     const formatted = formatPhoneNumber(e.target.value, selectedCountry);
-                    form.setValue("phoneNumber", formatted);
+                    setValue("phoneNumber", formatted);
                   }}
                 />
                 {errors.phoneNumber && (
