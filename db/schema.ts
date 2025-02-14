@@ -43,11 +43,27 @@ export const users = pgTable("users", {
     description?: string;
     categories?: string[];
     location?: string;
+    country?: string;
+    address?: {
+      street?: string;
+      city?: string;
+      state?: string;
+      postalCode?: string;
+      country: string;
+    };
     matchPreferences?: {
       preferredCategories?: string[];
       locationPreference?: string[];
       budgetRange?: { min: number; max: number };
     };
+  }>(),
+  businessDetails: jsonb("business_details").$type<{
+    registrationNumber?: string;
+    registrationType?: "companiesHouse" | "ein" | "other";
+    taxNumber?: string;
+    taxNumberType?: "vat" | "ein" | "other";
+    country: string;
+    verificationStatus: "pending" | "verified" | "rejected";
   }>(),
 });
 
@@ -61,7 +77,7 @@ export const leads = pgTable("leads", {
   location: text("location"),
   status: text("status", { enum: ["open", "closed", "in_progress"] }).default("open"),
   created_at: timestamp("created_at").defaultNow(),
-  expires_at: timestamp("expires_at").notNull(), 
+  expires_at: timestamp("expires_at").notNull(),
   archived: boolean("archived").default(false),
 });
 

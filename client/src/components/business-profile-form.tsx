@@ -10,16 +10,31 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMutation } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
+
+const COUNTRIES = {
+  GB: "United Kingdom",
+  US: "United States",
+  // Add more countries as needed
+};
 
 const businessProfileSchema = z.object({
   name: z.string().min(2, "Business name must be at least 2 characters"),
   description: z.string().min(10, "Description must be at least 10 characters"),
   categories: z.string().min(1, "Please enter at least one category"),
-  location: z.string().min(2, "Location is required"),
-  budget: z.string().min(1, "Budget range is required"),
-  industries: z.string().min(1, "Please enter at least one industry"),
+  country: z.string().min(2, "Please select a country"),
+  address: z.object({
+    street: z.string().min(1, "Street address is required"),
+    city: z.string().min(1, "City is required"),
+    state: z.string().min(1, "State/Province is required"),
+    postalCode: z.string().min(1, "Postal code is required"),
+  }),
+  registrationNumber: z.string().min(1, "Business registration number is required"),
+  taxNumber: z.string().optional(),
+  budget: z.string(),
+  industries: z.string(),
 });
 
 type BusinessProfileFormData = z.infer<typeof businessProfileSchema>;
@@ -34,7 +49,15 @@ export function BusinessProfileForm() {
       name: user?.profile?.name || "",
       description: user?.profile?.description || "",
       categories: user?.profile?.categories?.join(", ") || "",
-      location: user?.profile?.location || "",
+      country: user?.profile?.country || "GB",
+      address: {
+        street: user?.profile?.address?.street || "",
+        city: user?.profile?.address?.city || "",
+        state: user?.profile?.address?.state || "",
+        postalCode: user?.profile?.address?.postalCode || "",
+      },
+      registrationNumber: user?.businessDetails?.registrationNumber || "",
+      taxNumber: user?.businessDetails?.taxNumber || "",
       budget: user?.profile?.matchPreferences?.budgetRange?.min?.toString() || "",
       industries: user?.profile?.matchPreferences?.industries?.join(", ") || "",
     },
@@ -46,15 +69,31 @@ export function BusinessProfileForm() {
         ...data,
         categories: data.categories.split(",").map(c => c.trim()),
         industries: data.industries.split(",").map(i => i.trim()),
-        budget: parseInt(data.budget),
+        address: {
+          ...data.address,
+          country: data.country,
+        },
+        businessDetails: {
+          registrationNumber: data.registrationNumber,
+          registrationType: data.country === "GB" ? "companiesHouse" : "ein",
+          taxNumber: data.taxNumber,
+          taxNumberType: data.country === "GB" ? "vat" : "ein",
+          country: data.country,
+        },
+        matchPreferences: {
+          budgetRange: {
+            min: parseInt(data.budget),
+            max: parseInt(data.budget) * 2,
+          },
+        },
       });
+
       if (!response.ok) {
         throw new Error("Failed to update profile");
       }
       return response.json();
     },
     onSuccess: () => {
-      // Invalidate and refetch user data and leads
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       toast({
@@ -80,24 +119,19 @@ export function BusinessProfileForm() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form
-          onSubmit={form.handleSubmit((data) => updateProfileMutation.mutate(data))}
-          className="space-y-4"
-        >
-          <div>
+        <form onSubmit={form.handleSubmit((data) => updateProfileMutation.mutate(data))} className="space-y-4">
+          <div className="space-y-2">
             <Label htmlFor="name">Business Name</Label>
             <Input
               id="name"
               {...form.register("name")}
             />
             {form.formState.errors.name && (
-              <p className="text-sm text-destructive mt-1">
-                {form.formState.errors.name.message}
-              </p>
+              <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
             )}
           </div>
 
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="description">Business Description</Label>
             <Textarea
               id="description"
@@ -105,66 +139,102 @@ export function BusinessProfileForm() {
               className="min-h-[100px]"
             />
             {form.formState.errors.description && (
-              <p className="text-sm text-destructive mt-1">
-                {form.formState.errors.description.message}
-              </p>
+              <p className="text-sm text-destructive">{form.formState.errors.description.message}</p>
             )}
           </div>
 
-          <div>
-            <Label htmlFor="categories">Service Categories</Label>
+          <div className="space-y-2">
+            <Label htmlFor="country">Country</Label>
+            <Select
+              onValueChange={(value) => form.setValue("country", value)}
+              defaultValue={form.getValues("country")}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select your country" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(COUNTRIES).map(([code, name]) => (
+                  <SelectItem key={code} value={code}>
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="address.street">Street Address</Label>
             <Input
-              id="categories"
-              {...form.register("categories")}
-              placeholder="e.g. Web Development, Marketing, Design (comma-separated)"
+              id="address.street"
+              {...form.register("address.street")}
             />
-            {form.formState.errors.categories && (
-              <p className="text-sm text-destructive mt-1">
-                {form.formState.errors.categories.message}
-              </p>
+            {form.formState.errors.address?.street && (
+              <p className="text-sm text-destructive">{form.formState.errors.address.street.message}</p>
             )}
           </div>
 
-          <div>
-            <Label htmlFor="location">Location</Label>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="address.city">City</Label>
+              <Input
+                id="address.city"
+                {...form.register("address.city")}
+              />
+              {form.formState.errors.address?.city && (
+                <p className="text-sm text-destructive">{form.formState.errors.address.city.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="address.state">
+                {form.watch("country") === "GB" ? "County" : "State"}
+              </Label>
+              <Input
+                id="address.state"
+                {...form.register("address.state")}
+              />
+              {form.formState.errors.address?.state && (
+                <p className="text-sm text-destructive">{form.formState.errors.address.state.message}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="address.postalCode">
+              {form.watch("country") === "GB" ? "Postcode" : "ZIP Code"}
+            </Label>
             <Input
-              id="location"
-              {...form.register("location")}
-              placeholder="e.g. London, Manchester"
+              id="address.postalCode"
+              {...form.register("address.postalCode")}
             />
-            {form.formState.errors.location && (
-              <p className="text-sm text-destructive mt-1">
-                {form.formState.errors.location.message}
-              </p>
+            {form.formState.errors.address?.postalCode && (
+              <p className="text-sm text-destructive">{form.formState.errors.address.postalCode.message}</p>
             )}
           </div>
 
-          <div>
-            <Label htmlFor="budget">Average Project Budget (£)</Label>
+          <div className="space-y-2">
+            <Label htmlFor="registrationNumber">
+              {form.watch("country") === "GB" ? "Companies House Number" : "EIN"}
+            </Label>
             <Input
-              id="budget"
-              type="number"
-              {...form.register("budget")}
-              placeholder="e.g. 5000"
+              id="registrationNumber"
+              {...form.register("registrationNumber")}
             />
-            {form.formState.errors.budget && (
-              <p className="text-sm text-destructive mt-1">
-                {form.formState.errors.budget.message}
-              </p>
+            {form.formState.errors.registrationNumber && (
+              <p className="text-sm text-destructive">{form.formState.errors.registrationNumber.message}</p>
             )}
           </div>
 
-          <div>
-            <Label htmlFor="industries">Industries</Label>
+          <div className="space-y-2">
+            <Label htmlFor="taxNumber">
+              {form.watch("country") === "GB" ? "VAT Number" : "Tax ID (Optional)"}
+            </Label>
             <Input
-              id="industries"
-              {...form.register("industries")}
-              placeholder="e.g. Technology, Healthcare, Retail (comma-separated)"
+              id="taxNumber"
+              {...form.register("taxNumber")}
             />
-            {form.formState.errors.industries && (
-              <p className="text-sm text-destructive mt-1">
-                {form.formState.errors.industries.message}
-              </p>
+            {form.formState.errors.taxNumber && (
+              <p className="text-sm text-destructive">{form.formState.errors.taxNumber.message}</p>
             )}
           </div>
 
