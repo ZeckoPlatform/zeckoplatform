@@ -49,13 +49,26 @@ function Router() {
 
         {/* Admin Routes */}
         <Route path="/admin">
-          {() => <ProtectedRoute component={AdminManagement} />}
+          {() => <ProtectedRoute component={AdminManagement} adminRequired />}
+        </Route>
+        <Route path="/admin/dashboard">
+          {() => <ProtectedRoute component={AdminManagement} adminRequired />}
         </Route>
         <Route path="/admin/themes">
-          {() => <ProtectedRoute component={ThemeManager} />}
+          {() => <ProtectedRoute component={ThemeManager} adminRequired />}
         </Route>
-        <Route path="/admin/users/edit/:id" component={UserEditPage} />
-        <Route path="/admin/reviews" component={ReviewModerationPage} />
+        <Route path="/admin/users">
+          {() => <ProtectedRoute component={AdminManagement} adminRequired />}
+        </Route>
+        <Route path="/admin/settings">
+          {() => <ProtectedRoute component={AdminManagement} adminRequired />}
+        </Route>
+        <Route path="/admin/users/edit/:id">
+          {() => <ProtectedRoute component={UserEditPage} adminRequired />}
+        </Route>
+        <Route path="/admin/reviews">
+          {() => <ProtectedRoute component={ReviewModerationPage} adminRequired />}
+        </Route>
 
         {/* Settings Routes */}
         <Route path="/settings/security">

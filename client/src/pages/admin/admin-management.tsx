@@ -4,11 +4,16 @@ import ThemeManager from "./theme-manager";
 
 export default function AdminManagement() {
   const [location] = useLocation();
-  const currentPath = location.split("/").pop();
+  const currentPath = location.split("/").pop() || "dashboard";
 
   return (
     <div className="container py-8">
       <div className="flex gap-4 mb-8">
+        <Link href="/admin/dashboard">
+          <Button variant={currentPath === "dashboard" ? "default" : "outline"}>
+            Dashboard
+          </Button>
+        </Link>
         <Link href="/admin/users">
           <Button variant={currentPath === "users" ? "default" : "outline"}>
             User Management
@@ -26,6 +31,7 @@ export default function AdminManagement() {
         </Link>
       </div>
 
+      {currentPath === "dashboard" && <div>Admin Dashboard</div>}
       {currentPath === "themes" && <ThemeManager />}
       {/* Other admin sections render here based on currentPath */}
     </div>
