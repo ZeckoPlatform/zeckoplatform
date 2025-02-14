@@ -47,11 +47,7 @@ function Router() {
         <Route path="/notifications" component={() => <ProtectedRoute component={NotificationsPage} />} />
 
         {/* Admin Routes */}
-        <Route path="/admin" component={() => <ProtectedRoute component={AdminManagement} adminRequired />} />
-        <Route path="/admin/dashboard" component={() => <ProtectedRoute component={AdminManagement} adminRequired />} />
-        <Route path="/admin/users" component={() => <ProtectedRoute component={AdminManagement} adminRequired />} />
-        <Route path="/admin/themes" component={() => <ProtectedRoute component={AdminManagement} adminRequired />} />
-        <Route path="/admin/settings" component={() => <ProtectedRoute component={AdminManagement} adminRequired />} />
+        <Route path="/admin/:page*" component={() => <ProtectedRoute component={AdminManagement} adminRequired />} />
 
         {/* Settings Routes */}
         <Route path="/settings/security">
