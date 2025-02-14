@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMutation } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
+import { useState } from "react";
 
 const COUNTRIES = {
   GB: "United Kingdom",
@@ -40,7 +41,9 @@ const userProfileSchema = z.object({
   phoneNumber: z.string()
     .min(1, "Phone number is required")
     .refine((val) => {
-      const countryCode = form.getValues("country");
+      // Remove validation temporarily while typing
+      if (val.length < 10) return true;
+      const countryCode = val.startsWith('+1') ? 'US' : 'GB';
       return PHONE_COUNTRY_CODES[countryCode]?.pattern.test(val);
     }, {
       message: "Please enter a valid phone number"
@@ -52,6 +55,7 @@ type UserProfileFormData = z.infer<typeof userProfileSchema>;
 export function UserProfileForm() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [selectedCountry, setSelectedCountry] = useState<"GB" | "US">(user?.countryCode as "GB" | "US" || "GB");
 
   const form = useForm<UserProfileFormData>({
     resolver: zodResolver(userProfileSchema),
@@ -87,18 +91,38 @@ export function UserProfileForm() {
     },
   });
 
-  const selectedCountry = form.watch("country");
-
   const formatPhoneNumber = (value: string, country: "GB" | "US") => {
-    const digits = value.replace(/\D/g, "");
+    // Remove all non-digits but keep the plus sign if it exists
+    const digits = value.replace(/[^\d+]/g, "");
 
+    // US Phone number formatting
     if (country === "US") {
-      if (digits.length <= 3) return `+1 (${digits}`;
-      if (digits.length <= 6) return `+1 (${digits.slice(0, 3)}) ${digits.slice(3)}`;
-      return `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
-    } else {
-      if (digits.length <= 4) return `+44 ${digits}`;
-      return `+44 ${digits.slice(0, 4)} ${digits.slice(4, 10)}`;
+      // If empty or just has plus, return as is
+      if (digits.length <= 1) return digits;
+
+      // If less than full number, just return the digits with +1 prefix
+      if (digits.length < 11) {
+        return digits.startsWith('+1') ? digits : `+1${digits}`;
+      }
+
+      // Format complete number
+      const number = digits.startsWith('+1') ? digits.slice(2) : digits;
+      return `+1 (${number.slice(0, 3)}) ${number.slice(3, 6)}-${number.slice(6, 10)}`;
+    }
+
+    // UK Phone number formatting
+    else {
+      // If empty or just has plus, return as is
+      if (digits.length <= 1) return digits;
+
+      // If less than full number, just return the digits with +44 prefix
+      if (digits.length < 11) {
+        return digits.startsWith('+44') ? digits : `+44${digits}`;
+      }
+
+      // Format complete number
+      const number = digits.startsWith('+44') ? digits.slice(3) : digits;
+      return `+44 ${number.slice(0, 4)} ${number.slice(4, 10)}`;
     }
   };
 
@@ -135,44 +159,47 @@ export function UserProfileForm() {
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="country">Country</Label>
-            <Select
-              onValueChange={(value: "GB" | "US") => {
-                form.setValue("country", value);
-                form.setValue("phoneNumber", "");
-              }}
-              defaultValue={form.getValues("country")}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select your country" />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(COUNTRIES).map(([code, name]) => (
-                  <SelectItem key={code} value={code}>
-                    {name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="country">Country</Label>
+              <Select
+                onValueChange={(value: "GB" | "US") => {
+                  setSelectedCountry(value);
+                  form.setValue("country", value);
+                  form.setValue("phoneNumber", ""); // Reset phone number when country changes
+                }}
+                defaultValue={form.getValues("country")}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select your country" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(COUNTRIES).map(([code, name]) => (
+                    <SelectItem key={code} value={code}>
+                      {name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="phoneNumber">Phone Number</Label>
-            <Input
-              id="phoneNumber"
-              {...form.register("phoneNumber")}
-              placeholder={PHONE_COUNTRY_CODES[selectedCountry]?.format}
-              onChange={(e) => {
-                const formatted = formatPhoneNumber(e.target.value, selectedCountry);
-                form.setValue("phoneNumber", formatted);
-              }}
-            />
-            {form.formState.errors.phoneNumber && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.phoneNumber.message}
-              </p>
-            )}
+            <div className="space-y-2">
+              <Label htmlFor="phoneNumber">Phone Number</Label>
+              <Input
+                id="phoneNumber"
+                {...form.register("phoneNumber")}
+                placeholder={PHONE_COUNTRY_CODES[selectedCountry]?.format}
+                onChange={(e) => {
+                  const formatted = formatPhoneNumber(e.target.value, selectedCountry);
+                  form.setValue("phoneNumber", formatted);
+                }}
+              />
+              {form.formState.errors.phoneNumber && (
+                <p className="text-sm text-destructive">
+                  {form.formState.errors.phoneNumber.message}
+                </p>
+              )}
+            </div>
           </div>
 
           <Button
