@@ -64,13 +64,21 @@ export default function BusinessProfilePage() {
   }
 
   const formatPhoneNumber = (value: string, country: "GB" | "US") => {
+    // Remove all non-digits
     const digits = value.replace(/\D/g, "");
+
     if (country === "US") {
+      // For US numbers
+      if (digits.length === 0) return "";
       if (digits.length <= 3) return `+1 (${digits}`;
       if (digits.length <= 6) return `+1 (${digits.slice(0, 3)}) ${digits.slice(3)}`;
+      if (digits.length <= 10) return `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
       return `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
     } else {
+      // For UK numbers
+      if (digits.length === 0) return "";
       if (digits.length <= 4) return `+44 ${digits}`;
+      if (digits.length <= 10) return `+44 ${digits.slice(0, 4)} ${digits.slice(4)}`;
       return `+44 ${digits.slice(0, 4)} ${digits.slice(4, 10)}`;
     }
   };
