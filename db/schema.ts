@@ -43,11 +43,28 @@ export const users = pgTable("users", {
     description?: string;
     categories?: string[];
     location?: string;
+    country?: string;
+    address?: {
+      street?: string;
+      city?: string;
+      state?: string;
+      postalCode?: string;
+      country: string;
+    };
     matchPreferences?: {
       preferredCategories?: string[];
       locationPreference?: string[];
       budgetRange?: { min: number; max: number };
+      industries?: string[];
     };
+  }>(),
+  businessDetails: jsonb("business_details").$type<{
+    registrationNumber?: string;
+    registrationType?: "companiesHouse" | "ein" | "other";
+    taxNumber?: string;
+    taxNumberType?: "vat" | "ein" | "other";
+    country: string;
+    verificationStatus: "pending" | "verified" | "rejected";
   }>(),
 });
 
