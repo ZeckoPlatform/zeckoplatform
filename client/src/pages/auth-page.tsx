@@ -13,34 +13,71 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
 import { ForgotPasswordForm } from "@/components/auth/ForgotPasswordForm";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const COUNTRIES = {
+  GB: "United Kingdom",
+  US: "United States",
+};
+
+const CURRENCY_SYMBOLS = {
+  GB: "£",
+  US: "$",
+};
 
 const SUBSCRIPTION_PRICES = {
-  business: {
-    monthly: {
-      base: 29.99,
-      vat: 29.99 * 0.20,
-      total: 29.99 * 1.20
+  GB: {
+    business: {
+      monthly: {
+        base: 29.99,
+        vat: 29.99 * 0.20,
+        total: 29.99 * 1.20
+      },
+      annual: {
+        base: (29.99 * 12 * 0.9),
+        vat: (29.99 * 12 * 0.9) * 0.20,
+        total: (29.99 * 12 * 0.9) * 1.20
+      },
     },
-    annual: {
-      base: (29.99 * 12 * 0.9),
-      vat: (29.99 * 12 * 0.9) * 0.20,
-      total: (29.99 * 12 * 0.9) * 1.20
-    },
+    vendor: {
+      monthly: {
+        base: 49.99,
+        vat: 49.99 * 0.20,
+        total: 49.99 * 1.20
+      },
+      annual: {
+        base: (49.99 * 12 * 0.9),
+        vat: (49.99 * 12 * 0.9) * 0.20,
+        total: (49.99 * 12 * 0.9) * 1.20
+      },
+    }
   },
-  vendor: {
-    monthly: {
-      base: 49.99,
-      vat: 49.99 * 0.20,
-      total: 49.99 * 1.20
+  US: {
+    business: {
+      monthly: {
+        base: 34.99,
+        tax: 0,
+        total: 34.99
+      },
+      annual: {
+        base: (34.99 * 12 * 0.9),
+        tax: 0,
+        total: (34.99 * 12 * 0.9)
+      },
     },
-    annual: {
-      base: (49.99 * 12 * 0.9),
-      vat: (49.99 * 12 * 0.9) * 0.20,
-      total: (49.99 * 12 * 0.9) * 1.20
-    },
+    vendor: {
+      monthly: {
+        base: 54.99,
+        tax: 0,
+        total: 54.99
+      },
+      annual: {
+        base: (54.99 * 12 * 0.9),
+        tax: 0,
+        total: (54.99 * 12 * 0.9)
+      },
+    }
   }
 };
 
@@ -54,31 +91,70 @@ const registerSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
   username: z.string().min(3, "Username must be at least 3 characters"),
   userType: z.enum(["free", "business", "vendor"]),
-  businessType: z.enum(["registered", "selfEmployed"]).optional(),
+  countryCode: z.enum(["GB", "US"]),
   businessName: z.string().min(2, "Company name must be at least 2 characters").optional(),
+  // UK fields
   companyNumber: z.string()
     .regex(/^[A-Z0-9]{8}$/, "Please enter a valid 8-character Companies House number")
+    .optional(),
+  vatNumber: z.string()
+    .regex(/^GB[0-9]{9}$/, "Please enter a valid UK VAT number")
     .optional(),
   utrNumber: z.string()
     .regex(/^[0-9]{10}$/, "Please enter a valid 10-digit UTR number")
     .optional(),
+  // US fields
+  einNumber: z.string()
+    .regex(/^\d{2}-\d{7}$/, "Please enter a valid EIN (XX-XXXXXXX)")
+    .optional(),
+  registeredState: z.string().optional(),
+  stateRegistrationNumber: z.string().optional(),
   paymentFrequency: z.enum(["monthly", "annual"]).optional(),
-}).refine((data) => {
-  if (data.userType === "business") {
-    if (data.businessType === "registered") {
-      return !!data.businessName && !!data.companyNumber;
+}).superRefine((data, ctx) => {
+  if (data.userType === "business" || data.userType === "vendor") {
+    if (!data.businessName) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `${data.userType === "business" ? "Business" : "Vendor"} name is required`,
+        path: ["businessName"]
+      });
     }
-    if (data.businessType === "selfEmployed") {
-      return !!data.utrNumber;
+
+    if (data.countryCode === "GB") {
+      if (!data.companyNumber) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Companies House number is required for UK businesses",
+          path: ["companyNumber"]
+        });
+      }
+      if (data.userType === "vendor" && !data.utrNumber) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "UTR number is required for UK vendors",
+          path: ["utrNumber"]
+        });
+      }
     }
-  }
-  if (data.userType === "vendor") {
-    return !!data.businessName && !!data.companyNumber;
+
+    if (data.countryCode === "US") {
+      if (!data.einNumber) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "EIN is required for US businesses",
+          path: ["einNumber"]
+        });
+      }
+      if (!data.registeredState) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "State registration is required for US businesses",
+          path: ["registeredState"]
+        });
+      }
+    }
   }
   return true;
-}, {
-  message: "Please fill in all required business information",
-  path: ["businessType"],
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -105,13 +181,20 @@ export default function AuthPage() {
       password: "",
       username: "",
       userType: "free",
-      businessType: "registered",
+      countryCode: "GB",
       businessName: "",
       companyNumber: "",
+      vatNumber: "",
       utrNumber: "",
+      einNumber: "",
+      registeredState: "",
+      stateRegistrationNumber: "",
       paymentFrequency: "monthly",
     },
   });
+
+  const selectedCountry = registerForm.watch("countryCode");
+  const selectedUserType = registerForm.watch("userType");
 
   const onLoginSuccess = (data: any) => {
     switch (data.userType) {
@@ -138,6 +221,18 @@ export default function AuthPage() {
   if (user) {
     return <Redirect to="/" />;
   }
+
+  const getSubscriptionPrice = (userType: "business" | "vendor", frequency: "monthly" | "annual") => {
+    const countryPrices = SUBSCRIPTION_PRICES[selectedCountry];
+    if (!countryPrices) return null;
+    const prices = countryPrices[userType][frequency];
+    const symbol = CURRENCY_SYMBOLS[selectedCountry];
+    return {
+      base: `${symbol}${prices.base.toFixed(2)}`,
+      tax: prices.tax || prices.vat ? `${symbol}${(prices.tax || prices.vat).toFixed(2)}` : null,
+      total: `${symbol}${prices.total.toFixed(2)}`,
+    };
+  };
 
   return (
     <div className="min-h-screen grid md:grid-cols-2">
@@ -250,6 +345,7 @@ export default function AuthPage() {
                       </p>
                     )}
                   </div>
+
                   <div>
                     <Label htmlFor="username">Username</Label>
                     <Input
@@ -263,6 +359,7 @@ export default function AuthPage() {
                       </p>
                     )}
                   </div>
+
                   <div>
                     <Label htmlFor="reg-password">Password</Label>
                     <Input
@@ -278,6 +375,34 @@ export default function AuthPage() {
                   </div>
 
                   <div>
+                    <Label>Country</Label>
+                    <Select
+                      onValueChange={(value: "GB" | "US") => {
+                        registerForm.setValue("countryCode", value);
+                        // Reset country-specific fields
+                        registerForm.setValue("companyNumber", "");
+                        registerForm.setValue("vatNumber", "");
+                        registerForm.setValue("utrNumber", "");
+                        registerForm.setValue("einNumber", "");
+                        registerForm.setValue("registeredState", "");
+                        registerForm.setValue("stateRegistrationNumber", "");
+                      }}
+                      defaultValue={registerForm.getValues("countryCode")}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select your country" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(COUNTRIES).map(([code, name]) => (
+                          <SelectItem key={code} value={code}>
+                            {name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
                     <Label>Account Type</Label>
                     <RadioGroup
                       defaultValue="free"
@@ -285,10 +410,11 @@ export default function AuthPage() {
                         registerForm.setValue("userType", value as "free" | "business" | "vendor");
                         registerForm.setValue("businessName", "");
                         registerForm.setValue("companyNumber", "");
+                        registerForm.setValue("vatNumber", "");
                         registerForm.setValue("utrNumber", "");
-                        if (value === "business") {
-                          registerForm.setValue("businessType", "registered");
-                        }
+                        registerForm.setValue("einNumber", "");
+                        registerForm.setValue("registeredState", "");
+                        registerForm.setValue("stateRegistrationNumber", "");
                       }}
                     >
                       <div className="flex items-center space-x-2">
@@ -298,52 +424,36 @@ export default function AuthPage() {
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="business" id="business" />
                         <Label htmlFor="business">
-                          Business (£{SUBSCRIPTION_PRICES.business.monthly.base.toFixed(2)} + VAT = £{SUBSCRIPTION_PRICES.business.monthly.total.toFixed(2)}/month)
+                          Business
+                          {selectedUserType === "business" && (
+                            <span className="ml-1 text-sm text-muted-foreground">
+                              ({getSubscriptionPrice("business", "monthly")?.total}/month)
+                            </span>
+                          )}
                         </Label>
                       </div>
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="vendor" id="vendor" />
                         <Label htmlFor="vendor">
-                          Vendor (£{SUBSCRIPTION_PRICES.vendor.monthly.base.toFixed(2)} + VAT = £{SUBSCRIPTION_PRICES.vendor.monthly.total.toFixed(2)}/month)
+                          Vendor
+                          {selectedUserType === "vendor" && (
+                            <span className="ml-1 text-sm text-muted-foreground">
+                              ({getSubscriptionPrice("vendor", "monthly")?.total}/month)
+                            </span>
+                          )}
                         </Label>
                       </div>
                     </RadioGroup>
                   </div>
 
-                  {registerForm.watch("userType") === "business" && (
-                    <div>
-                      <Label>Business Type</Label>
-                      <RadioGroup
-                        defaultValue="registered"
-                        onValueChange={(value) => {
-                          registerForm.setValue("businessType", value as "registered" | "selfEmployed");
-                          registerForm.setValue("businessName", "");
-                          registerForm.setValue("companyNumber", "");
-                          registerForm.setValue("utrNumber", "");
-                        }}
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="registered" id="registered" />
-                          <Label htmlFor="registered">Registered Company</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="selfEmployed" id="selfEmployed" />
-                          <Label htmlFor="selfEmployed">Self-employed</Label>
-                        </div>
-                      </RadioGroup>
-                    </div>
-                  )}
-
-                  {((registerForm.watch("userType") === "business" &&
-                    registerForm.watch("businessType") === "registered") ||
-                    registerForm.watch("userType") === "vendor") && (
+                  {(selectedUserType === "business" || selectedUserType === "vendor") && (
                     <>
                       <div>
-                        <Label htmlFor="businessName">Company Name</Label>
+                        <Label htmlFor="businessName">Business Name</Label>
                         <Input
                           id="businessName"
                           {...registerForm.register("businessName")}
-                          placeholder="Enter your company name"
+                          placeholder="Enter your business name"
                         />
                         {registerForm.formState.errors.businessName && (
                           <p className="text-sm text-destructive mt-1">
@@ -351,65 +461,123 @@ export default function AuthPage() {
                           </p>
                         )}
                       </div>
-                      <div>
-                        <Label htmlFor="companyNumber">Companies House Number</Label>
-                        <Input
-                          id="companyNumber"
-                          {...registerForm.register("companyNumber")}
-                          placeholder="12345678"
-                        />
-                        {registerForm.formState.errors.companyNumber && (
-                          <p className="text-sm text-destructive mt-1">
-                            {registerForm.formState.errors.companyNumber.message}
-                          </p>
-                        )}
+
+                      {selectedCountry === "GB" ? (
+                        <>
+                          <div>
+                            <Label htmlFor="companyNumber">Companies House Number</Label>
+                            <Input
+                              id="companyNumber"
+                              {...registerForm.register("companyNumber")}
+                              placeholder="12345678"
+                            />
+                            {registerForm.formState.errors.companyNumber && (
+                              <p className="text-sm text-destructive mt-1">
+                                {registerForm.formState.errors.companyNumber.message}
+                              </p>
+                            )}
+                          </div>
+
+                          {selectedUserType === "vendor" && (
+                            <div>
+                              <Label htmlFor="utrNumber">UTR Number</Label>
+                              <Input
+                                id="utrNumber"
+                                {...registerForm.register("utrNumber")}
+                                placeholder="1234567890"
+                              />
+                              {registerForm.formState.errors.utrNumber && (
+                                <p className="text-sm text-destructive mt-1">
+                                  {registerForm.formState.errors.utrNumber.message}
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          <div>
+                            <Label htmlFor="vatNumber">VAT Number (Optional)</Label>
+                            <Input
+                              id="vatNumber"
+                              {...registerForm.register("vatNumber")}
+                              placeholder="GB123456789"
+                            />
+                            {registerForm.formState.errors.vatNumber && (
+                              <p className="text-sm text-destructive mt-1">
+                                {registerForm.formState.errors.vatNumber.message}
+                              </p>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div>
+                            <Label htmlFor="einNumber">EIN (Tax ID)</Label>
+                            <Input
+                              id="einNumber"
+                              {...registerForm.register("einNumber")}
+                              placeholder="XX-XXXXXXX"
+                            />
+                            {registerForm.formState.errors.einNumber && (
+                              <p className="text-sm text-destructive mt-1">
+                                {registerForm.formState.errors.einNumber.message}
+                              </p>
+                            )}
+                          </div>
+
+                          <div>
+                            <Label htmlFor="registeredState">Registered State</Label>
+                            <Input
+                              id="registeredState"
+                              {...registerForm.register("registeredState")}
+                            />
+                            {registerForm.formState.errors.registeredState && (
+                              <p className="text-sm text-destructive mt-1">
+                                {registerForm.formState.errors.registeredState.message}
+                              </p>
+                            )}
+                          </div>
+
+                          <div>
+                            <Label htmlFor="stateRegistrationNumber">State Registration Number</Label>
+                            <Input
+                              id="stateRegistrationNumber"
+                              {...registerForm.register("stateRegistrationNumber")}
+                            />
+                            {registerForm.formState.errors.stateRegistrationNumber && (
+                              <p className="text-sm text-destructive mt-1">
+                                {registerForm.formState.errors.stateRegistrationNumber.message}
+                              </p>
+                            )}
+                          </div>
+                        </>
+                      )}
+
+                      <div className="space-y-4 mt-4">
+                        <Label>Payment Preferences</Label>
+                        <div>
+                          <Label>Billing Frequency</Label>
+                          <RadioGroup
+                            defaultValue="monthly"
+                            onValueChange={(value) =>
+                              registerForm.setValue("paymentFrequency", value as "monthly" | "annual")
+                            }
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="monthly" id="monthly" />
+                              <Label htmlFor="monthly">
+                                Monthly ({getSubscriptionPrice(selectedUserType, "monthly")?.total}/month)
+                              </Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="annual" id="annual" />
+                              <Label htmlFor="annual">
+                                Annual ({getSubscriptionPrice(selectedUserType, "annual")?.total}/year - Save 10%)
+                              </Label>
+                            </div>
+                          </RadioGroup>
+                        </div>
                       </div>
                     </>
-                  )}
-
-                  {registerForm.watch("userType") === "business" &&
-                    registerForm.watch("businessType") === "selfEmployed" && (
-                    <div>
-                      <Label htmlFor="utrNumber">UTR Number</Label>
-                      <Input
-                        id="utrNumber"
-                        {...registerForm.register("utrNumber")}
-                        placeholder="1234567890"
-                      />
-                      {registerForm.formState.errors.utrNumber && (
-                        <p className="text-sm text-destructive mt-1">
-                          {registerForm.formState.errors.utrNumber.message}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {registerForm.watch("userType") !== "free" && (
-                    <div className="space-y-4 mt-4">
-                      <Label>Payment Preferences</Label>
-                      <div>
-                        <Label>Billing Frequency</Label>
-                        <RadioGroup
-                          defaultValue="monthly"
-                          onValueChange={(value) =>
-                            registerForm.setValue("paymentFrequency", value as "monthly" | "annual")
-                          }
-                        >
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="monthly" id="monthly" />
-                            <Label htmlFor="monthly">
-                              Monthly (£{SUBSCRIPTION_PRICES[registerForm.watch("userType")]?.monthly.base.toFixed(2)} + VAT = £{SUBSCRIPTION_PRICES[registerForm.watch("userType")]?.monthly.total.toFixed(2)}/month)
-                            </Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="annual" id="annual" />
-                            <Label htmlFor="annual">
-                              Annual (£{SUBSCRIPTION_PRICES[registerForm.watch("userType")]?.annual.base.toFixed(2)} + VAT = £{SUBSCRIPTION_PRICES[registerForm.watch("userType")]?.annual.total.toFixed(2)}/year - Save 10%)
-                            </Label>
-                          </div>
-                        </RadioGroup>
-                      </div>
-                    </div>
                   )}
 
                   <Button
