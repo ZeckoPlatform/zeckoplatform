@@ -19,12 +19,28 @@ import { ForgotPasswordForm } from "@/components/auth/ForgotPasswordForm";
 
 const SUBSCRIPTION_PRICES = {
   business: {
-    monthly: 29.99,
-    annual: (29.99 * 12 * 0.9).toFixed(2),
+    monthly: {
+      base: 29.99,
+      vat: 29.99 * 0.20,
+      total: 29.99 * 1.20
+    },
+    annual: {
+      base: (29.99 * 12 * 0.9),
+      vat: (29.99 * 12 * 0.9) * 0.20,
+      total: (29.99 * 12 * 0.9) * 1.20
+    },
   },
   vendor: {
-    monthly: 49.99,
-    annual: (49.99 * 12 * 0.9).toFixed(2),
+    monthly: {
+      base: 49.99,
+      vat: 49.99 * 0.20,
+      total: 49.99 * 1.20
+    },
+    annual: {
+      base: (49.99 * 12 * 0.9),
+      vat: (49.99 * 12 * 0.9) * 0.20,
+      total: (49.99 * 12 * 0.9) * 1.20
+    },
   }
 };
 
@@ -282,13 +298,13 @@ export default function AuthPage() {
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="business" id="business" />
                         <Label htmlFor="business">
-                          Business (£{SUBSCRIPTION_PRICES.business.monthly}/month)
+                          Business (£{SUBSCRIPTION_PRICES.business.monthly.base.toFixed(2)} + VAT = £{SUBSCRIPTION_PRICES.business.monthly.total.toFixed(2)}/month)
                         </Label>
                       </div>
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="vendor" id="vendor" />
                         <Label htmlFor="vendor">
-                          Vendor (£{SUBSCRIPTION_PRICES.vendor.monthly}/month)
+                          Vendor (£{SUBSCRIPTION_PRICES.vendor.monthly.base.toFixed(2)} + VAT = £{SUBSCRIPTION_PRICES.vendor.monthly.total.toFixed(2)}/month)
                         </Label>
                       </div>
                     </RadioGroup>
@@ -382,13 +398,13 @@ export default function AuthPage() {
                           <div className="flex items-center space-x-2">
                             <RadioGroupItem value="monthly" id="monthly" />
                             <Label htmlFor="monthly">
-                              Monthly (£{SUBSCRIPTION_PRICES[registerForm.watch("userType")]?.monthly}/month)
+                              Monthly (£{SUBSCRIPTION_PRICES[registerForm.watch("userType")]?.monthly.base.toFixed(2)} + VAT = £{SUBSCRIPTION_PRICES[registerForm.watch("userType")]?.monthly.total.toFixed(2)}/month)
                             </Label>
                           </div>
                           <div className="flex items-center space-x-2">
                             <RadioGroupItem value="annual" id="annual" />
                             <Label htmlFor="annual">
-                              Annual (£{SUBSCRIPTION_PRICES[registerForm.watch("userType")]?.annual}/year - Save 10%)
+                              Annual (£{SUBSCRIPTION_PRICES[registerForm.watch("userType")]?.annual.base.toFixed(2)} + VAT = £{SUBSCRIPTION_PRICES[registerForm.watch("userType")]?.annual.total.toFixed(2)}/year - Save 10%)
                             </Label>
                           </div>
                         </RadioGroup>
