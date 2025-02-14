@@ -16,6 +16,33 @@ import { Loader2 } from "lucide-react";
 import { ForgotPasswordForm } from "@/components/auth/ForgotPasswordForm";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+const PHONE_COUNTRY_CODES = {
+  GB: {
+    code: "44",
+    format: "+44 XXXX XXXXXX",
+    pattern: /^\+44\s\d{4}\s\d{6}$/
+  },
+  US: {
+    code: "1",
+    format: "+1 (XXX) XXX-XXXX",
+    pattern: /^\+1\s\(\d{3}\)\s\d{3}-\d{4}$/
+  }
+};
+
+const US_STATES = {
+  AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California",
+  CO: "Colorado", CT: "Connecticut", DE: "Delaware", FL: "Florida", GA: "Georgia",
+  HI: "Hawaii", ID: "Idaho", IL: "Illinois", IN: "Indiana", IA: "Iowa",
+  KS: "Kansas", KY: "Kentucky", LA: "Louisiana", ME: "Maine", MD: "Maryland",
+  MA: "Massachusetts", MI: "Michigan", MN: "Minnesota", MS: "Mississippi", MO: "Missouri",
+  MT: "Montana", NE: "Nebraska", NV: "Nevada", NH: "New Hampshire", NJ: "New Jersey",
+  NM: "New Mexico", NY: "New York", NC: "North Carolina", ND: "North Dakota", OH: "Ohio",
+  OK: "Oklahoma", OR: "Oregon", PA: "Pennsylvania", RI: "Rhode Island", SC: "South Carolina",
+  SD: "South Dakota", TN: "Tennessee", TX: "Texas", UT: "Utah", VT: "Vermont",
+  VA: "Virginia", WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming",
+  DC: "District of Columbia"
+};
+
 const COUNTRIES = {
   GB: "United Kingdom",
   US: "United States",
@@ -91,8 +118,15 @@ const registerSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
   userType: z.enum(["free", "business", "vendor"]),
   countryCode: z.enum(["GB", "US"]),
+  phoneNumber: z.string()
+    .min(1, "Phone number is required")
+    .refine((val) => {
+      const country = registerForm.getValues("countryCode");
+      return PHONE_COUNTRY_CODES[country].pattern.test(val);
+    }, {
+      message: "Please enter a valid phone number"
+    }),
   businessName: z.string().min(2, "Company name must be at least 2 characters").optional(),
-  // UK fields
   companyNumber: z.string()
     .regex(/^[A-Z0-9]{8}$/, "Please enter a valid 8-character Companies House number")
     .optional(),
@@ -102,7 +136,6 @@ const registerSchema = z.object({
   utrNumber: z.string()
     .regex(/^[0-9]{10}$/, "Please enter a valid 10-digit UTR number")
     .optional(),
-  // US fields
   einNumber: z.string()
     .regex(/^\d{2}-\d{7}$/, "Please enter a valid EIN (XX-XXXXXXX)")
     .optional(),
@@ -188,6 +221,7 @@ export default function AuthPage() {
       registeredState: "",
       stateRegistrationNumber: "",
       paymentFrequency: "monthly",
+      phoneNumber: ""
     },
   });
 
@@ -230,6 +264,19 @@ export default function AuthPage() {
       tax: prices.tax || prices.vat ? `${symbol}${(prices.tax || prices.vat).toFixed(2)}` : null,
       total: `${symbol}${prices.total.toFixed(2)}`,
     };
+  };
+
+  const formatPhoneNumber = (value: string, country: "GB" | "US") => {
+    const digits = value.replace(/\D/g, "");
+
+    if (country === "US") {
+      if (digits.length <= 3) return `+1 (${digits}`;
+      if (digits.length <= 6) return `+1 (${digits.slice(0, 3)}) ${digits.slice(3)}`;
+      return `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+    } else {
+      if (digits.length <= 4) return `+44 ${digits}`;
+      return `+44 ${digits.slice(0, 4)} ${digits.slice(4, 10)}`;
+    }
   };
 
   return (
@@ -363,6 +410,8 @@ export default function AuthPage() {
                     <Select
                       onValueChange={(value: "GB" | "US") => {
                         registerForm.setValue("countryCode", value);
+                        // Reset phone number when country changes
+                        registerForm.setValue("phoneNumber", "");
                         // Reset country-specific fields
                         registerForm.setValue("companyNumber", "");
                         registerForm.setValue("vatNumber", "");
@@ -384,6 +433,24 @@ export default function AuthPage() {
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="phoneNumber">Phone Number</Label>
+                    <Input
+                      id="phoneNumber"
+                      {...registerForm.register("phoneNumber")}
+                      placeholder={PHONE_COUNTRY_CODES[selectedCountry].format}
+                      onChange={(e) => {
+                        const formatted = formatPhoneNumber(e.target.value, selectedCountry);
+                        registerForm.setValue("phoneNumber", formatted);
+                      }}
+                    />
+                    {registerForm.formState.errors.phoneNumber && (
+                      <p className="text-sm text-destructive mt-1">
+                        {registerForm.formState.errors.phoneNumber.message}
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -510,10 +577,21 @@ export default function AuthPage() {
 
                           <div>
                             <Label htmlFor="registeredState">Registered State</Label>
-                            <Input
-                              id="registeredState"
-                              {...registerForm.register("registeredState")}
-                            />
+                            <Select
+                              onValueChange={(value) => registerForm.setValue("registeredState", value)}
+                              defaultValue={registerForm.getValues("registeredState")}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select your state" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Object.entries(US_STATES).map(([code, name]) => (
+                                  <SelectItem key={code} value={code}>
+                                    {name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                             {registerForm.formState.errors.registeredState && (
                               <p className="text-sm text-destructive mt-1">
                                 {registerForm.formState.errors.registeredState.message}
