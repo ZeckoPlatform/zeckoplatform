@@ -17,12 +17,27 @@ import { BUSINESS_CATEGORIES } from "../leads-page";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
 
+// Phone number formatting configuration
+const PHONE_COUNTRY_CODES = {
+  GB: {
+    code: "44",
+    format: "+44 XXXX XXXXXX",
+    pattern: /^\+44\s\d{4}\s\d{6}$/
+  },
+  US: {
+    code: "1",
+    format: "+1 (XXX) XXX-XXXX",
+    pattern: /^\+1\s\(\d{3}\)\s\d{3}-\d{4}$/
+  }
+};
+
 const businessProfileSchema = z.object({
   name: z.string().min(2, "Business name must be at least 2 characters"),
   description: z.string().min(10, "Description must be at least 10 characters"),
   category: z.string().min(1, "Please select a category"),
   subcategory: z.string().min(1, "Please select a subcategory"),
   location: z.string().min(2, "Location must be at least 2 characters"),
+  phoneNumber: z.string().min(10, "Phone number must be at least 10 digits"),
   budget: z.string(),
   industries: z.string(),
 });
@@ -41,7 +56,19 @@ export default function BusinessProfilePage() {
     return null;
   }
 
-  const { register, handleSubmit, formState: { errors }, setValue, getValues } = useForm<BusinessProfileFormData>({
+  const formatPhoneNumber = (value: string) => {
+    const digits = value.replace(/\D/g, "");
+    if (user?.countryCode === "US") {
+      if (digits.length <= 3) return `+1 (${digits}`;
+      if (digits.length <= 6) return `+1 (${digits.slice(0, 3)}) ${digits.slice(3)}`;
+      return `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+    } else {
+      if (digits.length <= 4) return `+44 ${digits}`;
+      return `+44 ${digits.slice(0, 4)} ${digits.slice(4, 10)}`;
+    }
+  };
+
+  const { register, handleSubmit, formState: { errors }, setValue, getValues, form } = useForm<BusinessProfileFormData>({
     resolver: zodResolver(businessProfileSchema),
     defaultValues: {
       name: user?.profile?.name || "",
@@ -49,6 +76,7 @@ export default function BusinessProfilePage() {
       category: user?.profile?.categories?.[0] || "",
       subcategory: user?.profile?.categories?.[1] || "",
       location: user?.profile?.location || "",
+      phoneNumber: user?.profile?.phoneNumber || "",
       budget: user?.profile?.matchPreferences?.budgetRange?.min?.toString() || "",
       industries: user?.profile?.matchPreferences?.industries?.join(", ") || "",
     },
@@ -56,17 +84,19 @@ export default function BusinessProfilePage() {
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: BusinessProfileFormData) => {
-      const response = await apiRequest("POST", "/api/users/profile", {
-        ...data,
-        categories: [data.category, data.subcategory],
-        industries: data.industries.split(",").map(i => i.trim()),
-        matchPreferences: {
-          budgetRange: {
-            min: parseInt(data.budget),
-            max: parseInt(data.budget) * 2,
-          },
+      const response = await apiRequest("PATCH", "/api/user/profile", {
+        profile: {
+          ...data,
+          categories: [data.category, data.subcategory],
           industries: data.industries.split(",").map(i => i.trim()),
-        },
+          matchPreferences: {
+            budgetRange: {
+              min: parseInt(data.budget),
+              max: parseInt(data.budget) * 2,
+            },
+            industries: data.industries.split(",").map(i => i.trim()),
+          },
+        }
       });
 
       if (!response.ok) {
@@ -95,7 +125,7 @@ export default function BusinessProfilePage() {
     <div className="container mx-auto py-8 space-y-8">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Business Profile</h1>
-        <Button variant="outline" onClick={() => setLocation("/settings")}>
+        <Button variant="outline" onClick={() => setLocation("/settings/business-profile")}>
           Back to Settings
         </Button>
       </div>
@@ -191,6 +221,22 @@ export default function BusinessProfilePage() {
               />
               {errors.location && (
                 <p className="text-sm text-destructive">{errors.location.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="phoneNumber">Phone Number</Label>
+              <Input
+                id="phoneNumber"
+                {...register("phoneNumber")}
+                placeholder={PHONE_COUNTRY_CODES[user?.countryCode || "GB"].format}
+                onChange={(e) => {
+                  const formatted = formatPhoneNumber(e.target.value);
+                  form.setValue("phoneNumber", formatted);
+                }}
+              />
+              {errors.phoneNumber && (
+                <p className="text-sm text-destructive">{errors.phoneNumber.message}</p>
               )}
             </div>
 
