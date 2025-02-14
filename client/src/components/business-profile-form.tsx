@@ -50,12 +50,14 @@ const businessProfileSchema = z.object({
   name: z.string().min(2, "Business name must be at least 2 characters"),
   description: z.string().min(10, "Description must be at least 10 characters"),
   categories: z.string().min(1, "Please enter at least one category"),
-  country: z.string().min(2, "Please select a country"),
+  country: z.enum(["GB", "US"], {
+    required_error: "Please select a country",
+  }),
   phoneNumber: z.string()
     .min(1, "Phone number is required")
     .refine((val) => {
       const countryCode = form.getValues("country");
-      return PHONE_COUNTRY_CODES[countryCode]?.pattern.test(val) || false; //added null check
+      return PHONE_COUNTRY_CODES[countryCode]?.pattern.test(val);
     }, {
       message: "Please enter a valid phone number"
     }),
@@ -124,6 +126,7 @@ export function BusinessProfileForm() {
       description: user?.profile?.description || "",
       categories: user?.profile?.categories?.join(", ") || "",
       country: user?.countryCode || "GB",
+      phoneNumber: user?.phoneNumber || "", 
       address: {
         street: user?.profile?.address?.street || "",
         city: user?.profile?.address?.city || "",
@@ -135,7 +138,6 @@ export function BusinessProfileForm() {
       einNumber: user?.einNumber || "",
       stateRegistrationNumber: user?.stateRegistrationNumber || "",
       registeredState: user?.registeredState || "",
-      phoneNumber: "" // Add default value for phoneNumber
     },
   });
 
@@ -195,7 +197,10 @@ export function BusinessProfileForm() {
           <div className="space-y-2">
             <Label htmlFor="country">Country</Label>
             <Select
-              onValueChange={(value) => form.setValue("country", value)}
+              onValueChange={(value: "GB" | "US") => {
+                form.setValue("country", value);
+                form.setValue("phoneNumber", "");
+              }}
               defaultValue={form.getValues("country")}
             >
               <SelectTrigger>
@@ -216,7 +221,7 @@ export function BusinessProfileForm() {
             <Input
               id="phoneNumber"
               {...form.register("phoneNumber")}
-              placeholder={PHONE_COUNTRY_CODES[selectedCountry]?.format || ""} // Handle potential undefined
+              placeholder={PHONE_COUNTRY_CODES[selectedCountry]?.format}
               onChange={(e) => {
                 const formatted = formatPhoneNumber(e.target.value, selectedCountry);
                 form.setValue("phoneNumber", formatted);
@@ -252,7 +257,6 @@ export function BusinessProfileForm() {
             )}
           </div>
 
-          {/* Country-specific registration fields */}
           {selectedCountry === 'GB' ? (
             <>
               <div className="space-y-2">
