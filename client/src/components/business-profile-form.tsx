@@ -17,7 +17,6 @@ import { Loader2 } from "lucide-react";
 const COUNTRIES = {
   GB: "United Kingdom",
   US: "United States",
-  // Add more countries as needed
 };
 
 const businessProfileSchema = z.object({
@@ -31,10 +30,44 @@ const businessProfileSchema = z.object({
     state: z.string().min(1, "State/Province is required"),
     postalCode: z.string().min(1, "Postal code is required"),
   }),
-  registrationNumber: z.string().min(1, "Business registration number is required"),
-  taxNumber: z.string().optional(),
-  budget: z.string(),
-  industries: z.string(),
+  // UK-specific fields
+  companyNumber: z.string().optional()
+    .refine(val => !val || /^[A-Z0-9]{8}$/.test(val), {
+      message: "Invalid Companies House number format"
+    }),
+  vatNumber: z.string().optional()
+    .refine(val => !val || /^GB[0-9]{9}$/.test(val), {
+      message: "Invalid UK VAT number format"
+    }),
+  // US-specific fields
+  einNumber: z.string().optional()
+    .refine(val => !val || /^\d{2}-\d{7}$/.test(val), {
+      message: "Invalid EIN format (XX-XXXXXXX)"
+    }),
+  stateRegistrationNumber: z.string().optional(),
+  registeredState: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.country === 'GB' && !data.companyNumber) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Companies House number is required for UK businesses",
+      path: ["companyNumber"]
+    });
+  }
+  if (data.country === 'US' && !data.einNumber) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "EIN is required for US businesses",
+      path: ["einNumber"]
+    });
+  }
+  if (data.country === 'US' && !data.registeredState) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "State registration is required for US businesses",
+      path: ["registeredState"]
+    });
+  }
 });
 
 type BusinessProfileFormData = z.infer<typeof businessProfileSchema>;
@@ -46,20 +79,21 @@ export function BusinessProfileForm() {
   const form = useForm<BusinessProfileFormData>({
     resolver: zodResolver(businessProfileSchema),
     defaultValues: {
-      name: user?.profile?.name || "",
+      name: user?.businessName || "",
       description: user?.profile?.description || "",
       categories: user?.profile?.categories?.join(", ") || "",
-      country: user?.profile?.country || "GB",
+      country: user?.countryCode || "GB",
       address: {
         street: user?.profile?.address?.street || "",
         city: user?.profile?.address?.city || "",
         state: user?.profile?.address?.state || "",
         postalCode: user?.profile?.address?.postalCode || "",
       },
-      registrationNumber: user?.businessDetails?.registrationNumber || "",
-      taxNumber: user?.businessDetails?.taxNumber || "",
-      budget: user?.profile?.matchPreferences?.budgetRange?.min?.toString() || "",
-      industries: user?.profile?.matchPreferences?.industries?.join(", ") || "",
+      companyNumber: user?.companyNumber || "",
+      vatNumber: user?.vatNumber || "",
+      einNumber: user?.einNumber || "",
+      stateRegistrationNumber: user?.stateRegistrationNumber || "",
+      registeredState: user?.registeredState || "",
     },
   });
 
@@ -68,24 +102,6 @@ export function BusinessProfileForm() {
       const response = await apiRequest("POST", "/api/users/profile", {
         ...data,
         categories: data.categories.split(",").map(c => c.trim()),
-        industries: data.industries.split(",").map(i => i.trim()),
-        address: {
-          ...data.address,
-          country: data.country,
-        },
-        businessDetails: {
-          registrationNumber: data.registrationNumber,
-          registrationType: data.country === "GB" ? "companiesHouse" : "ein",
-          taxNumber: data.taxNumber,
-          taxNumberType: data.country === "GB" ? "vat" : "ein",
-          country: data.country,
-        },
-        matchPreferences: {
-          budgetRange: {
-            min: parseInt(data.budget),
-            max: parseInt(data.budget) * 2,
-          },
-        },
       });
 
       if (!response.ok) {
@@ -95,7 +111,6 @@ export function BusinessProfileForm() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       toast({
         title: "Success",
         description: "Your business profile has been updated.",
@@ -110,16 +125,37 @@ export function BusinessProfileForm() {
     },
   });
 
+  const selectedCountry = form.watch("country");
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Business Profile</CardTitle>
         <CardDescription>
-          Complete your business profile to get matched with relevant leads.
+          Complete your business profile for {selectedCountry === 'GB' ? 'UK' : 'US'} registration
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={form.handleSubmit((data) => updateProfileMutation.mutate(data))} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="country">Country</Label>
+            <Select
+              onValueChange={(value) => form.setValue("country", value)}
+              defaultValue={form.getValues("country")}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select your country" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(COUNTRIES).map(([code, name]) => (
+                  <SelectItem key={code} value={code}>
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="name">Business Name</Label>
             <Input
@@ -143,24 +179,68 @@ export function BusinessProfileForm() {
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="country">Country</Label>
-            <Select
-              onValueChange={(value) => form.setValue("country", value)}
-              defaultValue={form.getValues("country")}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select your country" />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(COUNTRIES).map(([code, name]) => (
-                  <SelectItem key={code} value={code}>
-                    {name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Country-specific registration fields */}
+          {selectedCountry === 'GB' ? (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="companyNumber">Companies House Number</Label>
+                <Input
+                  id="companyNumber"
+                  {...form.register("companyNumber")}
+                />
+                {form.formState.errors.companyNumber && (
+                  <p className="text-sm text-destructive">{form.formState.errors.companyNumber.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="vatNumber">VAT Number (Optional)</Label>
+                <Input
+                  id="vatNumber"
+                  {...form.register("vatNumber")}
+                />
+                {form.formState.errors.vatNumber && (
+                  <p className="text-sm text-destructive">{form.formState.errors.vatNumber.message}</p>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="einNumber">EIN (Tax ID)</Label>
+                <Input
+                  id="einNumber"
+                  {...form.register("einNumber")}
+                  placeholder="XX-XXXXXXX"
+                />
+                {form.formState.errors.einNumber && (
+                  <p className="text-sm text-destructive">{form.formState.errors.einNumber.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="registeredState">Registered State</Label>
+                <Input
+                  id="registeredState"
+                  {...form.register("registeredState")}
+                />
+                {form.formState.errors.registeredState && (
+                  <p className="text-sm text-destructive">{form.formState.errors.registeredState.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="stateRegistrationNumber">State Registration Number</Label>
+                <Input
+                  id="stateRegistrationNumber"
+                  {...form.register("stateRegistrationNumber")}
+                />
+                {form.formState.errors.stateRegistrationNumber && (
+                  <p className="text-sm text-destructive">{form.formState.errors.stateRegistrationNumber.message}</p>
+                )}
+              </div>
+            </>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="address.street">Street Address</Label>
@@ -187,7 +267,7 @@ export function BusinessProfileForm() {
 
             <div className="space-y-2">
               <Label htmlFor="address.state">
-                {form.watch("country") === "GB" ? "County" : "State"}
+                {selectedCountry === 'GB' ? 'County' : 'State'}
               </Label>
               <Input
                 id="address.state"
@@ -201,7 +281,7 @@ export function BusinessProfileForm() {
 
           <div className="space-y-2">
             <Label htmlFor="address.postalCode">
-              {form.watch("country") === "GB" ? "Postcode" : "ZIP Code"}
+              {selectedCountry === 'GB' ? 'Postcode' : 'ZIP Code'}
             </Label>
             <Input
               id="address.postalCode"
@@ -209,32 +289,6 @@ export function BusinessProfileForm() {
             />
             {form.formState.errors.address?.postalCode && (
               <p className="text-sm text-destructive">{form.formState.errors.address.postalCode.message}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="registrationNumber">
-              {form.watch("country") === "GB" ? "Companies House Number" : "EIN"}
-            </Label>
-            <Input
-              id="registrationNumber"
-              {...form.register("registrationNumber")}
-            />
-            {form.formState.errors.registrationNumber && (
-              <p className="text-sm text-destructive">{form.formState.errors.registrationNumber.message}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="taxNumber">
-              {form.watch("country") === "GB" ? "VAT Number" : "Tax ID (Optional)"}
-            </Label>
-            <Input
-              id="taxNumber"
-              {...form.register("taxNumber")}
-            />
-            {form.formState.errors.taxNumber && (
-              <p className="text-sm text-destructive">{form.formState.errors.taxNumber.message}</p>
             )}
           </div>
 

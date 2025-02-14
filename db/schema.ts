@@ -24,6 +24,10 @@ export const users = pgTable("users", {
   companyNumber: text("company_number").unique(),
   vatNumber: text("vat_number").unique(),
   utrNumber: text("utr_number").unique(),
+  einNumber: text("ein_number").unique(),
+  stateRegistrationNumber: text("state_registration_number"),
+  registeredState: text("registered_state"),
+  countryCode: text("country_code").default("GB"),
   verificationStatus: text("verification_status", {
     enum: ["pending", "verified", "rejected"]
   }).default("pending"),
@@ -43,6 +47,13 @@ export const users = pgTable("users", {
     description?: string;
     categories?: string[];
     location?: string;
+    address?: {
+      street: string;
+      city: string;
+      state: string;
+      postalCode: string;
+      country: string;
+    };
     matchPreferences?: {
       preferredCategories?: string[];
       locationPreference?: string[];
