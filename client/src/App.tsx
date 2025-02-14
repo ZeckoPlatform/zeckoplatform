@@ -31,7 +31,7 @@ function Router() {
     <div className="min-h-screen bg-background">
       <Switch>
         {/* Public Routes */}
-        <Route path="/" component={AuthPage} />
+        <Route path="/" component={() => <ProtectedRoute component={HomePage} />} />
         <Route path="/auth" component={AuthPage} />
         <Route path="/auth/reset-password/:token" component={ResetPasswordPage} />
 
