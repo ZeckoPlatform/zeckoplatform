@@ -11,6 +11,19 @@ export default function HomePage() {
     ["business", "vendor"].includes(user.userType) && 
     !user.subscriptionActive;
 
+  const getStartedHref = () => {
+    if (!user) return "/auth";
+    switch (user.userType) {
+      case "vendor":
+        return "/vendor";
+      case "business":
+      case "free":
+        return "/leads";
+      default:
+        return "/";
+    }
+  };
+
   return (
     <div className="min-h-screen">
       {showSubscriptionAlert && (
@@ -48,7 +61,7 @@ export default function HomePage() {
             Find leads, connect with businesses, or sell your products - all in one place.
           </p>
           <div className="mt-10 flex gap-4">
-            <Link href="/auth">
+            <Link href={getStartedHref()}>
               <Button size="lg">Get Started</Button>
             </Link>
             <Link href="/marketplace">
