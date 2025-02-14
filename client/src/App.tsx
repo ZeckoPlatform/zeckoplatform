@@ -46,8 +46,8 @@ function Router() {
         <Route path="/reviews" component={() => <ProtectedRoute component={ReviewsDashboard} />} />
         <Route path="/notifications" component={() => <ProtectedRoute component={NotificationsPage} />} />
 
-        {/* Admin Routes - Single parent route */}
-        <Route path="/admin/:page*">
+        {/* Admin Routes */}
+        <Route path="/admin">
           {() => <ProtectedRoute component={AdminManagement} adminRequired />}
         </Route>
 

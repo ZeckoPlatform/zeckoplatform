@@ -1,11 +1,15 @@
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 
+type ProtectedRouteProps = {
+  component: () => React.JSX.Element;
+  adminRequired?: boolean;
+};
+
 export function ProtectedRoute({
   component: Component,
-}: {
-  component: () => React.JSX.Element;
-}) {
+  adminRequired = false,
+}: ProtectedRouteProps) {
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
@@ -18,6 +22,11 @@ export function ProtectedRoute({
 
   if (!user) {
     window.location.href = "/auth";
+    return null;
+  }
+
+  if (adminRequired && !user.superAdmin) {
+    window.location.href = "/";
     return null;
   }
 
