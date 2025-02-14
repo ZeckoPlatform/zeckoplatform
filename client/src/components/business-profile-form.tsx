@@ -19,6 +19,19 @@ const COUNTRIES = {
   US: "United States",
 };
 
+const PHONE_COUNTRY_CODES = {
+  GB: {
+    code: "44",
+    format: "+44 XXXX XXXXXX",
+    pattern: /^\+44\s\d{4}\s\d{6}$/
+  },
+  US: {
+    code: "1",
+    format: "+1 (XXX) XXX-XXXX",
+    pattern: /^\+1\s\(\d{3}\)\s\d{3}-\d{4}$/
+  }
+};
+
 const US_STATES = {
   AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California",
   CO: "Colorado", CT: "Connecticut", DE: "Delaware", FL: "Florida", GA: "Georgia",
@@ -33,19 +46,6 @@ const US_STATES = {
   DC: "District of Columbia"
 };
 
-const PHONE_COUNTRY_CODES = {
-  GB: {
-    code: "44",
-    format: "+44 XXXX XXXXXX",
-    pattern: /^\+44\s\d{4}\s\d{6}$/
-  },
-  US: {
-    code: "1",
-    format: "+1 (XXX) XXX-XXXX",
-    pattern: /^\+1\s\(\d{3}\)\s\d{3}-\d{4}$/
-  }
-};
-
 const businessProfileSchema = z.object({
   name: z.string().min(2, "Business name must be at least 2 characters"),
   description: z.string().min(10, "Description must be at least 10 characters"),
@@ -53,63 +53,69 @@ const businessProfileSchema = z.object({
   country: z.enum(["GB", "US"], {
     required_error: "Please select a country",
   }),
-  phoneNumber: z.string()
-    .min(1, "Phone number is required")
-    .refine((val) => {
-      const countryCode = form.getValues("country");
-      return PHONE_COUNTRY_CODES[countryCode]?.pattern.test(val);
-    }, {
-      message: "Please enter a valid phone number"
-    }),
+  phoneNumber: z.string().min(1, "Phone number is required"),
   address: z.object({
     street: z.string().min(1, "Street address is required"),
     city: z.string().min(1, "City is required"),
     state: z.string().min(1, "State/Province is required"),
-    postalCode: z.string()
-      .refine((val) => {
-        if (form.getValues("country") === 'US') {
-          return /^\d{5}(-\d{4})?$/.test(val);
-        }
-        return true;
-      }, {
-        message: "Invalid ZIP code format (XXXXX or XXXXX-XXXX)"
-      }),
+    postalCode: z.string().min(1, "Postal code is required"),
   }),
-  companyNumber: z.string().optional()
-    .refine(val => !val || /^[A-Z0-9]{8}$/.test(val), {
-      message: "Invalid Companies House number format"
-    }),
-  vatNumber: z.string().optional()
-    .refine(val => !val || /^GB[0-9]{9}$/.test(val), {
-      message: "Invalid UK VAT number format"
-    }),
-  einNumber: z.string().optional()
-    .refine(val => !val || /^\d{2}-\d{7}$/.test(val), {
-      message: "Invalid EIN format (XX-XXXXXXX)"
-    }),
-  stateRegistrationNumber: z.string().optional(),
+  companyNumber: z.string().optional(),
+  vatNumber: z.string().optional(),
+  einNumber: z.string().optional(),
   registeredState: z.string().optional(),
+  stateRegistrationNumber: z.string().optional(),
 }).superRefine((data, ctx) => {
-  if (data.country === 'GB' && !data.companyNumber) {
+  // Phone number validation
+  const phonePattern = PHONE_COUNTRY_CODES[data.country].pattern;
+  if (!phonePattern.test(data.phoneNumber)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: "Companies House number is required for UK businesses",
-      path: ["companyNumber"]
+      message: "Please enter a valid phone number",
+      path: ["phoneNumber"]
     });
   }
-  if (data.country === 'US' && !data.einNumber) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "EIN is required for US businesses",
-      path: ["einNumber"]
-    });
+
+  // Country specific validations
+  if (data.country === 'GB') {
+    if (!data.companyNumber || !/^[A-Z0-9]{8}$/.test(data.companyNumber)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Please enter a valid 8-character Companies House number",
+        path: ["companyNumber"]
+      });
+    }
+    if (data.vatNumber && !/^GB[0-9]{9}$/.test(data.vatNumber)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Please enter a valid UK VAT number",
+        path: ["vatNumber"]
+      });
+    }
   }
-  if (data.country === 'US' && !data.registeredState) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "State registration is required for US businesses",
-      path: ["registeredState"]
-    });
+
+  if (data.country === 'US') {
+    if (!data.einNumber || !/^\d{2}-\d{7}$/.test(data.einNumber)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Please enter a valid EIN (XX-XXXXXXX)",
+        path: ["einNumber"]
+      });
+    }
+    if (!data.registeredState) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Please select a registered state",
+        path: ["registeredState"]
+      });
+    }
+    if (data.address.postalCode && !/^\d{5}(-\d{4})?$/.test(data.address.postalCode)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Invalid ZIP code format (XXXXX or XXXXX-XXXX)",
+        path: ["address", "postalCode"]
+      });
+    }
   }
 });
 
@@ -126,7 +132,7 @@ export function BusinessProfileForm() {
       description: user?.profile?.description || "",
       categories: user?.profile?.categories?.join(", ") || "",
       country: user?.countryCode || "GB",
-      phoneNumber: user?.phoneNumber || "", 
+      phoneNumber: user?.phoneNumber || "",
       address: {
         street: user?.profile?.address?.street || "",
         city: user?.profile?.address?.city || "",
@@ -221,7 +227,7 @@ export function BusinessProfileForm() {
             <Input
               id="phoneNumber"
               {...form.register("phoneNumber")}
-              placeholder={PHONE_COUNTRY_CODES[selectedCountry]?.format}
+              placeholder={PHONE_COUNTRY_CODES[selectedCountry].format}
               onChange={(e) => {
                 const formatted = formatPhoneNumber(e.target.value, selectedCountry);
                 form.setValue("phoneNumber", formatted);
@@ -264,6 +270,7 @@ export function BusinessProfileForm() {
                 <Input
                   id="companyNumber"
                   {...form.register("companyNumber")}
+                  placeholder="12345678"
                 />
                 {form.formState.errors.companyNumber && (
                   <p className="text-sm text-destructive">{form.formState.errors.companyNumber.message}</p>
@@ -275,6 +282,7 @@ export function BusinessProfileForm() {
                 <Input
                   id="vatNumber"
                   {...form.register("vatNumber")}
+                  placeholder="GB123456789"
                 />
                 {form.formState.errors.vatNumber && (
                   <p className="text-sm text-destructive">{form.formState.errors.vatNumber.message}</p>
@@ -297,17 +305,28 @@ export function BusinessProfileForm() {
 
               <div className="space-y-2">
                 <Label htmlFor="registeredState">Registered State</Label>
-                <Input
-                  id="registeredState"
-                  {...form.register("registeredState")}
-                />
+                <Select
+                  onValueChange={(value) => form.setValue("registeredState", value)}
+                  defaultValue={form.getValues("registeredState")}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select your state" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(US_STATES).map(([code, name]) => (
+                      <SelectItem key={code} value={code}>
+                        {name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {form.formState.errors.registeredState && (
                   <p className="text-sm text-destructive">{form.formState.errors.registeredState.message}</p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="stateRegistrationNumber">State Registration Number</Label>
+                <Label htmlFor="stateRegistrationNumber">State Registration Number (Optional)</Label>
                 <Input
                   id="stateRegistrationNumber"
                   {...form.register("stateRegistrationNumber")}
