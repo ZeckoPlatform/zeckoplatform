@@ -62,49 +62,60 @@ router.post("/admin/users/create", authenticateToken, checkSuperAdminAccess, asy
     // Hash password
     const hashedPassword = await hashPassword(password);
 
-    // Create new user
-    const newUser = await db.insert(users).values({
-      email,
-      username,
-      password: hashedPassword,
-      userType,
-      businessType: businessType || null,
-      businessName: businessName || null,
-      companyNumber: companyNumber || null,
-      utrNumber: utrNumber || null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      superAdmin: false,
-      profile: null,
-      verificationCode: null,
-      resetPasswordToken: null,
-      resetPasswordExpiry: null,
-    }).returning();
-
-    console.log('User created:', newUser[0]);
-
-    // If creating a business or vendor account, create initial subscription
-    if (userType === "business" || userType === "vendor") {
-      const subscription = await db.insert(subscriptions).values({
-        userId: newUser[0].id,
-        status: "active",
-        type: userType,
-        price: userType === "business" ? 2999 : 4999, // Price in pence
-        startDate: new Date(),
-        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-        stripeSubscriptionId: null,
-        stripeCustomerId: null,
-        stripePriceId: null,
-        stripePaymentMethodId: null,
+    try {
+      // Create new user
+      const [newUser] = await db.insert(users).values({
+        email,
+        username,
+        password: hashedPassword,
+        userType,
+        businessType: businessType || null,
+        businessName: businessName || null,
+        companyNumber: companyNumber || null,
+        utrNumber: utrNumber || null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        superAdmin: false,
+        profile: null,
+        verificationCode: null,
+        resetPasswordToken: null,
+        resetPasswordExpiry: null,
       }).returning();
 
-      console.log('Subscription created:', subscription[0]);
-    }
+      console.log('User created:', newUser);
 
-    return res.status(201).json(newUser[0]);
+      // If creating a business or vendor account, create initial subscription
+      if ((userType === "business" || userType === "vendor") && newUser?.id) {
+        try {
+          const subscription = await db.insert(subscriptions).values({
+            userId: newUser.id, // Now we have the user ID
+            status: "active",
+            type: userType,
+            price: userType === "business" ? 2999 : 4999, // Price in pence
+            startDate: new Date(),
+            endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+            stripeSubscriptionId: null,
+            stripeCustomerId: null,
+            stripePriceId: null,
+            stripePaymentMethodId: null,
+          }).returning();
+
+          console.log('Subscription created:', subscription[0]);
+        } catch (subscriptionError) {
+          console.error("Error creating subscription:", subscriptionError);
+          // Don't fail the whole operation if subscription creation fails
+          // Just log it and continue
+        }
+      }
+
+      return res.status(201).json(newUser);
+    } catch (error) {
+      console.error("Error creating user:", error);
+      return res.status(500).json({ error: "Failed to create user" });
+    }
   } catch (error) {
-    console.error("Error creating user:", error);
-    return res.status(500).json({ error: "Failed to create user" });
+    console.error("Error in user creation route:", error);
+    return res.status(500).json({ error: "Failed to process request" });
   }
 });
 
