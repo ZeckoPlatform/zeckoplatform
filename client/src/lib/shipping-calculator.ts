@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 interface PackageDimensions {
   length: number;
   width: number;
@@ -12,9 +14,11 @@ interface ShippingZone {
 
 interface ShippingProvider {
   name: string;
+  country: "UK" | "US";
   speeds: {
     name: string;
     multiplier: number;
+    estimatedDays: string;
   }[];
   baseRates: ShippingRate[];
 }
@@ -22,10 +26,10 @@ interface ShippingProvider {
 interface ShippingRate {
   maxWeight: number; // in grams
   maxSize: number; // in cm (length + width + height)
-  price: number; // in GBP
+  price: number; // in local currency (GBP or USD)
 }
 
-// UK postcodes grouped by zones (simplified version)
+// UK postcodes grouped by zones
 const UK_SHIPPING_ZONES: ShippingZone[] = [
   {
     name: "London",
@@ -49,13 +53,39 @@ const UK_SHIPPING_ZONES: ShippingZone[] = [
   },
 ];
 
+// US ZIP codes grouped by zones (simplified version)
+const US_SHIPPING_ZONES = [
+  {
+    name: "Zone 1 (Northeast)",
+    postcodes: ["0", "1"],
+    priceMultiplier: 1.0,
+  },
+  {
+    name: "Zone 2 (Southeast)",
+    postcodes: ["2", "3"],
+    priceMultiplier: 1.1,
+  },
+  {
+    name: "Zone 3 (Midwest)",
+    postcodes: ["4", "5", "6"],
+    priceMultiplier: 1.2,
+  },
+  {
+    name: "Zone 4 (West)",
+    postcodes: ["7", "8", "9"],
+    priceMultiplier: 1.3,
+  },
+];
+
 const SHIPPING_PROVIDERS: ShippingProvider[] = [
+  // UK Providers
   {
     name: "Royal Mail",
+    country: "UK",
     speeds: [
-      { name: "Standard", multiplier: 1.0 },
-      { name: "First Class", multiplier: 1.5 },
-      { name: "Special Delivery", multiplier: 2.0 },
+      { name: "Standard", multiplier: 1.0, estimatedDays: "3-5 business days" },
+      { name: "First Class", multiplier: 1.5, estimatedDays: "1-2 business days" },
+      { name: "Special Delivery", multiplier: 2.0, estimatedDays: "Next business day" },
     ],
     baseRates: [
       { maxWeight: 1000, maxSize: 50, price: 3.95 },
@@ -66,10 +96,11 @@ const SHIPPING_PROVIDERS: ShippingProvider[] = [
   },
   {
     name: "DPD",
+    country: "UK",
     speeds: [
-      { name: "Standard", multiplier: 1.2 },
-      { name: "Express", multiplier: 1.8 },
-      { name: "Next Day", multiplier: 2.2 },
+      { name: "Standard", multiplier: 1.2, estimatedDays: "2-3 business days" },
+      { name: "Express", multiplier: 1.8, estimatedDays: "1-2 business days" },
+      { name: "Next Day", multiplier: 2.2, estimatedDays: "Next business day" },
     ],
     baseRates: [
       { maxWeight: 1000, maxSize: 50, price: 4.95 },
@@ -78,14 +109,86 @@ const SHIPPING_PROVIDERS: ShippingProvider[] = [
       { maxWeight: 10000, maxSize: 200, price: 14.95 },
     ],
   },
+  {
+    name: "Evri",
+    country: "UK",
+    speeds: [
+      { name: "Standard", multiplier: 1.0, estimatedDays: "3-5 business days" },
+      { name: "Next Day", multiplier: 1.8, estimatedDays: "Next business day" },
+    ],
+    baseRates: [
+      { maxWeight: 1000, maxSize: 50, price: 3.49 },
+      { maxWeight: 2000, maxSize: 100, price: 4.99 },
+      { maxWeight: 5000, maxSize: 150, price: 7.99 },
+      { maxWeight: 10000, maxSize: 200, price: 11.99 },
+    ],
+  },
+  // US Providers
+  {
+    name: "USPS",
+    country: "US",
+    speeds: [
+      { name: "First-Class Package", multiplier: 1.0, estimatedDays: "2-5 business days" },
+      { name: "Priority Mail", multiplier: 1.5, estimatedDays: "1-3 business days" },
+      { name: "Priority Mail Express", multiplier: 2.5, estimatedDays: "1-2 business days" },
+    ],
+    baseRates: [
+      { maxWeight: 1000, maxSize: 50, price: 4.50 },
+      { maxWeight: 2000, maxSize: 100, price: 6.50 },
+      { maxWeight: 5000, maxSize: 150, price: 9.50 },
+      { maxWeight: 10000, maxSize: 200, price: 13.50 },
+    ],
+  },
+  {
+    name: "UPS",
+    country: "US",
+    speeds: [
+      { name: "Ground", multiplier: 1.2, estimatedDays: "1-5 business days" },
+      { name: "3 Day Select", multiplier: 1.8, estimatedDays: "3 business days" },
+      { name: "2nd Day Air", multiplier: 2.2, estimatedDays: "2 business days" },
+      { name: "Next Day Air", multiplier: 3.0, estimatedDays: "Next business day" },
+    ],
+    baseRates: [
+      { maxWeight: 1000, maxSize: 50, price: 5.95 },
+      { maxWeight: 2000, maxSize: 100, price: 7.95 },
+      { maxWeight: 5000, maxSize: 150, price: 10.95 },
+      { maxWeight: 10000, maxSize: 200, price: 15.95 },
+    ],
+  },
+  {
+    name: "FedEx",
+    country: "US",
+    speeds: [
+      { name: "Ground", multiplier: 1.2, estimatedDays: "1-5 business days" },
+      { name: "Express Saver", multiplier: 1.8, estimatedDays: "3 business days" },
+      { name: "2Day", multiplier: 2.2, estimatedDays: "2 business days" },
+      { name: "Priority Overnight", multiplier: 3.0, estimatedDays: "Next business day" },
+    ],
+    baseRates: [
+      { maxWeight: 1000, maxSize: 50, price: 5.95 },
+      { maxWeight: 2000, maxSize: 100, price: 7.95 },
+      { maxWeight: 5000, maxSize: 150, price: 10.95 },
+      { maxWeight: 10000, maxSize: 200, price: 15.95 },
+    ],
+  },
 ];
 
-function getZoneMultiplier(postcode: string): number {
+function getZoneMultiplier(postcode: string, country: "UK" | "US"): number {
+  const zones = country === "UK" ? UK_SHIPPING_ZONES : US_SHIPPING_ZONES;
   const prefix = postcode.toUpperCase().replace(/[0-9]/g, '');
-  const zone = UK_SHIPPING_ZONES.find(zone => 
+
+  if (country === "US") {
+    const firstDigit = postcode.charAt(0);
+    const zone = zones.find(zone => 
+      zone.postcodes.includes(firstDigit)
+    );
+    return zone?.priceMultiplier || 1.2;
+  }
+
+  const zone = zones.find(zone => 
     zone.postcodes.some(code => prefix.startsWith(code))
   );
-  return zone?.priceMultiplier || 1.2; // Default multiplier for other areas
+  return zone?.priceMultiplier || 1.2;
 }
 
 export interface ShippingOption {
@@ -93,6 +196,19 @@ export interface ShippingOption {
   speed: string;
   price: number;
   estimatedDays: string;
+  country: "UK" | "US";
+}
+
+export function isUKPostcode(postcode: string): boolean {
+  // UK postcode regex pattern
+  const ukPattern = /^[A-Z]{1,2}[0-9][A-Z0-9]? ?[0-9][A-Z]{2}$/i;
+  return ukPattern.test(postcode);
+}
+
+export function isUSZipCode(zipCode: string): boolean {
+  // US ZIP code regex pattern (including ZIP+4)
+  const usPattern = /^\d{5}(-\d{4})?$/;
+  return usPattern.test(zipCode);
 }
 
 export function calculateShippingOptions(
@@ -106,24 +222,36 @@ export function calculateShippingOptions(
       provider: "Vendor Rate",
       speed: "Standard",
       price: vendorShippingOverride,
-      estimatedDays: "3-5 business days"
+      estimatedDays: "3-5 business days",
+      country: "UK", // Default to UK for vendor rates
     }];
   }
 
+  // Determine if it's a UK or US delivery based on the postcode format
+  const isUK = isUKPostcode(postcode);
+  const isUS = isUSZipCode(postcode);
+
+  if (!isUK && !isUS) {
+    throw new Error("Invalid postcode/ZIP code format");
+  }
+
+  const country = isUK ? "UK" : "US";
   const totalSize = dimensions.reduce((acc, dim) => {
     return acc + dim.length + dim.width + dim.height;
   }, 0);
 
   console.log(`Calculating shipping for:
+    Country: ${country}
     Total Weight: ${totalWeight}g
     Total Size: ${totalSize}cm
     Delivery Postcode: ${postcode}`);
 
-  const zoneMultiplier = getZoneMultiplier(postcode);
+  const zoneMultiplier = getZoneMultiplier(postcode, country);
+  const availableProviders = SHIPPING_PROVIDERS.filter(p => p.country === country);
 
   const options: ShippingOption[] = [];
 
-  SHIPPING_PROVIDERS.forEach(provider => {
+  availableProviders.forEach(provider => {
     const baseRate = provider.baseRates.find(
       rate => totalWeight <= rate.maxWeight && totalSize <= rate.maxSize
     ) || provider.baseRates[provider.baseRates.length - 1];
@@ -135,8 +263,8 @@ export function calculateShippingOptions(
         provider: provider.name,
         speed: speed.name,
         price: Number(finalPrice.toFixed(2)),
-        estimatedDays: speed.name === "Standard" ? "3-5 business days" :
-                      speed.name.includes("Next") ? "Next business day" : "1-2 business days"
+        estimatedDays: speed.estimatedDays,
+        country,
       });
     });
   });
