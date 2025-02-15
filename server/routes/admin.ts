@@ -38,15 +38,6 @@ router.post("/admin/users/create", authenticateToken, checkSuperAdminAccess, asy
       utrNumber
     } = req.body;
 
-    console.log('Creating user with data:', {
-      email,
-      userType,
-      businessType,
-      businessName,
-      companyNumber,
-      utrNumber
-    });
-
     // Check if user with email already exists
     const existingUser = await db.query.users.findFirst({
       where: eq(users.email, email),
@@ -88,16 +79,13 @@ router.post("/admin/users/create", authenticateToken, checkSuperAdminAccess, asy
       if ((userType === "business" || userType === "vendor") && newUser?.id) {
         try {
           const subscription = await db.insert(subscriptions).values({
-            userId: newUser.id, // Now we have the user ID
+            user_id: newUser.id, // Fixed: Changed userId to user_id to match schema
             status: "active",
             type: userType,
             price: userType === "business" ? 2999 : 4999, // Price in pence
-            startDate: new Date(),
-            endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-            stripeSubscriptionId: null,
-            stripeCustomerId: null,
-            stripePriceId: null,
-            stripePaymentMethodId: null,
+            start_date: new Date(),
+            end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+            auto_renew: false
           }).returning();
 
           console.log('Subscription created:', subscription[0]);
