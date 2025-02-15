@@ -28,31 +28,81 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, Eye, MessageSquare } from "lucide-react";
+import { Loader2, Eye, MessageSquare, Printer, Truck } from "lucide-react";
 import { format } from "date-fns";
 
-const ORDER_STATUSES = {
-  pending: "bg-yellow-500",
-  processing: "bg-blue-500",
-  shipped: "bg-purple-500",
-  delivered: "bg-green-500",
-  cancelled: "bg-red-500",
-  refunded: "bg-gray-500",
+interface OrderStatus {
+  value: string;
+  label: string;
+  color: string;
+}
+
+const ORDER_STATUSES: OrderStatus[] = [
+  { value: "pending", label: "Pending", color: "bg-yellow-500" },
+  { value: "processing", label: "Processing", color: "bg-blue-500" },
+  { value: "shipped", label: "Shipped", color: "bg-purple-500" },
+  { value: "delivered", label: "Delivered", color: "bg-green-500" },
+  { value: "cancelled", label: "Cancelled", color: "bg-red-500" },
+  { value: "refunded", label: "Refunded", color: "bg-gray-500" },
+];
+
+type ShippingLabel = {
+  id: string;
+  trackingNumber: string;
+  carrier: string;
+  url: string;
 };
+
+interface Order {
+  id: number;
+  createdAt: string;
+  status: string;
+  totalAmount: number;
+  items: Array<{
+    id: number;
+    product: {
+      name: string;
+      sku: string;
+    };
+    quantity: number;
+    pricePerUnit: number;
+    totalPrice: number;
+  }>;
+  shippingAddress: {
+    fullName: string;
+    street: string;
+    city: string;
+    state: string;
+    postalCode: string;
+    country: string;
+    phone: string;
+  };
+  billingAddress: {
+    companyName?: string;
+    vatNumber?: string;
+    street: string;
+    city: string;
+    state: string;
+    postalCode: string;
+    country: string;
+  };
+  specialInstructions?: string;
+  shippingLabel?: ShippingLabel;
+}
 
 export default function OrderManagement() {
   const { toast } = useToast();
-  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isMessageOpen, setIsMessageOpen] = useState(false);
   const [message, setMessage] = useState("");
 
-  const { data: orders, isLoading } = useQuery({
+  const { data: orders, isLoading } = useQuery<Order[]>({
     queryKey: ["/api/vendor/orders"],
   });
 
   const updateOrderStatusMutation = useMutation({
-    mutationFn: async ({ orderId, status }) => {
+    mutationFn: async ({ orderId, status }: { orderId: number; status: string }) => {
       const response = await apiRequest("PATCH", `/api/vendor/orders/${orderId}/status`, {
         status,
       });
@@ -62,7 +112,7 @@ export default function OrderManagement() {
       queryClient.invalidateQueries({ queryKey: ["/api/vendor/orders"] });
       toast({ title: "Success", description: "Order status updated successfully" });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
         description: error.message,
@@ -72,7 +122,7 @@ export default function OrderManagement() {
   });
 
   const sendMessageMutation = useMutation({
-    mutationFn: async ({ orderId, message }) => {
+    mutationFn: async ({ orderId, message }: { orderId: number; message: string }) => {
       const response = await apiRequest("POST", `/api/vendor/orders/${orderId}/messages`, {
         message,
       });
@@ -83,7 +133,7 @@ export default function OrderManagement() {
       setIsMessageOpen(false);
       toast({ title: "Success", description: "Message sent successfully" });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
         description: error.message,
@@ -92,13 +142,61 @@ export default function OrderManagement() {
     },
   });
 
-  const handleStatusChange = (orderId, status) => {
+  const generateShippingLabelMutation = useMutation({
+    mutationFn: async (orderId: number) => {
+      const response = await apiRequest("POST", `/api/vendor/orders/${orderId}/shipping-label`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendor/orders"] });
+      toast({ 
+        title: "Success", 
+        description: "Shipping label generated successfully. Tracking number: " + data.trackingNumber 
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const generateInvoiceMutation = useMutation({
+    mutationFn: async (orderId: number) => {
+      const response = await apiRequest("POST", `/api/vendor/orders/${orderId}/invoice`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      // Open invoice PDF in new window
+      window.open(data.invoiceUrl, '_blank');
+      toast({ title: "Success", description: "Invoice generated successfully" });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleStatusChange = (orderId: number, status: string) => {
     updateOrderStatusMutation.mutate({ orderId, status });
   };
 
-  const handleSendMessage = (orderId) => {
+  const handleSendMessage = (orderId: number) => {
     if (!message.trim()) return;
     sendMessageMutation.mutate({ orderId, message });
+  };
+
+  const handleGenerateShippingLabel = (orderId: number) => {
+    generateShippingLabelMutation.mutate(orderId);
+  };
+
+  const handleGenerateInvoice = (orderId: number) => {
+    generateInvoiceMutation.mutate(orderId);
   };
 
   if (isLoading) {
@@ -121,6 +219,7 @@ export default function OrderManagement() {
                 <TableHead>Customer</TableHead>
                 <TableHead>Total</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Shipping</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -144,21 +243,45 @@ export default function OrderManagement() {
                     >
                       <SelectTrigger className="w-[130px]">
                         <SelectValue>
-                          <Badge className={ORDER_STATUSES[order.status]}>
+                          <Badge 
+                            className={ORDER_STATUSES.find(s => s.value === order.status)?.color}
+                          >
                             {order.status}
                           </Badge>
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        {Object.keys(ORDER_STATUSES).map((status) => (
-                          <SelectItem key={status} value={status}>
-                            <Badge className={ORDER_STATUSES[status]}>
-                              {status}
+                        {ORDER_STATUSES.map((status) => (
+                          <SelectItem key={status.value} value={status.value}>
+                            <Badge className={status.color}>
+                              {status.label}
                             </Badge>
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                  </TableCell>
+                  <TableCell>
+                    {order.shippingLabel ? (
+                      <a
+                        href={order.shippingLabel.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        {order.shippingLabel.trackingNumber}
+                      </a>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleGenerateShippingLabel(order.id)}
+                        disabled={generateShippingLabelMutation.isPending}
+                      >
+                        <Truck className="h-4 w-4 mr-2" />
+                        Generate Label
+                      </Button>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
@@ -213,6 +336,7 @@ export default function OrderManagement() {
                               <TableHeader>
                                 <TableRow>
                                   <TableHead>Product</TableHead>
+                                  <TableHead>SKU</TableHead>
                                   <TableHead>Quantity</TableHead>
                                   <TableHead>Price</TableHead>
                                   <TableHead>Total</TableHead>
@@ -222,6 +346,7 @@ export default function OrderManagement() {
                                 {order.items.map((item) => (
                                   <TableRow key={item.id}>
                                     <TableCell>{item.product.name}</TableCell>
+                                    <TableCell>{item.product.sku}</TableCell>
                                     <TableCell>{item.quantity}</TableCell>
                                     <TableCell>
                                       £{(item.pricePerUnit / 100).toFixed(2)}
@@ -240,6 +365,25 @@ export default function OrderManagement() {
                               <p>{order.specialInstructions}</p>
                             </div>
                           )}
+                          <div className="mt-6 flex justify-end space-x-4">
+                            <Button
+                              variant="outline"
+                              onClick={() => handleGenerateInvoice(order.id)}
+                              disabled={generateInvoiceMutation.isPending}
+                            >
+                              <Printer className="h-4 w-4 mr-2" />
+                              Generate Invoice
+                            </Button>
+                            {!order.shippingLabel && (
+                              <Button
+                                onClick={() => handleGenerateShippingLabel(order.id)}
+                                disabled={generateShippingLabelMutation.isPending}
+                              >
+                                <Truck className="h-4 w-4 mr-2" />
+                                Generate Shipping Label
+                              </Button>
+                            )}
+                          </div>
                         </DialogContent>
                       </Dialog>
 
@@ -269,9 +413,16 @@ export default function OrderManagement() {
                             />
                             <Button
                               onClick={() => handleSendMessage(order.id)}
-                              disabled={!message.trim()}
+                              disabled={!message.trim() || sendMessageMutation.isPending}
                             >
-                              Send Message
+                              {sendMessageMutation.isPending ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Sending...
+                                </>
+                              ) : (
+                                'Send Message'
+                              )}
                             </Button>
                           </div>
                         </DialogContent>
