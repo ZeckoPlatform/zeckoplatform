@@ -79,27 +79,6 @@ export default function SubscriptionPage() {
   // Check if subscription is active (either paid or admin-granted)
   const isSubscriptionActive = user?.subscriptionActive || subscriptionData?.isAdminGranted;
 
-  const cancelSubscriptionMutation = useMutation({
-    mutationFn: async () => {
-      if (!subscriptionData?.id) throw new Error("No subscription ID found");
-      await cancelSubscription(subscriptionData.id);
-    },
-    onSuccess: () => {
-      refetchSubscription();
-      toast({
-        title: "Subscription cancelled",
-        description: "Your subscription has been cancelled successfully.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to cancel subscription",
-        variant: "destructive",
-      });
-    },
-  });
-
   const pauseMutation = useMutation({
     mutationFn: async () => {
       if (!subscriptionData?.id) throw new Error("No subscription ID found");
@@ -140,6 +119,27 @@ export default function SubscriptionPage() {
       toast({
         title: "Error",
         description: error.message || "Failed to resume subscription",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const cancelSubscriptionMutation = useMutation({
+    mutationFn: async () => {
+      if (!subscriptionData?.id) throw new Error("No subscription ID found");
+      await cancelSubscription(subscriptionData.id);
+    },
+    onSuccess: () => {
+      refetchSubscription();
+      toast({
+        title: "Subscription cancelled",
+        description: "Your subscription has been cancelled successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to cancel subscription",
         variant: "destructive",
       });
     },
@@ -238,18 +238,16 @@ export default function SubscriptionPage() {
 
             {isSubscriptionActive && (
               <div className="space-x-2">
-                {!subscriptionData?.isAdminGranted && (
-                  <Button
-                    variant="outline"
-                    onClick={() => setPauseDialogOpen(true)}
-                    disabled={pauseMutation.isPending}
-                  >
-                    {pauseMutation.isPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : null}
-                    Pause Subscription
-                  </Button>
-                )}
+                <Button
+                  variant="outline"
+                  onClick={() => setPauseDialogOpen(true)}
+                  disabled={pauseMutation.isPending}
+                >
+                  {pauseMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  Pause Subscription
+                </Button>
                 <Button
                   variant="destructive"
                   onClick={() => {
