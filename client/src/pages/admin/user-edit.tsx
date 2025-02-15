@@ -44,6 +44,30 @@ export default function UserEditPage() {
         title: "Success",
         description: "User updated successfully",
       });
+      setLocation("/admin-management");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("DELETE", `/api/users/${id}`);
+      if (!response.ok) throw new Error("Failed to delete user");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({
+        title: "Success",
+        description: "User deleted successfully",
+      });
+      setLocation("/admin-management");
     },
     onError: (error: Error) => {
       toast({
@@ -69,25 +93,21 @@ export default function UserEditPage() {
     updateUserMutation.mutate(data);
   };
 
+  const handleDelete = async () => {
+    if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+      deleteUserMutation.mutate();
+    }
+  };
+
   return (
     <div className="container mx-auto py-8">
       <Card>
         <CardHeader>
-          <CardTitle>Edit User: {user.username}</CardTitle>
+          <CardTitle>Edit User: {user.email}</CardTitle>
           <CardDescription>Update user information and settings</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
-              <Input
-                id="username"
-                name="username"
-                defaultValue={user.username}
-                required
-              />
-            </div>
-
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -135,20 +155,32 @@ export default function UserEditPage() {
               />
             </div>
 
-            <div className="flex justify-end space-x-4 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setLocation("/admin")}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={updateUserMutation.isPending}
-              >
-                {updateUserMutation.isPending ? "Saving..." : "Save Changes"}
-              </Button>
+            <div className="flex justify-between space-x-4 pt-4">
+              <div>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={handleDelete}
+                  disabled={deleteUserMutation.isPending}
+                >
+                  {deleteUserMutation.isPending ? "Deleting..." : "Delete User"}
+                </Button>
+              </div>
+              <div className="flex space-x-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setLocation("/admin-management")}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={updateUserMutation.isPending}
+                >
+                  {updateUserMutation.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
             </div>
           </form>
         </CardContent>
