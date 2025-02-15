@@ -21,5 +21,10 @@ export function ProtectedRoute({
     return null;
   }
 
+  // Ensure we don't redirect vendor users
+  if (user.userType === 'vendor') {
+    return <Component />;
+  }
+
   return <Component />;
 }
