@@ -77,7 +77,7 @@ export default function SubscriptionPage() {
   // Cancel subscription mutation
   const cancelSubscriptionMutation = useMutation({
     mutationFn: async () => {
-      await cancelSubscription();
+      await cancelSubscription(subscriptionData?.id);
     },
     onSuccess: () => {
       refetchSubscription();
@@ -97,7 +97,8 @@ export default function SubscriptionPage() {
 
   const pauseMutation = useMutation({
     mutationFn: async () => {
-      await pauseSubscription(pauseReason, resumeDate);
+      if (!subscriptionData?.id) throw new Error("No subscription ID found");
+      await pauseSubscription(subscriptionData.id, pauseReason, resumeDate);
     },
     onSuccess: () => {
       setPauseDialogOpen(false);
@@ -120,7 +121,8 @@ export default function SubscriptionPage() {
 
   const resumeMutation = useMutation({
     mutationFn: async () => {
-      await resumeSubscription();
+      if (!subscriptionData?.id) throw new Error("No subscription ID found");
+      await resumeSubscription(subscriptionData.id);
     },
     onSuccess: () => {
       refetchSubscription();
@@ -222,13 +224,14 @@ export default function SubscriptionPage() {
                   This subscription was granted by an administrator
                   {subscriptionData.endsAt && ` and is valid until ${format(new Date(subscriptionData.endsAt), "PP")}`}
                 </p>
-              ) : subscriptionData?.current_period_end && (
+              ) : subscriptionData?.endsAt && (
                 <p className="text-sm text-muted-foreground mt-1">
-                  Next billing date: {format(new Date(subscriptionData.current_period_end), "PP")}
+                  Next billing date: {format(new Date(subscriptionData.endsAt), "PP")}
                 </p>
               )}
             </div>
-            {/* Show subscription management buttons for all active subscriptions */}
+
+            {/* Show subscription management buttons for active subscriptions */}
             {isSubscriptionActive && (
               <div className="space-x-2">
                 {!subscriptionData?.isAdminGranted && (
@@ -264,7 +267,7 @@ export default function SubscriptionPage() {
             )}
           </div>
 
-          {/* Show subscription options for inactive subscriptions */}
+          {/* Show subscription options only for inactive subscriptions */}
           {!isSubscriptionActive && (
             <Form {...form}>
               <form onSubmit={form.handleSubmit((data) => subscribeMutation.mutate(data))}
@@ -310,7 +313,7 @@ export default function SubscriptionPage() {
                       Setting up subscription...
                     </>
                   ) : (
-                    'Start Free Trial'
+                    'Subscribe Now'
                   )}
                 </Button>
               </form>

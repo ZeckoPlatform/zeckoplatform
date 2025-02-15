@@ -647,6 +647,7 @@ export default function VendorDashboard() {
               </CardContent>
             </Card>
 
+            {/* Subscription Status Card */}
             <Card>
               <CardHeader>
                 <CardTitle>Subscription Status</CardTitle>
@@ -655,11 +656,27 @@ export default function VendorDashboard() {
                 <div>
                   <h3 className="font-medium mb-2">Current Plan</h3>
                   <p className="text-sm text-muted-foreground">
-                    Your vendor subscription is {user?.subscriptionActive ? "active" : "inactive"}
+                    {user?.subscriptionActive ? (
+                      <>
+                        Your vendor subscription is active
+                        {user?.subscriptionEndsAt && (
+                          <> until {format(new Date(user.subscriptionEndsAt), "PP")}</>
+                        )}
+                      </>
+                    ) : (
+                      "Your vendor subscription is inactive"
+                    )}
                   </p>
                 </div>
-                <Button variant="outline" asChild className="mt-4">
-                  <a href="/subscription">Manage Subscription</a>
+                <Button 
+                  variant="outline" 
+                  className="mt-4"
+                  onClick={() => {
+                    // Use location instead of <a> tag to prevent page reload
+                    window.location.href = '/subscription';
+                  }}
+                >
+                  Manage Subscription
                 </Button>
               </CardContent>
             </Card>

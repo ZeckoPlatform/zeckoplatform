@@ -1,19 +1,4 @@
 import { apiRequest } from "./queryClient";
-import type { SubscriptionWithPayment } from "@db/schema";
-import { useToast } from "@/hooks/use-toast";
-
-interface StartTrialParams {
-  userId: number;
-  tier: "business" | "vendor";
-  paymentMethod: "stripe" | "direct_debit";
-  paymentFrequency: "monthly" | "annual";
-  stripePaymentMethodId?: string;
-  bankDetails?: {
-    accountHolder: string;
-    sortCode: string;
-    accountNumber: string;
-  };
-}
 
 export async function createCheckoutSession(
   tier: "business" | "vendor",
@@ -50,10 +35,11 @@ export async function createCheckoutSession(
 }
 
 export async function getSubscriptionStatus(): Promise<{
+  id: number;
   active: boolean;
   tier: string | null;
   endsAt: string | null;
-  isAdminGranted?: boolean;
+  isAdminGranted: boolean;
 }> {
   try {
     const response = await apiRequest("GET", "/api/subscriptions/current");
@@ -65,6 +51,7 @@ export async function getSubscriptionStatus(): Promise<{
     console.log("Subscription status response:", data);
 
     return {
+      id: data.id,
       active: data.active || data.isAdminGranted,
       tier: data.tier,
       endsAt: data.endsAt,
@@ -78,16 +65,15 @@ export async function getSubscriptionStatus(): Promise<{
 
 export async function cancelSubscription(subscriptionId: number): Promise<void> {
   try {
-    const response = await apiRequest("POST", `/api/subscriptions/${subscriptionId}/cancel`);
+    const response = await apiRequest(
+      "POST",
+      `/api/subscriptions/${subscriptionId}/cancel`
+    );
 
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.message || "Failed to cancel subscription");
     }
-
-    // Return the success message from the server
-    const data = await response.json();
-    return data;
   } catch (error) {
     console.error("Error cancelling subscription:", error);
     throw error;
@@ -111,6 +97,7 @@ export async function pauseSubscription(
       throw new Error(error.message || "Failed to pause subscription");
     }
   } catch (error) {
+    console.error("Error pausing subscription:", error);
     throw error;
   }
 }
@@ -118,7 +105,7 @@ export async function pauseSubscription(
 export async function resumeSubscription(subscriptionId: number): Promise<void> {
   try {
     const response = await apiRequest(
-      "POST",
+      "POST", 
       `/api/subscriptions/${subscriptionId}/resume`
     );
 
@@ -127,6 +114,7 @@ export async function resumeSubscription(subscriptionId: number): Promise<void> 
       throw new Error(error.message || "Failed to resume subscription");
     }
   } catch (error) {
+    console.error("Error resuming subscription:", error);
     throw error;
   }
 }
