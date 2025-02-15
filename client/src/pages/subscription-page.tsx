@@ -34,6 +34,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useLocation } from 'wouter';
 
 const subscriptionFormSchema = z.object({
   paymentFrequency: z.enum(["monthly", "annual"])
@@ -59,6 +60,7 @@ export default function SubscriptionPage() {
   const [pauseReason, setPauseReason] = useState("");
   const [resumeDate, setResumeDate] = useState<Date>();
   const [isLoading, setIsLoading] = useState(false);
+  const [, setLocation] = useLocation();
 
   const form = useForm<SubscriptionFormData>({
     resolver: zodResolver(subscriptionFormSchema),
@@ -77,7 +79,8 @@ export default function SubscriptionPage() {
   // Cancel subscription mutation
   const cancelSubscriptionMutation = useMutation({
     mutationFn: async () => {
-      await cancelSubscription(subscriptionData?.id);
+      if (!subscriptionData?.id) throw new Error("No subscription ID found");
+      await cancelSubscription(subscriptionData.id);
     },
     onSuccess: () => {
       refetchSubscription();
@@ -145,20 +148,17 @@ export default function SubscriptionPage() {
       setIsLoading(true);
       try {
         if (!user?.userType) throw new Error("User type not found");
-        console.log("Starting subscription process...");
 
         const { checkoutUrl } = await createCheckoutSession(
           user.userType as "business" | "vendor",
           data.paymentFrequency
         );
 
-        console.log("Received checkout URL:", checkoutUrl);
-
         if (!checkoutUrl) {
           throw new Error("No checkout URL received");
         }
 
-        window.location.href = checkoutUrl;
+        setLocation(checkoutUrl);
       } catch (error) {
         console.error("Subscription error:", error);
         throw error;
@@ -181,6 +181,9 @@ export default function SubscriptionPage() {
   const annualBasePrice = (basePrice * 12 * 0.9); // 10% discount
   const annualPrice = calculatePriceWithVAT(annualBasePrice);
 
+  // Check if subscription is active (either paid or admin-granted)
+  const isSubscriptionActive = subscriptionData?.active || subscriptionData?.isAdminGranted;
+
   if (!user || user.userType === "free") {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
@@ -196,9 +199,6 @@ export default function SubscriptionPage() {
     );
   }
 
-  // Check if subscription is active (either paid or admin-granted)
-  const isSubscriptionActive = subscriptionData?.active || subscriptionData?.isAdminGranted;
-
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
       <Card>
@@ -213,16 +213,23 @@ export default function SubscriptionPage() {
             <div>
               <h3 className="font-semibold">Status</h3>
               <p className="text-sm text-muted-foreground">
-                {isSubscriptionActive
-                  ? subscriptionData?.isAdminGranted
-                    ? "Active (Admin Granted)"
-                    : "Active"
-                  : "Inactive"}
+                {isSubscriptionActive ? (
+                  <>
+                    {subscriptionData?.isAdminGranted ? (
+                      "Active (Admin Granted)"
+                    ) : (
+                      "Active"
+                    )}
+                  </>
+                ) : (
+                  "Inactive"
+                )}
               </p>
               {subscriptionData?.isAdminGranted ? (
                 <p className="text-sm text-muted-foreground mt-1">
                   This subscription was granted by an administrator
-                  {subscriptionData.endsAt && ` and is valid until ${format(new Date(subscriptionData.endsAt), "PP")}`}
+                  {subscriptionData.endsAt && 
+                    ` and is valid until ${format(new Date(subscriptionData.endsAt), "PP")}`}
                 </p>
               ) : subscriptionData?.endsAt && (
                 <p className="text-sm text-muted-foreground mt-1">
@@ -231,7 +238,6 @@ export default function SubscriptionPage() {
               )}
             </div>
 
-            {/* Show subscription management buttons for active subscriptions */}
             {isSubscriptionActive && (
               <div className="space-x-2">
                 {!subscriptionData?.isAdminGranted && (
@@ -249,10 +255,12 @@ export default function SubscriptionPage() {
                 <Button
                   variant="destructive"
                   onClick={() => {
-                    if (window.confirm('Are you sure you want to cancel your subscription?' + 
-                      (subscriptionData?.isAdminGranted 
+                    if (window.confirm(
+                      'Are you sure you want to cancel your subscription?' +
+                      (subscriptionData?.isAdminGranted
                         ? ' This will immediately end your admin-granted subscription.'
-                        : ' This will take effect at the end of your current billing period.'))) {
+                        : ' This will take effect at the end of your current billing period.')
+                    )) {
                       cancelSubscriptionMutation.mutate();
                     }
                   }}
@@ -267,7 +275,6 @@ export default function SubscriptionPage() {
             )}
           </div>
 
-          {/* Show subscription options only for inactive subscriptions */}
           {!isSubscriptionActive && (
             <Form {...form}>
               <form onSubmit={form.handleSubmit((data) => subscribeMutation.mutate(data))}

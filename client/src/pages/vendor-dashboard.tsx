@@ -16,6 +16,8 @@ import { ProductForm } from "@/components/ProductForm";
 import { UserReviews } from "@/components/reviews/UserReviews";
 import { format } from 'date-fns'
 import { ReviewsTab } from "@/components/reviews/ReviewsTab";
+import { useLocation } from 'wouter';
+
 
 interface Product {
   id: number;
@@ -73,6 +75,7 @@ export default function VendorDashboard() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [, setLocation] = useLocation();
 
   const isFeatureAvailable = (feature: 'payments' | 'analytics' | 'advanced_reviews') => {
     return user?.subscriptionActive || feature === 'basic';
@@ -668,12 +671,11 @@ export default function VendorDashboard() {
                     )}
                   </p>
                 </div>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="mt-4"
                   onClick={() => {
-                    // Use location instead of <a> tag to prevent page reload
-                    window.location.href = '/subscription';
+                    setLocation('/subscription');
                   }}
                 >
                   Manage Subscription
