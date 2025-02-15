@@ -14,6 +14,14 @@ import { Search, Mail, Phone, Loader2 } from "lucide-react";
 import { useCart } from "@/hooks/use-cart";
 import { Heart, ShoppingCart } from "lucide-react";
 
+interface ProductVariation {
+  id: number;
+  attributes: Record<string, string>;
+  price: number;
+  stock: number;
+  sku: string;
+}
+
 interface Product {
   id: number;
   title: string;
@@ -21,19 +29,35 @@ interface Product {
   price: number;
   category: string;
   imageUrl: string;
-  weight?: number; // in grams
+  weight?: number;
   dimensions?: {
-    length: number; // in cm
+    length: number;
     width: number;
     height: number;
   };
-  shippingOverride?: number; // Added field for vendor shipping override
+  shippingOverride?: number;
   vendor: {
     name: string;
     email: string;
     phone?: string;
     id: number;
   };
+  variations?: ProductVariation[];
+  attributes?: {
+    name: string;
+    values: string[];
+  }[];
+  reviews?: {
+    id: number;
+    rating: number;
+    comment: string;
+    userName: string;
+    createdAt: string;
+  }[];
+  averageRating?: number;
+  stock: number;
+  sku?: string;
+  tags?: string[];
 }
 
 export default function MarketplacePage() {

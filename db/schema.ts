@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, decimal } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -165,15 +165,94 @@ export const subscriptions = pgTable("subscriptions", {
   price: integer("price").notNull(),
 });
 
+export const productCategories = pgTable("product_categories", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").unique().notNull(),
+  description: text("description"),
+  parentId: integer("parent_id").references(() => productCategories.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const productAttributes = pgTable("product_attributes", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  type: text("type", { enum: ["select", "color", "button"] }).notNull(),
+  required: boolean("required").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const productAttributeValues = pgTable("product_attribute_values", {
+  id: serial("id").primaryKey(),
+  attributeId: integer("attribute_id").references(() => productAttributes.id).notNull(),
+  value: text("value").notNull(),
+  displayValue: text("display_value"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
   vendorId: integer("vendor_id").references(() => users.id).notNull(),
   title: text("title").notNull(),
   description: text("description").notNull(),
-  price: integer("price").notNull(),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  compareAtPrice: decimal("compare_at_price", { precision: 10, scale: 2 }),
   category: text("category").notNull(),
+  categoryId: integer("category_id").references(() => productCategories.id),
+  imageUrl: text("image_url"),
+  galleryImages: text("gallery_images").array(),
+  sku: text("sku"),
+  barcode: text("barcode"),
+  weight: decimal("weight", { precision: 10, scale: 2 }),
+  dimensions: jsonb("dimensions").$type<{
+    length: number;
+    width: number;
+    height: number;
+    unit: "cm" | "in";
+  }>(),
+  shippingRequired: boolean("shipping_required").default(true),
+  shippingWeight: decimal("shipping_weight", { precision: 10, scale: 2 }),
+  tags: text("tags").array(),
+  status: text("status", {
+    enum: ["draft", "active", "archived"]
+  }).default("draft"),
+  hasVariants: boolean("has_variants").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const productVariations = pgTable("product_variations", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  sku: text("sku"),
+  barcode: text("barcode"),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  compareAtPrice: decimal("compare_at_price", { precision: 10, scale: 2 }),
+  weight: decimal("weight", { precision: 10, scale: 2 }),
+  position: integer("position").default(0),
   imageUrl: text("image_url"),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const productVariationAttributes = pgTable("product_variation_attributes", {
+  id: serial("id").primaryKey(),
+  variationId: integer("variation_id").references(() => productVariations.id).notNull(),
+  attributeId: integer("attribute_id").references(() => productAttributes.id).notNull(),
+  attributeValueId: integer("attribute_value_id").references(() => productAttributeValues.id).notNull(),
+});
+
+export const productInventory = pgTable("product_inventory", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").references(() => products.id),
+  variationId: integer("variation_id").references(() => productVariations.id),
+  quantity: integer("quantity").notNull().default(0),
+  reservedQuantity: integer("reserved_quantity").default(0),
+  lowStockThreshold: integer("low_stock_threshold"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const invoices = pgTable("invoices", {
@@ -430,7 +509,6 @@ export const reputationScores = pgTable("reputation_scores", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
   buyerId: integer("buyer_id").references(() => users.id).notNull(),
@@ -530,11 +608,17 @@ export const leadsRelations = relations(leads, ({ one, many }) => ({
   messages: many(messages),
 }));
 
-export const productsRelations = relations(products, ({ one }) => ({
+export const productsRelations = relations(products, ({ one, many }) => ({
   vendor: one(users, {
     fields: [products.vendorId],
     references: [users.id],
   }),
+  category: one(productCategories, {
+    fields: [products.categoryId],
+    references: [productCategories.id],
+  }),
+  variations: many(productVariations),
+  inventory: many(productInventory),
 }));
 
 export const leadResponsesRelations = relations(leadResponses, ({ one }) => ({
@@ -756,5 +840,46 @@ export const orderCommunicationRelations = relations(orderCommunication, ({ one 
   receiver: one(users, {
     fields: [orderCommunication.receiverId],
     references: [users.id],
+  }),
+}));
+
+export const productCategoriesRelations = relations(productCategories, ({ one, many }) => ({
+  parent: one(productCategories, {
+    fields: [productCategories.parentId],
+    references: [productCategories.id],
+  }),
+  children: many(productCategories),
+  products: many(products),
+}));
+
+export const productVariationsRelations = relations(productVariations, ({ one, many }) => ({
+  product: one(products, {
+    fields: [productVariations.productId],
+    references: [products.id],
+  }),
+  attributes: many(productVariationAttributes),
+  inventory: one(productInventory, {
+    fields: [productVariations.id],
+    references: [productInventory.variationId],
+  }),
+}));
+
+export const productAttributesRelations = relations(productAttributes, ({ many }) => ({
+  values: many(productAttributeValues),
+  variations: many(productVariationAttributes),
+}));
+
+export const productAttributeValuesRelations = relations(productAttributeValues, ({ many }) => ({
+  variations: many(productVariationAttributes),
+}));
+
+export const productInventoryRelations = relations(productInventory, ({ one }) => ({
+  product: one(products, {
+    fields: [productInventory.productId],
+    references: [products.id],
+  }),
+  variation: one(productVariations, {
+    fields: [productInventory.variationId],
+    references: [productVariations.id],
   }),
 }));
