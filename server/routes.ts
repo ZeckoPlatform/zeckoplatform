@@ -30,6 +30,7 @@ interface User {
   stripeAccountId?: string;
   stripeAccountStatus?: string;
   profile?: any;
+  countryCode?: string; // Added countryCode to User interface
 }
 
 declare global {
@@ -175,7 +176,8 @@ export function registerRoutes(app: Express): Server {
         location: req.body.location,
         status: "open" as const,
         expires_at: expiresAt,
-        archived: false
+        archived: false,
+        region: req.user.countryCode, // Set region based on user's country code
       };
 
       log(`Attempting to create lead: ${JSON.stringify(newLead)}`);
@@ -212,7 +214,7 @@ export function registerRoutes(app: Express): Server {
         const userLeads = await db.query.leads.findMany({
           where: and(
             eq(leads.user_id, req.user.id),
-            gt(leads.expires_at, now), // Only return non-expired leads
+            gt(leads.expires_at, now),
             eq(leads.archived, false)
           ),
           columns: {
@@ -225,7 +227,8 @@ export function registerRoutes(app: Express): Server {
             status: true,
             expires_at: true,
             created_at: true,
-            user_id: true
+            user_id: true,
+            region: true
           },
           with: {
             responses: {
@@ -293,8 +296,9 @@ export function registerRoutes(app: Express): Server {
         const businessLeads = await db.query.leads.findMany({
           where: and(
             eq(leads.status, "open"),
-            gt(leads.expires_at, now), // Only return non-expired leads
-            eq(leads.archived, false)
+            gt(leads.expires_at, now),
+            eq(leads.archived, false),
+            eq(leads.region, req.user.countryCode) // Add region filter
           ),
           columns: {
             id: true,
@@ -306,7 +310,8 @@ export function registerRoutes(app: Express): Server {
             status: true,
             expires_at: true,
             created_at: true,
-            user_id: true
+            user_id: true,
+            region: true
           },
           with: {
             responses: {

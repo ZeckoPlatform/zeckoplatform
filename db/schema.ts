@@ -127,6 +127,8 @@ export const leads = pgTable("leads", {
   created_at: timestamp("created_at").defaultNow(),
   expires_at: timestamp("expires_at").notNull(),
   archived: boolean("archived").default(false),
+  // Add region field that matches user's country code
+  region: text("region", { enum: ["GB", "US"] }).notNull(),
 });
 
 export const leadResponses = pgTable("lead_responses", {
