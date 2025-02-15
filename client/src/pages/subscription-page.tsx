@@ -76,7 +76,9 @@ export default function SubscriptionPage() {
     enabled: !!user && user.userType !== "free",
   });
 
-  // Cancel subscription mutation
+  // Check if subscription is active (either paid or admin-granted)
+  const isSubscriptionActive = user?.subscriptionActive || subscriptionData?.isAdminGranted;
+
   const cancelSubscriptionMutation = useMutation({
     mutationFn: async () => {
       if (!subscriptionData?.id) throw new Error("No subscription ID found");
@@ -167,7 +169,6 @@ export default function SubscriptionPage() {
       }
     },
     onError: (error: Error) => {
-      console.error("Subscription mutation error:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to start subscription",
@@ -180,9 +181,6 @@ export default function SubscriptionPage() {
   const monthlyPrice = calculatePriceWithVAT(basePrice);
   const annualBasePrice = (basePrice * 12 * 0.9); // 10% discount
   const annualPrice = calculatePriceWithVAT(annualBasePrice);
-
-  // Check if subscription is active (either paid or admin-granted)
-  const isSubscriptionActive = subscriptionData?.active || subscriptionData?.isAdminGranted;
 
   if (!user || user.userType === "free") {
     return (
