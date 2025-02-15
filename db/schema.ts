@@ -349,6 +349,151 @@ export const trialHistory = pgTable("trial_history", {
   created_at: timestamp("created_at").defaultNow(),
 });
 
+export const documents = pgTable("documents", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  filePath: text("file_path").notNull(),
+  fileType: text("file_type").notNull(),
+  fileSize: integer("file_size").notNull(),
+  isPublic: boolean("is_public").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  metadata: jsonb("metadata").$type<{
+    originalName: string;
+    contentType: string;
+    tags?: string[];
+  }>(),
+});
+
+export const documentVersions = pgTable("document_versions", {
+  id: serial("id").primaryKey(),
+  documentId: integer("document_id").references(() => documents.id).notNull(),
+  version: integer("version").notNull(),
+  filePath: text("file_path").notNull(),
+  fileSize: integer("file_size").notNull(),
+  createdBy: integer("created_by").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  changeLog: text("change_log"),
+});
+
+export const documentAccess = pgTable("document_access", {
+  id: serial("id").primaryKey(),
+  documentId: integer("document_id").references(() => documents.id).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  accessLevel: text("access_level", {
+    enum: ["view", "edit", "admin"]
+  }).notNull(),
+  grantedBy: integer("granted_by").references(() => users.id).notNull(),
+  grantedAt: timestamp("granted_at").defaultNow(),
+  expiresAt: timestamp("expires_at"),
+});
+
+export const reviews = pgTable("reviews", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  targetId: integer("target_id").references(() => users.id).notNull(),
+  rating: integer("rating").notNull(),
+  content: text("content").notNull(),
+  targetType: text("target_type", {
+    enum: ["business", "vendor", "product"]
+  }).notNull(),
+  status: text("status", {
+    enum: ["pending", "approved", "rejected"]
+  }).default("pending"),
+  reply: text("reply"),
+  repliedAt: timestamp("replied_at"),
+  repliedBy: integer("replied_by").references(() => users.id),
+  moderatedBy: integer("moderated_by").references(() => users.id),
+  moderationNotes: text("moderation_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const reviewVotes = pgTable("review_votes", {
+  id: serial("id").primaryKey(),
+  reviewId: integer("review_id").references(() => reviews.id).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  voteType: text("vote_type", { enum: ["helpful", "unhelpful"] }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const reputationScores = pgTable("reputation_scores", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  overallScore: text("overall_score").notNull().default("0"),
+  totalReviews: integer("total_reviews").notNull().default(0),
+  averageRating: text("average_rating").notNull().default("0"),
+  responseRate: text("response_rate").notNull().default("0"),
+  completionRate: text("completion_rate").notNull().default("0"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+
+export const orders = pgTable("orders", {
+  id: serial("id").primaryKey(),
+  buyerId: integer("buyer_id").references(() => users.id).notNull(),
+  vendorId: integer("vendor_id").references(() => users.id).notNull(),
+  status: text("status", {
+    enum: ["pending", "processing", "shipped", "delivered", "cancelled", "refunded"]
+  }).notNull().default("pending"),
+  totalAmount: integer("total_amount").notNull(),
+  currency: text("currency").notNull().default("gbp"),
+  shippingAddress: jsonb("shipping_address").$type<{
+    fullName: string;
+    street: string;
+    city: string;
+    state: string;
+    postalCode: string;
+    country: string;
+    phone: string;
+  }>().notNull(),
+  billingAddress: jsonb("billing_address").$type<{
+    companyName?: string;
+    vatNumber?: string;
+    street: string;
+    city: string;
+    state: string;
+    postalCode: string;
+    country: string;
+  }>().notNull(),
+  specialInstructions: text("special_instructions"),
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const orderItems = pgTable("order_items", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").references(() => orders.id).notNull(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  quantity: integer("quantity").notNull(),
+  pricePerUnit: integer("price_per_unit").notNull(),
+  totalPrice: integer("total_price").notNull(),
+});
+
+export const orderHistory = pgTable("order_history", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").references(() => orders.id).notNull(),
+  status: text("status", {
+    enum: ["pending", "processing", "shipped", "delivered", "cancelled", "refunded"]
+  }).notNull(),
+  note: text("note"),
+  createdBy: integer("created_by").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const orderCommunication = pgTable("order_communication", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").references(() => orders.id).notNull(),
+  senderId: integer("sender_id").references(() => users.id).notNull(),
+  receiverId: integer("receiver_id").references(() => users.id).notNull(),
+  message: text("message").notNull(),
+  read: boolean("read").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const usersRelations = relations(users, ({ many }) => ({
   leads: many(leads),
   products: many(products),
@@ -363,6 +508,10 @@ export const usersRelations = relations(users, ({ many }) => ({
   businessAnalytics: many(businessAnalytics),
   revenueAnalytics: many(revenueAnalytics),
   notifications: many(notifications),
+  buyerOrders: many(orders, { relationName: "buyerOrders" }),
+  vendorOrders: many(orders, { relationName: "vendorOrders" }),
+  orderHistory: many(orderHistory),
+  orderCommunications: many(orderCommunication),
 }));
 
 export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
@@ -487,47 +636,6 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
   }),
 }));
 
-export const documents = pgTable("documents", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  title: text("title").notNull(),
-  description: text("description"),
-  filePath: text("file_path").notNull(),
-  fileType: text("file_type").notNull(),
-  fileSize: integer("file_size").notNull(),
-  isPublic: boolean("is_public").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-  metadata: jsonb("metadata").$type<{
-    originalName: string;
-    contentType: string;
-    tags?: string[];
-  }>(),
-});
-
-export const documentVersions = pgTable("document_versions", {
-  id: serial("id").primaryKey(),
-  documentId: integer("document_id").references(() => documents.id).notNull(),
-  version: integer("version").notNull(),
-  filePath: text("file_path").notNull(),
-  fileSize: integer("file_size").notNull(),
-  createdBy: integer("created_by").references(() => users.id).notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-  changeLog: text("change_log"),
-});
-
-export const documentAccess = pgTable("document_access", {
-  id: serial("id").primaryKey(),
-  documentId: integer("document_id").references(() => documents.id).notNull(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  accessLevel: text("access_level", {
-    enum: ["view", "edit", "admin"]
-  }).notNull(),
-  grantedBy: integer("granted_by").references(() => users.id).notNull(),
-  grantedAt: timestamp("granted_at").defaultNow(),
-  expiresAt: timestamp("expires_at"),
-});
-
 export const documentsRelations = relations(documents, ({ one, many }) => ({
   owner: one(users, {
     fields: [documents.userId],
@@ -563,46 +671,6 @@ export const documentAccessRelations = relations(documentAccess, ({ one }) => ({
   }),
 }));
 
-export const reviews = pgTable("reviews", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  targetId: integer("target_id").references(() => users.id).notNull(),
-  rating: integer("rating").notNull(),
-  content: text("content").notNull(),
-  targetType: text("target_type", {
-    enum: ["business", "vendor", "product"]
-  }).notNull(),
-  status: text("status", {
-    enum: ["pending", "approved", "rejected"]
-  }).default("pending"),
-  reply: text("reply"),
-  repliedAt: timestamp("replied_at"),
-  repliedBy: integer("replied_by").references(() => users.id),
-  moderatedBy: integer("moderated_by").references(() => users.id),
-  moderationNotes: text("moderation_notes"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-export const reviewVotes = pgTable("review_votes", {
-  id: serial("id").primaryKey(),
-  reviewId: integer("review_id").references(() => reviews.id).notNull(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  voteType: text("vote_type", { enum: ["helpful", "unhelpful"] }).notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const reputationScores = pgTable("reputation_scores", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  overallScore: text("overall_score").notNull().default("0"),
-  totalReviews: integer("total_reviews").notNull().default(0),
-  averageRating: text("average_rating").notNull().default("0"),
-  responseRate: text("response_rate").notNull().default("0"),
-  completionRate: text("completion_rate").notNull().default("0"),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
 export const reviewsRelations = relations(reviews, ({ one }) => ({
   author: one(users, {
     fields: [reviews.userId],
@@ -636,6 +704,57 @@ export const reviewVotesRelations = relations(reviewVotes, ({ one }) => ({
 export const reputationScoresRelations = relations(reputationScores, ({ one }) => ({
   user: one(users, {
     fields: [reputationScores.userId],
+    references: [users.id],
+  }),
+}));
+
+export const ordersRelations = relations(orders, ({ one, many }) => ({
+  buyer: one(users, {
+    fields: [orders.buyerId],
+    references: [users.id],
+  }),
+  vendor: one(users, {
+    fields: [orders.vendorId],
+    references: [users.id],
+  }),
+  items: many(orderItems),
+  history: many(orderHistory),
+  communications: many(orderCommunication),
+}));
+
+export const orderItemsRelations = relations(orderItems, ({ one }) => ({
+  order: one(orders, {
+    fields: [orderItems.orderId],
+    references: [orders.id],
+  }),
+  product: one(products, {
+    fields: [orderItems.productId],
+    references: [products.id],
+  }),
+}));
+
+export const orderHistoryRelations = relations(orderHistory, ({ one }) => ({
+  order: one(orders, {
+    fields: [orderHistory.orderId],
+    references: [orders.id],
+  }),
+  creator: one(users, {
+    fields: [orderHistory.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const orderCommunicationRelations = relations(orderCommunication, ({ one }) => ({
+  order: one(orders, {
+    fields: [orderCommunication.orderId],
+    references: [orders.id],
+  }),
+  sender: one(users, {
+    fields: [orderCommunication.senderId],
+    references: [users.id],
+  }),
+  receiver: one(users, {
+    fields: [orderCommunication.receiverId],
     references: [users.id],
   }),
 }));

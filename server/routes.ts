@@ -20,6 +20,7 @@ import notificationRoutes from './routes/notifications';
 import adminRoutes from './routes/admin';
 import documentRoutes from './routes/documents';
 import reviewRoutes from './routes/reviews';
+import orderRoutes from './routes/orders';
 import { cleanupExpiredLeads } from './services/cleanup';
 
 interface User {
@@ -71,7 +72,7 @@ export function registerRoutes(app: Express): Server {
     authenticateToken(req, res, next);
   });
 
-  // Register all other route modules
+  // Register all route modules
   app.use('/api', subscriptionRoutes);
   app.use('/api', invoiceRoutes);
   app.use('/api', analyticsRoutes);
@@ -79,6 +80,7 @@ export function registerRoutes(app: Express): Server {
   app.use('/api', adminRoutes);
   app.use('/api', documentRoutes);
   app.use('/api', reviewRoutes);
+  app.use('/api', orderRoutes); // Add the new order routes
 
   // DELETE /api/leads/:id - Delete a lead
   app.delete("/api/leads/:id", async (req, res) => {
@@ -721,6 +723,7 @@ export function registerRoutes(app: Express): Server {
   });
 
 
+
   app.patch("/api/user/password", async (req, res) => {
     try {
       if (!req.user) {
@@ -948,7 +951,7 @@ export function registerRoutes(app: Express): Server {
 
       // Convert price back to decimal for response
       const responseProduct = {
-        ...updatedProduct,
+        ...updatedProduct        ,
         price: (updatedProduct.price / 100).toFixed(2), // Convert cents back to dollars with 2 decimal places
       };
 
