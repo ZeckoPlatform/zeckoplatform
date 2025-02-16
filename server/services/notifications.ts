@@ -5,10 +5,10 @@ import { z } from 'zod';
 
 // Define the notification schema
 const notificationSchema = z.object({
-  type: z.enum(['error', 'info', 'success', 'warning']),
+  type: z.enum(['info', 'success', 'warning', 'error']),
   title: z.string(),
   message: z.string(),
-  userId: z.number().optional(),
+  userId: z.number().array().optional(), // Allow array of userIds for admin notifications
   metadata: z.record(z.any()).optional(),
   notifyAdmins: z.boolean().optional()
 });
@@ -22,11 +22,43 @@ export async function createNotification(
     // Validate the notification data
     const validatedData = notificationSchema.parse(notification);
 
-    await db.insert(notifications).values({
-      ...validatedData,
-      read: false,
-      created_at: new Date()
-    });
+    // If notifyAdmins is true, get all admin user IDs
+    if (validatedData.notifyAdmins) {
+      const adminUsers = await db.query.users.findMany({
+        where: (users) => eq(users.userType, "admin"),
+        columns: { id: true }
+      });
+
+      // Create a notification for each admin
+      for (const admin of adminUsers) {
+        await db.insert(notifications).values({
+          type: validatedData.type,
+          title: validatedData.title,
+          message: validatedData.message,
+          metadata: validatedData.metadata,
+          userId: admin.id,
+          read: false,
+          createdAt: new Date()
+        });
+      }
+      return true;
+    }
+
+    // For regular notifications to specific users
+    if (validatedData.userId) {
+      for (const uid of Array.isArray(validatedData.userId) ? validatedData.userId : [validatedData.userId]) {
+        await db.insert(notifications).values({
+          type: validatedData.type,
+          title: validatedData.title,
+          message: validatedData.message,
+          metadata: validatedData.metadata,
+          userId: uid,
+          read: false,
+          createdAt: new Date()
+        });
+      }
+    }
+
     return true;
   } catch (error) {
     console.error('Error creating notification:', error);

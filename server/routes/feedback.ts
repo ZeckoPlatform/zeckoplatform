@@ -35,8 +35,7 @@ router.post("/api/feedback", async (req, res) => {
           <p><strong>Technical Context:</strong></p>
           <pre>${JSON.stringify(technicalContext, null, 2)}</pre>
         `,
-        text: `
-New ${type} Report
+        text: `New ${type} Report
 
 Description: ${description}
 User: ${technicalContext.userEmail}
@@ -60,8 +59,7 @@ Technical Context: ${JSON.stringify(technicalContext, null, 2)}
           feedbackId: result.id,
           feedbackType: type
         },
-        notifyAdmins: true,
-        userId: userId
+        notifyAdmins: true // This will automatically notify all admin users
       });
     }
 
