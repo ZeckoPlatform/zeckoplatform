@@ -586,6 +586,7 @@ export const feedback = pgTable("feedback", {
       width: number;
       height: number;
     };
+    userEmail?: string;
   }>(),
   path: text("path"),
   user_id: integer("user_id").references(() => users.id),
@@ -790,7 +791,7 @@ export const reviewsRelations = relations(reviews, ({ one }) => ({
   }),
   target: one(users, {
     fields: [reviews.targetId],
-references: [users.id],
+    references: [users.id],
   }),
   moderator: one(users, {
     fields: [reviews.moderatedBy],

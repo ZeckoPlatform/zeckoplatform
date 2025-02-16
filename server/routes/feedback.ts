@@ -54,39 +54,30 @@ router.post("/api/feedback", async (req, res) => {
 
     // Create admin notification if requested
     if (notifyAdmins) {
-      console.log('Creating admin notification for feedback');
       const truncatedMessage = description.length > 100 
         ? description.substring(0, 100) + "..." 
         : description;
 
-      try {
-        const notificationData = {
-          title: `New ${type} Report`,
-          message: truncatedMessage,
-          type: NotificationTypes.INFO,
-          metadata: {
-            feedbackId: result.id,
-            feedbackType: type,
-            path
-          },
-          notifyAdmins: true
-        };
-        console.log('Creating notification with data:', JSON.stringify(notificationData, null, 2));
-
-        await createNotification(notificationData);
-      } catch (notificationError) {
-        console.error('Error creating notification:', notificationError);
-        // Don't fail the whole request if notification fails
-      }
+      await createNotification({
+        title: `New ${type} Report`,
+        message: truncatedMessage,
+        type: NotificationTypes.INFO,
+        metadata: {
+          feedbackId: result.id,
+          feedbackType: type,
+          path
+        },
+        notifyAdmins: true
+      });
     }
 
     res.status(201).json(result);
   } catch (error) {
     console.error("Failed to save feedback:", error);
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: error.errors });
+      return res.status(400).json({ message: error.errors[0].message });
     }
-    res.status(500).json({ error: "Failed to save feedback" });
+    res.status(500).json({ message: "Failed to save feedback" });
   }
 });
 

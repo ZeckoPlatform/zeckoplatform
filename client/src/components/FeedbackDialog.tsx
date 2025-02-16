@@ -70,8 +70,8 @@ export function FeedbackDialog() {
       const response = await apiRequest("POST", "/api/feedback", payload);
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to submit feedback");
+        const errorData = await response.json().catch(() => ({ message: "Failed to submit feedback" }));
+        throw new Error(errorData.message || "Failed to submit feedback");
       }
 
       return response.json();
