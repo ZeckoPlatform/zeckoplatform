@@ -37,6 +37,7 @@ router.post("/api/feedback", async (req, res) => {
           <pre>${JSON.stringify(technicalContext, null, 2)}</pre>
         `,
         text: `
+New ${type} Report
 Type: ${type}
 Description: ${description}
 User: ${technicalContext.userEmail}
