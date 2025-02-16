@@ -67,75 +67,66 @@ export default function ProfilePage() {
   });
 
   return (
-    <div className="container mx-auto py-8 space-y-8">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Profile Settings</h1>
-        <Button variant="outline" onClick={() => setLocation("/settings")}>
-          Back to Settings
-        </Button>
-      </div>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <User className="h-5 w-5" />
+          Personal Information
+        </CardTitle>
+        <CardDescription>
+          Update your profile information
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={form.handleSubmit((data) => updateProfileMutation.mutate(data))} className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="name">Name</Label>
+            <Input
+              id="name"
+              {...form.register("name")}
+            />
+            {form.formState.errors.name && (
+              <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
+            )}
+          </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
-            Personal Information
-          </CardTitle>
-          <CardDescription>
-            Update your profile information
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={form.handleSubmit((data) => updateProfileMutation.mutate(data))} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                {...form.register("name")}
-              />
-              {form.formState.errors.name && (
-                <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
-              )}
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              {...form.register("email")}
+            />
+            {form.formState.errors.email && (
+              <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
+            )}
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                {...form.register("email")}
-              />
-              {form.formState.errors.email && (
-                <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
-              )}
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="bio">Bio</Label>
+            <Textarea
+              id="bio"
+              {...form.register("bio")}
+              placeholder="Tell us a bit about yourself"
+            />
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="bio">Bio</Label>
-              <Textarea
-                id="bio"
-                {...form.register("bio")}
-                placeholder="Tell us a bit about yourself"
-              />
-            </div>
-
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={updateProfileMutation.isPending}
-            >
-              {updateProfileMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Updating Profile...
-                </>
-              ) : (
-                "Save Profile"
-              )}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={updateProfileMutation.isPending}
+          >
+            {updateProfileMutation.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Updating Profile...
+              </>
+            ) : (
+              "Save Profile"
+            )}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }

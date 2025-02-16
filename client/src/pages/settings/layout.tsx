@@ -12,8 +12,26 @@ import {
 } from "lucide-react";
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { user } = useAuth();
+
+  // Helper function to get the correct dashboard link
+  const getDashboardLink = () => {
+    if (!user) return "/";
+
+    switch (user.userType) {
+      case "vendor":
+        return "/vendor/dashboard";
+      case "business":
+        return "/leads";
+      case "admin":
+        return user.superAdmin ? "/admin-management" : "/leads";
+      case "free":
+        return "/leads";
+      default:
+        return "/";
+    }
+  };
 
   const navigation = [
     {
@@ -51,9 +69,13 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
   return (
     <div className="container mx-auto py-8">
       <div className="flex items-center mb-8">
-        <Button variant="ghost" onClick={() => window.history.back()} className="mr-4">
+        <Button 
+          variant="ghost" 
+          onClick={() => setLocation(getDashboardLink())} 
+          className="mr-4"
+        >
           <ChevronLeft className="h-4 w-4 mr-2" />
-          Back
+          Back to Dashboard
         </Button>
         <h1 className="text-3xl font-bold">Settings</h1>
       </div>
