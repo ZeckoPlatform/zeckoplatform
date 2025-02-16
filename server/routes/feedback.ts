@@ -25,7 +25,8 @@ router.post("/api/feedback", async (req, res) => {
     // Validate request body
     const validatedData = feedbackSchema.parse(req.body);
     const { type, description, screenshot, technicalContext, path, notifyEmail, notifyAdmins } = validatedData;
-    const userId = req.user?.id;
+    // Make user_id optional
+    const userId = req.user?.id || null;
 
     // Store feedback in database
     const [feedbackEntry] = await db.insert(feedback).values({
