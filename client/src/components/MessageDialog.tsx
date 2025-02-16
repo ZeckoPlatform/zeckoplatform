@@ -46,28 +46,33 @@ export function MessageDialog({
   const playNotification = useNotificationSound();
   const { toast } = useToast();
   const messageContainerRef = useRef<HTMLDivElement>(null);
-  const lastMessageRef = useRef<HTMLDivElement>(null);
-  const isFirstMount = useRef(true);
-  const previousMessagesCount = useRef(0);
+  const isFirstLoad = useRef(true);
+  const previousMessagesLength = useRef(0);
 
   const messagesQueryKey = [`/api/leads/${leadId}/messages`];
 
   const { data: messages = [], isLoading } = useQuery<Message[]>({
     queryKey: messagesQueryKey,
-    enabled: !!user?.id && isOpen,
+    enabled: isOpen && !!user?.id,
     refetchInterval: isOpen ? 3000 : false,
   });
 
-  const scrollToBottom = () => {
+  const scrollToBottom = (smooth = true) => {
     if (messageContainerRef.current) {
       messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
     }
   };
 
-  // Initial scroll and mark as read when dialog opens
+  // Initial load and mark messages as read
   useEffect(() => {
-    if (isOpen) {
-      scrollToBottom();
+    if (isOpen && messages.length > 0) {
+      // On first open, scroll immediately
+      if (isFirstLoad.current) {
+        scrollToBottom(false);
+        isFirstLoad.current = false;
+      }
+
+      // Check for unread messages
       const unreadMessages = messages.filter(m => !m.read && m.sender.id !== user?.id);
       if (unreadMessages.length > 0) {
         markAsReadMutation.mutate();
@@ -75,19 +80,18 @@ export function MessageDialog({
     }
   }, [isOpen, messages]);
 
-  // Handle new message notifications and scroll
+  // Handle new messages
   useEffect(() => {
-    if (!isFirstMount.current && messages.length > previousMessagesCount.current) {
+    if (!isFirstLoad.current && messages.length > previousMessagesLength.current) {
       const lastMessage = messages[messages.length - 1];
       if (lastMessage?.sender.id !== user?.id) {
         playNotification('receive');
         markAsReadMutation.mutate();
       }
-      scrollToBottom();
+      scrollToBottom(true);
     }
-    previousMessagesCount.current = messages.length;
-    isFirstMount.current = false;
-  }, [messages, user?.id]);
+    previousMessagesLength.current = messages.length;
+  }, [messages]);
 
   const markAsReadMutation = useMutation({
     mutationFn: async () => {
@@ -96,13 +100,17 @@ export function MessageDialog({
       return response.json();
     },
     onSuccess: () => {
+      // Update local messages to show as read
       queryClient.setQueryData<Message[]>(messagesQueryKey, oldMessages => 
         oldMessages?.map(m => ({
           ...m,
           read: m.sender.id !== user?.id ? true : m.read
         }))
       );
+
+      // Update lead counts
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+
       if (onMessagesRead) onMessagesRead();
     },
     onError: (error: Error) => {
@@ -127,7 +135,7 @@ export function MessageDialog({
       setNewMessage("");
       playNotification('send');
       queryClient.setQueryData<Message[]>(messagesQueryKey, old => [...(old || []), newMessage]);
-      scrollToBottom();
+      scrollToBottom(true);
     },
     onError: (error: Error) => {
       toast({
@@ -163,10 +171,9 @@ export function MessageDialog({
             </div>
           ) : (
             <div className="space-y-4">
-              {messages.map((message, index) => (
+              {messages.map((message) => (
                 <div
                   key={message.id}
-                  ref={index === messages.length - 1 ? lastMessageRef : null}
                   className={`flex flex-col ${
                     message.sender.id === user?.id
                       ? "items-end"

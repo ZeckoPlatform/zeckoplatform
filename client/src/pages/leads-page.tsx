@@ -576,6 +576,12 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
   );
 };
 
+// Single source of truth for unread count calculation
+function getUnreadCount(messages: any[] | undefined, userId: number): number {
+  if (!messages || !Array.isArray(messages)) return 0;
+  return messages.filter(m => !m.read && m.sender_id !== userId).length;
+}
+
 const BusinessLeadsView = ({
   leads,
   user,
@@ -662,11 +668,6 @@ const BusinessLeadsView = ({
     return acc;
   }, {} as Record<number, any>);
 
-  const getUnreadCount = (lead: LeadWithUnreadCount, userId: number) => {
-    if (!lead.messages) return 0;
-    return lead.messages.filter(m => !m.read && m.sender_id !== userId).length;
-  };
-
   const sendProposalMutation = useMutation({
     mutationFn: async ({ leadId, proposal }: { leadId: number; proposal: string }) => {
       const res = await apiRequest("POST", `/api/leads/${leadId}/responses`, {
@@ -697,7 +698,7 @@ const BusinessLeadsView = ({
 
   return (
     <div className="space-y-8">
-      {leads.some(lead => getUnreadCount(lead, user.id) > 0) && (
+      {leads.some(lead => getUnreadCount(lead.messages, user.id) > 0) && (
         <div className="bg-muted/50 p-4 rounded-lg flex items-center gap-2 mb-4">
           <Info className="h-5 w-5 text-primary" />
           <p className="text-sm">You have unread messages in your leads</p>
@@ -923,12 +924,6 @@ const BusinessLeadsView = ({
   );
 };
 
-// Use a single implementation of getUnreadCount
-const getUnreadCount = (lead: LeadWithUnreadCount, userId: number) => {
-  if (!lead.messages) return 0;
-  return lead.messages.filter(m => !m.read && m.sender_id !== userId).length;
-};
-
 const FreeUserLeadsView = ({
   leads,
   createLeadMutation,
@@ -964,7 +959,7 @@ const FreeUserLeadsView = ({
       </TabsList>
       <TabsContent value="my-leads" className="mt-4">
         <div className="grid gap-6">
-          {leads.some(lead => getUnreadCount(lead, user.id) > 0) && (
+          {leads.some(lead => getUnreadCount(lead.messages, user.id) > 0) && (
             <div className="bg-muted/50 p-4 rounded-lg flex items-center gap-2 mb-4">
               <Info className="h-5 w-5 text-primary" />
               <p className="text-sm">You have unread messages in your leads</p>
@@ -1033,16 +1028,16 @@ const FreeUserLeadsView = ({
                         {response.status === "accepted" ? (
                           <div className="mt-4 flex items-center gap-2">
                             <Dialog>
-                                                            <DialogTrigger asChild>
+                              <DialogTrigger asChild>
                                 <Button variant="outline" size="sm" className="relative">
                                   <Send className="h-4 w-4 mr-2"/>
                                   Open Messages
-                                  {getUnreadCount(lead, user.id) > 0 && (
+                                  {getUnreadCount(lead.messages, user.id) > 0 && (
                                     <Badge
                                       variant="destructive"
                                       className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
                                     >
-                                      {getUnreadCount(lead, user.id)}
+                                      {getUnreadCount(lead.messages, user.id)}
                                     </Badge>
                                   )}
                                 </Button>
