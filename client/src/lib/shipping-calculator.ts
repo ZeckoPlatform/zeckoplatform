@@ -1,3 +1,15 @@
+// TODO: Replace static shipping rates with live carrier API integrations
+// Required APIs:
+// UK Carriers:
+// - Royal Mail Shipping API (https://developer.royalmail.net/)
+// - DPD API (https://www.dpd.co.uk/business/sending/integration.jsp)
+// - Evri API (https://www.evri.com/business)
+//
+// US Carriers:
+// - USPS Web Tools API (https://www.usps.com/business/web-tools-apis/)
+// - UPS Developer API (https://www.ups.com/upsdeveloperkit)
+// - FedEx Web Services (https://www.fedex.com/en-us/developer.html)
+
 import { z } from "zod";
 
 interface PackageDimensions {
@@ -179,13 +191,13 @@ function getZoneMultiplier(postcode: string, country: "UK" | "US"): number {
 
   if (country === "US") {
     const firstDigit = postcode.charAt(0);
-    const zone = zones.find(zone => 
+    const zone = zones.find(zone =>
       zone.postcodes.includes(firstDigit)
     );
     return zone?.priceMultiplier || 1.2;
   }
 
-  const zone = zones.find(zone => 
+  const zone = zones.find(zone =>
     zone.postcodes.some(code => prefix.startsWith(code))
   );
   return zone?.priceMultiplier || 1.2;

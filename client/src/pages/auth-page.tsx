@@ -121,6 +121,10 @@ const registerSchema = z.object({
   phoneNumber: z.string()
     .min(1, "Phone number is required")
     .refine((val) => {
+      const userType = registerForm.getValues("userType");
+      // Skip phone format validation for free users
+      if (userType === "free") return true;
+
       const country = registerForm.getValues("countryCode");
       return PHONE_COUNTRY_CODES[country].pattern.test(val);
     }, {
@@ -266,7 +270,12 @@ export default function AuthPage() {
     };
   };
 
-  const formatPhoneNumber = (value: string, country: "GB" | "US") => {
+  const formatPhoneNumber = (value: string, country: "GB" | "US", userType: string) => {
+    // For free users, just return the cleaned input without formatting
+    if (userType === "free") {
+      return value.replace(/[^\d+]/g, "");
+    }
+
     const digits = value.replace(/\D/g, "");
 
     if (country === "US") {
@@ -440,9 +449,9 @@ export default function AuthPage() {
                     <Input
                       id="phoneNumber"
                       {...registerForm.register("phoneNumber")}
-                      placeholder={PHONE_COUNTRY_CODES[selectedCountry].format}
+                      placeholder={selectedUserType === "free" ? "Enter your phone number" : PHONE_COUNTRY_CODES[selectedCountry].format}
                       onChange={(e) => {
-                        const formatted = formatPhoneNumber(e.target.value, selectedCountry);
+                        const formatted = formatPhoneNumber(e.target.value, selectedCountry, selectedUserType);
                         registerForm.setValue("phoneNumber", formatted);
                       }}
                     />
