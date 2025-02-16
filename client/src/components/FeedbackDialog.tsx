@@ -7,7 +7,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
-//import { apiRequest } from "@/lib/queryClient"; // Removed as fetch is used instead
 
 type FeedbackType = "bug" | "feedback" | null;
 
@@ -66,15 +65,13 @@ export function FeedbackDialog() {
       };
 
       try {
-        // Ensure proper headers are set
+        // Basic fetch request without authorization
         const response = await fetch('/api/feedback', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
+            'Content-Type': 'application/json'
           },
-          body: JSON.stringify(payload),
-          credentials: 'include'
+          body: JSON.stringify(payload)
         });
 
         let responseData;
