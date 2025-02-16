@@ -577,6 +577,7 @@ const BusinessLeadsView = ({
   toast,
   playNotification
 }: BusinessLeadsViewProps) => {
+  const queryClient = useQueryClient();
   const isFirstLoadRef = useRef(true);
   const previousMessagesLengthRef = useRef(0);
   const proposalForm = useForm<ProposalFormData>({
@@ -652,12 +653,9 @@ const BusinessLeadsView = ({
     return acc;
   }, {} as Record<number, any>);
 
-  const hasUnreadMessages = leads.some(lead =>
-    lead.messages?.some(m =>
-      m.sender_id !== user?.id &&
-      !m.read
-    )
-  );
+  const getUnreadCount = (lead: LeadWithUnreadCount) => {
+    return lead.messages?.filter(m => !m.read && m.sender_id !== user?.id).length || 0;
+  };
 
   const sendProposalMutation = useMutation({
     mutationFn: async ({ leadId, proposal }: { leadId: number; proposal: string }) => {
@@ -689,7 +687,7 @@ const BusinessLeadsView = ({
 
   return (
     <div className="space-y-8">
-      {hasUnreadMessages && (
+      {leads.some(lead => getUnreadCount(lead) > 0) && (
         <div className="bg-muted/50 p-4 rounded-lg flex items-center gap-2 mb-4">
           <Info className="h-5 w-5 text-primary" />
           <p className="text-sm">You have unread messages in your leads</p>
@@ -944,6 +942,13 @@ const FreeUserLeadsView = ({
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
   const queryClient = useQueryClient();
 
+  // Calculate unread messages for the lead
+  const getUnreadCount = (lead: LeadWithUnreadCount) => {
+    return lead.messages?.filter(m =>
+      !m.read && m.sender_id !== user?.id
+    ).length || 0;
+  };
+
   const editForm = useForm<LeadFormData>({
     defaultValues: {
       title: editingLead?.title || "",
@@ -964,6 +969,13 @@ const FreeUserLeadsView = ({
       </TabsList>
       <TabsContent value="my-leads" className="mt-4">
         <div className="grid gap-6">
+          {leads.some(lead => getUnreadCount(lead) > 0) && (
+            <div className="bg-muted/50 p-4 rounded-lg flex items-center gap-2 mb-4">
+              <Info className="h-5 w-5 text-primary" />
+              <p className="text-sm">You have unread messages in your leads</p>
+            </div>
+          )}
+
           {leads.map((lead) => (
             <Card key={lead.id}>
               <CardHeader>
@@ -1037,19 +1049,19 @@ const FreeUserLeadsView = ({
                   <div className="space-y-4 mt-6">
                     <h3 className="font-semibold">Proposals</h3>
                     {lead.responses.map((response) => (
-                      <div key={response.id} className="border rounded-lg p-4">
-                        <div className="flex justify-between items-start mb-2">
+                      <div key={response.id} className="mt-4 border-t pt-4">
+                        <div className="flex justify-between items-start mb-4">
                           <div>
                             <p className="font-medium">
                               {response.business?.profile?.name || "Anonymous Business"}
                             </p>
-                            <p className="text-sm text-mutedforeground">
+                            <p className="text-sm text-muted-foreground">
                               Sent: {response.created_at ? format(new Date(response.created_at), 'PPp') : 'Recently'}
                             </p>
                           </div>
                           <Badge variant={
-                            response.status ==="accepted" ? "success" :
-                              response.status === "rejected" ?"destructive" :
+                            response.status === "accepted" ? "success" :
+                              response.status === "rejected" ? "destructive" :
                                 "secondary"
                           }>
                             {response.status.charAt(0).toUpperCase() + response.status.slice(1)}
@@ -1074,12 +1086,12 @@ const FreeUserLeadsView = ({
                                     <Button variant="outline" size="sm" className="relative">
                                       <Send className="h-4 w-4 mr-2" />
                                       Open Messages
-                                      {(lead.unreadMessages > 0) && (
+                                      {getUnreadCount(lead) > 0 && (
                                         <Badge
                                           variant="destructive"
                                           className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
                                         >
-                                          {lead.unreadMessages}
+                                          {getUnreadCount(lead)}
                                         </Badge>
                                       )}
                                     </Button>
@@ -1117,7 +1129,7 @@ const FreeUserLeadsView = ({
                                     Please provide your contact details for the business.
                                   </DialogDescription>
                                 </DialogHeader>
-                                <form onSubmit={form.handleSubmit((data) => {
+                                <form onSubmit={editForm.handleSubmit((data) => {
                                   acceptProposalMutation.mutate({
                                     leadId: lead.id,
                                     responseId: response.id,
@@ -1131,7 +1143,7 @@ const FreeUserLeadsView = ({
                                       <Textarea
                                         id="contactDetails"
                                         placeholder="Provide your contact information (phone, email, etc.)"
-                                        {...form.register("contactDetails")}
+                                        {...editForm.register("contactDetails")}
                                         required
                                       />
                                     </div>

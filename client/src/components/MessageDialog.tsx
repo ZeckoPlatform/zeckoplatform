@@ -56,7 +56,7 @@ export function MessageDialog({
   const { data: messages = [], isLoading } = useQuery<Message[]>({
     queryKey: messagesQueryKey,
     enabled: !!user?.id && isOpen,
-    refetchInterval: isOpen ? 3000 : false
+    refetchInterval: isOpen ? 3000 : false,
   });
 
   // Mark messages as read when dialog opens
@@ -68,6 +68,19 @@ export function MessageDialog({
       }
     }
   }, [isOpen, messages]);
+
+  // Handle new message notifications
+  useEffect(() => {
+    if (messages.length > previousMessagesCount.current && !isFirstMount.current) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage?.sender.id !== user?.id) {
+        playNotification('receive');
+      }
+      lastMessageRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+    previousMessagesCount.current = messages.length;
+    isFirstMount.current = false;
+  }, [messages, user?.id, playNotification]);
 
   const markAsReadMutation = useMutation({
     mutationFn: async () => {
@@ -83,9 +96,16 @@ export function MessageDialog({
           read: m.sender.id !== user?.id ? true : m.read
         }))
       );
-      // Invalidate the leads query to update unread counts
+      // Invalidate both the messages and leads queries to update unread counts
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       if (onMessagesRead) onMessagesRead();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: "Failed to mark messages as read",
+        variant: "destructive"
+      });
     }
   });
 
