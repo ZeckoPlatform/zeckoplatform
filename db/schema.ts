@@ -572,6 +572,33 @@ export const orderCommunication = pgTable("order_communication", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const feedback = pgTable("feedback", {
+  id: serial("id").primaryKey(),
+  type: text("type", { enum: ["bug", "feedback"] }).notNull(),
+  description: text("description").notNull(),
+  screenshot: text("screenshot"),
+  technical_context: jsonb("technical_context").$type<{
+    userAgent: string;
+    url: string;
+    timestamp: string;
+    userType?: string;
+    viewport?: {
+      width: number;
+      height: number;
+    };
+  }>(),
+  path: text("path"),
+  user_id: integer("user_id").references(() => users.id),
+  created_at: timestamp("created_at").defaultNow(),
+});
+
+export const feedbackRelations = relations(feedback, ({ one }) => ({
+  user: one(users, {
+    fields: [feedback.user_id],
+    references: [users.id],
+  }),
+}));
+
 export const usersRelations = relations(users, ({ many }) => ({
   leads: many(leads),
   products: many(products),
@@ -590,6 +617,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   vendorOrders: many(orders, { relationName: "vendorOrders" }),
   orderHistory: many(orderHistory),
   orderCommunications: many(orderCommunication),
+  feedback: many(feedback)
 }));
 
 export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
@@ -762,7 +790,7 @@ export const reviewsRelations = relations(reviews, ({ one }) => ({
   }),
   target: one(users, {
     fields: [reviews.targetId],
-    references: [users.id],
+references: [users.id],
   }),
   moderator: one(users, {
     fields: [reviews.moderatedBy],
