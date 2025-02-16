@@ -20,6 +20,7 @@ import SecuritySettingsPage from "@/pages/settings/security-settings";
 import NotificationSettingsPage from "@/pages/settings/notification-settings";
 import AnalyticsSettingsPage from "@/pages/settings/analytics-settings";
 import BusinessProfilePage from "@/pages/settings/business-profile";
+import ProfilePage from "@/pages/settings/profile";
 import UserEditPage from "@/pages/admin/user-edit";
 import ReviewModerationPage from "@/pages/admin/review-moderation";
 import ResetPasswordPage from "@/pages/auth/reset-password";
@@ -48,6 +49,17 @@ function Router() {
         <Route path="/notifications" component={() => <ProtectedRoute component={NotificationsPage} />} />
 
         {/* Settings Routes */}
+        <Route path="/settings/profile">
+          {() => (
+            <ProtectedRoute
+              component={() => (
+                <SettingsLayout>
+                  <ProfilePage />
+                </SettingsLayout>
+              )}
+            />
+          )}
+        </Route>
         <Route path="/settings/security">
           {() => (
             <ProtectedRoute

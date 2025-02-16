@@ -7,7 +7,8 @@ import {
   Bell, 
   BarChart4,
   Building2,
-  ChevronLeft
+  ChevronLeft,
+  User
 } from "lucide-react";
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
@@ -15,6 +16,12 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
   const { user } = useAuth();
 
   const navigation = [
+    {
+      name: "Profile",
+      href: "/settings/profile",
+      icon: User,
+      show: user?.userType === "free", // Only show for free users
+    },
     {
       name: "Security",
       href: "/settings/security",
