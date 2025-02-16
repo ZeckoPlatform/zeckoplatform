@@ -54,75 +54,107 @@ const createServer = (): Server => {
 
 const startServer = async (server: Server, port: number): Promise<boolean> => {
   return new Promise((resolve) => {
+    let isResolved = false;
+
     const cleanup = () => {
-      server.removeAllListeners();
-      if (server.listening) {
-        server.close();
+      if (!isResolved) {
+        server.removeAllListeners();
+        if (server.listening) {
+          server.close();
+        }
       }
     };
 
     const onError = (error: NodeJS.ErrnoException) => {
+      if (isResolved) return;
+
       cleanup();
       if (error.code === 'EADDRINUSE') {
-        log(`Port ${port} is in use`);
+        log(`Port ${port} is in use, will try next port`);
         resolve(false);
       } else {
         log(`Server error on port ${port}: ${error.message}`);
         resolve(false);
       }
+      isResolved = true;
     };
 
     const onListening = () => {
+      if (isResolved) return;
+
       log(`Server successfully started on port ${port}`);
       resolve(true);
+      isResolved = true;
     };
 
     server.once('error', onError);
     server.once('listening', onListening);
 
+    // Set a timeout for the port binding attempt
+    const timeout = setTimeout(() => {
+      if (!isResolved) {
+        log(`Timeout while attempting to bind to port ${port}`);
+        cleanup();
+        resolve(false);
+        isResolved = true;
+      }
+    }, 5000); // 5 second timeout
+
     try {
+      log(`Attempting to bind to port ${port}...`);
       server.listen(port, '0.0.0.0');
     } catch (error) {
-      cleanup();
-      log(`Failed to start server: ${error}`);
-      resolve(false);
+      if (!isResolved) {
+        cleanup();
+        log(`Failed to start server: ${error}`);
+        resolve(false);
+        isResolved = true;
+      }
+    } finally {
+      clearTimeout(timeout);
     }
   });
 };
 
 (async () => {
   try {
+    // Log environment information
+    log('=== Environment Information ===');
+    log(`NODE_ENV: ${process.env.NODE_ENV}`);
+    log(`PORT: ${process.env.PORT}`);
+    log(`REPLIT_PORT: ${process.env.REPLIT_PORT}`);
+    log('=== End Environment Information ===');
+
     log('Initializing server...');
     const server = createServer();
 
-    // Setup Vite or static serving before attempting port binding
-    try {
-      if (app.get("env") === "development") {
-        log('Setting up Vite development server...');
-        await setupVite(app, server);
-        log('Vite setup completed successfully');
-      } else {
-        log('Production mode: Setting up static file serving...');
-        serveStatic(app);
-      }
-    } catch (error) {
-      log(`Fatal error during server setup: ${error}`);
-      process.exit(1);
-    }
+    // Define ports to try in order of preference
+    const preferredPort = process.env.PORT || process.env.REPLIT_PORT || 3000;
+    const ports = [parseInt(preferredPort.toString()), 3000, 8080, 4000];
 
-    // Get port from environment or use defaults
-    const envPort = process.env.PORT || process.env.REPLIT_PORT;
-    const defaultPorts = [3000, 3001, 4000, 4001, 8080, 8081];
-    const ports = envPort ? [parseInt(envPort)] : defaultPorts;
-
-    // Try ports sequentially
+    log(`Will try ports in order: ${ports.join(', ')}`);
     let serverStarted = false;
+
+    // Try each port until one works
     for (const port of ports) {
       log(`Attempting to start server on port ${port}...`);
       serverStarted = await startServer(server, port);
       if (serverStarted) {
-        log(`Server is now running on port ${port}`);
-        break;
+        // Setup Vite or static serving after successful port binding
+        try {
+          if (app.get("env") === "development") {
+            log('Setting up Vite development server...');
+            await setupVite(app, server);
+            log('Vite setup completed successfully');
+          } else {
+            log('Production mode: Setting up static file serving...');
+            serveStatic(app);
+          }
+          break;
+        } catch (error) {
+          log(`Warning: Failed to setup Vite/static serving: ${error}`);
+          // Continue running even if Vite setup fails
+        }
       }
     }
 
