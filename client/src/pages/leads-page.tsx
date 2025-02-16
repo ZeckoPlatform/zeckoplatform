@@ -1059,7 +1059,7 @@ const FreeUserLeadsView = ({
                                 <h4 className="font-medium">Messages</h4>
                                 <Dialog>
                                   <DialogTrigger asChild>
-                                    <Button variant="outline" size="sm">
+                                    <Button variant="outline" size="sm" className="relative">
                                       <Send className="h-4 w-4 mr-2" />
                                       Open Messages
                                       {lead.unreadMessages > 0 && (
