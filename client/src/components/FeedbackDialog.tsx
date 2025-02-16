@@ -43,7 +43,8 @@ export function FeedbackDialog() {
         viewport: {
           width: window.innerWidth,
           height: window.innerHeight
-        }
+        },
+        userEmail: user?.email || 'Anonymous'
       };
 
       const response = await apiRequest("POST", "/api/feedback", {
@@ -52,6 +53,9 @@ export function FeedbackDialog() {
         screenshot,
         technicalContext,
         path: location,
+        // Add notification targets
+        notifyEmail: "zeckoinfo@gmail.com",
+        notifyAdmins: true
       });
 
       if (!response.ok) {
@@ -63,7 +67,7 @@ export function FeedbackDialog() {
     onSuccess: () => {
       toast({
         title: "Thank you!",
-        description: "Your feedback has been submitted successfully.",
+        description: "Your feedback has been submitted successfully and sent to our team.",
       });
       setFeedbackType(null);
       setDescription("");
@@ -97,7 +101,7 @@ export function FeedbackDialog() {
         <Button
           variant="outline"
           size="icon"
-          className="fixed bottom-4 right-4 h-12 w-12 rounded-full shadow-lg"
+          className="fixed bottom-4 right-4 h-12 w-12 rounded-full shadow-lg z-50"
         >
           <MessageSquarePlus className="h-6 w-6" />
         </Button>
