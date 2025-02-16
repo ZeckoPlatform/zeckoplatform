@@ -57,10 +57,29 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
       serveStatic(app);
     }
 
-    const PORT = process.env.PORT || 5000;
-    server.listen(PORT, () => {
-      log(`Server running on port ${PORT}`);
-    });
+    // Try different ports if the default one is busy
+    const ports = [5000, 3000, 3001];
+    let serverStarted = false;
+
+    for (const port of ports) {
+      try {
+        server.listen(port, '0.0.0.0', () => {
+          log(`Server running on port ${port}`);
+          serverStarted = true;
+        });
+        break;
+      } catch (error: any) {
+        if (error.code === 'EADDRINUSE') {
+          log(`Port ${port} is busy, trying next port...`);
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    if (!serverStarted) {
+      throw new Error('Could not start server on any available ports');
+    }
   } catch (error) {
     log(`Server startup error: ${error}`);
     process.exit(1);
