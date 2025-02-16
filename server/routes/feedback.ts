@@ -38,6 +38,7 @@ router.post("/api/feedback", async (req, res) => {
         `,
         text: `
 New ${type} Report
+
 Type: ${type}
 Description: ${description}
 User: ${technicalContext.userEmail}
@@ -51,7 +52,9 @@ Technical Context: ${JSON.stringify(technicalContext, null, 2)}
     if (notifyAdmins) {
       await createNotification({
         title: `New ${type} Report`,
-        message: `${technicalContext.userEmail} submitted a ${type} report: ${description.substring(0, 100)}${description.length > 100 ? '...' : ''}`,
+        message: description.length > 100 
+          ? `${description.substring(0, 100)}...` 
+          : description,
         type: 'feedback',
         metadata: {
           feedbackId: result.id,
