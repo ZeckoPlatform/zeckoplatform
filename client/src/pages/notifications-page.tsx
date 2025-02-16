@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 
 export default function NotificationsPage() {
   const { toast } = useToast();
@@ -43,6 +43,23 @@ export default function NotificationsPage() {
     },
   });
 
+  const handleNotificationClick = async (notification: any) => {
+    try {
+      // Mark notification as read
+      await markAsReadMutation.mutate(notification.id);
+
+      // Handle feedback notifications
+      if (notification.metadata?.feedbackId) {
+        toast({
+          title: "Feedback Details",
+          description: notification.message,
+        });
+      }
+    } catch (error) {
+      console.error('Error handling notification click:', error);
+    }
+  };
+
   return (
     <div className="container mx-auto py-8">
       <Card>
@@ -59,9 +76,10 @@ export default function NotificationsPage() {
               {notifications.map((notification: any) => (
                 <div
                   key={notification.id}
-                  className={`flex items-start space-x-4 rounded-lg border p-4 ${
+                  className={`flex items-start space-x-4 rounded-lg border p-4 hover:bg-accent cursor-pointer ${
                     notification.read ? "bg-muted/50" : "bg-background"
                   }`}
+                  onClick={() => handleNotificationClick(notification)}
                 >
                   <div className="flex-1">
                     <h4 className="text-sm font-semibold">
@@ -71,14 +89,17 @@ export default function NotificationsPage() {
                       {notification.message}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {format(new Date(notification.created_at), "PPp")}
+                      {notification.created_at && format(parseISO(notification.created_at), "PPp")}
                     </p>
                   </div>
                   {!notification.read && (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => markAsReadMutation.mutate(notification.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        markAsReadMutation.mutate(notification.id);
+                      }}
                     >
                       Mark as read
                     </Button>
