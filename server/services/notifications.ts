@@ -32,7 +32,7 @@ export async function createNotification(
 
       // Create a notification for each admin
       for (const admin of adminUsers) {
-        await db.insert(notifications).values({
+        const notificationData = {
           userId: admin.id,
           title: validatedData.title,
           message: validatedData.message,
@@ -40,7 +40,9 @@ export async function createNotification(
           link: validatedData.link,
           metadata: validatedData.metadata || {},
           read: false,
-        });
+        };
+
+        await db.insert(notifications).values(notificationData);
       }
       return true;
     }
@@ -52,7 +54,7 @@ export async function createNotification(
         : [validatedData.userId];
 
       for (const uid of userIds) {
-        await db.insert(notifications).values({
+        const notificationData = {
           userId: uid,
           title: validatedData.title,
           message: validatedData.message,
@@ -60,7 +62,9 @@ export async function createNotification(
           link: validatedData.link,
           metadata: validatedData.metadata || {},
           read: false,
-        });
+        };
+
+        await db.insert(notifications).values(notificationData);
       }
     }
 
