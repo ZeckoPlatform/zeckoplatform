@@ -308,7 +308,7 @@ interface LeadFormData {
   subcategory: string;
   budget: string;
   location: string;
-  phoneNumber?: string; // Added phone number field
+  phoneNumber?: string; 
 }
 
 interface ProfileFormData {
@@ -361,14 +361,20 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
   });
 
   const formatPhoneNumber = (value: string, country: "GB" | "US") => {
-    const digits = value.replace(/\D/g, "");
+    // Remove all non-digits
+    const digits = value.replace(/[^\d]/g, '');
 
     if (country === "US") {
+      // For US numbers
+      if (digits.length === 0) return "";
       if (digits.length <= 3) return `+1 (${digits}`;
       if (digits.length <= 6) return `+1 (${digits.slice(0, 3)}) ${digits.slice(3)}`;
       return `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
     } else {
+      // For UK numbers
+      if (digits.length === 0) return "";
       if (digits.length <= 4) return `+44 ${digits}`;
+      if (digits.length <= 10) return `+44 ${digits.slice(0, 4)} ${digits.slice(4)}`;
       return `+44 ${digits.slice(0, 4)} ${digits.slice(4, 10)}`;
     }
   };
@@ -849,7 +855,7 @@ const FreeUserLeadsView = ({
       subcategory: editingLead?.subcategory || "",
       budget: editingLead?.budget?.toString() || "",
       location: editingLead?.location || "",
-      phoneNumber: editingLead?.phoneNumber || "" //Added phone number to default values
+      phoneNumber: editingLead?.phoneNumber || "" 
     },
   });
 
@@ -1030,7 +1036,7 @@ const FreeUserLeadsView = ({
                                 <MessageDialogContent
                                   leadId={lead.id}
                                   receiverId={response.business_id}
-                                  onClose={() => queryClient.invalidateQueries({ queryKey: ["/api/leads"] })}
+                                                                    onClose={() => queryClient.invalidateQueries({ queryKey: ["/api/leads"] })}
                                 />
                               </Dialog>
                             </div>
