@@ -29,7 +29,6 @@ router.post("/api/feedback", async (req, res) => {
         subject: `New ${type} Report - Zecko Platform`,
         html: `
           <h2>New ${type} Report</h2>
-          <p><strong>Type:</strong> ${type}</p>
           <p><strong>Description:</strong> ${description}</p>
           <p><strong>User:</strong> ${technicalContext.userEmail}</p>
           <p><strong>Path:</strong> ${path}</p>
@@ -52,8 +51,8 @@ Technical Context: ${JSON.stringify(technicalContext, null, 2)}
     if (notifyAdmins) {
       await createNotification({
         title: `New ${type} Report`,
-        message: description.length > 100 ? description.substring(0, 100) + "..." : description,
-        type: "feedback",
+        message: description.substring(0, 100) + (description.length > 100 ? "..." : ""),
+        type: "info",
         metadata: {
           feedbackId: result.id,
           feedbackType: type
