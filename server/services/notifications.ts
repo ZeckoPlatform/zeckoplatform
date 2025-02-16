@@ -3,13 +3,20 @@ import { notifications, users } from '@db/schema';
 import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
 
-type NotificationType = 'info' | 'success' | 'warning' | 'error';
+export const NotificationTypeEnum = {
+  INFO: "info",
+  SUCCESS: "success",
+  WARNING: "warning",
+  ERROR: "error",
+} as const;
+
+export type NotificationType = typeof NotificationTypeEnum[keyof typeof NotificationTypeEnum];
 
 const notificationSchema = z.object({
   userId: z.number().array().optional(),
   title: z.string(),
   message: z.string(),
-  type: z.enum(['info', 'success', 'warning', 'error'] as const),
+  type: z.nativeEnum(NotificationTypeEnum),
   link: z.string().optional(),
   metadata: z.record(z.any()).optional(),
   notifyAdmins: z.boolean().optional()
@@ -38,10 +45,10 @@ export async function createNotification(
       for (const admin of adminUsers) {
         try {
           const notificationData = {
-            type: validatedData.type,
             userId: admin.id,
             title: validatedData.title,
             message: validatedData.message,
+            type: validatedData.type,
             link: validatedData.link,
             metadata: validatedData.metadata,
             read: false,
@@ -67,10 +74,10 @@ export async function createNotification(
       for (const uid of userIds) {
         try {
           const notificationData = {
-            type: validatedData.type,
             userId: uid,
             title: validatedData.title,
             message: validatedData.message,
+            type: validatedData.type,
             link: validatedData.link,
             metadata: validatedData.metadata,
             read: false,
