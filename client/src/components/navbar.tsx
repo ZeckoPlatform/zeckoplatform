@@ -131,6 +131,14 @@ export default function Navbar() {
                         Feedback Management
                       </NavigationMenuLink>
                     </NavigationMenuItem>
+                    <NavigationMenuItem>
+                      <NavigationMenuLink
+                        className="cursor-pointer"
+                        onClick={() => handleNavigation("/admin/settings/notifications")}
+                      >
+                        Notification Settings
+                      </NavigationMenuLink>
+                    </NavigationMenuItem>
                   </>
                 )}
               </NavigationMenuList>

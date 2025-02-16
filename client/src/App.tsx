@@ -111,7 +111,7 @@ function Router() {
         <Route path="/admin/users/edit/:id" component={UserEditPage} />
         <Route path="/admin/reviews" component={ReviewModerationPage} />
         <Route path="/admin/feedback" component={() => <ProtectedRoute component={FeedbackManagementPage} />} />
-        <Route path="/admin/notifications" component={() => (
+        <Route path="/admin/settings/notifications" component={() => (
           <ProtectedRoute
             component={() => (
               <SettingsLayout>
