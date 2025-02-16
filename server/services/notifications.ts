@@ -8,7 +8,7 @@ const notificationSchema = z.object({
   userId: z.number().array().optional(),
   title: z.string(),
   message: z.string(),
-  type: z.enum(["info", "success", "warning", "error"]),
+  type: z.enum(["info", "success", "warning", "error"]).default("info"),
   link: z.string().optional(),
   metadata: z.record(z.any()).optional(),
   notifyAdmins: z.boolean().optional()
