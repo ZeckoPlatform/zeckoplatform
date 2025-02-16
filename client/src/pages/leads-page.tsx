@@ -25,7 +25,7 @@ import { SubscriptionRequiredModal } from "@/components/subscription-required-mo
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const PHONE_COUNTRY_CODES = {
-  GB: {
+ GB: {
     code: "44",
     format: "+44 XXXX XXXXXX",
     pattern: /^\+44\s\d{4}\s\d{6}$/
@@ -308,7 +308,7 @@ interface LeadFormData {
   subcategory: string;
   budget: string;
   location: string;
-  phoneNumber?: string; 
+  phoneNumber?: string;
 }
 
 interface ProfileFormData {
@@ -346,7 +346,8 @@ interface LeadWithUnreadCount extends SelectLead {
 
 const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [selectedCountry, setSelectedCountry] = useState<"GB" | "US">("GB");
+  const { user } = useAuth();
+  const countryCode = user?.countryCode || "GB";
 
   const form = useForm<LeadFormData>({
     defaultValues: {
@@ -361,23 +362,22 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
   });
 
   const formatPhoneNumber = (value: string, country: "GB" | "US") => {
-    // Remove all non-digits
-    const digits = value.replace(/[^\d]/g, '');
+    const rawDigits = value.replace(/[^\d+]/g, '');
+    const digits = rawDigits.replace(/^\+?(44|1)/, '');
 
     if (country === "US") {
-      // For US numbers
       if (digits.length === 0) return "";
       if (digits.length <= 3) return `+1 (${digits}`;
       if (digits.length <= 6) return `+1 (${digits.slice(0, 3)}) ${digits.slice(3)}`;
       return `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
     } else {
-      // For UK numbers
       if (digits.length === 0) return "";
       if (digits.length <= 4) return `+44 ${digits}`;
       if (digits.length <= 10) return `+44 ${digits.slice(0, 4)} ${digits.slice(4)}`;
       return `+44 ${digits.slice(0, 4)} ${digits.slice(4, 10)}`;
     }
   };
+
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -451,41 +451,17 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
         <Label htmlFor="location">Location</Label>
         <Input id="location" {...form.register("location")} required />
       </div>
-      <div className="space-y-4">
-        <div>
-          <Label htmlFor="phoneCountry">Phone Country</Label>
-          <Select
-            onValueChange={(value: "GB" | "US") => {
-              setSelectedCountry(value);
-              form.setValue("phoneNumber", "");
-            }}
-            defaultValue={selectedCountry}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select country code" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(COUNTRIES).map(([code, name]) => (
-                <SelectItem key={code} value={code}>
-                  {name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <Label htmlFor="phoneNumber">Phone Number (Optional)</Label>
-          <Input
-            id="phoneNumber"
-            {...form.register("phoneNumber")}
-            placeholder={PHONE_COUNTRY_CODES[selectedCountry].format}
-            onChange={(e) => {
-              const formatted = formatPhoneNumber(e.target.value, selectedCountry);
-              form.setValue("phoneNumber", formatted);
-            }}
-          />
-        </div>
+      <div>
+        <Label htmlFor="phoneNumber">Phone Number (Optional)</Label>
+        <Input
+          id="phoneNumber"
+          {...form.register("phoneNumber")}
+          placeholder={PHONE_COUNTRY_CODES[countryCode].format}
+          onChange={(e) => {
+            const formatted = formatPhoneNumber(e.target.value, countryCode as "GB" | "US");
+            form.setValue("phoneNumber", formatted);
+          }}
+        />
       </div>
       <Button
         type="submit"
@@ -855,7 +831,7 @@ const FreeUserLeadsView = ({
       subcategory: editingLead?.subcategory || "",
       budget: editingLead?.budget?.toString() || "",
       location: editingLead?.location || "",
-      phoneNumber: editingLead?.phoneNumber || "" 
+      phoneNumber: editingLead?.phoneNumber || ""
     },
   });
 
@@ -1001,7 +977,7 @@ const FreeUserLeadsView = ({
                   {lead.responses && lead.responses.length > 0 ? (
                     <div className="space-y-4">
                       {lead.responses.map((response) => (
-                        <div key={response.id} className="bg-muted p-4 rounded-lg">
+                        <div key={response.id} className="border rounded-lg p-4">
                           <div className="flex justify-between items-start mb-2">
                             <div>
                               <p className="font-medium">
@@ -1022,42 +998,34 @@ const FreeUserLeadsView = ({
                           <p className="text-sm mt-2">{response.proposal}</p>
 
                           {response.status === "accepted" && (
-                            <div className="mt-4">
-                              <Dialog>
-                                <DialogTrigger asChild>
-                                  <Button variant="outline" size="sm" className="relative">
-                                    <Send className="h-4 w-4 mr-2" />
-                                    Open Messages
-                                    {lead.unreadMessages > 0 && (
-                                      <span className="absolute -top-1 -right-1 h-3 w-3 bg-destructive rounded-full" />
-                                    )}
-                                  </Button>
-                                </DialogTrigger>
-                                <MessageDialogContent
-                                  leadId={lead.id}
-                                  receiverId={response.business_id}
-                                                                    onClose={() => queryClient.invalidateQueries({ queryKey: ["/api/leads"] })}
-                                />
-                              </Dialog>
+                            <div className="mt-4 space-y-4">
+                              <div className="p-4 bg-background rounded-lg border">
+                                <h4 className="font-medium mb-2">Contact Information</h4>
+                                <p className="text-sm whitespace-pre-wrap">
+                                  {response.contactDetails || "No contact details provided yet."}
+                                </p>
+                              </div>
+
+                              <div className="p-4 bg-background rounded-lg border">
+                                <div className="flex justify-between items-center mb-4">
+                                  <h4 className="font-medium">Messages</h4>
+                                  <Dialog>
+                                    <DialogTrigger asChild>
+                                      <Button variant="outline" size="sm">
+                                        <Send className="h-4 w-4 mr-2" />
+                                        Open Messages
+                                      </Button>
+                                    </DialogTrigger>
+                                    <MessageDialogContent
+                                      leadId={lead.id}
+                                      receiverId={response.business_id}
+                                      onClose={() => queryClient.invalidateQueries({ queryKey: ["/api/leads"] })}
+                                    />
+                                  </Dialog>
+                                </div>
+                              </div>
                             </div>
                           )}
-
-                          {response.status === "pending" && (
-                            <div className="flex gap-2 mt-4">
-                              <Button
-                                size="sm"
-                              >
-                                Accept
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                              >
-                                Reject
-                              </Button>
-                            </div>
-                          )}
-
                         </div>
                       ))}
                     </div>
