@@ -119,17 +119,7 @@ const registerSchema = z.object({
   userType: z.enum(["free", "business", "vendor"]),
   countryCode: z.enum(["GB", "US"]),
   phoneNumber: z.string()
-    .min(1, "Phone number is required")
-    .refine((val) => {
-      const userType = registerForm.getValues("userType");
-      // Skip phone format validation for free users
-      if (userType === "free") return true;
-
-      const country = registerForm.getValues("countryCode");
-      return PHONE_COUNTRY_CODES[country].pattern.test(val);
-    }, {
-      message: "Please enter a valid phone number"
-    }),
+    .min(1, "Phone number is required"),
   businessName: z.string().min(2, "Company name must be at least 2 characters").optional(),
   companyNumber: z.string()
     .regex(/^[A-Z0-9]{8}$/, "Please enter a valid 8-character Companies House number")
@@ -146,51 +136,6 @@ const registerSchema = z.object({
   registeredState: z.string().optional(),
   stateRegistrationNumber: z.string().optional(),
   paymentFrequency: z.enum(["monthly", "annual"]).optional(),
-}).superRefine((data, ctx) => {
-  if (data.userType === "business" || data.userType === "vendor") {
-    if (!data.businessName) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `${data.userType === "business" ? "Business" : "Vendor"} name is required`,
-        path: ["businessName"]
-      });
-    }
-
-    if (data.countryCode === "GB") {
-      if (!data.companyNumber) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Companies House number is required for UK businesses",
-          path: ["companyNumber"]
-        });
-      }
-      if (data.userType === "vendor" && !data.utrNumber) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "UTR number is required for UK vendors",
-          path: ["utrNumber"]
-        });
-      }
-    }
-
-    if (data.countryCode === "US") {
-      if (!data.einNumber) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "EIN is required for US businesses",
-          path: ["einNumber"]
-        });
-      }
-      if (!data.registeredState) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "State registration is required for US businesses",
-          path: ["registeredState"]
-        });
-      }
-    }
-  }
-  return true;
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -228,6 +173,45 @@ export default function AuthPage() {
       phoneNumber: ""
     },
   });
+
+  // Move the validation to a separate function that has access to form values
+  const validateRegisterForm = (data: RegisterFormData) => {
+    const errors: Record<string, string> = {};
+
+    // Phone number validation for business/vendor users
+    if (data.userType !== "free") {
+      const phonePattern = PHONE_COUNTRY_CODES[data.countryCode].pattern;
+      if (!phonePattern.test(data.phoneNumber)) {
+        errors.phoneNumber = "Please enter a valid phone number";
+      }
+    }
+
+    if (data.userType === "business" || data.userType === "vendor") {
+      if (!data.businessName) {
+        errors.businessName = `${data.userType === "business" ? "Business" : "Vendor"} name is required`;
+      }
+
+      if (data.countryCode === "GB") {
+        if (!data.companyNumber) {
+          errors.companyNumber = "Companies House number is required for UK businesses";
+        }
+        if (data.userType === "vendor" && !data.utrNumber) {
+          errors.utrNumber = "UTR number is required for UK vendors";
+        }
+      }
+
+      if (data.countryCode === "US") {
+        if (!data.einNumber) {
+          errors.einNumber = "EIN is required for US businesses";
+        }
+        if (!data.registeredState) {
+          errors.registeredState = "State registration is required for US businesses";
+        }
+      }
+    }
+
+    return errors;
+  };
 
   const selectedCountry = registerForm.watch("countryCode");
   const selectedUserType = registerForm.watch("userType");
@@ -379,11 +363,22 @@ export default function AuthPage() {
 
               <TabsContent value="register">
                 <form
-                  onSubmit={registerForm.handleSubmit((data) =>
-                    registerMutation.mutate(data, {
-                      onSuccess: onRegisterSuccess,
-                    })
-                  )}
+                  onSubmit={registerForm.handleSubmit((data) => {
+                    const errors = validateRegisterForm(data);
+                    if (Object.keys(errors).length > 0) {
+                      registerForm.setError("phoneNumber", { type: 'custom', message: errors.phoneNumber });
+                      registerForm.setError("businessName", { type: 'custom', message: errors.businessName });
+                      registerForm.setError("companyNumber", { type: 'custom', message: errors.companyNumber });
+                      registerForm.setError("utrNumber", { type: 'custom', message: errors.utrNumber });
+                      registerForm.setError("einNumber", { type: 'custom', message: errors.einNumber });
+                      registerForm.setError("registeredState", { type: 'custom', message: errors.registeredState });
+
+                    } else {
+                      registerMutation.mutate(data, {
+                        onSuccess: onRegisterSuccess,
+                      });
+                    }
+                  })}
                   className="space-y-4"
                 >
                   <div>
