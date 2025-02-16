@@ -150,7 +150,7 @@ export function setupAuth(app: Express) {
         active: true,
       };
 
-      // Add business-specific fields if not a free user
+      // Only add business-specific fields if not a free user
       if (result.data.userType !== "free") {
         Object.assign(userData, {
           businessName: result.data.businessName,
@@ -165,6 +165,7 @@ export function setupAuth(app: Express) {
           paymentFrequency: result.data.paymentFrequency,
         });
       } else {
+        // For free users, set subscription fields accordingly
         Object.assign(userData, {
           subscriptionActive: true,
           subscriptionTier: "none",

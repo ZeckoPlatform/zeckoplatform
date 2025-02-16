@@ -118,24 +118,24 @@ const registerSchema = z.object({
   userType: z.enum(["free", "business", "vendor"]),
   countryCode: z.enum(["GB", "US"]),
   phoneNumber: z.string().min(1, "Phone number is required"),
-  // Make business fields optional and only validate them for business/vendor users
-  businessName: z.string().min(2, "Company name must be at least 2 characters").optional().nullable(),
-  companyNumber: z.string().optional().nullable(),
-  vatNumber: z.string().optional().nullable(),
-  utrNumber: z.string().optional().nullable(),
-  einNumber: z.string().optional().nullable(),
-  registeredState: z.string().optional().nullable(),
-  stateRegistrationNumber: z.string().optional().nullable(),
-  paymentFrequency: z.enum(["monthly", "annual"]).optional().nullable(),
-}).refine((data) => {
+  // Business fields are completely optional
+  businessName: z.string().optional(),
+  companyNumber: z.string().optional(),
+  vatNumber: z.string().optional(),
+  utrNumber: z.string().optional(),
+  einNumber: z.string().optional(),
+  registeredState: z.string().optional(),
+  stateRegistrationNumber: z.string().optional(),
+  paymentFrequency: z.enum(["monthly", "annual"]).optional(),
+}).superRefine((data, ctx) => {
   // Only validate business fields if user type is business or vendor
-  if (data.userType !== "free") {
-    return !!data.businessName; // Require business name for business/vendor
+  if (data.userType !== "free" && !data.businessName) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Business name is required for business/vendor accounts",
+      path: ["businessName"],
+    });
   }
-  return true; // No additional validation for free users
-}, {
-  message: "Business name is required for business/vendor accounts",
-  path: ["businessName"],
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -195,26 +195,17 @@ export default function AuthPage() {
     try {
       console.log('Starting registration with data:', data);
 
-      // Prepare registration data
+      // For free users, strip out all business-related fields
       const registrationData: any = {
         email: data.email,
         password: data.password,
         userType: data.userType,
         countryCode: data.countryCode,
-        phoneNumber: formatPhoneNumber(data.phoneNumber, data.countryCode, data.userType),
+        phoneNumber: formatPhoneNumber(data.phoneNumber, data.countryCode),
       };
 
-      // Only add business-specific fields if not a free user
+      // Only include business fields for business/vendor users
       if (data.userType !== "free") {
-        if (!data.businessName) {
-          console.log('Business name validation failed');
-          registerForm.setError("businessName", {
-            type: "custom",
-            message: `${data.userType === "business" ? "Business" : "Vendor"} name is required`,
-          });
-          return;
-        }
-
         Object.assign(registrationData, {
           businessName: data.businessName,
           companyNumber: data.companyNumber,
@@ -253,29 +244,29 @@ export default function AuthPage() {
     }
   };
 
-  const formatPhoneNumber = (value: string, country: "GB" | "US", userType: string) => {
+  const formatPhoneNumber = (value: string, country: "GB" | "US", userType?: string) => {
     // Remove all non-digits first
     const digits = value.replace(/[^\d+]/g, "");
 
-    // For free users, just return the cleaned number
-    if (userType === "free") {
+    // For free users, just return the cleaned number, otherwise apply formatting
+    if (!userType || userType === "free") {
       // If it starts with a plus, keep it, otherwise add the country code
       if (digits.startsWith('+')) {
         return digits;
       }
       return country === "GB" ? `+44${digits}` : `+1${digits}`;
-    }
-
-    // For business/vendor users, apply country-specific formatting
-    if (country === "US") {
-      if (digits.length <= 1) return digits;
-      if (digits.length <= 3) return `+1 (${digits}`;
-      if (digits.length <= 6) return `+1 (${digits.slice(0, 3)}) ${digits.slice(3)}`;
-      return `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
     } else {
-      if (digits.length <= 1) return digits;
-      if (digits.length <= 4) return `+44 ${digits}`;
-      return `+44 ${digits.slice(0, 4)} ${digits.slice(4, 10)}`;
+      // For business/vendor users, apply country-specific formatting
+      if (country === "US") {
+        if (digits.length <= 1) return digits;
+        if (digits.length <= 3) return `+1 (${digits}`;
+        if (digits.length <= 6) return `+1 (${digits.slice(0, 3)}) ${digits.slice(3)}`;
+        return `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+      } else {
+        if (digits.length <= 1) return digits;
+        if (digits.length <= 4) return `+44 ${digits}`;
+        return `+44 ${digits.slice(0, 4)} ${digits.slice(4, 10)}`;
+      }
     }
   };
 
@@ -373,8 +364,8 @@ export default function AuthPage() {
               </TabsContent>
 
               <TabsContent value="register">
-                <form 
-                  onSubmit={registerForm.handleSubmit(handleRegisterSubmit)} 
+                <form
+                  onSubmit={registerForm.handleSubmit(handleRegisterSubmit)}
                   className="space-y-4"
                 >
                   <div>
@@ -411,16 +402,16 @@ export default function AuthPage() {
                       defaultValue="free"
                       onValueChange={(value) => {
                         registerForm.setValue("userType", value as "free" | "business" | "vendor");
-                        // Reset business-related fields when switching to free
+                        // Reset all business-related fields when switching to free
                         if (value === "free") {
-                          registerForm.setValue("businessName", "");
-                          registerForm.setValue("companyNumber", "");
-                          registerForm.setValue("vatNumber", "");
-                          registerForm.setValue("utrNumber", "");
-                          registerForm.setValue("einNumber", "");
-                          registerForm.setValue("registeredState", "");
-                          registerForm.setValue("stateRegistrationNumber", "");
-                          registerForm.setValue("paymentFrequency", "monthly");
+                          registerForm.setValue("businessName", undefined);
+                          registerForm.setValue("companyNumber", undefined);
+                          registerForm.setValue("vatNumber", undefined);
+                          registerForm.setValue("utrNumber", undefined);
+                          registerForm.setValue("einNumber", undefined);
+                          registerForm.setValue("registeredState", undefined);
+                          registerForm.setValue("stateRegistrationNumber", undefined);
+                          registerForm.setValue("paymentFrequency", undefined);
                         }
                       }}
                     >
@@ -667,8 +658,8 @@ export default function AuthPage() {
 
                   {registerMutation.isError && (
                     <p className="text-sm text-destructive mt-2">
-                      {registerMutation.error instanceof Error 
-                        ? registerMutation.error.message 
+                      {registerMutation.error instanceof Error
+                        ? registerMutation.error.message
                         : "An error occurred during registration"}
                     </p>
                   )}
