@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@db";
 import { feedback } from "@db/schema";
 import { sendEmail } from "../services/email";
-import { createNotification, NotificationTypeEnum } from "../services/notifications";
+import { createNotification } from "../services/notifications";
 
 const router = Router();
 
@@ -49,7 +49,7 @@ router.post("/api/feedback", async (req, res) => {
         const notificationData = {
           title: `New ${type} Report`,
           message: truncatedMessage,
-          type: NotificationTypeEnum.INFO,
+          type: "info", // Explicitly using string literal that matches database enum
           metadata: {
             feedbackId: result.id,
             feedbackType: type,
@@ -57,7 +57,7 @@ router.post("/api/feedback", async (req, res) => {
           },
           notifyAdmins: true
         };
-        console.log('Notification data:', notificationData);
+        console.log('Creating notification with data:', JSON.stringify(notificationData, null, 2));
 
         await createNotification(notificationData);
       } catch (notificationError) {

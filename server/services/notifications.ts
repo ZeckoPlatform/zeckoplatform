@@ -3,20 +3,12 @@ import { notifications, users } from '@db/schema';
 import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
 
-export const NotificationTypeEnum = {
-  INFO: "info",
-  SUCCESS: "success",
-  WARNING: "warning",
-  ERROR: "error",
-} as const;
-
-export type NotificationType = typeof NotificationTypeEnum[keyof typeof NotificationTypeEnum];
-
+// Define the notification schema to match database schema exactly
 const notificationSchema = z.object({
   userId: z.number().array().optional(),
   title: z.string(),
   message: z.string(),
-  type: z.nativeEnum(NotificationTypeEnum),
+  type: z.enum(["info", "success", "warning", "error"]),
   link: z.string().optional(),
   metadata: z.record(z.any()).optional(),
   notifyAdmins: z.boolean().optional()
@@ -28,9 +20,12 @@ export async function createNotification(
   notification: CreateNotificationInput
 ): Promise<boolean> {
   try {
+    // Log incoming notification data
+    console.log('Incoming notification data:', JSON.stringify(notification, null, 2));
+
     // Validate the notification data
     const validatedData = notificationSchema.parse(notification);
-    console.log('Validated notification data:', validatedData);
+    console.log('Validated notification data:', JSON.stringify(validatedData, null, 2));
 
     // If notifyAdmins is true, get all admin user IDs
     if (validatedData.notifyAdmins) {
@@ -53,7 +48,7 @@ export async function createNotification(
             metadata: validatedData.metadata,
             read: false,
           };
-          console.log('Inserting notification for admin:', notificationData);
+          console.log('Inserting notification for admin:', JSON.stringify(notificationData, null, 2));
 
           const result = await db.insert(notifications).values(notificationData);
           console.log('Insert result:', result);
@@ -82,7 +77,7 @@ export async function createNotification(
             metadata: validatedData.metadata,
             read: false,
           };
-          console.log('Inserting notification for user:', notificationData);
+          console.log('Inserting notification for user:', JSON.stringify(notificationData, null, 2));
 
           const result = await db.insert(notifications).values(notificationData);
           console.log('Insert result:', result);
