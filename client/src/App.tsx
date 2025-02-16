@@ -26,6 +26,7 @@ import ReviewModerationPage from "@/pages/admin/review-moderation";
 import ResetPasswordPage from "@/pages/auth/reset-password";
 import ReviewsDashboard from "@/pages/reviews-dashboard";
 import NotificationsPage from "@/pages/notifications-page";
+import { FeedbackDialog } from "@/components/FeedbackDialog";
 
 function Router() {
   return (
@@ -111,6 +112,7 @@ function Router() {
 
         <Route component={NotFound} />
       </Switch>
+      <FeedbackDialog />
     </div>
   );
 }
