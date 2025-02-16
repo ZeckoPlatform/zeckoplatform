@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { MessageSquarePlus, Bug, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -115,6 +115,13 @@ export function FeedbackDialog() {
               ? "Report a Bug"
               : "Share Feedback"}
           </DialogTitle>
+          <DialogDescription>
+            {!feedbackType
+              ? "Choose the type of feedback you'd like to share"
+              : feedbackType === "bug"
+              ? "Help us improve by reporting any issues you encounter"
+              : "Share your thoughts and suggestions with us"}
+          </DialogDescription>
         </DialogHeader>
 
         {!feedbackType ? (
