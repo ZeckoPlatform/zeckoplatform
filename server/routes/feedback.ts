@@ -57,9 +57,10 @@ Technical Context: ${JSON.stringify(technicalContext, null, 2)}
         message: truncatedMessage,
         metadata: {
           feedbackId: result.id,
-          feedbackType: type
+          feedbackType: type,
+          path
         },
-        notifyAdmins: true // This will automatically notify all admin users
+        notifyAdmins: true
       });
     }
 

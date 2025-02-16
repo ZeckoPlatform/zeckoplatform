@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 // Define the notification schema
 const notificationSchema = z.object({
-  type: z.enum(['info', 'success', 'warning', 'error']),
+  type: z.enum(["info", "success", "warning", "error"]),
   title: z.string(),
   message: z.string(),
   userId: z.number().array().optional(), // Allow array of userIds for admin notifications
@@ -35,7 +35,7 @@ export async function createNotification(
           type: validatedData.type,
           title: validatedData.title,
           message: validatedData.message,
-          metadata: validatedData.metadata,
+          metadata: validatedData.metadata || {},
           userId: admin.id,
           read: false,
           createdAt: new Date()
@@ -51,7 +51,7 @@ export async function createNotification(
           type: validatedData.type,
           title: validatedData.title,
           message: validatedData.message,
-          metadata: validatedData.metadata,
+          metadata: validatedData.metadata || {},
           userId: uid,
           read: false,
           createdAt: new Date()
