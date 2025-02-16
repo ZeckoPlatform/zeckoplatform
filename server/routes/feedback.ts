@@ -52,13 +52,11 @@ Technical Context: ${JSON.stringify(technicalContext, null, 2)}
     if (notifyAdmins) {
       await createNotification({
         title: `New ${type} Report`,
-        message: description.length > 100 
-          ? `${description.substring(0, 100)}...` 
-          : description,
-        type: 'feedback',
+        message: description.length > 100 ? description.substring(0, 100) + "..." : description,
+        type: "feedback",
         metadata: {
           feedbackId: result.id,
-          feedbackType: type,
+          feedbackType: type
         },
         notifyAdmins: true
       });
