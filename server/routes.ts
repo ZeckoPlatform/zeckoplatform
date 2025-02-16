@@ -22,6 +22,7 @@ import documentRoutes from './routes/documents';
 import reviewRoutes from './routes/reviews';
 import orderRoutes from './routes/orders';
 import { cleanupExpiredLeads } from './services/cleanup';
+import feedbackRoutes from './routes/feedback';
 
 interface User {
   id: number;
@@ -54,8 +55,9 @@ async function getUserByUsername(username: string): Promise<[User | null]> {
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
 
-  // Register auth routes before middleware
-  app.use('/api', authRoutes);
+  // Register feedback routes before authentication middleware
+  // This allows the feedback endpoint to be accessed without authentication
+  app.use('/api', feedbackRoutes);
 
   // Authentication middleware for protected routes
   app.use('/api', (req, res, next) => {
@@ -66,36 +68,15 @@ export function registerRoutes(app: Express): Server {
         req.path.endsWith('/auth/reset-password/confirm') ||
         req.path.endsWith('/vendor/stripe/account') ||
         req.path.endsWith('/vendor/stripe/account/status') ||
+        req.path.endsWith('/feedback') ||  // Add feedback endpoint to bypass list
         req.method === 'OPTIONS') {
       return next();
     }
     authenticateToken(req, res, next);
   });
 
-  // Move products route to main routes
-  // Add before the subscription routes registration
-  app.get("/api/products", async (req, res) => {
-    try {
-      const allProducts = await db
-        .select()
-        .from(products)
-        .orderBy(desc(products.created_at));
-
-      // Convert prices from cents to dollars for response
-      const productsWithFormattedPrices = allProducts.map(product => ({
-        ...product,
-        price: (Number(product.price) / 100).toFixed(2)
-      }));
-
-      return res.json(productsWithFormattedPrices);
-    } catch (error) {
-      log(`Error fetching products: ${error instanceof Error ? error.message : String(error)}`);
-      console.error("Error fetching products:", error);
-      return res.status(500).json({ error: "Failed to fetch products" });
-    }
-  });
-
-  // Register all route modules
+  // Register all other route modules
+  app.use('/api', authRoutes);
   app.use('/api', subscriptionRoutes);
   app.use('/api', invoiceRoutes);
   app.use('/api', analyticsRoutes);

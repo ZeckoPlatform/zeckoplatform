@@ -18,6 +18,7 @@ const feedbackSchema = z.object({
   notifyAdmins: z.boolean().optional()
 });
 
+// Remove authentication requirement for feedback submission
 router.post("/api/feedback", async (req, res) => {
   try {
     console.log('Received feedback request:', JSON.stringify(req.body, null, 2));
@@ -25,6 +26,7 @@ router.post("/api/feedback", async (req, res) => {
     // Validate request body
     const validatedData = feedbackSchema.parse(req.body);
     const { type, description, screenshot, technicalContext, path, notifyEmail, notifyAdmins } = validatedData;
+
     // Make user_id optional
     const userId = req.user?.id || null;
 
