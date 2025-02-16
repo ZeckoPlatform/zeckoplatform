@@ -183,6 +183,8 @@ export default function AuthPage() {
 
   const handleRegisterSubmit = async (data: RegisterFormData) => {
     try {
+      console.log('Starting registration with data:', data);
+
       // Prepare registration data
       const registrationData: any = {
         email: data.email,
@@ -196,6 +198,7 @@ export default function AuthPage() {
       if (data.userType !== "free") {
         // Validate business/vendor specific fields
         if (!data.businessName) {
+          console.log('Business name validation failed');
           registerForm.setError("businessName", {
             type: "custom",
             message: `${data.userType === "business" ? "Business" : "Vendor"} name is required`,
@@ -361,7 +364,10 @@ export default function AuthPage() {
               </TabsContent>
 
               <TabsContent value="register">
-                <form onSubmit={registerForm.handleSubmit(handleRegisterSubmit)} className="space-y-4">
+                <form 
+                  onSubmit={registerForm.handleSubmit(handleRegisterSubmit)} 
+                  className="space-y-4"
+                >
                   <div>
                     <Label htmlFor="reg-email">Email</Label>
                     <Input
@@ -627,6 +633,18 @@ export default function AuthPage() {
                     type="submit"
                     className="w-full"
                     disabled={registerMutation.isPending}
+                    onClick={() => {
+                      // Add form validation check
+                      if (Object.keys(registerForm.formState.errors).length > 0) {
+                        console.log('Form validation errors:', registerForm.formState.errors);
+                        toast({
+                          title: "Validation Error",
+                          description: "Please check all fields are filled correctly.",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                    }}
                   >
                     {registerMutation.isPending ? (
                       <>
@@ -637,6 +655,14 @@ export default function AuthPage() {
                       'Register'
                     )}
                   </Button>
+
+                  {registerMutation.isError && (
+                    <p className="text-sm text-destructive mt-2">
+                      {registerMutation.error instanceof Error 
+                        ? registerMutation.error.message 
+                        : "An error occurred during registration"}
+                    </p>
+                  )}
                 </form>
               </TabsContent>
             </Tabs>
