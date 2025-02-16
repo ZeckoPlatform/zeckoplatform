@@ -1,16 +1,30 @@
 import { Router } from "express";
 import { db } from "@db";
 import { feedback } from "@db/schema";
+import { z } from "zod";
 import { sendEmail } from "../services/email";
 import { createNotification, NotificationTypes } from "../services/notifications";
 
 const router = Router();
 
-router.post("/api/feedback", async (req, res) => {
-  const { type, description, screenshot, technicalContext, path, notifyEmail, notifyAdmins } = req.body;
-  const userId = req.user?.id;
+// Define feedback schema
+const feedbackSchema = z.object({
+  type: z.enum(["bug", "feedback"]),
+  description: z.string().min(1),
+  screenshot: z.string().nullable(),
+  technicalContext: z.record(z.any()),
+  path: z.string(),
+  notifyEmail: z.string().email().optional(),
+  notifyAdmins: z.boolean().optional()
+});
 
+router.post("/api/feedback", async (req, res) => {
   try {
+    // Validate request body
+    const validatedData = feedbackSchema.parse(req.body);
+    const { type, description, screenshot, technicalContext, path, notifyEmail, notifyAdmins } = validatedData;
+    const userId = req.user?.id;
+
     // Store feedback in database
     const [result] = await db.insert(feedback).values({
       type,
@@ -69,6 +83,9 @@ router.post("/api/feedback", async (req, res) => {
     res.status(201).json(result);
   } catch (error) {
     console.error("Failed to save feedback:", error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: error.errors });
+    }
     res.status(500).json({ error: "Failed to save feedback" });
   }
 });

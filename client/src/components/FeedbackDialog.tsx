@@ -35,6 +35,13 @@ export function FeedbackDialog() {
 
   const submitFeedbackMutation = useMutation({
     mutationFn: async () => {
+      // Sanitize description by trimming whitespace
+      const sanitizedDescription = description.trim();
+
+      if (!sanitizedDescription) {
+        throw new Error("Please provide a description");
+      }
+
       const technicalContext = {
         userAgent: navigator.userAgent,
         url: window.location.href,
@@ -49,7 +56,7 @@ export function FeedbackDialog() {
 
       const response = await apiRequest("POST", "/api/feedback", {
         type: feedbackType,
-        description,
+        description: sanitizedDescription,
         screenshot,
         technicalContext,
         path: location,
@@ -58,7 +65,8 @@ export function FeedbackDialog() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to submit feedback");
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to submit feedback");
       }
 
       return response.json();
@@ -68,9 +76,7 @@ export function FeedbackDialog() {
         title: "Thank you!",
         description: "Your feedback has been submitted successfully and sent to our team.",
       });
-      setFeedbackType(null);
-      setDescription("");
-      setScreenshot(null);
+      resetForm();
       setOpen(false);
     },
     onError: (error: Error) => {
@@ -84,7 +90,9 @@ export function FeedbackDialog() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!description) {
+
+    const trimmedDescription = description.trim();
+    if (!trimmedDescription) {
       toast({
         title: "Error",
         description: "Please provide a description",
@@ -92,7 +100,13 @@ export function FeedbackDialog() {
       });
       return;
     }
-    await submitFeedbackMutation.mutateAsync();
+
+    try {
+      await submitFeedbackMutation.mutateAsync();
+    } catch (error) {
+      // Error is handled in mutation's onError
+      console.error('Feedback submission error:', error);
+    }
   };
 
   const resetForm = () => {
@@ -102,12 +116,15 @@ export function FeedbackDialog() {
   };
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => {
-      setOpen(isOpen);
-      if (!isOpen) {
-        resetForm();
-      }
-    }}>
+    <Dialog 
+      open={open} 
+      onOpenChange={(isOpen) => {
+        setOpen(isOpen);
+        if (!isOpen) {
+          resetForm();
+        }
+      }}
+    >
       <DialogTrigger asChild>
         <Button
           variant="outline"
