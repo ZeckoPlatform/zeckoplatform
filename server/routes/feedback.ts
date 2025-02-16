@@ -38,7 +38,6 @@ router.post("/api/feedback", async (req, res) => {
         text: `
 New ${type} Report
 
-Type: ${type}
 Description: ${description}
 User: ${technicalContext.userEmail}
 Path: ${path}
@@ -49,15 +48,20 @@ Technical Context: ${JSON.stringify(technicalContext, null, 2)}
 
     // Create admin notification
     if (notifyAdmins) {
+      const truncatedMessage = description.length > 100 
+        ? description.substring(0, 100) + "..." 
+        : description;
+
       await createNotification({
-        title: `New ${type} Report`,
-        message: description.substring(0, 100) + (description.length > 100 ? "..." : ""),
         type: "info",
+        title: `New ${type} Report`,
+        message: truncatedMessage,
         metadata: {
           feedbackId: result.id,
           feedbackType: type
         },
-        notifyAdmins: true
+        notifyAdmins: true,
+        userId: userId
       });
     }
 

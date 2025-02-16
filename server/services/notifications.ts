@@ -1,12 +1,32 @@
 import { db } from '@db';
-import { notifications, type InsertNotification } from '@db/schema';
-import { eq } from 'drizzle-orm';
+import { notifications } from '@db/schema';
+import { eq, and } from 'drizzle-orm';
+import { z } from 'zod';
+
+// Define the notification schema
+const notificationSchema = z.object({
+  type: z.enum(['error', 'info', 'success', 'warning']),
+  title: z.string(),
+  message: z.string(),
+  userId: z.number().optional(),
+  metadata: z.record(z.any()).optional(),
+  notifyAdmins: z.boolean().optional()
+});
+
+export type CreateNotificationInput = z.infer<typeof notificationSchema>;
 
 export async function createNotification(
-  notification: Omit<InsertNotification, 'id' | 'createdAt' | 'read'>
+  notification: CreateNotificationInput
 ): Promise<boolean> {
   try {
-    await db.insert(notifications).values(notification);
+    // Validate the notification data
+    const validatedData = notificationSchema.parse(notification);
+
+    await db.insert(notifications).values({
+      ...validatedData,
+      read: false,
+      created_at: new Date()
+    });
     return true;
   } catch (error) {
     console.error('Error creating notification:', error);
@@ -23,8 +43,10 @@ export async function markNotificationAsRead(
       .update(notifications)
       .set({ read: true })
       .where(
-        eq(notifications.id, notificationId) &&
-        eq(notifications.userId, userId)
+        and(
+          eq(notifications.id, notificationId),
+          eq(notifications.userId, userId)
+        )
       )
       .returning();
 
@@ -41,8 +63,10 @@ export async function getUnreadNotifications(userId: number) {
       .select()
       .from(notifications)
       .where(
-        eq(notifications.userId, userId) &&
-        eq(notifications.read, false)
+        and(
+          eq(notifications.userId, userId),
+          eq(notifications.read, false)
+        )
       )
       .orderBy(notifications.createdAt);
   } catch (error) {
@@ -59,8 +83,10 @@ export async function deleteOldNotifications(daysToKeep = 30): Promise<boolean> 
     await db
       .delete(notifications)
       .where(
-        notifications.createdAt < cutoffDate &&
-        notifications.read === true
+        and(
+          notifications.createdAt < cutoffDate,
+          eq(notifications.read, true)
+        )
       );
 
     return true;
