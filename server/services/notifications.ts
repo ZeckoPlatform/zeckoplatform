@@ -5,13 +5,13 @@ import { z } from 'zod';
 
 // Define the notification type to match database schema exactly
 const NotificationType = ["info", "success", "warning", "error"] as const;
-export type NotificationType = typeof NotificationType[number];
+export type NotificationType = (typeof NotificationType)[number];
 
 const notificationSchema = z.object({
   userId: z.union([z.number(), z.array(z.number())]).optional(),
   title: z.string(),
   message: z.string(),
-  type: z.enum(NotificationType),
+  type: z.enum(NotificationType).default("info"),
   link: z.string().optional(),
   metadata: z.record(z.any()).optional(),
   notifyAdmins: z.boolean().optional()
