@@ -35,24 +35,26 @@ export async function checkLoginAttempts(ip: string, email: string): Promise<{
 
   // Filter failed attempts and get the count
   const failedAttempts = recentAttempts.filter(
-    (attempt) => attempt.metadata?.successful === false
+    (attempt) => attempt.metadata && attempt.metadata.successful === false
   );
 
   if (failedAttempts.length >= MAX_LOGIN_ATTEMPTS) {
     const mostRecentAttempt = failedAttempts[failedAttempts.length - 1];
-    const lockoutEnd = new Date(
-      mostRecentAttempt.created_at.getTime() + LOCKOUT_DURATION
-    );
+    if (mostRecentAttempt && mostRecentAttempt.created_at) {
+      const lockoutEnd = new Date(
+        mostRecentAttempt.created_at.getTime() + LOCKOUT_DURATION
+      );
 
-    if (lockoutEnd > new Date()) {
-      const remainingMs = lockoutEnd.getTime() - Date.now();
-      const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
+      if (lockoutEnd > new Date()) {
+        const remainingMs = lockoutEnd.getTime() - Date.now();
+        const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
 
-      return {
-        allowed: false,
-        lockoutEndTime: lockoutEnd,
-        lockoutMinutes: remainingMinutes
-      };
+        return {
+          allowed: false,
+          lockoutEndTime: lockoutEnd,
+          lockoutMinutes: remainingMinutes
+        };
+      }
     }
   }
 
@@ -64,8 +66,8 @@ export async function checkLoginAttempts(ip: string, email: string): Promise<{
 
 export async function recordLoginAttempt(attempt: LoginAttempt) {
   try {
-    const logEntry = {
-      user_id: attempt.successful ? attempt.userId : null,
+    await db.insert(analyticsLogs).values({
+      user_id: attempt.userId || null,
       event_type: "login",
       ip_address: attempt.ip,
       metadata: {
@@ -73,9 +75,7 @@ export async function recordLoginAttempt(attempt: LoginAttempt) {
         successful: attempt.successful,
       },
       created_at: attempt.timestamp,
-    };
-
-    await db.insert(analyticsLogs).values(logEntry);
+    });
   } catch (error) {
     console.error('Error recording login attempt:', error);
     // Don't throw the error - we don't want to break the login flow
