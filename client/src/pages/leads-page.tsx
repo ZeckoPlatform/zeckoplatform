@@ -767,6 +767,12 @@ const BusinessLeadsView = ({
                               </Button>
                             </DialogTrigger>
                             <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Message Thread</DialogTitle>
+                                <DialogDescription>
+                                  View and send messages for this lead
+                                </DialogDescription>
+                              </DialogHeader>
                               <MessageDialog
                                 leadId={lead.id}
                                 receiverId={lead.user_id} // Send to lead owner
@@ -1061,6 +1067,12 @@ const FreeUserLeadsView = ({
                                 </Button>
                               </DialogTrigger>
                               <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Message Thread</DialogTitle>
+                                  <DialogDescription>
+                                    View and send messages for this lead
+                                  </DialogDescription>
+                                </DialogHeader>
                                 <MessageDialog
                                   leadId={lead.id}
                                   receiverId={response.business_id} // Send to business
