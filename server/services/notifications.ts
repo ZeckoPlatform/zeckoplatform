@@ -111,24 +111,3 @@ export async function getUnreadNotifications(userId: number) {
     return [];
   }
 }
-
-export async function deleteOldNotifications(daysToKeep = 30): Promise<boolean> {
-  try {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
-
-    await db
-      .delete(notifications)
-      .where(
-        and(
-          notifications.createdAt < cutoffDate,
-          eq(notifications.read, true)
-        )
-      );
-
-    return true;
-  } catch (error) {
-    console.error('Error deleting old notifications:', error);
-    return false;
-  }
-}

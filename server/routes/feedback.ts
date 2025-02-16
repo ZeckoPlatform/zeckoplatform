@@ -47,7 +47,7 @@ router.post("/api/feedback", async (req, res) => {
       await createNotification({
         title: `New ${type} Report`,
         message: truncatedMessage,
-        type: "info",  // Use exact case-sensitive enum value
+        type: "info",
         metadata: {
           feedbackId: result.id,
           feedbackType: type,
