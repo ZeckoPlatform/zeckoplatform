@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { setupAuth, authenticateToken } from "./auth";
 import { db } from "@db";
 import { leads, users, subscriptions, products, leadResponses, messages } from "@db/schema";
-import { eq, and, or, gt, not, sql } from "drizzle-orm";
+import { eq, and, or, gt, not, sql, desc } from "drizzle-orm";
 import { log } from "./vite";
 import { comparePasswords, hashPassword } from './auth';
 import fs from 'fs';
@@ -70,6 +70,29 @@ export function registerRoutes(app: Express): Server {
       return next();
     }
     authenticateToken(req, res, next);
+  });
+
+  // Move products route to main routes
+  // Add before the subscription routes registration
+  app.get("/api/products", authenticateToken, async (req, res) => {
+    try {
+      const allProducts = await db
+        .select()
+        .from(products)
+        .orderBy(desc(products.createdAt));
+
+      // Convert prices from cents to dollars for response
+      const productsWithFormattedPrices = allProducts.map(product => ({
+        ...product,
+        price: (product.price / 100).toFixed(2)
+      }));
+
+      return res.json(productsWithFormattedPrices);
+    } catch (error) {
+      log(`Error fetching products: ${error instanceof Error ? error.message : String(error)}`);
+      console.error("Error fetching products:", error);
+      return res.status(500).json({ error: "Failed to fetch products" });
+    }
   });
 
   // Register all route modules
@@ -951,14 +974,14 @@ export function registerRoutes(app: Express): Server {
 
       // Convert price back to decimal for response
       const responseProduct = {
-        ...updatedProduct        ,
+        ...updatedProduct,
         price: (updatedProduct.price / 100).toFixed(2), // Convert cents back to dollars with 2 decimal places
       };
 
       log(`Updated product price: ${responseProduct.price} (converted from ${updatedProduct.price} cents)`);
       res.json(responseProduct);
     } catch (error) {
-      log(`Product updateerror: ${error instanceof Error? error.message : String(error)}`);
+      log(`Product updateerror: ${error instanceof Error ? error.message : String(error)}`);
       console.error('Full error:', error);
       res.status(500).json({
         message: "Failed to update product",

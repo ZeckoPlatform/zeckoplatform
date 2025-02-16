@@ -19,6 +19,24 @@ export default function SecuritySettingsPage() {
   const { toast } = useToast();
   const [show2FAQRCode, setShow2FAQRCode] = useState(false);
 
+  // Helper function to get the correct dashboard link
+  const getDashboardLink = () => {
+    if (!user) return "/";
+
+    switch (user.userType) {
+      case "vendor":
+        return "/vendor/dashboard";
+      case "business":
+        return "/leads";
+      case "admin":
+        return user.superAdmin ? "/admin-management" : "/leads";
+      case "free":
+        return "/leads";
+      default:
+        return "/";
+    }
+  };
+
   // Security preferences query
   const { data: securityPreferences } = useQuery({
     queryKey: ["/api/security-preferences"],
@@ -93,7 +111,7 @@ export default function SecuritySettingsPage() {
     <div className="container mx-auto py-8 space-y-8">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Security Settings</h1>
-        <Button variant="outline" onClick={() => setLocation("/admin-management")}>
+        <Button variant="outline" onClick={() => setLocation(getDashboardLink())}>
           Back to Dashboard
         </Button>
       </div>

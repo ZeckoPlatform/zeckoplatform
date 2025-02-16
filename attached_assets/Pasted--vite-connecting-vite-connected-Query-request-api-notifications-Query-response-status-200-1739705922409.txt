@@ -1,0 +1,79 @@
+[vite] connecting...
+[vite] connected.
+Query request - /api/notifications
+Query response status: 200
+Query request - /api/products
+Query response status: 500
+Query error: 
+Error {}
+
+Query request - /api/products
+Query response status: 500
+Query error: 
+Error {}
+
+API Request - GET /api/leads
+Request payload: undefined
+Request options: 
+Object {method: "GET", headers: {…}, bodyLength: 0}
+Response status: 200
+API Request - GET /api/security-preferences
+Request payload: undefined
+Request options: 
+Object {method: "GET", headers: {…}, bodyLength: 0}
+API Request - GET /api/security/activity-log
+Request payload: undefined
+Request options: 
+Object {method: "GET", headers: {…}, bodyLength: 0}
+Response status: 200
+Warning: Cannot update a component (&#x60;ForwardRef&#x60;) while rendering a different component (&#x60;AdminManagementPage&#x60;). To locate the bad setState() call inside &#x60;AdminManagementPage&#x60;, follow the stack trace as described in https://reactjs.org/link/setstate-in-render
+AdminManagementPage@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/pages/admin-management.tsx:72:27
+ProtectedRoute@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/lib/protected-route.tsx:23:5
+component
+Route@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js:323:14
+Switch@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js:380:27
+div
+Router
+AuthProvider@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/hooks/use-auth.tsx:177:6
+QueryClientProvider@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js:2805:9
+App
+API Request - GET /api/users
+Request payload: undefined
+Request options: 
+Object {method: "GET", headers: {…}, bodyLength: 0}
+API Request - GET /api/admins
+Request payload: undefined
+Request options: 
+Object {method: "GET", headers: {…}, bodyLength: 0}
+API Request - GET /api/documents
+Request payload: undefined
+Request options: 
+Object {method: "GET", headers: {…}, bodyLength: 0}
+API Request - GET /api/admin/stats
+Request payload: undefined
+Request options: 
+Object {method: "GET", headers: {…}, bodyLength: 0}
+API Request - GET /api/products
+Request payload: undefined
+Request options: 
+Object {method: "GET", headers: {…}, bodyLength: 0}
+Response status: 403
+Error response text: {"message":"Super admin access required"}
+API request error: 
+Error {name: "ForbiddenError"}
+
+Response status: 403
+Error response text: {"message":"Super admin access required"}
+API request error: 
+Error {name: "ForbiddenError"}
+
+Response status: 403
+Error response text: {"message":"Super admin access required"}
+API request error: 
+Error {name: "ForbiddenError"}
+
+Response status: 200
+Response status: 500
+Error response text: {"error":"Failed to fetch products"}
+API request error: 
+Error {}

@@ -470,21 +470,6 @@ router.post("/admin/mass-email", authenticateToken, checkSuperAdminAccess, async
   }
 });
 
-// Get all products - Remove superAdmin check
-router.get("/products", authenticateToken, async (req, res) => {
-  try {
-    const allProducts = await db
-      .select()
-      .from(products)
-      .orderBy(desc(products.createdAt));
-
-    return res.json(allProducts);
-  } catch (error) {
-    console.error("Error fetching products:", error);
-    return res.status(500).json({ error: "Failed to fetch products" });
-  }
-});
-
 // Update product - Keep superAdmin check
 router.patch("/products/:productId", authenticateToken, checkSuperAdminAccess, async (req, res) => {
   try {

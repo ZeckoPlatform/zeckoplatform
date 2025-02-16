@@ -16,7 +16,7 @@ import { Loader2, User } from "lucide-react";
 
 const profileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
-  email: z.string().email("Please enter a valid email address"),
+  email: z.string().email("Please enter a valid email address").optional(),
   bio: z.string().optional(),
 });
 
@@ -44,7 +44,12 @@ export default function ProfilePage() {
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: ProfileFormData) => {
-      const response = await apiRequest("POST", "/api/users/profile", data);
+      const response = await apiRequest("PATCH", "/api/user/profile", {
+        profile: {
+          name: data.name,
+          bio: data.bio || "",
+        }
+      });
       if (!response.ok) {
         throw new Error("Failed to update profile");
       }
@@ -66,6 +71,10 @@ export default function ProfilePage() {
     },
   });
 
+  const handleSubmit = form.handleSubmit((data) => {
+    updateProfileMutation.mutate(data);
+  });
+
   return (
     <Card>
       <CardHeader>
@@ -78,7 +87,7 @@ export default function ProfilePage() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={form.handleSubmit((data) => updateProfileMutation.mutate(data))} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>
             <Input
@@ -91,24 +100,15 @@ export default function ProfilePage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              {...form.register("email")}
-            />
-            {form.formState.errors.email && (
-              <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
             <Label htmlFor="bio">Bio</Label>
             <Textarea
               id="bio"
               {...form.register("bio")}
               placeholder="Tell us a bit about yourself"
             />
+            {form.formState.errors.bio && (
+              <p className="text-sm text-destructive">{form.formState.errors.bio.message}</p>
+            )}
           </div>
 
           <Button
