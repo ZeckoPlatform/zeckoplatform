@@ -74,17 +74,17 @@ export function registerRoutes(app: Express): Server {
 
   // Move products route to main routes
   // Add before the subscription routes registration
-  app.get("/api/products", authenticateToken, async (req, res) => {
+  app.get("/api/products", async (req, res) => {
     try {
       const allProducts = await db
         .select()
         .from(products)
-        .orderBy(desc(products.createdAt));
+        .orderBy(desc(products.created_at));
 
       // Convert prices from cents to dollars for response
       const productsWithFormattedPrices = allProducts.map(product => ({
         ...product,
-        price: (product.price / 100).toFixed(2)
+        price: (Number(product.price) / 100).toFixed(2)
       }));
 
       return res.json(productsWithFormattedPrices);

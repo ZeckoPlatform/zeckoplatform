@@ -17,7 +17,7 @@ import { Loader2, User } from "lucide-react";
 const profileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Please enter a valid email address").optional(),
-  bio: z.string().optional(),
+  bio: z.string().optional().nullable(),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
