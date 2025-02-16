@@ -70,17 +70,19 @@ export function FeedbackDialog() {
       try {
         const response = await apiRequest("POST", "/api/feedback", payload);
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || "Failed to submit feedback");
+        let responseData;
+        try {
+          responseData = await response.json();
+        } catch (parseError) {
+          console.error('Failed to parse response:', parseError);
+          throw new Error('Invalid server response');
         }
 
-        const result = await response.json();
-        if (!result.success) {
-          throw new Error(result.message || "Failed to submit feedback");
+        if (!response.ok || !responseData.success) {
+          throw new Error(responseData.message || 'Failed to submit feedback');
         }
 
-        return result.data;
+        return responseData.data;
       } catch (error) {
         console.error('API request error:', error);
         throw error instanceof Error ? error : new Error('Failed to submit feedback');
@@ -94,7 +96,6 @@ export function FeedbackDialog() {
       handleClose();
     },
     onError: (error: Error) => {
-      console.error('Feedback submission error:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to submit feedback. Please try again.",
@@ -106,7 +107,12 @@ export function FeedbackDialog() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    await submitFeedbackMutation.mutateAsync();
+    try {
+      await submitFeedbackMutation.mutateAsync();
+    } catch (error) {
+      // Error already handled in mutation callbacks
+      console.error('Form submission error:', error);
+    }
   };
 
   const handleClose = () => {
