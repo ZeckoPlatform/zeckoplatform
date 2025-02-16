@@ -41,6 +41,12 @@ interface SelectLead {
     business_id: number;
     created_at: string;
     contactDetails?: string;
+    business?: {
+      id: number;
+      profile?: {
+        name: string;
+      };
+    };
   }>;
   messages?: Array<{
     id: number;
@@ -896,6 +902,7 @@ const BusinessLeadsView = ({
   );
 };
 
+// Add the missing interface
 interface FreeUserLeadsViewProps {
   leads: LeadWithUnreadCount[];
   createLeadMutation: any;
@@ -905,6 +912,7 @@ interface FreeUserLeadsViewProps {
   deleteLeadMutation: any;
   user: SelectUser;
   acceptProposalMutation: any;
+  rejectProposalMutation: any;
 }
 
 const FreeUserLeadsView = ({
@@ -915,9 +923,15 @@ const FreeUserLeadsView = ({
   setEditingLead,
   deleteLeadMutation,
   user,
-  acceptProposalMutation
+  acceptProposalMutation,
+  rejectProposalMutation
 }: FreeUserLeadsViewProps) => {
   const { toast } = useToast();
+  const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
+  const form = useForm<AcceptProposalData>({
+    defaultValues: { contactDetails: "" }
+  });
+
   const editForm = useForm<LeadFormData>({
     defaultValues: {
       title: editingLead?.title || "",
@@ -928,30 +942,6 @@ const FreeUserLeadsView = ({
       location: editingLead?.location || "",
       phoneNumber: editingLead?.phoneNumber || ""
     },
-  });
-  const form = useForm<AcceptProposalData>({
-    defaultValues: { contactDetails: "" }
-  });
-
-  const rejectProposalMutation = useMutation({
-    mutationFn: async ({ leadId, responseId }: { leadId: number; responseId: number }) => {
-      const res = await apiRequest("PATCH", `/api/leads/${leadId}/responses/${responseId}`, { status: "rejected" });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-      toast({
-        title: "Success",
-        description: "Proposal rejected successfully.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to reject proposal",
-        variant: "destructive",
-      });
-    }
   });
 
   return (
@@ -971,11 +961,7 @@ const FreeUserLeadsView = ({
                     <div className="flex gap-2">
                       <Dialog>
                         <DialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => setEditingLead(lead)}
-                          >
+                          <Button variant="outline" size="sm">
                             <Edit className="h-4 w-4" />
                           </Button>
                         </DialogTrigger>
@@ -983,89 +969,37 @@ const FreeUserLeadsView = ({
                           <DialogHeader>
                             <DialogTitle>Edit Lead</DialogTitle>
                           </DialogHeader>
-                          <form
-                            onSubmit={editForm.handleSubmit((data) =>
-                              updateLeadMutation.mutate({ id: lead.id, data })
-                            )}
-                            className="space-y-4"
-                          >
-                            <div>
-                              <Label htmlFor="edit-title">Title</Label>
-                              <Input
-                                id="edit-title"
-                                {...editForm.register("title")}
-                                required
-                              />
+                          <form onSubmit={editForm.handleSubmit((data) => {
+                            updateLeadMutation.mutate({ id: lead.id, ...data });
+                          })}>
+                            <div className="space-y-4">
+                              <div>
+                                <Label htmlFor="title">Title</Label>
+                                <Input id="title" {...editForm.register("title")} required />
+                              </div>
+                              <Button
+                                type="submit"
+                                className="w-full"
+                                disabled={updateLeadMutation.isPending}
+                              >
+                                {updateLeadMutation.isPending ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Saving...
+                                  </>
+                                ) : (
+                                  'Save Changes'
+                                )}
+                              </Button>
                             </div>
-                            <div>
-                              <Label htmlFor="edit-description">Description</Label>
-                              <Textarea
-                                id="edit-description"
-                                {...editForm.register("description")}
-                                required
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="edit-category">Category</Label>
-                              <Input
-                                id="edit-category"
-                                {...editForm.register("category")}
-                                required
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="edit-subcategory">Subcategory</Label>
-                              <Input
-                                id="edit-subcategory"
-                                {...editForm.register("subcategory")}
-                                required
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="edit-budget">Budget (£)</Label>
-                              <Input
-                                id="edit-budget"
-                                type="number"
-                                {...editForm.register("budget")}
-                                required
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="edit-location">Location</Label>
-                              <Input
-                                id="edit-location"
-                                {...editForm.register("location")}
-                                required
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="edit-phoneNumber">Phone Number (Optional)</Label>
-                              <Input
-                                id="edit-phoneNumber"
-                                {...editForm.register("phoneNumber")}
-                              />
-                            </div>
-                            <Button
-                              type="submit"
-                              className="w-full"
-                              disabled={updateLeadMutation.isPending}
-                            >
-                              {updateLeadMutation.isPending ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Saving...
-                                </>
-                              ) : (
-                                'Save Changes'
-                              )}
-                            </Button>
                           </form>
                         </DialogContent>
                       </Dialog>
                       <Button
                         variant="destructive"
-                        size="icon"
+                        size="sm"
                         onClick={() => deleteLeadMutation.mutate(lead.id)}
+                        disabled={deleteLeadMutation.isPending}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -1075,7 +1009,7 @@ const FreeUserLeadsView = ({
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground mb-4">{lead.description}</p>
-                <div className="grid grid-cols-3 gap-4 text-sm mb-6">
+                <div className="grid grid-cols-3 gap-4 text-sm">
                   <div>
                     <span className="font-medium">Category:</span> {lead.category}
                   </div>
@@ -1087,163 +1021,147 @@ const FreeUserLeadsView = ({
                   </div>
                 </div>
 
-                <div className="border-t pt-4">
-                  <h3 className="text-lg font-semibold mb-3">Received Proposals</h3>
-                  {lead.responses && lead.responses.length > 0 ? (
-                    <div className="space-y-4">
-                      {lead.responses.map((response) => (
-                        <div key={response.id} className="border rounded-lg p-4">
-                          <div className="flex justify-between items-start mb-2">
-                            <div>
-                              <p className="font-medium">
-                                {response.business?.profile?.name || "Anonymous Business"}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                Sent: {response.created_at ? format(new Date(response.created_at), 'PPp') : 'Recently'}
-                              </p>
-                            </div>
-                            <Badge variant={
-                              response.status === "accepted" ? "success" :
-                                response.status === "rejected" ? "destructive" :
-                                  "secondary"
-                            }>
-                              {response.status.charAt(0).toUpperCase() + response.status.slice(1)}
-                            </Badge>
+                {lead.responses && lead.responses.length > 0 ? (
+                  <div className="space-y-4 mt-6">
+                    <h3 className="font-semibold">Proposals</h3>
+                    {lead.responses.map((response) => (
+                      <div key={response.id} className="border rounded-lg p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <p className="font-medium">
+                              {response.business?.profile?.name || "Anonymous Business"}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Sent: {response.created_at ? format(new Date(response.created_at), 'PPp') : 'Recently'}
+                            </p>
                           </div>
-                          <p className="text-sm mt-2">{response.proposal}</p>
+                          <Badge variant={
+                            response.status === "accepted" ? "success" :
+                              response.status === "rejected" ? "destructive" :
+                                "secondary"
+                          }>
+                            {response.status.charAt(0).toUpperCase() + response.status.slice(1)}
+                          </Badge>
+                        </div>
+                        <p className="text-sm mt-2">{response.proposal}</p>
 
-                          {response.status === "accepted" && (
-                            <div className="mt-4 space-y-4">
-                              <div className="p-4 bg-background rounded-lg border">
-                                <h4 className="font-medium mb-2">Contact Information</h4>
-                                <p className="text-sm whitespace-pre-wrap">                                  {response.contactDetails || "No contact details provided yet."}
-                                </p>
-                              </div>
+                        {response.status === "accepted" ? (
+                          <div className="mt-4 space-y-4">
+                            <div className="p-4 bg-background rounded-lg border">
+                              <h4 className="font-medium mb-2">Contact Information</h4>
+                              <p className="text-sm whitespace-pre-wrap">
+                                {response.contactDetails || "No contact details provided yet."}
+                              </p>
+                            </div>
 
-                              <div className="p-4 bg-background rounded-lg border">
-                                <div className="flex justify-between items-center">
-                                  <h4 className="font-medium">Messages</h4>
-                                  <Dialog>
-                                    <DialogTrigger asChild>
-                                      <Button variant="outline" size="sm">
-                                        <Send className="h-4 w-4 mr-2" />
-                                        Open Messages
-                                      </Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                      <MessageDialogContent
-                                        leadId={lead.id}
-                                        receiverId={response.business_id}
-                                        onClose={() =>
-                                          queryClient.invalidateQueries({
-                                            queryKey: ["/api/leads"],
-                                          })
-                                        }
-                                      />
-                                    </DialogContent>
-                                  </Dialog>
-                                </div>
+                            <div className="p-4 bg-background rounded-lg border">
+                              <div className="flex justify-between items-center mb-4">
+                                <h4 className="font-medium">Messages</h4>
+                                <Dialog>
+                                  <DialogTrigger asChild>
+                                    <Button variant="outline" size="sm">
+                                      <Send className="h-4 w-4 mr-2" />
+                                      Open Messages
+                                      {lead.unreadMessages > 0 && (
+                                        <span className="absolute -top-1 -right-1 h-3 w-3 bg-destructive rounded-full" />
+                                      )}
+                                    </Button>
+                                  </DialogTrigger>
+                                  <DialogContent>
+                                    <MessageDialogContent
+                                      leadId={lead.id}
+                                      receiverId={response.business_id}
+                                      onClose={() => queryClient.invalidateQueries({ queryKey: ["/api/leads"] })}
+                                    />
+                                  </DialogContent>
+                                </Dialog>
                               </div>
                             </div>
-                          )}
-
-                          {response.status === "pending" && (
-                            <div className="flex gap-2 mt-4">
-                              <Dialog>
-                                <DialogTrigger asChild>
-                                  <Button size="sm">Accept</Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                  <DialogHeader>
-                                    <DialogTitle>Accept Proposal</DialogTitle>
-                                    <DialogDescription>
-                                      Please provide your contact details for the vendor
-                                    </DialogDescription>
-                                  </DialogHeader>
-                                  <form
-                                    onSubmit={form.handleSubmit((data) =>
-                                      acceptProposalMutation.mutate({
-                                        leadId: lead.id,
-                                        responseId: response.id,
-                                        contactDetails: data.contactDetails,
-                                      })
-                                    )}
-                                  >
-                                    <div className="space-y-4">
-                                      <div className="space-y-2">
-                                        <Label htmlFor="contactDetails">
-                                          Contact Details
-                                        </Label>
-                                        <Textarea
-                                          id="contactDetails"
-                                          {...form.register("contactDetails")}
-                                          placeholder="Enter your phone number, email, or any other contact information..."
-                                          className="min-h-[100px]"
-                                        />
-                                      </div>
-                                      <Button
-                                        type="submit"
-                                        className="w-full"
-                                        disabled={acceptProposalMutation.isPending}
-                                      >
-                                        {acceptProposalMutation.isPending ? (
-                                          <>
-                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                            Accepting...
-                                          </>
-                                        ) : (
-                                          "Accept Proposal"
-                                        )}
-                                      </Button>
-                                    </div>
-                                  </form>
-                                </DialogContent>
-                              </Dialog>
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => {
-                                  rejectProposalMutation.mutate({
+                          </div>
+                        ) : response.status === "pending" && (
+                          <div className="flex gap-2 mt-4">
+                            <Dialog open={acceptDialogOpen} onOpenChange={setAcceptDialogOpen}>
+                              <DialogTrigger asChild>
+                                <Button variant="default" size="sm">Accept</Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Accept Proposal</DialogTitle>
+                                  <DialogDescription>
+                                    Please provide your contact details for the business.
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <form onSubmit={form.handleSubmit((data) => {
+                                  acceptProposalMutation.mutate({
                                     leadId: lead.id,
                                     responseId: response.id,
+                                    contactDetails: data.contactDetails
                                   });
-                                }}
-                                disabled={rejectProposalMutation.isPending}
-                              >
-                                {rejectProposalMutation.isPending ? (
-                                  <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Rejecting...
-                                  </>
-                                ) : (
-                                  "Reject"
-                                )}
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No proposals received yet.</p>
-                  )}
-                </div>
+                                  setAcceptDialogOpen(false);
+                                })}>
+                                  <div className="space-y-4">
+                                    <div>
+                                      <Label htmlFor="contactDetails">Contact Details</Label>
+                                      <Textarea
+                                        id="contactDetails"
+                                        placeholder="Provide your contact information (phone, email, etc.)"
+                                        {...form.register("contactDetails")}
+                                        required
+                                      />
+                                    </div>
+                                    <Button
+                                      type="submit"
+                                      className="w-full"
+                                      disabled={acceptProposalMutation.isPending}
+                                    >
+                                      {acceptProposalMutation.isPending ? (
+                                        <>
+                                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                          Accepting...
+                                        </>
+                                      ) : (
+                                        'Accept and Share Contact Details'
+                                      )}
+                                    </Button>
+                                  </div>
+                                </form>
+                              </DialogContent>
+                            </Dialog>
+
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => {
+                                rejectProposalMutation.mutate({
+                                  leadId: lead.id,
+                                  responseId: response.id
+                                });
+                              }}
+                              disabled={rejectProposalMutation.isPending}
+                            >
+                              {rejectProposalMutation.isPending ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Rejecting...
+                                </>
+                              ) : (
+                                'Reject'
+                              )}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground mt-4">No proposals yet</p>
+                )}
               </CardContent>
-              <CardFooter>
-                <p className="text-sm text-muted-foreground">
-                  Posted {lead.created_at ? format(new Date(lead.created_at), 'PPp') : 'Recently'}
-                </p>
-              </CardFooter>
             </Card>
           ))}
-          {(!leads || leads.length === 0) && (
-            <p className="text-muted-foreground text-center py-8">
-              You haven't postedany leads yet. Create your first lead to get started!
-            </p>
-          )}
         </div>
       </TabsContent>
-      <TabsContent value="post" className="mt-4">
+      <TabsContent value="post">
         <Card>
           <CardHeader>
             <CardTitle>Post a New Lead</CardTitle>
@@ -1253,7 +1171,7 @@ const FreeUserLeadsView = ({
           </CardHeader>
           <CardContent>
             <CreateLeadForm
-              onSubmit={(data) => createLeadMutation.mutate(data)}
+              onSubmit={createLeadMutation.mutate}
               isSubmitting={createLeadMutation.isPending}
             />
           </CardContent>
@@ -1440,11 +1358,14 @@ export default function LeadsPage() {
   });
 
   const acceptProposalMutation = useMutation({
-    mutationFn: async ({ responseId, contactDetails }: { responseId: number; contactDetails: string }) => {
-      const res = await apiRequest("PATCH", `/api/leads/${selectedLead?.id}/responses/${responseId}`, {
+    mutationFn: async ({ leadId, responseId, contactDetails }: { leadId: number; responseId: number; contactDetails: string }) => {
+      const res = await apiRequest("PATCH", `/api/leads/${leadId}/responses/${responseId}`, {
         status: "accepted",
         contactDetails
       });
+      if (!res.ok) {
+        throw new Error("Failed to update lead response");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -1453,7 +1374,6 @@ export default function LeadsPage() {
         title: "Success",
         description: "Proposal accepted successfully.",
       });
-      setAcceptDialogOpen(false);
     },
     onError: (error: Error) => {
       toast({
