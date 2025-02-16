@@ -6,22 +6,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, User, Bell } from "lucide-react";
+import { Loader2, User } from "lucide-react";
 
 const profileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
-  bio: z.string().optional(),
   email: z.string().email("Please enter a valid email address"),
-  notificationsEnabled: z.boolean().optional(),
-  marketingEmails: z.boolean().optional(),
-  profileVisibility: z.enum(["public", "private"]).default("public"),
+  bio: z.string().optional(),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
@@ -37,25 +33,18 @@ export default function ProfilePage() {
     return null;
   }
 
-  const { register, handleSubmit, formState: { errors }, watch, setValue } = useForm<ProfileFormData>({
+  const form = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
       name: user?.profile?.name || "",
-      bio: user?.profile?.bio || "",
       email: user?.email || "",
-      notificationsEnabled: user?.profile?.notifications?.enabled || false,
-      marketingEmails: user?.profile?.notifications?.marketing || false,
-      profileVisibility: user?.profile?.visibility || "public",
+      bio: user?.profile?.bio || "",
     },
   });
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: ProfileFormData) => {
-      const response = await apiRequest("POST", "/api/users/profile", {
-        ...data,
-        type: "free",
-      });
-
+      const response = await apiRequest("POST", "/api/users/profile", data);
       if (!response.ok) {
         throw new Error("Failed to update profile");
       }
@@ -93,29 +82,20 @@ export default function ProfilePage() {
             Personal Information
           </CardTitle>
           <CardDescription>
-            Manage your basic profile information
+            Update your profile information
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit((data) => updateProfileMutation.mutate(data))} className="space-y-6">
+          <form onSubmit={form.handleSubmit((data) => updateProfileMutation.mutate(data))} className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>
               <Input
                 id="name"
-                {...register("name")}
+                {...form.register("name")}
               />
-              {errors.name && (
-                <p className="text-sm text-destructive">{errors.name.message}</p>
+              {form.formState.errors.name && (
+                <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
               )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="bio">Bio</Label>
-              <Textarea
-                id="bio"
-                {...register("bio")}
-                placeholder="Tell us a bit about yourself"
-              />
             </div>
 
             <div className="space-y-2">
@@ -123,49 +103,20 @@ export default function ProfilePage() {
               <Input
                 id="email"
                 type="email"
-                {...register("email")}
+                {...form.register("email")}
               />
-              {errors.email && (
-                <p className="text-sm text-destructive">{errors.email.message}</p>
+              {form.formState.errors.email && (
+                <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
               )}
             </div>
 
-            <div className="space-y-4">
-              <Label>Profile Visibility</Label>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="profileVisibility"
-                  {...register("profileVisibility")}
-                  checked={watch("profileVisibility") === "public"}
-                  onCheckedChange={(checked) =>
-                    setValue("profileVisibility", checked ? "public" : "private")
-                  }
-                />
-                <Label htmlFor="profileVisibility">Make profile public</Label>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <Label className="flex items-center gap-2">
-                <Bell className="h-5 w-5" />
-                Notification Preferences
-              </Label>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="notificationsEnabled"
-                    {...register("notificationsEnabled")}
-                  />
-                  <Label htmlFor="notificationsEnabled">Enable notifications</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="marketingEmails"
-                    {...register("marketingEmails")}
-                  />
-                  <Label htmlFor="marketingEmails">Receive marketing emails</Label>
-                </div>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="bio">Bio</Label>
+              <Textarea
+                id="bio"
+                {...form.register("bio")}
+                placeholder="Tell us a bit about yourself"
+              />
             </div>
 
             <Button

@@ -200,7 +200,7 @@ export default function Navbar() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="flex items-center gap-2">
                     <UserCircle className="h-6 w-6" />
-                    <span>{user.username}</span>
+                    <span>{user.email}</span>
                     {user.superAdmin && (
                       <Shield className="h-4 w-4 text-primary" />
                     )}
@@ -212,6 +212,11 @@ export default function Navbar() {
                   <DropdownMenuItem onClick={() => handleNavigation(getDashboardLink())}>
                     Dashboard
                   </DropdownMenuItem>
+                  {user.userType === "free" && (
+                    <DropdownMenuItem onClick={() => handleNavigation("/settings/profile")}>
+                      Profile Settings
+                    </DropdownMenuItem>
+                  )}
                   {(user.userType === "business" || user.userType === "vendor") && (
                     <DropdownMenuItem onClick={() => handleNavigation("/settings/business-profile")}>
                       Business Profile
@@ -227,14 +232,6 @@ export default function Navbar() {
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleNavigation("/analytics")}>
                         Analytics
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                  {user.superAdmin && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => handleNavigation("/admin-management")}>
-                        Admin Management
                       </DropdownMenuItem>
                     </>
                   )}
