@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
-import { Loader2, MessageCircle } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useNotificationSound } from "@/lib/useNotificationSound";
 import { useToast } from "@/hooks/use-toast";
 
@@ -45,11 +45,10 @@ export function MessageDialog({
   const queryClient = useQueryClient();
   const playNotification = useNotificationSound();
   const { toast } = useToast();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messageContainerRef = useRef<HTMLDivElement>(null);
   const lastMessageRef = useRef<HTMLDivElement>(null);
   const isFirstMount = useRef(true);
   const previousMessagesCount = useRef(0);
-  const messageContainerRef = useRef<HTMLDivElement>(null);
 
   const messagesQueryKey = [`/api/leads/${leadId}/messages`];
 
@@ -59,7 +58,6 @@ export function MessageDialog({
     refetchInterval: isOpen ? 3000 : false,
   });
 
-  // Scroll to bottom when new messages arrive or dialog opens
   const scrollToBottom = () => {
     if (messageContainerRef.current) {
       messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
@@ -70,11 +68,9 @@ export function MessageDialog({
   useEffect(() => {
     if (isOpen) {
       scrollToBottom();
-      if (messages.length > 0) {
-        const hasUnread = messages.some(m => !m.read && m.sender.id !== user?.id);
-        if (hasUnread) {
-          markAsReadMutation.mutate();
-        }
+      const unreadMessages = messages.filter(m => !m.read && m.sender.id !== user?.id);
+      if (unreadMessages.length > 0) {
+        markAsReadMutation.mutate();
       }
     }
   }, [isOpen, messages]);
@@ -85,12 +81,13 @@ export function MessageDialog({
       const lastMessage = messages[messages.length - 1];
       if (lastMessage?.sender.id !== user?.id) {
         playNotification('receive');
+        markAsReadMutation.mutate();
       }
       scrollToBottom();
     }
     previousMessagesCount.current = messages.length;
     isFirstMount.current = false;
-  }, [messages, user?.id, playNotification]);
+  }, [messages, user?.id]);
 
   const markAsReadMutation = useMutation({
     mutationFn: async () => {
@@ -99,18 +96,13 @@ export function MessageDialog({
       return response.json();
     },
     onSuccess: () => {
-      // Update the messages in the cache to mark them as read
       queryClient.setQueryData<Message[]>(messagesQueryKey, oldMessages => 
         oldMessages?.map(m => ({
           ...m,
           read: m.sender.id !== user?.id ? true : m.read
         }))
       );
-
-      // Invalidate both the messages and leads queries
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-      queryClient.invalidateQueries({ queryKey: messagesQueryKey });
-
       if (onMessagesRead) onMessagesRead();
     },
     onError: (error: Error) => {
@@ -195,7 +187,6 @@ export function MessageDialog({
                   </span>
                 </div>
               ))}
-              <div ref={messagesEndRef} />
             </div>
           )}
         </div>

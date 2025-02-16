@@ -663,7 +663,8 @@ const BusinessLeadsView = ({
   }, {} as Record<number, any>);
 
   const getUnreadCount = (lead: LeadWithUnreadCount, userId: number) => {
-    return lead.messages?.filter(m => !m.read && m.sender_id !== userId).length || 0;
+    if (!lead.messages) return 0;
+    return lead.messages.filter(m => !m.read && m.sender_id !== userId).length;
   };
 
   const sendProposalMutation = useMutation({
@@ -922,8 +923,10 @@ const BusinessLeadsView = ({
   );
 };
 
+// Use a single implementation of getUnreadCount
 const getUnreadCount = (lead: LeadWithUnreadCount, userId: number) => {
-  return lead.messages?.filter(m => !m.read && m.sender_id !== userId).length || 0;
+  if (!lead.messages) return 0;
+  return lead.messages.filter(m => !m.read && m.sender_id !== userId).length;
 };
 
 const FreeUserLeadsView = ({
@@ -967,7 +970,6 @@ const FreeUserLeadsView = ({
               <p className="text-sm">You have unread messages in your leads</p>
             </div>
           )}
-
           {leads.map((lead) => (
             <Card key={lead.id}>
               <CardHeader>
@@ -986,7 +988,6 @@ const FreeUserLeadsView = ({
                         variant="destructive"
                         size="sm"
                         onClick={() => deleteLeadMutation.mutate(lead.id)}
-                        disabled={deleteLeadMutation.isPending}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -1012,16 +1013,14 @@ const FreeUserLeadsView = ({
                   <div className="space-y-4 mt-6">
                     <h3 className="font-semibold">Proposals</h3>
                     {lead.responses.map((response) => (
-                      <div key={response.id} className="mt-4 border-t pt-4">
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <p className="font-medium">
-                              {response.business?.profile?.name || "Anonymous Business"}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              Sent: {response.created_at ? format(new Date(response.created_at), 'PPp') : 'Recently'}
-                            </p>
-                          </div>
+                      <div
+                        key={response.id}
+                        className="border rounded-lg p-4"
+                      >
+                        <div className="flex justify-between items-center">
+                          <p className="font-medium">
+                            {response.business?.profile?.name || "Business"}
+                          </p>
                           <Badge variant={
                             response.status === "accepted" ? "success" :
                               response.status === "rejected" ? "destructive" :
@@ -1034,7 +1033,7 @@ const FreeUserLeadsView = ({
                         {response.status === "accepted" ? (
                           <div className="mt-4 flex items-center gap-2">
                             <Dialog>
-                              <DialogTrigger asChild>
+                                                            <DialogTrigger asChild>
                                 <Button variant="outline" size="sm" className="relative">
                                   <Send className="h-4 w-4 mr-2"/>
                                   Open Messages
@@ -1113,45 +1112,6 @@ const FreeUserLeadsView = ({
     </Tabs>
   );
 };
-
-const BusinessProfileForm = () => {
-  const { user, setUser } = useAuth();
-  const { register, handleSubmit } = useForm<ProfileFormData>();
-
-  const onSubmit = async (data: ProfileFormData) => {
-    try {
-      await apiRequest('POST', '/api/users/profile', data);
-      setUser({...user, profile: data});
-      globalQueryClient.invalidateQueries({queryKey: ['/api/leads']});
-
-    } catch (error) {
-      console.error("Error updating profile:", error);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <div>
-        <Label htmlFor="name">Name</Label>
-        <Input id="name" {...register('name')} />
-      </div>
-      <div>
-        <Label htmlFor="description">Description</Label>
-        <Textarea id="description" {...register('description')} />
-      </div>
-      <div>
-        <Label htmlFor="categories">Categories (comma-separated)</Label>
-        <Input id="categories" {...register('categories')} />
-      </div>
-      <div>
-        <Label htmlFor="location">Location</Label>
-        <Input id="location" {...register('location')} />
-      </div>
-      <Button type="submit">Save Profile</Button>
-    </form>
-  );
-};
-
 
 export default function LeadsPage() {
   const { user, setUser } = useAuth();
