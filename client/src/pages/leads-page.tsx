@@ -51,6 +51,12 @@ interface SelectLead {
     sender_id: number;
     read: boolean;
     created_at: string;
+    sender?: {
+      id: number;
+      profile?: {
+        name: string;
+      };
+    };
   }>;
 }
 
@@ -91,6 +97,17 @@ interface SelectMessage {
     };
   };
 }
+
+interface Message {
+  id: number;
+  content: string;
+  sender: { id: number; profile?: { name: string } };
+  receiver_id: number;
+  lead_id: number;
+  read: boolean;
+  created_at: string;
+}
+
 
 const PHONE_COUNTRY_CODES = {
   GB: {
@@ -576,10 +593,10 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
   );
 };
 
-// Single source of truth for unread message counting
-function getUnreadMessageCount(messages: any[] | undefined, userId: number): number {
+// Single source of truth for unread counts
+function getUnreadCount(messages: Message[] | undefined, userId: number): number {
   if (!messages || !Array.isArray(messages)) return 0;
-  return messages.filter(m => !m.read && m.sender_id !== userId).length;
+  return messages.filter(m => !m.read && m.sender.id !== userId).length;
 }
 
 const BusinessLeadsView = ({
@@ -639,7 +656,7 @@ const BusinessLeadsView = ({
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex items-center gap-4 p-4 bg-muted rounded-lg">
-            <AlertTriangle className="h-6 w-6 text-primary" />
+            {/*AlertTriangle className="h-6 w-6 text-primary" />*/}
             <div>
               <p className="font-medium">No Active Subscription</p>
               <p className="text-sm text-muted-foreground">
@@ -698,7 +715,7 @@ const BusinessLeadsView = ({
 
   return (
     <div className="space-y-8">
-      {leads.some(lead => getUnreadMessageCount(lead.messages, user.id) > 0) && (
+      {leads.some(lead => getUnreadCount(lead.messages, user.id) > 0) && (
         <div className="bg-muted/50 p-4 rounded-lg flex items-center gap-2 mb-4">
           <Info className="h-5 w-5 text-primary" />
           <p className="text-sm">You have unread messages in your leads</p>
@@ -939,6 +956,9 @@ const FreeUserLeadsView = ({
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
   const queryClient = useQueryClient();
 
+  // Show notification banner if there are unread messages
+  const hasUnreadMessages = leads.some(lead => getUnreadCount(lead.messages, user.id) > 0);
+
   const editForm = useForm<LeadFormData>({
     defaultValues: {
       title: editingLead?.title || "",
@@ -959,8 +979,8 @@ const FreeUserLeadsView = ({
       </TabsList>
       <TabsContent value="my-leads" className="mt-4">
         <div className="grid gap-6">
-          {leads.some(lead => getUnreadMessageCount(lead.messages, user.id) > 0) && (
-            <div className="bg-muted/50 p-4 rounded-lg flex items-center gap-2 mb-4">
+          {hasUnreadMessages && (
+            <div className="bg-muted/50 p-4 rounded-lg flex items-center gap-2">
               <Info className="h-5 w-5 text-primary" />
               <p className="text-sm">You have unread messages in your leads</p>
             </div>
@@ -1032,12 +1052,12 @@ const FreeUserLeadsView = ({
                                 <Button variant="outline" size="sm" className="relative">
                                   <Send className="h-4 w-4 mr-2"/>
                                   Open Messages
-                                  {getUnreadMessageCount(lead.messages, user.id) > 0 && (
+                                  {getUnreadCount(lead.messages, user.id) > 0 && (
                                     <Badge
                                       variant="destructive"
                                       className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
                                     >
-                                      {getUnreadMessageCount(lead.messages, user.id)}
+                                      {getUnreadCount(lead.messages, user.id)}
                                     </Badge>
                                   )}
                                 </Button>

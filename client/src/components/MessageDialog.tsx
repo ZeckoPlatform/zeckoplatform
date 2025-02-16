@@ -46,53 +46,65 @@ export function MessageDialog({
   const playNotification = useNotificationSound();
   const { toast } = useToast();
   const messageContainerRef = useRef<HTMLDivElement>(null);
-  const hasUnreadMessagesRef = useRef(false);
+  const unreadCountRef = useRef(0);
+  const previousMessagesRef = useRef<Message[]>([]);
 
-  const messagesQueryKey = [`/api/leads/${leadId}/messages`];
-
-  const { data: messages = [], isLoading } = useQuery<Message[]>({
-    queryKey: messagesQueryKey,
+  // Query for messages
+  const { data: messages = [] } = useQuery<Message[]>({
+    queryKey: [`/api/leads/${leadId}/messages`],
     enabled: isOpen && !!user?.id,
     refetchInterval: isOpen ? 3000 : false,
   });
 
-  // Scroll helper with smooth scrolling option
+  // Scroll to bottom with optional smooth behavior
   const scrollToBottom = (smooth = true) => {
     if (!messageContainerRef.current) return;
-    const container = messageContainerRef.current;
-    container.scrollTo({
-      top: container.scrollHeight,
+    messageContainerRef.current.scrollTo({
+      top: messageContainerRef.current.scrollHeight,
       behavior: smooth ? 'smooth' : 'auto'
     });
   };
 
-  // Initial mount effect - scroll and check for unread
+  // Initial load - scroll and check unread
   useEffect(() => {
     if (!isOpen || !messages.length) return;
 
+    // Immediate scroll on first load
     scrollToBottom(false);
 
+    // Calculate actual unread messages
     const unreadMessages = messages.filter(m => !m.read && m.sender.id !== user?.id);
+    unreadCountRef.current = unreadMessages.length;
+
+    // Only mark as read if there are actually unread messages
     if (unreadMessages.length > 0) {
-      hasUnreadMessagesRef.current = true;
       markAsReadMutation.mutate();
     }
-  }, [isOpen, messages.length]);
+  }, [isOpen]);
 
-  // New message effect - handle notifications and scroll
+  // Handle new messages
   useEffect(() => {
-    if (!isOpen || !messages.length) return;
+    if (!isOpen || !messages.length || messages === previousMessagesRef.current) return;
 
-    const lastMessage = messages[messages.length - 1];
-    if (lastMessage?.sender.id !== user?.id) {
-      playNotification('receive');
-      if (!lastMessage.read) {
-        markAsReadMutation.mutate();
+    const newMessages = messages.filter(
+      msg => !previousMessagesRef.current.find(prev => prev.id === msg.id)
+    );
+
+    if (newMessages.length > 0) {
+      const lastMessage = newMessages[newMessages.length - 1];
+      if (lastMessage.sender.id !== user?.id) {
+        playNotification('receive');
+        if (!lastMessage.read) {
+          markAsReadMutation.mutate();
+        }
       }
+      scrollToBottom(true);
     }
-    scrollToBottom(true);
+
+    previousMessagesRef.current = messages;
   }, [messages]);
 
+  // Handle read status
   const markAsReadMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", `/api/leads/${leadId}/messages/read`);
@@ -100,19 +112,19 @@ export function MessageDialog({
       return response.json();
     },
     onSuccess: () => {
-      // Update local message state
-      queryClient.setQueryData<Message[]>(messagesQueryKey, oldMessages => 
-        oldMessages?.map(m => ({
+      // Update local messages
+      queryClient.setQueryData<Message[]>([`/api/leads/${leadId}/messages`], 
+        oldMessages => oldMessages?.map(m => ({
           ...m,
           read: m.sender.id !== user?.id ? true : m.read
         }))
       );
 
-      // Update lead counts in parent
-      if (hasUnreadMessagesRef.current) {
+      // Only update leads if we actually marked messages as read
+      if (unreadCountRef.current > 0) {
         queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
         if (onMessagesRead) onMessagesRead();
-        hasUnreadMessagesRef.current = false;
+        unreadCountRef.current = 0;
       }
     },
     onError: (error: Error) => {
@@ -124,6 +136,7 @@ export function MessageDialog({
     }
   });
 
+  // Send message
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
       const response = await apiRequest("POST", `/api/leads/${leadId}/messages`, {
@@ -136,7 +149,12 @@ export function MessageDialog({
     onSuccess: (newMessage) => {
       setNewMessage("");
       playNotification('send');
-      queryClient.setQueryData<Message[]>(messagesQueryKey, old => [...(old || []), newMessage]);
+
+      // Update messages immediately
+      queryClient.setQueryData<Message[]>([`/api/leads/${leadId}/messages`], 
+        old => [...(old || []), newMessage]
+      );
+
       scrollToBottom(true);
     },
     onError: (error: Error) => {
@@ -153,6 +171,8 @@ export function MessageDialog({
     if (!newMessage.trim()) return;
     await sendMessageMutation.mutateAsync(newMessage);
   };
+
+  const isLoading = !messages; //Simplified isLoading check
 
   return (
     <DialogContent className="max-w-md">
