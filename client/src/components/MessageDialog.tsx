@@ -49,6 +49,7 @@ export function MessageDialog({
   const lastMessageRef = useRef<HTMLDivElement>(null);
   const isFirstMount = useRef(true);
   const previousMessagesCount = useRef(0);
+  const messageContainerRef = useRef<HTMLDivElement>(null);
 
   const messagesQueryKey = [`/api/leads/${leadId}/messages`];
 
@@ -58,24 +59,34 @@ export function MessageDialog({
     refetchInterval: isOpen ? 3000 : false,
   });
 
-  // Mark messages as read when dialog opens
+  // Scroll to bottom when new messages arrive or dialog opens
+  const scrollToBottom = () => {
+    if (messageContainerRef.current) {
+      messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
+    }
+  };
+
+  // Initial scroll and mark as read when dialog opens
   useEffect(() => {
-    if (isOpen && messages.length > 0) {
-      const hasUnread = messages.some(m => !m.read && m.sender.id !== user?.id);
-      if (hasUnread) {
-        markAsReadMutation.mutate();
+    if (isOpen) {
+      scrollToBottom();
+      if (messages.length > 0) {
+        const hasUnread = messages.some(m => !m.read && m.sender.id !== user?.id);
+        if (hasUnread) {
+          markAsReadMutation.mutate();
+        }
       }
     }
   }, [isOpen, messages]);
 
-  // Handle new message notifications
+  // Handle new message notifications and scroll
   useEffect(() => {
     if (!isFirstMount.current && messages.length > previousMessagesCount.current) {
       const lastMessage = messages[messages.length - 1];
       if (lastMessage?.sender.id !== user?.id) {
         playNotification('receive');
       }
-      lastMessageRef.current?.scrollIntoView({ behavior: 'smooth' });
+      scrollToBottom();
     }
     previousMessagesCount.current = messages.length;
     isFirstMount.current = false;
@@ -111,32 +122,6 @@ export function MessageDialog({
     }
   });
 
-  // Set up Intersection Observer for auto-scroll
-  useEffect(() => {
-    if (!lastMessageRef.current) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry.isIntersecting) {
-          lastMessageRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }
-      },
-      { threshold: 1.0 }
-    );
-
-    observer.observe(lastMessageRef.current);
-    return () => observer.disconnect();
-  }, [messages.length]);
-
-  // Handle dialog open/close
-  useEffect(() => {
-    if (isOpen && messages.length > 0) {
-      // Scroll to bottom when opening
-      lastMessageRef.current?.scrollIntoView({ behavior: 'auto' });
-    }
-  }, [isOpen, messages.length]);
-
-
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
       const response = await apiRequest("POST", `/api/leads/${leadId}/messages`, {
@@ -150,7 +135,7 @@ export function MessageDialog({
       setNewMessage("");
       playNotification('send');
       queryClient.setQueryData<Message[]>(messagesQueryKey, old => [...(old || []), newMessage]);
-      lastMessageRef.current?.scrollIntoView({ behavior: 'smooth' });
+      scrollToBottom();
     },
     onError: (error: Error) => {
       toast({
@@ -167,26 +152,17 @@ export function MessageDialog({
     await sendMessageMutation.mutateAsync(newMessage);
   };
 
-  // Calculate unread count for visual indicator
-  const unreadCount = messages.filter(m => !m.read && m.sender.id !== user?.id).length;
-
   return (
     <DialogContent className="max-w-md">
       <DialogHeader>
-        <DialogTitle className="flex items-center gap-2">
-          Messages
-          {unreadCount > 0 && (
-            <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full">
-              {unreadCount}
-            </span>
-          )}
-        </DialogTitle>
+        <DialogTitle>Messages</DialogTitle>
         <DialogDescription>
           Send and receive messages about this lead
         </DialogDescription>
       </DialogHeader>
       <div className="flex flex-col h-[400px]">
         <div 
+          ref={messageContainerRef}
           className="flex-1 overflow-y-auto p-4 space-y-4"
         >
           {isLoading ? (

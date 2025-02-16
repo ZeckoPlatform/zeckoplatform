@@ -1,26 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
-import { Redirect } from "wouter";
-import { Loader2, Send, Edit, Trash2, AlertTriangle, Info } from "lucide-react";
+import { Loader2, Send, Edit, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { apiRequest } from "@/lib/queryClient";
-import { queryClient as globalQueryClient } from "@/lib/queryClient";
-import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useNotificationSound } from "@/lib/useNotificationSound";
 import { MessageDialog } from "@/components/MessageDialog";
-import { SubscriptionRequiredModal } from "@/components/subscription-required-modal";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 
 // Type definitions for database entities
 interface SelectLead {
@@ -428,6 +424,18 @@ interface BusinessLeadsViewProps {
   setProposalDialogOpen: (open: boolean) => void;
   toast: (options: any) => void;
   playNotification: (type: string) => void;
+}
+
+interface FreeUserLeadsViewProps {
+  leads: LeadWithUnreadCount[];
+  createLeadMutation: any;
+  updateLeadMutation: any;
+  editingLead: LeadWithUnreadCount | null;
+  setEditingLead: (lead: LeadWithUnreadCount | null) => void;
+  deleteLeadMutation: any;
+  user: SelectUser;
+  acceptProposalMutation: any;
+  rejectProposalMutation: any;
 }
 
 const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
@@ -913,18 +921,9 @@ const BusinessLeadsView = ({
   );
 };
 
-// Add the missing interface
-interface FreeUserLeadsViewProps {
-  leads: LeadWithUnreadCount[];
-  createLeadMutation: any;
-  updateLeadMutation: any;
-  editingLead: LeadWithUnreadCount | null;
-  setEditingLead: (lead: LeadWithUnreadCount | null) => void;
-  deleteLeadMutation: any;
-  user: SelectUser;
-  acceptProposalMutation: any;
-  rejectProposalMutation: any;
-}
+const getUnreadCount = (lead: LeadWithUnreadCount, userId: number) => {
+  return lead.messages?.filter(m => !m.read && m.sender_id !== userId).length || 0;
+};
 
 const FreeUserLeadsView = ({
   leads,
@@ -938,15 +937,8 @@ const FreeUserLeadsView = ({
   rejectProposalMutation
 }: FreeUserLeadsViewProps) => {
   const { toast } = useToast();
-  const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
   const queryClient = useQueryClient();
-
-  const getUnreadCount = (lead: LeadWithUnreadCount, userId: number) => {
-    return lead.messages?.filter(m =>
-      !m.read && m.sender_id !== userId
-    ).length || 0;
-  };
 
   const editForm = useForm<LeadFormData>({
     defaultValues: {
@@ -982,42 +974,13 @@ const FreeUserLeadsView = ({
                   <CardTitle>{lead.title}</CardTitle>
                   {lead.user_id === user?.id && (
                     <div className="flex gap-2">
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="sm">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Edit Lead</DialogTitle>
-                          </DialogHeader>
-                          <form onSubmit={editForm.handleSubmit((data) => {
-                            updateLeadMutation.mutate({ id: lead.id, ...data });
-                          })}>
-                            <div className="space-y-4">
-                              <div>
-                                <Label htmlFor="title">Title</Label>
-                                <Input id="title" {...editForm.register("title")} required />
-                              </div>
-                              <Button
-                                type="submit"
-                                className="w-full"
-                                disabled={updateLeadMutation.isPending}
-                              >
-                                {updateLeadMutation.isPending ? (
-                                  <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Saving...
-                                  </>
-                                ) : (
-                                  'Save Changes'
-                                )}
-                              </Button>
-                            </div>
-                          </form>
-                        </DialogContent>
-                      </Dialog>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEditingLead(lead)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
                       <Button
                         variant="destructive"
                         size="sm"
@@ -1044,7 +1007,7 @@ const FreeUserLeadsView = ({
                   </div>
                 </div>
 
-                {lead.responses && lead.responses.length > 0 ? (
+                {lead.responses && lead.responses.length > 0 && (
                   <div className="space-y-4 mt-6">
                     <h3 className="font-semibold">Proposals</h3>
                     {lead.responses.map((response) => (
@@ -1067,131 +1030,66 @@ const FreeUserLeadsView = ({
                           </Badge>
                         </div>
                         <p className="text-sm mt-2">{response.proposal}</p>
-
                         {response.status === "accepted" ? (
-                          <div className="mt-4 space-y-4">
-                            <div className="p-4 bg-background rounded-lg border">
-                              <h4 className="font-medium mb-2">Contact Information</h4>
-                              <p className="text-sm whitespace-pre-wrap">
-                                {response.contactDetails || "No contact details provided yet."}
-                              </p>
-                            </div>
-
-                            <div className="p-4 bg-background rounded-lg border">
-                              <div className="flex justify-between items-center mb-4">
-                                <h4 className="font-medium">Messages</h4>
-                                <Dialog open={messageDialogOpen} onOpenChange={setMessageDialogOpen}>
-                                  <DialogTrigger asChild>
-                                    <Button variant="outline" size="sm" className="relative">
-                                      <Send className="h-4 w-4 mr-2" />
-                                      Open Messages
-                                      {getUnreadCount(lead, user.id) > 0 && (
-                                        <Badge
-                                          variant="destructive"
-                                          className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
-                                        >
-                                          {getUnreadCount(lead, user.id)}
-                                        </Badge>
-                                      )}
-                                    </Button>
-                                  </DialogTrigger>
-                                  <DialogContent>
-                                    <MessageDialog
-                                      leadId={lead.id}
-                                      receiverId={response.business_id}
-                                      isOpen={messageDialogOpen}
-                                      onOpenChange={(open) => {
-                                        setMessageDialogOpen(open);
-                                        if (!open) {
-                                          queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-                                        }
-                                      }}
-                                      onMessagesRead={() => {
-                                        queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-                                      }}
-                                    />
-                                  </DialogContent>
-                                </Dialog>
-                              </div>
-                            </div>
-                          </div>
-                        ) : response.status === "pending" && (
-                          <div className="flex gap-2 mt-4">
-                            <Dialog open={acceptDialogOpen} onOpenChange={setAcceptDialogOpen}>
+                          <div className="mt-4 flex items-center gap-2">
+                            <Dialog>
                               <DialogTrigger asChild>
-                                <Button variant="default" size="sm">Accept</Button>
+                                <Button variant="outline" size="sm" className="relative">
+                                  <Send className="h-4 w-4 mr-2"/>
+                                  Open Messages
+                                  {getUnreadCount(lead, user.id) > 0 && (
+                                    <Badge
+                                      variant="destructive"
+                                      className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
+                                    >
+                                      {getUnreadCount(lead, user.id)}
+                                    </Badge>
+                                  )}
+                                </Button>
                               </DialogTrigger>
                               <DialogContent>
-                                <DialogHeader>
-                                  <DialogTitle>Accept Proposal</DialogTitle>
-                                  <DialogDescription>
-                                    Please provide your contact details for the business.
-                                  </DialogDescription>
-                                </DialogHeader>
-                                <form onSubmit={editForm.handleSubmit((data) => {
-                                  acceptProposalMutation.mutate({
-                                    leadId: lead.id,
-                                    responseId: response.id,
-                                    contactDetails: data.contactDetails
-                                  });
-                                  setAcceptDialogOpen(false);
-                                })}>
-                                  <div className="space-y-4">
-                                    <div>
-                                      <Label htmlFor="contactDetails">Contact Details</Label>
-                                      <Textarea
-                                        id="contactDetails"
-                                        placeholder="Provide your contact information (phone, email, etc.)"
-                                        {...editForm.register("contactDetails")}
-                                        required
-                                      />
-                                    </div>
-                                    <Button
-                                      type="submit"
-                                      className="w-full"
-                                      disabled={acceptProposalMutation.isPending}
-                                    >
-                                      {acceptProposalMutation.isPending ? (
-                                        <>
-                                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                          Accepting...
-                                        </>
-                                      ) : (
-                                        'Accept and Share Contact Details'
-                                      )}
-                                    </Button>
-                                  </div>
-                                </form>
+                                <MessageDialog
+                                  leadId={lead.id}
+                                  receiverId={response.business_id}
+                                  isOpen={true}
+                                  onOpenChange={(open) => {
+                                    if (!open) {
+                                      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+                                    }
+                                  }}
+                                  onMessagesRead={() => {
+                                    queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+                                  }}
+                                />
                               </DialogContent>
                             </Dialog>
-
+                          </div>
+                        ) : response.status === "pending" && (
+                          <div className="mt-4 flex items-center gap-2">
                             <Button
-                              variant="destructive"
                               size="sm"
-                              onClick={() => {
-                                rejectProposalMutation.mutate({
-                                  leadId: lead.id,
-                                  responseId: response.id
-                                });
-                              }}
-                              disabled={rejectProposalMutation.isPending}
+                              onClick={() => acceptProposalMutation.mutate({
+                                leadId: lead.id,
+                                responseId: response.id
+                              })}
                             >
-                              {rejectProposalMutation.isPending ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Rejecting...
-                                </>
-                              ) : (
-                                'Reject'
-                              )}
+                              Accept
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => rejectProposalMutation.mutate({
+                                leadId: lead.id,
+                                responseId: response.id
+                              })}
+                            >
+                              Reject
                             </Button>
                           </div>
                         )}
                       </div>
                     ))}
                   </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground mt-4">No proposals yet</p>
                 )}
               </CardContent>
             </Card>
@@ -1202,13 +1100,10 @@ const FreeUserLeadsView = ({
         <Card>
           <CardHeader>
             <CardTitle>Post a New Lead</CardTitle>
-            <CardDescription>
-              Fill out the form below to post a new lead
-            </CardDescription>
           </CardHeader>
           <CardContent>
             <CreateLeadForm
-              onSubmit={createLeadMutation.mutate}
+              onSubmit={(data) => createLeadMutation.mutate(data)}
               isSubmitting={createLeadMutation.isPending}
             />
           </CardContent>
