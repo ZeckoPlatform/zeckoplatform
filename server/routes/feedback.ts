@@ -20,13 +20,15 @@ const feedbackSchema = z.object({
 
 router.post("/api/feedback", async (req, res) => {
   try {
+    console.log('Received feedback request:', JSON.stringify(req.body, null, 2));
+
     // Validate request body
     const validatedData = feedbackSchema.parse(req.body);
     const { type, description, screenshot, technicalContext, path, notifyEmail, notifyAdmins } = validatedData;
     const userId = req.user?.id;
 
     // Store feedback in database
-    const [result] = await db.insert(feedback).values({
+    const [feedbackEntry] = await db.insert(feedback).values({
       type,
       description,
       screenshot,
@@ -35,49 +37,72 @@ router.post("/api/feedback", async (req, res) => {
       user_id: userId,
     }).returning();
 
+    console.log('Feedback stored successfully:', JSON.stringify(feedbackEntry, null, 2));
+
     // Send email notification if requested
     if (notifyEmail) {
-      await sendEmail({
-        to: notifyEmail,
-        subject: `New ${type} Report - Zecko Platform`,
-        html: `
-          <h2>New ${type} Report</h2>
-          <p><strong>Description:</strong> ${description}</p>
-          <p><strong>User:</strong> ${technicalContext.userEmail}</p>
-          <p><strong>Path:</strong> ${path}</p>
-          <p><strong>Technical Context:</strong></p>
-          <pre>${JSON.stringify(technicalContext, null, 2)}</pre>
-        `,
-        text: `New ${type} Report\n\nDescription: ${description}\nUser: ${technicalContext.userEmail}\nPath: ${path}\nTechnical Context: ${JSON.stringify(technicalContext, null, 2)}`
-      });
+      try {
+        await sendEmail({
+          to: notifyEmail,
+          subject: `New ${type} Report - Zecko Platform`,
+          html: `
+            <h2>New ${type} Report</h2>
+            <p><strong>Description:</strong> ${description}</p>
+            <p><strong>User:</strong> ${technicalContext.userEmail}</p>
+            <p><strong>Path:</strong> ${path}</p>
+            <p><strong>Technical Context:</strong></p>
+            <pre>${JSON.stringify(technicalContext, null, 2)}</pre>
+          `,
+          text: `New ${type} Report\n\nDescription: ${description}\nUser: ${technicalContext.userEmail}\nPath: ${path}\nTechnical Context: ${JSON.stringify(technicalContext, null, 2)}`
+        });
+      } catch (emailError) {
+        console.error('Error sending email notification:', emailError);
+        // Continue execution even if email fails
+      }
     }
 
     // Create admin notification if requested
     if (notifyAdmins) {
-      const truncatedMessage = description.length > 100 
-        ? description.substring(0, 100) + "..." 
-        : description;
+      try {
+        const truncatedMessage = description.length > 100 
+          ? description.substring(0, 100) + "..." 
+          : description;
 
-      await createNotification({
-        title: `New ${type} Report`,
-        message: truncatedMessage,
-        type: NotificationTypes.INFO,
-        metadata: {
-          feedbackId: result.id,
-          feedbackType: type,
-          path
-        },
-        notifyAdmins: true
+        await createNotification({
+          title: `New ${type} Report`,
+          message: truncatedMessage,
+          type: NotificationTypes.INFO,
+          metadata: {
+            feedbackId: feedbackEntry.id,
+            feedbackType: type,
+            path
+          },
+          notifyAdmins: true
+        });
+      } catch (notificationError) {
+        console.error('Error creating admin notification:', notificationError);
+        // Continue execution even if notification fails
+      }
+    }
+
+    res.status(201).json({ 
+      success: true, 
+      data: feedbackEntry 
+    });
+  } catch (error) {
+    console.error("Failed to save feedback:", error);
+
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ 
+        success: false, 
+        message: error.errors[0].message 
       });
     }
 
-    res.status(201).json(result);
-  } catch (error) {
-    console.error("Failed to save feedback:", error);
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: error.errors[0].message });
-    }
-    res.status(500).json({ message: "Failed to save feedback" });
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to save feedback. Please try again." 
+    });
   }
 });
 
