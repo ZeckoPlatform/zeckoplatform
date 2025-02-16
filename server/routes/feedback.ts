@@ -57,7 +57,6 @@ router.post("/api/feedback", async (req, res) => {
         });
       } catch (emailError) {
         console.error('Error sending email notification:', emailError);
-        // Continue execution even if email fails
       }
     }
 
@@ -81,16 +80,20 @@ router.post("/api/feedback", async (req, res) => {
         });
       } catch (notificationError) {
         console.error('Error creating admin notification:', notificationError);
-        // Continue execution even if notification fails
       }
     }
 
-    res.status(201).json({ 
+    // Always set Content-Type header to application/json
+    res.setHeader('Content-Type', 'application/json');
+    return res.status(201).json({ 
       success: true, 
       data: feedbackEntry 
     });
   } catch (error) {
     console.error("Failed to save feedback:", error);
+
+    // Always set Content-Type header to application/json
+    res.setHeader('Content-Type', 'application/json');
 
     if (error instanceof z.ZodError) {
       return res.status(400).json({ 
@@ -99,7 +102,7 @@ router.post("/api/feedback", async (req, res) => {
       });
     }
 
-    res.status(500).json({ 
+    return res.status(500).json({ 
       success: false, 
       message: "Failed to save feedback. Please try again." 
     });

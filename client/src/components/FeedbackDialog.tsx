@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+//import { apiRequest } from "@/lib/queryClient"; // Removed as fetch is used instead
 
 type FeedbackType = "bug" | "feedback" | null;
 
@@ -45,37 +45,50 @@ export function FeedbackDialog() {
         throw new Error("Please select a feedback type");
       }
 
-      const technicalContext = {
-        userAgent: navigator.userAgent,
-        url: window.location.href,
-        timestamp: new Date().toISOString(),
-        userType: user?.userType,
-        viewport: {
-          width: window.innerWidth,
-          height: window.innerHeight
-        },
-        userEmail: user?.email || 'Anonymous'
-      };
-
       const payload = {
         type: feedbackType,
         description: sanitizedDescription,
         screenshot,
-        technicalContext,
+        technicalContext: {
+          userAgent: navigator.userAgent,
+          url: window.location.href,
+          timestamp: new Date().toISOString(),
+          userType: user?.userType,
+          viewport: {
+            width: window.innerWidth,
+            height: window.innerHeight
+          },
+          userEmail: user?.email || 'Anonymous'
+        },
         path: location,
         notifyEmail: "zeckoinfo@gmail.com",
         notifyAdmins: true
       };
 
       try {
-        const response = await apiRequest("POST", "/api/feedback", payload);
+        // Ensure proper headers are set
+        const response = await fetch('/api/feedback', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(payload),
+          credentials: 'include'
+        });
 
         let responseData;
         try {
-          responseData = await response.json();
-        } catch (parseError) {
-          console.error('Failed to parse response:', parseError);
-          throw new Error('Invalid server response');
+          const text = await response.text();
+          try {
+            responseData = JSON.parse(text);
+          } catch (parseError) {
+            console.error('Failed to parse response:', text);
+            throw new Error('Invalid server response format');
+          }
+        } catch (error) {
+          console.error('Error reading response:', error);
+          throw new Error('Failed to read server response');
         }
 
         if (!response.ok || !responseData.success) {
