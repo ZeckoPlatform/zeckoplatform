@@ -3,12 +3,13 @@ import { notifications, users } from '@db/schema';
 import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
 
-// Define the notification schema to match database schema exactly
+type NotificationType = 'info' | 'success' | 'warning' | 'error';
+
 const notificationSchema = z.object({
   userId: z.number().array().optional(),
   title: z.string(),
   message: z.string(),
-  type: z.enum(["info", "success", "warning", "error"]).default("info"),
+  type: z.enum(['info', 'success', 'warning', 'error'] as const),
   link: z.string().optional(),
   metadata: z.record(z.any()).optional(),
   notifyAdmins: z.boolean().optional()
@@ -32,17 +33,15 @@ export async function createNotification(
 
       // Create a notification for each admin
       for (const admin of adminUsers) {
-        const notificationData = {
+        await db.insert(notifications).values({
           userId: admin.id,
           title: validatedData.title,
           message: validatedData.message,
           type: validatedData.type,
           link: validatedData.link,
-          metadata: validatedData.metadata || {},
+          metadata: validatedData.metadata,
           read: false,
-        };
-
-        await db.insert(notifications).values(notificationData);
+        });
       }
       return true;
     }
@@ -54,17 +53,15 @@ export async function createNotification(
         : [validatedData.userId];
 
       for (const uid of userIds) {
-        const notificationData = {
+        await db.insert(notifications).values({
           userId: uid,
           title: validatedData.title,
           message: validatedData.message,
           type: validatedData.type,
           link: validatedData.link,
-          metadata: validatedData.metadata || {},
+          metadata: validatedData.metadata,
           read: false,
-        };
-
-        await db.insert(notifications).values(notificationData);
+        });
       }
     }
 

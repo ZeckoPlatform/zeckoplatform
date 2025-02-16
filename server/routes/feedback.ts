@@ -47,7 +47,7 @@ router.post("/api/feedback", async (req, res) => {
       await createNotification({
         title: `New ${type} Report`,
         message: truncatedMessage,
-        type: "info" as const,
+        type: 'info' as const,
         metadata: {
           feedbackId: result.id,
           feedbackType: type,
