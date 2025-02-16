@@ -114,14 +114,24 @@ export default function Navbar() {
                   </>
                 )}
                 {user?.superAdmin && (
-                  <NavigationMenuItem>
-                    <NavigationMenuLink
-                      className="cursor-pointer"
-                      onClick={() => handleNavigation("/admin-management")}
-                    >
-                      Admin Management
-                    </NavigationMenuLink>
-                  </NavigationMenuItem>
+                  <>
+                    <NavigationMenuItem>
+                      <NavigationMenuLink
+                        className="cursor-pointer"
+                        onClick={() => handleNavigation("/admin-management")}
+                      >
+                        Admin Management
+                      </NavigationMenuLink>
+                    </NavigationMenuItem>
+                    <NavigationMenuItem>
+                      <NavigationMenuLink
+                        className="cursor-pointer"
+                        onClick={() => handleNavigation("/admin/feedback")}
+                      >
+                        Feedback Management
+                      </NavigationMenuLink>
+                    </NavigationMenuItem>
+                  </>
                 )}
               </NavigationMenuList>
             </NavigationMenu>
