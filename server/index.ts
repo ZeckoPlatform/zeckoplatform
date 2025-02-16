@@ -61,53 +61,77 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
       }
     };
 
-    server.once('error', (err: NodeJS.ErrnoException) => {
+    const onError = (error: NodeJS.ErrnoException) => {
       cleanup();
-      if (err.code === 'EADDRINUSE') {
+      if (error.code === 'EADDRINUSE') {
         log(`Port ${port} is in use`);
         resolve(false);
       } else {
-        log(`Server error on port ${port}: ${err.message}`);
+        log(`Server error on port ${port}: ${error.message}`);
         resolve(false);
       }
-    });
+    };
 
-    server.listen(port, '0.0.0.0', () => {
-      log(`Server running on port ${port}`);
+    const onListening = () => {
+      log(`Server successfully started on port ${port}`);
       resolve(true);
-    });
+    };
+
+    server.once('error', onError);
+    server.once('listening', onListening);
+
+    try {
+      server.listen(port, '0.0.0.0');
+    } catch (error) {
+      cleanup();
+      log(`Failed to start server: ${error}`);
+      resolve(false);
+    }
   });
 };
 
 (async () => {
   try {
     log('Initializing server...');
-
-    // Create a single server instance
     const server = createServer();
 
-    // Temporarily use static serving for both dev and prod
-    log('Setting up static file serving...');
-    serveStatic(app);
+    // Setup Vite or static serving before attempting port binding
+    try {
+      if (app.get("env") === "development") {
+        log('Setting up Vite development server...');
+        await setupVite(app, server);
+        log('Vite setup completed successfully');
+      } else {
+        log('Production mode: Setting up static file serving...');
+        serveStatic(app);
+      }
+    } catch (error) {
+      log(`Fatal error during server setup: ${error}`);
+      process.exit(1);
+    }
 
-    // Try ports in sequence
-    const ports = [5000, 3000, 3001, 8080, 8081, 4000, 4001];
+    // Get port from environment or use defaults
+    const envPort = process.env.PORT || process.env.REPLIT_PORT;
+    const defaultPorts = [3000, 3001, 4000, 4001, 8080, 8081];
+    const ports = envPort ? [parseInt(envPort)] : defaultPorts;
+
+    // Try ports sequentially
     let serverStarted = false;
-
     for (const port of ports) {
       log(`Attempting to start server on port ${port}...`);
-      const success = await startServer(server, port);
-      if (success) {
-        serverStarted = true;
+      serverStarted = await startServer(server, port);
+      if (serverStarted) {
+        log(`Server is now running on port ${port}`);
         break;
       }
     }
 
     if (!serverStarted) {
-      throw new Error('Could not start server on any available ports');
+      throw new Error('Could not start server on any available port');
     }
+
   } catch (error) {
-    log(`Server startup error: ${error}`);
+    log(`Fatal server startup error: ${error}`);
     process.exit(1);
   }
 })();
