@@ -10,6 +10,7 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 
 export function FeedbackDialog() {
+  const [open, setOpen] = useState(false);
   const [feedbackType, setFeedbackType] = useState<"bug" | "feedback" | null>(null);
   const [description, setDescription] = useState("");
   const [screenshot, setScreenshot] = useState<string | null>(null);
@@ -17,7 +18,6 @@ export function FeedbackDialog() {
   const { user } = useAuth();
   const [location] = useLocation();
 
-  // Capture screenshot using html2canvas
   const captureScreenshot = async () => {
     try {
       const html2canvas = (await import('html2canvas')).default;
@@ -53,7 +53,6 @@ export function FeedbackDialog() {
         screenshot,
         technicalContext,
         path: location,
-        // Add notification targets
         notifyEmail: "zeckoinfo@gmail.com",
         notifyAdmins: true
       });
@@ -72,17 +71,18 @@ export function FeedbackDialog() {
       setFeedbackType(null);
       setDescription("");
       setScreenshot(null);
+      setOpen(false);
     },
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to submit feedback. Please try again.",
         variant: "destructive",
       });
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!description) {
       toast({
@@ -92,11 +92,22 @@ export function FeedbackDialog() {
       });
       return;
     }
-    submitFeedbackMutation.mutate();
+    await submitFeedbackMutation.mutateAsync();
+  };
+
+  const resetForm = () => {
+    setFeedbackType(null);
+    setDescription("");
+    setScreenshot(null);
   };
 
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      setOpen(isOpen);
+      if (!isOpen) {
+        resetForm();
+      }
+    }}>
       <DialogTrigger asChild>
         <Button
           variant="outline"
