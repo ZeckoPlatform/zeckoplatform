@@ -3,15 +3,15 @@ import { notifications, users } from '@db/schema';
 import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
 
-// Define the notification type to match exactly with the database schema
-const NotificationType = z.enum(["info", "success", "warning", "error"]);
-type NotificationType = z.infer<typeof NotificationType>;
+// Define the notification type to match database schema exactly
+const NotificationType = ["info", "success", "warning", "error"] as const;
+export type NotificationType = (typeof NotificationType)[number];
 
 const notificationSchema = z.object({
   userId: z.number().array().optional(),
   title: z.string(),
   message: z.string(),
-  type: NotificationType,
+  type: z.enum(NotificationType),
   link: z.string().optional(),
   metadata: z.record(z.any()).optional(),
   notifyAdmins: z.boolean().optional()
