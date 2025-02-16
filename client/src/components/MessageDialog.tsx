@@ -13,16 +13,11 @@ import { useToast } from "@/hooks/use-toast";
 interface Message {
   id: number;
   content: string;
-  created_at: string;
+  sender_id: number;
+  receiver_id: number;
+  lead_id: number;
   read: boolean;
-  sender: {
-    id: number;
-    username: string;
-  };
-  receiver: {
-    id: number;
-    username: string;
-  };
+  created_at: string;
 }
 
 interface MessageDialogProps {
@@ -33,78 +28,58 @@ interface MessageDialogProps {
   onMessagesRead?: () => void;
 }
 
-export function MessageDialog({ 
-  leadId, 
-  receiverId, 
-  isOpen, 
+export function MessageDialog({
+  leadId,
+  receiverId,
+  isOpen,
   onOpenChange,
-  onMessagesRead 
+  onMessagesRead
 }: MessageDialogProps) {
   const [newMessage, setNewMessage] = useState("");
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const playNotification = useNotificationSound();
-  const { toast } = useToast();
   const messageContainerRef = useRef<HTMLDivElement>(null);
-  const unreadCountRef = useRef(0);
-  const previousMessagesRef = useRef<Message[]>([]);
+  const previousMessageCountRef = useRef(0);
+  const playNotification = useNotificationSound();
 
   // Query for messages
-  const { data: messages = [] } = useQuery<Message[]>({
+  const { data: messages = [], isLoading } = useQuery<Message[]>({
     queryKey: [`/api/leads/${leadId}/messages`],
     enabled: isOpen && !!user?.id,
-    refetchInterval: isOpen ? 3000 : false,
+    refetchInterval: isOpen ? 3000 : false, // Poll every 3 seconds when dialog is open
   });
 
-  // Scroll to bottom with optional smooth behavior
-  const scrollToBottom = (smooth = true) => {
-    if (!messageContainerRef.current) return;
-    messageContainerRef.current.scrollTo({
-      top: messageContainerRef.current.scrollHeight,
-      behavior: smooth ? 'smooth' : 'auto'
-    });
-  };
-
-  // Initial load - scroll and check unread
+  // Handle scrolling and notifications
   useEffect(() => {
     if (!isOpen || !messages.length) return;
 
-    // Immediate scroll on first load
-    scrollToBottom(false);
+    // Check for new messages
+    if (messages.length > previousMessageCountRef.current) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.sender_id !== user?.id) {
+        playNotification('receive');
+      }
+      scrollToBottom();
+    }
 
-    // Calculate actual unread messages
-    const unreadMessages = messages.filter(m => !m.read && m.sender.id !== user?.id);
-    unreadCountRef.current = unreadMessages.length;
+    // Update message count reference
+    previousMessageCountRef.current = messages.length;
 
-    // Only mark as read if there are actually unread messages
-    if (unreadMessages.length > 0) {
+    // Mark unread messages as read
+    const hasUnreadMessages = messages.some(m => !m.read && m.sender_id !== user?.id);
+    if (hasUnreadMessages) {
       markAsReadMutation.mutate();
     }
-  }, [isOpen]);
+  }, [messages, isOpen, user?.id]);
 
-  // Handle new messages
-  useEffect(() => {
-    if (!isOpen || !messages.length || messages === previousMessagesRef.current) return;
-
-    const newMessages = messages.filter(
-      msg => !previousMessagesRef.current.find(prev => prev.id === msg.id)
-    );
-
-    if (newMessages.length > 0) {
-      const lastMessage = newMessages[newMessages.length - 1];
-      if (lastMessage.sender.id !== user?.id) {
-        playNotification('receive');
-        if (!lastMessage.read) {
-          markAsReadMutation.mutate();
-        }
-      }
-      scrollToBottom(true);
+  // Scroll to bottom
+  const scrollToBottom = () => {
+    if (messageContainerRef.current) {
+      messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
     }
+  };
 
-    previousMessagesRef.current = messages;
-  }, [messages]);
-
-  // Handle read status
+  // Mark messages as read
   const markAsReadMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", `/api/leads/${leadId}/messages/read`);
@@ -112,27 +87,17 @@ export function MessageDialog({
       return response.json();
     },
     onSuccess: () => {
-      // Update local messages
+      // Update read status locally
       queryClient.setQueryData<Message[]>([`/api/leads/${leadId}/messages`], 
         oldMessages => oldMessages?.map(m => ({
           ...m,
-          read: m.sender.id !== user?.id ? true : m.read
+          read: m.sender_id !== user?.id ? true : m.read
         }))
       );
 
-      // Only update leads if we actually marked messages as read
-      if (unreadCountRef.current > 0) {
-        queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-        if (onMessagesRead) onMessagesRead();
-        unreadCountRef.current = 0;
-      }
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: "Failed to mark messages as read",
-        variant: "destructive"
-      });
+      // Update leads for notification badges
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      if (onMessagesRead) onMessagesRead();
     }
   });
 
@@ -155,14 +120,7 @@ export function MessageDialog({
         old => [...(old || []), newMessage]
       );
 
-      scrollToBottom(true);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to send message",
-        variant: "destructive"
-      });
+      scrollToBottom();
     }
   });
 
@@ -171,8 +129,6 @@ export function MessageDialog({
     if (!newMessage.trim()) return;
     await sendMessageMutation.mutateAsync(newMessage);
   };
-
-  const isLoading = !messages; //Simplified isLoading check
 
   return (
     <DialogContent className="max-w-md">
@@ -189,7 +145,12 @@ export function MessageDialog({
         >
           {isLoading ? (
             <div className="flex items-center justify-center h-full">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Loading messages...
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-muted-foreground">No messages yet</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -197,14 +158,14 @@ export function MessageDialog({
                 <div
                   key={message.id}
                   className={`flex flex-col ${
-                    message.sender.id === user?.id
+                    message.sender_id === user?.id
                       ? "items-end"
                       : "items-start"
                   }`}
                 >
                   <div
                     className={`max-w-[80%] rounded-lg p-3 ${
-                      message.sender.id === user?.id
+                      message.sender_id === user?.id
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted"
                     }`}
@@ -212,7 +173,7 @@ export function MessageDialog({
                     <p className="text-sm">{message.content}</p>
                   </div>
                   <span className="text-xs text-muted-foreground mt-1">
-                    {message.sender.username} • {format(new Date(message.created_at), "MMM d, h:mm a")}
+                    {format(new Date(message.created_at), "MMM d, h:mm a")}
                   </span>
                 </div>
               ))}

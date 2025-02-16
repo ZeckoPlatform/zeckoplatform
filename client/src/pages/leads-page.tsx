@@ -82,7 +82,8 @@ interface SelectUser {
   };
 }
 
-interface SelectMessage {
+// Clean interface for messages
+interface Message {
   id: number;
   content: string;
   sender_id: number;
@@ -90,24 +91,12 @@ interface SelectMessage {
   lead_id: number;
   read: boolean;
   created_at: string;
-  sender?: {
-    id: number;
-    profile?: {
-      name: string;
-    };
-  };
 }
 
-interface Message {
-  id: number;
-  content: string;
-  sender: { id: number; profile?: { name: string } };
-  receiver_id: number;
-  lead_id: number;
-  read: boolean;
-  created_at: string;
+interface LeadWithUnreadCount extends SelectLead {
+  messages?: Message[];
+  unreadCount?: number;
 }
-
 
 const PHONE_COUNTRY_CODES = {
   GB: {
@@ -424,9 +413,6 @@ interface AcceptProposalData {
   contactDetails: string;
 }
 
-interface LeadWithUnreadCount extends SelectLead {
-  unreadMessages: number;
-}
 
 interface CreateLeadFormProps {
   onSubmit: (data: LeadFormData) => void;
@@ -454,6 +440,12 @@ interface FreeUserLeadsViewProps {
   user: SelectUser;
   acceptProposalMutation: any;
   rejectProposalMutation: any;
+}
+
+// Single source of truth for unread count calculation
+function getUnreadCount(messages: Message[] | undefined, userId: number): number {
+  if (!messages || !Array.isArray(messages)) return 0;
+  return messages.filter(m => !m.read && m.sender_id !== userId).length;
 }
 
 const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
@@ -593,12 +585,6 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
   );
 };
 
-// Single source of truth for unread counts
-function getUnreadCount(messages: Message[] | undefined, userId: number): number {
-  if (!messages || !Array.isArray(messages)) return 0;
-  return messages.filter(m => !m.read && m.sender.id !== userId).length;
-}
-
 const BusinessLeadsView = ({
   leads,
   user,
@@ -727,32 +713,36 @@ const BusinessLeadsView = ({
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {Object.entries(myResponses).map(([leadId, response]) => {
+            {Object.entries(myResponses).map(([leadId, businessResponse]) => {
               const lead = leads.find(l => l.id === parseInt(leadId));
+              if (!lead) return null;
+
+              const unreadCount = getUnreadCount(lead.messages, user.id);
+
               return (
                 <div key={leadId} className="border rounded-lg p-4">
                   <div className="flex justify-between items-start mb-2">
                     <div>
-                      <h3 className="font-medium">{lead?.title}</h3>
+                      <h3 className="font-medium">{lead.title}</h3>
                       <p className="text-sm text-muted-foreground">
-                        Sent: {response.created_at ? format(new Date(response.created_at), 'PPp') : 'Recently'}
+                        Sent: {businessResponse.created_at ? format(new Date(businessResponse.created_at), 'PPp') : 'Recently'}
                       </p>
                     </div>
                     <Badge variant={
-                      response.status === "accepted" ? "success" :
-                        response.status === "rejected" ? "destructive" :
+                      businessResponse.status === "accepted" ? "success" :
+                        businessResponse.status === "rejected" ? "destructive" :
                           "secondary"
                     }>
-                      {response.status.charAt(0).toUpperCase() + response.status.slice(1)}
+                      {businessResponse.status.charAt(0).toUpperCase() + businessResponse.status.slice(1)}
                     </Badge>
                   </div>
-                  <p className="text-sm mt-2">{response.proposal}</p>
-                  {response.status === "accepted" && (
+                  <p className="text-sm mt-2">{businessResponse.proposal}</p>
+                  {businessResponse.status === "accepted" && (
                     <div className="mt-4 space-y-4">
                       <div className="p-4 bg-background rounded-lg border">
                         <h4 className="font-medium mb-2">Contact Information</h4>
                         <p className="text-sm whitespace-pre-wrap">
-                          {response.contactDetails || "No contact details provided yet."}
+                          {businessResponse.contactDetails || "No contact details provided yet."}
                         </p>
                       </div>
 
@@ -764,12 +754,12 @@ const BusinessLeadsView = ({
                               <Button variant="outline" size="sm" className="relative">
                                 <Send className="h-4 w-4 mr-2" />
                                 Open Messages
-                                {(lead.unreadMessages > 0) && (
+                                {unreadCount > 0 && (
                                   <Badge
                                     variant="destructive"
                                     className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
                                   >
-                                    {lead.unreadMessages}
+                                    {unreadCount}
                                   </Badge>
                                 )}
                               </Button>
@@ -777,7 +767,7 @@ const BusinessLeadsView = ({
                             <DialogContent>
                               <MessageDialog
                                 leadId={lead.id}
-                                receiverId={response.business_id}
+                                receiverId={businessResponse.business_id}
                                 isOpen={true}
                                 onOpenChange={(open) => {
                                   if (!open) {
@@ -806,6 +796,7 @@ const BusinessLeadsView = ({
         {leads.map((lead) => {
           const matchScore = calculateMatchScore(lead, user);
           const existingResponse = myResponses[lead.id];
+          const unreadCount = getUnreadCount(lead.messages, user.id);
 
           return (
             <Card key={lead.id}>
@@ -985,130 +976,134 @@ const FreeUserLeadsView = ({
               <p className="text-sm">You have unread messages in your leads</p>
             </div>
           )}
-          {leads.map((lead) => (
-            <Card key={lead.id}>
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <CardTitle>{lead.title}</CardTitle>
-                  {lead.user_id === user?.id && (
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setEditingLead(lead)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => deleteLeadMutation.mutate(lead.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+          {leads.map((lead) => {
+            const unreadCount = getUnreadCount(lead.messages, user.id);
+
+            return (
+              <Card key={lead.id}>
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <CardTitle>{lead.title}</CardTitle>
+                    {lead.user_id === user?.id && (
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditingLead(lead)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => deleteLeadMutation.mutate(lead.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground mb-4">{lead.description}</p>
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium">Category:</span> {lead.category}
+                    </div>
+                    <div>
+                      <span className="font-medium">Budget:</span> £{lead.budget}
+                    </div>
+                    <div>
+                      <span className="font-medium">Location:</span> {lead.location}
+                    </div>
+                  </div>
+
+                  {lead.responses && lead.responses.length > 0 && (
+                    <div className="space-y-4 mt-6">
+                      <h3 className="font-semibold">Proposals</h3>
+                      {lead.responses.map((response) => (
+                        <div
+                          key={response.id}
+                          className="border rounded-lg p-4"
+                        >
+                          <div className="flex justify-between items-center">
+                            <p className="font-medium">
+                              {response.business?.profile?.name || "Business"}
+                            </p>
+                            <Badge variant={
+                              response.status === "accepted" ? "success" :
+                                response.status === "rejected" ? "destructive" :
+                                  "secondary"
+                            }>
+                              {response.status.charAt(0).toUpperCase() + response.status.slice(1)}
+                            </Badge>
+                          </div>
+                          <p className="text-sm mt-2">{response.proposal}</p>
+                          {response.status === "accepted" ? (
+                            <div className="mt-4 flex items-center gap-2">
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button variant="outline" size="sm" className="relative">
+                                    <Send className="h-4 w-4 mr-2"/>
+                                    Open Messages
+                                    {unreadCount > 0 && (
+                                      <Badge
+                                        variant="destructive"
+                                        className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
+                                      >
+                                        {unreadCount}
+                                      </Badge>
+                                    )}
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                  <MessageDialog
+                                    leadId={lead.id}
+                                    receiverId={response.business_id}
+                                    isOpen={true}
+                                    onOpenChange={(open) => {
+                                      if (!open) {
+                                        queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+                                      }
+                                    }}
+                                    onMessagesRead={() => {
+                                      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+                                    }}
+                                  />
+                                </DialogContent>
+                              </Dialog>
+                            </div>
+                          ) : response.status === "pending" && (
+                            <div className="mt-4 flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => acceptProposalMutation.mutate({
+                                  leadId: lead.id,
+                                  responseId: response.id
+                                })}
+                              >
+                                Accept
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => rejectProposalMutation.mutate({
+                                  leadId: lead.id,
+                                  responseId: response.id
+                                })}
+                              >
+                                Reject
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground mb-4">{lead.description}</p>
-                <div className="grid grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <span className="font-medium">Category:</span> {lead.category}
-                  </div>
-                  <div>
-                    <span className="font-medium">Budget:</span> £{lead.budget}
-                  </div>
-                  <div>
-                    <span className="font-medium">Location:</span> {lead.location}
-                  </div>
-                </div>
-
-                {lead.responses && lead.responses.length > 0 && (
-                  <div className="space-y-4 mt-6">
-                    <h3 className="font-semibold">Proposals</h3>
-                    {lead.responses.map((response) => (
-                      <div
-                        key={response.id}
-                        className="border rounded-lg p-4"
-                      >
-                        <div className="flex justify-between items-center">
-                          <p className="font-medium">
-                            {response.business?.profile?.name || "Business"}
-                          </p>
-                          <Badge variant={
-                            response.status === "accepted" ? "success" :
-                              response.status === "rejected" ? "destructive" :
-                                "secondary"
-                          }>
-                            {response.status.charAt(0).toUpperCase() + response.status.slice(1)}
-                          </Badge>
-                        </div>
-                        <p className="text-sm mt-2">{response.proposal}</p>
-                        {response.status === "accepted" ? (
-                          <div className="mt-4 flex items-center gap-2">
-                            <Dialog>
-                              <DialogTrigger asChild>
-                                <Button variant="outline" size="sm" className="relative">
-                                  <Send className="h-4 w-4 mr-2"/>
-                                  Open Messages
-                                  {getUnreadCount(lead.messages, user.id) > 0 && (
-                                    <Badge
-                                      variant="destructive"
-                                      className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
-                                    >
-                                      {getUnreadCount(lead.messages, user.id)}
-                                    </Badge>
-                                  )}
-                                </Button>
-                              </DialogTrigger>
-                              <DialogContent>
-                                <MessageDialog
-                                  leadId={lead.id}
-                                  receiverId={response.business_id}
-                                  isOpen={true}
-                                  onOpenChange={(open) => {
-                                    if (!open) {
-                                      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-                                    }
-                                  }}
-                                  onMessagesRead={() => {
-                                    queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-                                  }}
-                                />
-                              </DialogContent>
-                            </Dialog>
-                          </div>
-                        ) : response.status === "pending" && (
-                          <div className="mt-4 flex items-center gap-2">
-                            <Button
-                              size="sm"
-                              onClick={() => acceptProposalMutation.mutate({
-                                leadId: lead.id,
-                                responseId: response.id
-                              })}
-                            >
-                              Accept
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => rejectProposalMutation.mutate({
-                                leadId: lead.id,
-                                responseId: response.id
-                              })}
-                            >
-                              Reject
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       </TabsContent>
       <TabsContent value="post">
