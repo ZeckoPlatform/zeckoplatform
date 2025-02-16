@@ -19,10 +19,9 @@ router.post("/api/feedback", async (req, res) => {
       technical_context: technicalContext,
       path,
       user_id: userId,
-      created_at: new Date(),
     }).returning();
 
-    // Send email notification
+    // Send email notification if requested
     if (notifyEmail) {
       await sendEmail({
         to: notifyEmail,
@@ -35,17 +34,11 @@ router.post("/api/feedback", async (req, res) => {
           <p><strong>Technical Context:</strong></p>
           <pre>${JSON.stringify(technicalContext, null, 2)}</pre>
         `,
-        text: `New ${type} Report
-
-Description: ${description}
-User: ${technicalContext.userEmail}
-Path: ${path}
-Technical Context: ${JSON.stringify(technicalContext, null, 2)}
-        `
+        text: `New ${type} Report\n\nDescription: ${description}\nUser: ${technicalContext.userEmail}\nPath: ${path}\nTechnical Context: ${JSON.stringify(technicalContext, null, 2)}`
       });
     }
 
-    // Create admin notification
+    // Create admin notification if requested
     if (notifyAdmins) {
       const truncatedMessage = description.length > 100 
         ? description.substring(0, 100) + "..." 

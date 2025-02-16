@@ -1,14 +1,15 @@
 import { db } from '@db';
-import { notifications } from '@db/schema';
+import { notifications, users } from '@db/schema';
 import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
 
-// Define the notification schema
+// Define the notification schema to match database schema exactly
 const notificationSchema = z.object({
-  type: z.enum(["info", "success", "warning", "error"]),
+  userId: z.number().array().optional(),
   title: z.string(),
   message: z.string(),
-  userId: z.number().array().optional(), // Allow array of userIds for admin notifications
+  type: z.enum(["info", "success", "warning", "error"]),
+  link: z.string().optional(),
   metadata: z.record(z.any()).optional(),
   notifyAdmins: z.boolean().optional()
 });
@@ -24,21 +25,21 @@ export async function createNotification(
 
     // If notifyAdmins is true, get all admin user IDs
     if (validatedData.notifyAdmins) {
-      const adminUsers = await db.query.users.findMany({
-        where: (users) => eq(users.userType, "admin"),
-        columns: { id: true }
-      });
+      const adminUsers = await db
+        .select()
+        .from(users)
+        .where(eq(users.userType, "admin"));
 
       // Create a notification for each admin
       for (const admin of adminUsers) {
         await db.insert(notifications).values({
-          type: validatedData.type,
+          userId: admin.id,
           title: validatedData.title,
           message: validatedData.message,
+          type: validatedData.type,
+          link: validatedData.link,
           metadata: validatedData.metadata || {},
-          userId: admin.id,
           read: false,
-          createdAt: new Date()
         });
       }
       return true;
@@ -46,15 +47,19 @@ export async function createNotification(
 
     // For regular notifications to specific users
     if (validatedData.userId) {
-      for (const uid of Array.isArray(validatedData.userId) ? validatedData.userId : [validatedData.userId]) {
+      const userIds = Array.isArray(validatedData.userId) 
+        ? validatedData.userId 
+        : [validatedData.userId];
+
+      for (const uid of userIds) {
         await db.insert(notifications).values({
-          type: validatedData.type,
+          userId: uid,
           title: validatedData.title,
           message: validatedData.message,
+          type: validatedData.type,
+          link: validatedData.link,
           metadata: validatedData.metadata || {},
-          userId: uid,
           read: false,
-          createdAt: new Date()
         });
       }
     }
