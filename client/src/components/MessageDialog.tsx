@@ -46,8 +46,7 @@ export function MessageDialog({
   const playNotification = useNotificationSound();
   const { toast } = useToast();
   const messageContainerRef = useRef<HTMLDivElement>(null);
-  const isFirstLoad = useRef(true);
-  const previousMessagesLength = useRef(0);
+  const hasUnreadMessagesRef = useRef(false);
 
   const messagesQueryKey = [`/api/leads/${leadId}/messages`];
 
@@ -57,40 +56,41 @@ export function MessageDialog({
     refetchInterval: isOpen ? 3000 : false,
   });
 
+  // Scroll helper with smooth scrolling option
   const scrollToBottom = (smooth = true) => {
-    if (messageContainerRef.current) {
-      messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
-    }
+    if (!messageContainerRef.current) return;
+    const container = messageContainerRef.current;
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: smooth ? 'smooth' : 'auto'
+    });
   };
 
-  // Initial load and mark messages as read
+  // Initial mount effect - scroll and check for unread
   useEffect(() => {
-    if (isOpen && messages.length > 0) {
-      // On first open, scroll immediately
-      if (isFirstLoad.current) {
-        scrollToBottom(false);
-        isFirstLoad.current = false;
-      }
+    if (!isOpen || !messages.length) return;
 
-      // Check for unread messages
-      const unreadMessages = messages.filter(m => !m.read && m.sender.id !== user?.id);
-      if (unreadMessages.length > 0) {
+    scrollToBottom(false);
+
+    const unreadMessages = messages.filter(m => !m.read && m.sender.id !== user?.id);
+    if (unreadMessages.length > 0) {
+      hasUnreadMessagesRef.current = true;
+      markAsReadMutation.mutate();
+    }
+  }, [isOpen, messages.length]);
+
+  // New message effect - handle notifications and scroll
+  useEffect(() => {
+    if (!isOpen || !messages.length) return;
+
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage?.sender.id !== user?.id) {
+      playNotification('receive');
+      if (!lastMessage.read) {
         markAsReadMutation.mutate();
       }
     }
-  }, [isOpen, messages]);
-
-  // Handle new messages
-  useEffect(() => {
-    if (!isFirstLoad.current && messages.length > previousMessagesLength.current) {
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage?.sender.id !== user?.id) {
-        playNotification('receive');
-        markAsReadMutation.mutate();
-      }
-      scrollToBottom(true);
-    }
-    previousMessagesLength.current = messages.length;
+    scrollToBottom(true);
   }, [messages]);
 
   const markAsReadMutation = useMutation({
@@ -100,7 +100,7 @@ export function MessageDialog({
       return response.json();
     },
     onSuccess: () => {
-      // Update local messages to show as read
+      // Update local message state
       queryClient.setQueryData<Message[]>(messagesQueryKey, oldMessages => 
         oldMessages?.map(m => ({
           ...m,
@@ -108,10 +108,12 @@ export function MessageDialog({
         }))
       );
 
-      // Update lead counts
-      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-
-      if (onMessagesRead) onMessagesRead();
+      // Update lead counts in parent
+      if (hasUnreadMessagesRef.current) {
+        queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+        if (onMessagesRead) onMessagesRead();
+        hasUnreadMessagesRef.current = false;
+      }
     },
     onError: (error: Error) => {
       toast({
