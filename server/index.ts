@@ -58,6 +58,7 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
 
     const cleanup = () => {
       if (!isResolved) {
+        log(`Cleaning up server on port ${port}`);
         server.removeAllListeners();
         if (server.listening) {
           server.close();
@@ -68,21 +69,19 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
     const onError = (error: NodeJS.ErrnoException) => {
       if (isResolved) return;
 
-      cleanup();
+      log(`Server error on port ${port}: ${error.message}`);
       if (error.code === 'EADDRINUSE') {
         log(`Port ${port} is in use, will try next port`);
-        resolve(false);
-      } else {
-        log(`Server error on port ${port}: ${error.message}`);
-        resolve(false);
       }
+      cleanup();
+      resolve(false);
       isResolved = true;
     };
 
     const onListening = () => {
       if (isResolved) return;
 
-      log(`Server successfully started on port ${port}`);
+      log(`Server successfully started and listening on port ${port}`);
       resolve(true);
       isResolved = true;
     };
@@ -105,8 +104,8 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
       server.listen(port, '0.0.0.0');
     } catch (error) {
       if (!isResolved) {
-        cleanup();
         log(`Failed to start server: ${error}`);
+        cleanup();
         resolve(false);
         isResolved = true;
       }
@@ -129,8 +128,8 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
     const server = createServer();
 
     // Define ports to try in order of preference
-    const preferredPort = process.env.PORT || process.env.REPLIT_PORT || 3000;
-    const ports = [parseInt(preferredPort.toString()), 3000, 8080, 4000];
+    const preferredPort = process.env.PORT || process.env.REPLIT_PORT || 5000;
+    const ports = [parseInt(preferredPort.toString()), 5000];  // Only try preferred port and 5000
 
     log(`Will try ports in order: ${ports.join(', ')}`);
     let serverStarted = false;
@@ -150,10 +149,14 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
             log('Production mode: Setting up static file serving...');
             serveStatic(app);
           }
+          log('Server setup completed successfully');
           break;
         } catch (error) {
-          log(`Warning: Failed to setup Vite/static serving: ${error}`);
-          // Continue running even if Vite setup fails
+          log(`Error during Vite/static setup: ${error}`);
+          // Close the server and try the next port
+          server.close();
+          serverStarted = false;
+          continue;
         }
       }
     }
