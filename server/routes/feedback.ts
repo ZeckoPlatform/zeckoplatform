@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { db } from "@db";
-import { feedback } from "@db/schema";
+import { feedback, feedbackResponses } from "@db/schema";
 import { z } from "zod";
 import { sendEmail } from "../services/email";
 import { createNotification, NotificationTypes } from "../services/notifications";
+import { eq } from "drizzle-orm";
 
 const router = Router();
 
@@ -41,6 +42,15 @@ router.post("/api/feedback", async (req, res) => {
     }).returning();
 
     console.log('Feedback stored successfully:', JSON.stringify(feedbackEntry, null, 2));
+
+    // Create automated response
+    await db.insert(feedbackResponses).values({
+      feedback_id: feedbackEntry.id,
+      content: type === "bug" 
+        ? "Thank you for reporting this bug. Our team has been notified and will investigate the issue." 
+        : "Thank you for your feedback. We appreciate your input in helping us improve our platform.",
+      response_type: "automated",
+    });
 
     // Send email notification if requested
     if (notifyEmail) {
@@ -86,7 +96,6 @@ router.post("/api/feedback", async (req, res) => {
       }
     }
 
-    // Always set Content-Type header to application/json
     res.setHeader('Content-Type', 'application/json');
     return res.status(201).json({ 
       success: true, 
@@ -95,7 +104,6 @@ router.post("/api/feedback", async (req, res) => {
   } catch (error) {
     console.error("Failed to save feedback:", error);
 
-    // Always set Content-Type header to application/json
     res.setHeader('Content-Type', 'application/json');
 
     if (error instanceof z.ZodError) {
@@ -109,6 +117,75 @@ router.post("/api/feedback", async (req, res) => {
       success: false, 
       message: "Failed to save feedback. Please try again." 
     });
+  }
+});
+
+// Admin routes for feedback management
+router.get("/api/admin/feedback", async (req, res) => {
+  try {
+    const feedbackList = await db.query.feedback.findMany({
+      with: {
+        responses: true,
+        user: true,
+      },
+      orderBy: (feedback, { desc }) => [desc(feedback.created_at)],
+    });
+
+    return res.json(feedbackList);
+  } catch (error) {
+    console.error("Failed to fetch feedback:", error);
+    return res.status(500).json({ message: "Failed to fetch feedback" });
+  }
+});
+
+router.patch("/api/admin/feedback/:id/status", async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  try {
+    const [updated] = await db
+      .update(feedback)
+      .set({ 
+        status, 
+        updated_at: new Date() 
+      })
+      .where(eq(feedback.id, parseInt(id)))
+      .returning();
+
+    return res.json(updated);
+  } catch (error) {
+    console.error("Failed to update feedback status:", error);
+    return res.status(500).json({ message: "Failed to update feedback status" });
+  }
+});
+
+router.post("/api/admin/feedback/:id/respond", async (req, res) => {
+  const { id } = req.params;
+  const { content } = req.body;
+  const adminId = req.user?.id;
+
+  try {
+    const [response] = await db.insert(feedbackResponses).values({
+      feedback_id: parseInt(id),
+      admin_id: adminId,
+      content,
+      response_type: "admin",
+    }).returning();
+
+    // Update the feedback status to 'acknowledged' if it's still 'new'
+    await db
+      .update(feedback)
+      .set({ 
+        status: "acknowledged", 
+        updated_at: new Date() 
+      })
+      .where(eq(feedback.id, parseInt(id)))
+      .where(eq(feedback.status, "new"));
+
+    return res.json(response);
+  } catch (error) {
+    console.error("Failed to add feedback response:", error);
+    return res.status(500).json({ message: "Failed to add feedback response" });
   }
 });
 

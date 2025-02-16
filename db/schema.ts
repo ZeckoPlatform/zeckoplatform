@@ -590,12 +590,39 @@ export const feedback = pgTable("feedback", {
   }>(),
   path: text("path"),
   user_id: integer("user_id").references(() => users.id),
+  status: text("status", {
+    enum: ["new", "acknowledged", "in_progress", "resolved", "closed"]
+  }).default("new"),
+  created_at: timestamp("created_at").defaultNow(),
+  updated_at: timestamp("updated_at").defaultNow(),
+});
+
+export const feedbackResponses = pgTable("feedback_responses", {
+  id: serial("id").primaryKey(),
+  feedback_id: integer("feedback_id").references(() => feedback.id).notNull(),
+  admin_id: integer("admin_id").references(() => users.id),
+  content: text("content").notNull(),
+  response_type: text("response_type", {
+    enum: ["automated", "admin"]
+  }).notNull(),
   created_at: timestamp("created_at").defaultNow(),
 });
 
-export const feedbackRelations = relations(feedback, ({ one }) => ({
+export const feedbackRelations = relations(feedback, ({ one, many }) => ({
   user: one(users, {
     fields: [feedback.user_id],
+    references: [users.id],
+  }),
+  responses: many(feedbackResponses),
+}));
+
+export const feedbackResponsesRelations = relations(feedbackResponses, ({ one }) => ({
+  feedback: one(feedback, {
+    fields: [feedbackResponses.feedback_id],
+    references: [feedback.id],
+  }),
+  admin: one(users, {
+    fields: [feedbackResponses.admin_id],
     references: [users.id],
   }),
 }));

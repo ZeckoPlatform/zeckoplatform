@@ -27,6 +27,7 @@ import ResetPasswordPage from "@/pages/auth/reset-password";
 import ReviewsDashboard from "@/pages/reviews-dashboard";
 import NotificationsPage from "@/pages/notifications-page";
 import { FeedbackDialog } from "@/components/FeedbackDialog";
+import FeedbackManagementPage from "@/pages/admin/feedback-management";
 
 function Router() {
   return (
@@ -109,6 +110,7 @@ function Router() {
         {/* Admin Routes */}
         <Route path="/admin/users/edit/:id" component={UserEditPage} />
         <Route path="/admin/reviews" component={ReviewModerationPage} />
+        <Route path="/admin/feedback" component={() => <ProtectedRoute component={FeedbackManagementPage} />} />
 
         <Route component={NotFound} />
       </Switch>
