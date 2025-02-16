@@ -653,8 +653,8 @@ const BusinessLeadsView = ({
     return acc;
   }, {} as Record<number, any>);
 
-  const getUnreadCount = (lead: LeadWithUnreadCount) => {
-    return lead.messages?.filter(m => !m.read && m.sender_id !== user?.id).length || 0;
+  const getUnreadCount = (lead: LeadWithUnreadCount, userId: number) => {
+    return lead.messages?.filter(m => !m.read && m.sender_id !== userId).length || 0;
   };
 
   const sendProposalMutation = useMutation({
@@ -687,7 +687,7 @@ const BusinessLeadsView = ({
 
   return (
     <div className="space-y-8">
-      {leads.some(lead => getUnreadCount(lead) > 0) && (
+      {leads.some(lead => getUnreadCount(lead, user.id) > 0) && (
         <div className="bg-muted/50 p-4 rounded-lg flex items-center gap-2 mb-4">
           <Info className="h-5 w-5 text-primary" />
           <p className="text-sm">You have unread messages in your leads</p>
@@ -942,10 +942,9 @@ const FreeUserLeadsView = ({
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
   const queryClient = useQueryClient();
 
-  // Calculate unread messages for the lead
-  const getUnreadCount = (lead: LeadWithUnreadCount) => {
+  const getUnreadCount = (lead: LeadWithUnreadCount, userId: number) => {
     return lead.messages?.filter(m =>
-      !m.read && m.sender_id !== user?.id
+      !m.read && m.sender_id !== userId
     ).length || 0;
   };
 
@@ -969,7 +968,7 @@ const FreeUserLeadsView = ({
       </TabsList>
       <TabsContent value="my-leads" className="mt-4">
         <div className="grid gap-6">
-          {leads.some(lead => getUnreadCount(lead) > 0) && (
+          {leads.some(lead => getUnreadCount(lead, user.id) > 0) && (
             <div className="bg-muted/50 p-4 rounded-lg flex items-center gap-2 mb-4">
               <Info className="h-5 w-5 text-primary" />
               <p className="text-sm">You have unread messages in your leads</p>
@@ -1086,12 +1085,12 @@ const FreeUserLeadsView = ({
                                     <Button variant="outline" size="sm" className="relative">
                                       <Send className="h-4 w-4 mr-2" />
                                       Open Messages
-                                      {getUnreadCount(lead) > 0 && (
+                                      {getUnreadCount(lead, user.id) > 0 && (
                                         <Badge
                                           variant="destructive"
                                           className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
                                         >
-                                          {getUnreadCount(lead)}
+                                          {getUnreadCount(lead, user.id)}
                                         </Badge>
                                       )}
                                     </Button>

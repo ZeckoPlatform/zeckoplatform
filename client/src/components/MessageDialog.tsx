@@ -52,7 +52,6 @@ export function MessageDialog({
 
   const messagesQueryKey = [`/api/leads/${leadId}/messages`];
 
-  // Background query for messages
   const { data: messages = [], isLoading } = useQuery<Message[]>({
     queryKey: messagesQueryKey,
     enabled: !!user?.id && isOpen,
@@ -71,7 +70,7 @@ export function MessageDialog({
 
   // Handle new message notifications
   useEffect(() => {
-    if (messages.length > previousMessagesCount.current && !isFirstMount.current) {
+    if (!isFirstMount.current && messages.length > previousMessagesCount.current) {
       const lastMessage = messages[messages.length - 1];
       if (lastMessage?.sender.id !== user?.id) {
         playNotification('receive');
@@ -96,8 +95,11 @@ export function MessageDialog({
           read: m.sender.id !== user?.id ? true : m.read
         }))
       );
-      // Invalidate both the messages and leads queries to update unread counts
+
+      // Invalidate both the messages and leads queries
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      queryClient.invalidateQueries({ queryKey: messagesQueryKey });
+
       if (onMessagesRead) onMessagesRead();
     },
     onError: (error: Error) => {
