@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
 import { Redirect } from "wouter";
-import { Loader2 } from "lucide-react";
+import { Loader2, Send, Edit, Trash2, AlertTriangle, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
@@ -15,14 +15,79 @@ import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, Edit, Trash2, Send, AlertTriangle, Info } from "lucide-react";
-import type { SelectLead, SelectUser, SelectMessage } from "@db/schema";
-import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { useNotificationSound } from "@/lib/useNotificationSound";
 import { MessageDialog } from "@/components/MessageDialog";
 import { SubscriptionRequiredModal } from "@/components/subscription-required-modal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { format } from "date-fns";
+
+// Type definitions for database entities
+interface SelectLead {
+  id: number;
+  title: string;
+  description: string;
+  category: string;
+  subcategory: string;
+  budget: number;
+  location: string;
+  user_id: number;
+  created_at: string;
+  phoneNumber?: string;
+  responses?: Array<{
+    id: number;
+    proposal: string;
+    status: "pending" | "accepted" | "rejected";
+    business_id: number;
+    created_at: string;
+    contactDetails?: string;
+  }>;
+  messages?: Array<{
+    id: number;
+    content: string;
+    sender_id: number;
+    read: boolean;
+    created_at: string;
+  }>;
+}
+
+interface SelectUser {
+  id: number;
+  email: string;
+  userType: "free" | "business" | "vendor";
+  countryCode: "GB" | "US";
+  subscriptionActive: boolean;
+  profile?: {
+    name?: string;
+    description?: string;
+    categories?: string[];
+    location?: string;
+    industries?: string[];
+    matchPreferences?: {
+      budgetRange?: {
+        min: number;
+        max: number;
+      };
+      industries?: string[];
+    };
+  };
+}
+
+interface SelectMessage {
+  id: number;
+  content: string;
+  sender_id: number;
+  receiver_id: number;
+  lead_id: number;
+  read: boolean;
+  created_at: string;
+  sender?: {
+    id: number;
+    profile?: {
+      name: string;
+    };
+  };
+}
 
 const PHONE_COUNTRY_CODES = {
   GB: {
@@ -343,6 +408,22 @@ interface LeadWithUnreadCount extends SelectLead {
   unreadMessages: number;
 }
 
+interface CreateLeadFormProps {
+  onSubmit: (data: LeadFormData) => void;
+  isSubmitting: boolean;
+}
+
+interface BusinessLeadsViewProps {
+  leads: LeadWithUnreadCount[];
+  user: SelectUser;
+  selectedLead: SelectLead | null;
+  setSelectedLead: (lead: SelectLead | null) => void;
+  proposalDialogOpen: boolean;
+  setProposalDialogOpen: (open: boolean) => void;
+  toast: (options: any) => void;
+  playNotification: (type: string) => void;
+}
+
 const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const { user } = useAuth();
@@ -659,7 +740,7 @@ const BusinessLeadsView = ({
                             <DialogContent>
                               <MessageDialogContent
                                 leadId={lead.id}
-                                receiverId={user?.id === lead.user_id ? response.business_id : lead.user_id}
+                                receiverId={response.business_id}
                                 onClose={() => queryClient.invalidateQueries({ queryKey: ["/api/leads"] })}
                               />
                             </DialogContent>
@@ -815,6 +896,17 @@ const BusinessLeadsView = ({
   );
 };
 
+interface FreeUserLeadsViewProps {
+  leads: LeadWithUnreadCount[];
+  createLeadMutation: any;
+  updateLeadMutation: any;
+  editingLead: LeadWithUnreadCount | null;
+  setEditingLead: (lead: LeadWithUnreadCount | null) => void;
+  deleteLeadMutation: any;
+  user: SelectUser;
+  acceptProposalMutation: any;
+}
+
 const FreeUserLeadsView = ({
   leads,
   createLeadMutation,
@@ -823,9 +915,9 @@ const FreeUserLeadsView = ({
   setEditingLead,
   deleteLeadMutation,
   user,
-  acceptProposalMutation,
-  rejectProposalMutation
+  acceptProposalMutation
 }: FreeUserLeadsViewProps) => {
+  const { toast } = useToast();
   const editForm = useForm<LeadFormData>({
     defaultValues: {
       title: editingLead?.title || "",
@@ -861,7 +953,6 @@ const FreeUserLeadsView = ({
       });
     }
   });
-
 
   return (
     <Tabs defaultValue="my-leads">
@@ -974,11 +1065,7 @@ const FreeUserLeadsView = ({
                       <Button
                         variant="destructive"
                         size="icon"
-                        onClick={() => {
-                          if (confirm('Are you sure you want to delete this lead?')) {
-                            deleteLeadMutation.mutate(lead.id);
-                          }
-                        }}
+                        onClick={() => deleteLeadMutation.mutate(lead.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -1029,36 +1116,38 @@ const FreeUserLeadsView = ({
                             <div className="mt-4 space-y-4">
                               <div className="p-4 bg-background rounded-lg border">
                                 <h4 className="font-medium mb-2">Contact Information</h4>
-                                <p className="text-sm whitespace-pre-wrap">
-                                  {response.contactDetails || ""No contact details provided yet."}
+                                <p className="text-sm whitespace-pre-wrap">                                  {response.contactDetails || "No contact details provided yet."}
                                 </p>
                               </div>
 
                               <div className="p-4 bg-background rounded-lg border">
-                                <div className="flex justify-between items-center mb-4">
+                                <div className="flex justify-between items-center">
                                   <h4 className="font-medium">Messages</h4>
                                   <Dialog>
                                     <DialogTrigger asChild>
-                                      <Button variant="outline" size="sm" className="relative">
+                                      <Button variant="outline" size="sm">
                                         <Send className="h-4 w-4 mr-2" />
                                         Open Messages
-                                        {lead.unreadMessages > 0 && (
-                                          <span className="absolute -top-1 -right-1 h-3 w-3 bg-destructive rounded-full" />
-                                        )}
                                       </Button>
                                     </DialogTrigger>
                                     <DialogContent>
                                       <MessageDialogContent
                                         leadId={lead.id}
                                         receiverId={response.business_id}
-                                        onClose={() => queryClient.invalidateQueries({ queryKey: ["/api/leads"] })}
+                                        onClose={() =>
+                                          queryClient.invalidateQueries({
+                                            queryKey: ["/api/leads"],
+                                          })
+                                        }
                                       />
                                     </DialogContent>
                                   </Dialog>
                                 </div>
                               </div>
                             </div>
-                          ) : response.status === "pending" && (
+                          )}
+
+                          {response.status === "pending" && (
                             <div className="flex gap-2 mt-4">
                               <Dialog>
                                 <DialogTrigger asChild>
@@ -1068,25 +1157,28 @@ const FreeUserLeadsView = ({
                                   <DialogHeader>
                                     <DialogTitle>Accept Proposal</DialogTitle>
                                     <DialogDescription>
-                                      Please provide your contact details for the business.
+                                      Please provide your contact details for the vendor
                                     </DialogDescription>
                                   </DialogHeader>
-                                  <form onSubmit={form.handleSubmit((data) => {
-                                    acceptProposalMutation.mutate({
-                                      leadId: lead.id,
-                                      responseId: response.id,
-                                      contactDetails: data.contactDetails
-                                    });
-                                  })}>
+                                  <form
+                                    onSubmit={form.handleSubmit((data) =>
+                                      acceptProposalMutation.mutate({
+                                        leadId: lead.id,
+                                        responseId: response.id,
+                                        contactDetails: data.contactDetails,
+                                      })
+                                    )}
+                                  >
                                     <div className="space-y-4">
-                                      <div>
-                                        <Label htmlFor="contactDetails">Contact Details</Label>
+                                      <div className="space-y-2">
+                                        <Label htmlFor="contactDetails">
+                                          Contact Details
+                                        </Label>
                                         <Textarea
                                           id="contactDetails"
-                                          placeholder="Provide your contact information (phone, email, etc.)"
-                                          className="min-h-[100px]"
                                           {...form.register("contactDetails")}
-                                          required
+                                          placeholder="Enter your phone number, email, or any other contact information..."
+                                          className="min-h-[100px]"
                                         />
                                       </div>
                                       <Button
@@ -1100,7 +1192,7 @@ const FreeUserLeadsView = ({
                                             Accepting...
                                           </>
                                         ) : (
-                                          'Accept and Share Contact Details'
+                                          "Accept Proposal"
                                         )}
                                       </Button>
                                     </div>
@@ -1108,18 +1200,24 @@ const FreeUserLeadsView = ({
                                 </DialogContent>
                               </Dialog>
                               <Button
-                                variant="outline"
+                                variant="destructive"
                                 size="sm"
                                 onClick={() => {
-                                  if (confirm('Are you sure you want to reject this proposal?')) {
-                                    rejectProposalMutation.mutate({
-                                      leadId: lead.id,
-                                      responseId: response.id
-                                    });
-                                  }
+                                  rejectProposalMutation.mutate({
+                                    leadId: lead.id,
+                                    responseId: response.id,
+                                  });
                                 }}
+                                disabled={rejectProposalMutation.isPending}
                               >
-                                Reject
+                                {rejectProposalMutation.isPending ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Rejecting...
+                                  </>
+                                ) : (
+                                  "Reject"
+                                )}
                               </Button>
                             </div>
                           )}
@@ -1149,6 +1247,9 @@ const FreeUserLeadsView = ({
         <Card>
           <CardHeader>
             <CardTitle>Post a New Lead</CardTitle>
+            <CardDescription>
+              Fill out the form below to post a new lead
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <CreateLeadForm
@@ -1393,13 +1494,8 @@ export default function LeadsPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <SubscriptionRequiredModal
-        isOpen={showSubscriptionModal}
-        onClose={() => setShowSubscriptionModal(false)}
-        userType={user?.userType || ""}
-      />
-      {user?.userType === "business" ? (
+    <div className="container mx-auto py-8">
+      {user?.userType === 'business' || user?.userType === 'vendor' ? (
         <BusinessLeadsView
           leads={leads}
           user={user}
@@ -1427,27 +1523,27 @@ export default function LeadsPage() {
   );
 }
 
-function MessageDialogContent({
-  leadId,
-  receiverId,
-  onClose,
-}: {
+interface MessageDialogContentProps {
   leadId: number;
   receiverId: number;
   onClose?: () => void;
-}) {
+}
+
+export function MessageDialogContent({ leadId, receiverId, onClose }: MessageDialogContentProps) {
   const [open, setOpen] = useState(true);
 
   const handleOpenChange = (newOpen: boolean) => {
     setOpen(newOpen);
-    if (!newOpen && onClose) {
-      onClose();
+    if (!newOpen) {
+      onClose?.();
     }
   };
 
   return (
-    <DialogHeader>
-      <DialogTitle>Messages</DialogTitle>
+    <>
+      <DialogHeader>
+        <DialogTitle>Messages</DialogTitle>
+      </DialogHeader>
       <MessageDialog
         leadId={leadId}
         receiverId={receiverId}
@@ -1455,7 +1551,7 @@ function MessageDialogContent({
         onOpenChange={handleOpenChange}
         onMessagesRead={onClose}
       />
-    </DialogHeader>
+    </>
   );
 }
 
