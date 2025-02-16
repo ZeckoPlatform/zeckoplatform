@@ -40,21 +40,30 @@ router.post("/api/feedback", async (req, res) => {
 
     // Create admin notification if requested
     if (notifyAdmins) {
+      console.log('Creating admin notification for feedback');
       const truncatedMessage = description.length > 100 
         ? description.substring(0, 100) + "..." 
         : description;
 
-      await createNotification({
-        title: `New ${type} Report`,
-        message: truncatedMessage,
-        type: 'info' as const,
-        metadata: {
-          feedbackId: result.id,
-          feedbackType: type,
-          path
-        },
-        notifyAdmins: true
-      });
+      try {
+        const notificationData = {
+          title: `New ${type} Report`,
+          message: truncatedMessage,
+          type: 'info' as const,
+          metadata: {
+            feedbackId: result.id,
+            feedbackType: type,
+            path
+          },
+          notifyAdmins: true
+        };
+        console.log('Notification data:', notificationData);
+
+        await createNotification(notificationData);
+      } catch (notificationError) {
+        console.error('Error creating notification:', notificationError);
+        // Don't fail the whole request if notification fails
+      }
     }
 
     res.status(201).json(result);

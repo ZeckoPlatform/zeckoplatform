@@ -23,6 +23,7 @@ export async function createNotification(
   try {
     // Validate the notification data
     const validatedData = notificationSchema.parse(notification);
+    console.log('Validated notification data:', validatedData);
 
     // If notifyAdmins is true, get all admin user IDs
     if (validatedData.notifyAdmins) {
@@ -31,17 +32,28 @@ export async function createNotification(
         .from(users)
         .where(eq(users.userType, "admin"));
 
+      console.log('Found admin users:', adminUsers);
+
       // Create a notification for each admin
       for (const admin of adminUsers) {
-        await db.insert(notifications).values({
-          userId: admin.id,
-          title: validatedData.title,
-          message: validatedData.message,
-          type: validatedData.type,
-          link: validatedData.link,
-          metadata: validatedData.metadata,
-          read: false,
-        });
+        try {
+          const notificationData = {
+            type: validatedData.type,
+            userId: admin.id,
+            title: validatedData.title,
+            message: validatedData.message,
+            link: validatedData.link,
+            metadata: validatedData.metadata,
+            read: false,
+          };
+          console.log('Inserting notification for admin:', notificationData);
+
+          const result = await db.insert(notifications).values(notificationData);
+          console.log('Insert result:', result);
+        } catch (insertError) {
+          console.error('Error inserting notification for admin:', insertError);
+          throw insertError;
+        }
       }
       return true;
     }
@@ -53,21 +65,30 @@ export async function createNotification(
         : [validatedData.userId];
 
       for (const uid of userIds) {
-        await db.insert(notifications).values({
-          userId: uid,
-          title: validatedData.title,
-          message: validatedData.message,
-          type: validatedData.type,
-          link: validatedData.link,
-          metadata: validatedData.metadata,
-          read: false,
-        });
+        try {
+          const notificationData = {
+            type: validatedData.type,
+            userId: uid,
+            title: validatedData.title,
+            message: validatedData.message,
+            link: validatedData.link,
+            metadata: validatedData.metadata,
+            read: false,
+          };
+          console.log('Inserting notification for user:', notificationData);
+
+          const result = await db.insert(notifications).values(notificationData);
+          console.log('Insert result:', result);
+        } catch (insertError) {
+          console.error('Error inserting notification for user:', insertError);
+          throw insertError;
+        }
       }
     }
 
     return true;
   } catch (error) {
-    console.error('Error creating notification:', error);
+    console.error('Error in createNotification:', error);
     return false;
   }
 }
