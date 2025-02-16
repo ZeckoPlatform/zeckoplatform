@@ -738,16 +738,29 @@ const BusinessLeadsView = ({
                               <Button variant="outline" size="sm" className="relative">
                                 <Send className="h-4 w-4 mr-2" />
                                 Open Messages
-                                {lead.unreadMessages > 0 && (
-                                  <span className="absolute -top-1 -right-1 h-3 w-3 bg-destructive rounded-full" />
+                                {(lead.unreadMessages > 0) && (
+                                  <Badge
+                                    variant="destructive"
+                                    className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
+                                  >
+                                    {lead.unreadMessages}
+                                  </Badge>
                                 )}
                               </Button>
                             </DialogTrigger>
                             <DialogContent>
-                              <MessageDialogContent
+                              <MessageDialog
                                 leadId={lead.id}
                                 receiverId={response.business_id}
-                                onClose={() => queryClient.invalidateQueries({ queryKey: ["/api/leads"] })}
+                                isOpen={true}
+                                onOpenChange={(open) => {
+                                  if (!open) {
+                                    queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+                                  }
+                                }}
+                                onMessagesRead={() => {
+                                  queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+                                }}
                               />
                             </DialogContent>
                           </Dialog>
@@ -1036,8 +1049,8 @@ const FreeUserLeadsView = ({
                             </p>
                           </div>
                           <Badge variant={
-                            response.status === "accepted" ? "success" :
-                              response.status === "rejected" ? "destructive" :
+                            response.status ==="accepted" ? "success" :
+                              response.status === "rejected" ?"destructive" :
                                 "secondary"
                           }>
                             {response.status.charAt(0).toUpperCase() + response.status.slice(1)}
@@ -1062,16 +1075,29 @@ const FreeUserLeadsView = ({
                                     <Button variant="outline" size="sm" className="relative">
                                       <Send className="h-4 w-4 mr-2" />
                                       Open Messages
-                                      {lead.unreadMessages > 0 && (
-                                        <span className="absolute -top-1 -right-1 h-3 w-3 bg-destructive rounded-full" />
+                                      {(lead.unreadMessages > 0) && (
+                                        <Badge
+                                          variant="destructive"
+                                          className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
+                                        >
+                                          {lead.unreadMessages}
+                                        </Badge>
                                       )}
                                     </Button>
                                   </DialogTrigger>
                                   <DialogContent>
-                                    <MessageDialogContent
+                                    <MessageDialog
                                       leadId={lead.id}
                                       receiverId={response.business_id}
-                                      onClose={() => queryClient.invalidateQueries({ queryKey: ["/api/leads"] })}
+                                      isOpen={true}
+                                      onOpenChange={(open) => {
+                                        if (!open) {
+                                          queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+                                        }
+                                      }}
+                                      onMessagesRead={() => {
+                                        queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+                                      }}
                                     />
                                   </DialogContent>
                                 </Dialog>
