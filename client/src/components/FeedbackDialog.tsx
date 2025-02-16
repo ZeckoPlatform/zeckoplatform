@@ -9,9 +9,11 @@ import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 
+type FeedbackType = "bug" | "feedback" | null;
+
 export function FeedbackDialog() {
   const [open, setOpen] = useState(false);
-  const [feedbackType, setFeedbackType] = useState<"bug" | "feedback" | null>(null);
+  const [feedbackType, setFeedbackType] = useState<FeedbackType>(null);
   const [description, setDescription] = useState("");
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const { toast } = useToast();
@@ -35,11 +37,12 @@ export function FeedbackDialog() {
 
   const submitFeedbackMutation = useMutation({
     mutationFn: async () => {
-      // Sanitize description by trimming whitespace
       const sanitizedDescription = description.trim();
-
       if (!sanitizedDescription) {
         throw new Error("Please provide a description");
+      }
+      if (!feedbackType) {
+        throw new Error("Please select a feedback type");
       }
 
       const technicalContext = {
@@ -54,7 +57,7 @@ export function FeedbackDialog() {
         userEmail: user?.email || 'Anonymous'
       };
 
-      const response = await apiRequest("POST", "/api/feedback", {
+      const payload = {
         type: feedbackType,
         description: sanitizedDescription,
         screenshot,
@@ -62,7 +65,9 @@ export function FeedbackDialog() {
         path: location,
         notifyEmail: "zeckoinfo@gmail.com",
         notifyAdmins: true
-      });
+      };
+
+      const response = await apiRequest("POST", "/api/feedback", payload);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -74,42 +79,34 @@ export function FeedbackDialog() {
     onSuccess: () => {
       toast({
         title: "Thank you!",
-        description: "Your feedback has been submitted successfully and sent to our team.",
+        description: "Your feedback has been submitted successfully.",
       });
-      resetForm();
-      setOpen(false);
+      handleClose();
     },
     onError: (error: Error) => {
+      console.error('Feedback submission error:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to submit feedback. Please try again.",
         variant: "destructive",
       });
-    },
+    }
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    const trimmedDescription = description.trim();
-    if (!trimmedDescription) {
-      toast({
-        title: "Error",
-        description: "Please provide a description",
-        variant: "destructive",
-      });
-      return;
-    }
+    e.stopPropagation();
 
     try {
       await submitFeedbackMutation.mutateAsync();
     } catch (error) {
-      // Error is handled in mutation's onError
-      console.error('Feedback submission error:', error);
+      // Errors are handled in the mutation callbacks
+      console.error('Form submission error:', error);
     }
   };
 
-  const resetForm = () => {
+  const handleClose = () => {
+    setOpen(false);
     setFeedbackType(null);
     setDescription("");
     setScreenshot(null);
@@ -119,9 +116,10 @@ export function FeedbackDialog() {
     <Dialog 
       open={open} 
       onOpenChange={(isOpen) => {
-        setOpen(isOpen);
         if (!isOpen) {
-          resetForm();
+          handleClose();
+        } else {
+          setOpen(true);
         }
       }}
     >
@@ -130,11 +128,12 @@ export function FeedbackDialog() {
           variant="outline"
           size="icon"
           className="fixed bottom-4 right-4 h-12 w-12 rounded-full shadow-lg z-50"
+          onClick={() => setOpen(true)}
         >
           <MessageSquarePlus className="h-6 w-6" />
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
             {!feedbackType
@@ -181,7 +180,7 @@ export function FeedbackDialog() {
               }
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="min-h-[100px]"
+              className="min-h-[100px] resize-none"
               required
             />
             <div className="flex justify-between items-center">
@@ -195,7 +194,7 @@ export function FeedbackDialog() {
               </Button>
               <Button
                 type="submit"
-                disabled={submitFeedbackMutation.isPending}
+                disabled={submitFeedbackMutation.isPending || !description.trim()}
               >
                 {submitFeedbackMutation.isPending ? (
                   <>
