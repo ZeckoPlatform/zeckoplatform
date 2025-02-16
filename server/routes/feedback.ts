@@ -19,7 +19,7 @@ const feedbackSchema = z.object({
 });
 
 // Remove authentication requirement for feedback submission
-router.post("/api/feedback", async (req, res) => {
+router.post("/", async (req, res) => {
   try {
     console.log('Received feedback request:', JSON.stringify(req.body, null, 2));
 

@@ -89,16 +89,6 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
     server.once('error', onError);
     server.once('listening', onListening);
 
-    // Set a timeout for the port binding attempt
-    const timeout = setTimeout(() => {
-      if (!isResolved) {
-        log(`Timeout while attempting to bind to port ${port}`);
-        cleanup();
-        resolve(false);
-        isResolved = true;
-      }
-    }, 5000); // 5 second timeout
-
     try {
       log(`Attempting to bind to port ${port}...`);
       server.listen(port, '0.0.0.0');
@@ -109,8 +99,6 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
         resolve(false);
         isResolved = true;
       }
-    } finally {
-      clearTimeout(timeout);
     }
   });
 };
@@ -128,10 +116,7 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
     const server = createServer();
 
     // Define ports to try in order of preference
-    const preferredPort = process.env.PORT || process.env.REPLIT_PORT || 5000;
-    const ports = [parseInt(preferredPort.toString()), 5000];  // Only try preferred port and 5000
-
-    log(`Will try ports in order: ${ports.join(', ')}`);
+    const ports = [3000, 3001, 3002, 5000, 5001, 8000];  // Try multiple ports
     let serverStarted = false;
 
     // Try each port until one works

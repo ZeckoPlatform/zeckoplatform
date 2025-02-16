@@ -57,7 +57,7 @@ export function registerRoutes(app: Express): Server {
 
   // Register feedback routes before authentication middleware
   // This allows the feedback endpoint to be accessed without authentication
-  app.use('/api', feedbackRoutes);
+  app.use('/api/feedback', feedbackRoutes);
 
   // Authentication middleware for protected routes
   app.use('/api', (req, res, next) => {
@@ -68,7 +68,6 @@ export function registerRoutes(app: Express): Server {
         req.path.endsWith('/auth/reset-password/confirm') ||
         req.path.endsWith('/vendor/stripe/account') ||
         req.path.endsWith('/vendor/stripe/account/status') ||
-        req.path.endsWith('/feedback') ||  // Add feedback endpoint to bypass list
         req.method === 'OPTIONS') {
       return next();
     }
