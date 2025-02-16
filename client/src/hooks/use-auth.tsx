@@ -93,13 +93,14 @@ function useAuthState() {
   });
 
   const registerMutation = useMutation({
-    mutationFn: async (newUser: InsertUser) => {
+    mutationFn: async (data: any) => {
+      console.log('Registration data being sent:', data);
       const res = await fetch("/api/register", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(newUser),
+        body: JSON.stringify(data),
       });
 
       if (!res.ok) {
@@ -107,9 +108,9 @@ function useAuthState() {
         throw new Error(error.message || "Registration failed");
       }
 
-      const data = await res.json();
-      localStorage.setItem("token", data.token);
-      return data.user;
+      const responseData = await res.json();
+      localStorage.setItem("token", responseData.token);
+      return responseData.user;
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
@@ -125,6 +126,7 @@ function useAuthState() {
       }
     },
     onError: (error: Error) => {
+      console.error('Registration error:', error);
       toast({
         title: "Registration failed",
         description: error.message,
