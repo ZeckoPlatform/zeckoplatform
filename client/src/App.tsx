@@ -111,6 +111,15 @@ function Router() {
         <Route path="/admin/users/edit/:id" component={UserEditPage} />
         <Route path="/admin/reviews" component={ReviewModerationPage} />
         <Route path="/admin/feedback" component={() => <ProtectedRoute component={FeedbackManagementPage} />} />
+        <Route path="/admin/notifications" component={() => (
+          <ProtectedRoute
+            component={() => (
+              <SettingsLayout>
+                <NotificationSettingsPage />
+              </SettingsLayout>
+            )}
+          />
+        )} />
 
         <Route component={NotFound} />
       </Switch>
