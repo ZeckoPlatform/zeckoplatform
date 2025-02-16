@@ -19,6 +19,28 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 
+// Clean interface for messages
+interface Message {
+  id: number;
+  content: string;
+  sender_id: number;
+  receiver_id: number;
+  lead_id: number;
+  read: boolean;
+  created_at: string;
+}
+
+interface LeadWithUnreadCount extends SelectLead {
+  messages?: Message[];
+  unreadCount?: number;
+}
+
+// Single source of truth for unread count calculation
+function getUnreadCount(messages: Message[] | undefined, userId: number): number {
+  if (!messages || !Array.isArray(messages)) return 0;
+  return messages.filter(m => !m.read && m.sender_id !== userId).length;
+}
+
 // Type definitions for database entities
 interface SelectLead {
   id: number;
@@ -82,21 +104,6 @@ interface SelectUser {
   };
 }
 
-// Clean interface for messages
-interface Message {
-  id: number;
-  content: string;
-  sender_id: number;
-  receiver_id: number;
-  lead_id: number;
-  read: boolean;
-  created_at: string;
-}
-
-interface LeadWithUnreadCount extends SelectLead {
-  messages?: Message[];
-  unreadCount?: number;
-}
 
 const PHONE_COUNTRY_CODES = {
   GB: {
@@ -442,11 +449,6 @@ interface FreeUserLeadsViewProps {
   rejectProposalMutation: any;
 }
 
-// Single source of truth for unread count calculation
-function getUnreadCount(messages: Message[] | undefined, userId: number): number {
-  if (!messages || !Array.isArray(messages)) return 0;
-  return messages.filter(m => !m.read && m.sender_id !== userId).length;
-}
 
 const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
@@ -767,7 +769,7 @@ const BusinessLeadsView = ({
                             <DialogContent>
                               <MessageDialog
                                 leadId={lead.id}
-                                receiverId={businessResponse.business_id}
+                                receiverId={lead.user_id} // Send to lead owner
                                 isOpen={true}
                                 onOpenChange={(open) => {
                                   if (!open) {
@@ -1038,64 +1040,68 @@ const FreeUserLeadsView = ({
                               {response.status.charAt(0).toUpperCase() + response.status.slice(1)}
                             </Badge>
                           </div>
+
                           <p className="text-sm mt-2">{response.proposal}</p>
-                          {response.status === "accepted" ? (
-                            <div className="mt-4 flex items-center gap-2">
-                              <Dialog>
-                                <DialogTrigger asChild>
-                                  <Button variant="outline" size="sm" className="relative">
-                                    <Send className="h-4 w-4 mr-2"/>
-                                    Open Messages
-                                    {unreadCount > 0 && (
-                                      <Badge
-                                        variant="destructive"
-                                        className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
-                                      >
-                                        {unreadCount}
-                                      </Badge>
-                                    )}
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                  <MessageDialog
-                                    leadId={lead.id}
-                                    receiverId={response.business_id}
-                                    isOpen={true}
-                                    onOpenChange={(open) => {
-                                      if (!open) {
-                                        queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-                                      }
-                                    }}
-                                    onMessagesRead={() => {
+
+                        {response.status === "accepted" && (
+                          <div className="mt-4 flex items-center gap2">
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button variant="outline" size="sm" className="relative">
+                                  <Send className="h-4 w-4 mr-2"/>
+                                  Open Messages
+                                  {unreadCount > 0 && (
+                                    <Badge
+                                      variant="destructive"
+                                      className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
+                                    >
+                                      {unreadCount}
+                                    </Badge>
+                                  )}
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <MessageDialog
+                                  leadId={lead.id}
+                                  receiverId={response.business_id} // Send to business
+                                  isOpen={true}
+                                  onOpenChange={(open) => {
+                                    if (!open) {
                                       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-                                    }}
-                                  />
-                                </DialogContent>
-                              </Dialog>
-                            </div>
-                          ) : response.status === "pending" && (
-                            <div className="mt-4 flex items-center gap-2">
-                              <Button
-                                size="sm"
-                                onClick={() => acceptProposalMutation.mutate({
-                                  leadId: lead.id,
-                                  responseId: response.id
-                                })}
-                              >
-                                Accept
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => rejectProposalMutation.mutate({
-                                  leadId: lead.id,
-                                  responseId: response.id
-                                })}
-                              >
-                                Reject
-                              </Button>
-                            </div>
-                          )}
+                                    }
+                                  }}
+                                  onMessagesRead={() => {
+                                    queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+                                  }}
+                                />
+                              </DialogContent>
+                            </Dialog>
+                          </div>
+                        )}
+
+                        {response.status === "pending" && (
+                          <div className="mt-4 flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => acceptProposalMutation.mutate({
+                                leadId: lead.id,
+                                responseId: response.id
+                              })}
+                            >
+                              Accept
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => rejectProposalMutation.mutate({
+                                leadId: lead.id,
+                                responseId: response.id
+                              })}
+                            >
+                              Reject
+                            </Button>
+                          </div>
+                        )}
                         </div>
                       ))}
                     </div>
@@ -1106,6 +1112,7 @@ const FreeUserLeadsView = ({
           })}
         </div>
       </TabsContent>
+
       <TabsContent value="post">
         <Card>
           <CardHeader>

@@ -8,7 +8,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
 import { useNotificationSound } from "@/lib/useNotificationSound";
-import { useToast } from "@/hooks/use-toast";
 
 interface Message {
   id: number;
@@ -39,7 +38,7 @@ export function MessageDialog({
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const messageContainerRef = useRef<HTMLDivElement>(null);
-  const previousMessageCountRef = useRef(0);
+  const lastMessageIdRef = useRef<number | null>(null);
   const playNotification = useNotificationSound();
 
   // Query for messages
@@ -49,23 +48,23 @@ export function MessageDialog({
     refetchInterval: isOpen ? 3000 : false, // Poll every 3 seconds when dialog is open
   });
 
-  // Handle scrolling and notifications
+  // Handle new messages and scrolling
   useEffect(() => {
     if (!isOpen || !messages.length) return;
 
     // Check for new messages
-    if (messages.length > previousMessageCountRef.current) {
-      const lastMessage = messages[messages.length - 1];
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage && lastMessage.id !== lastMessageIdRef.current) {
+      // Play notification for new messages from others
       if (lastMessage.sender_id !== user?.id) {
         playNotification('receive');
       }
+      // Update reference and scroll
+      lastMessageIdRef.current = lastMessage.id;
       scrollToBottom();
     }
 
-    // Update message count reference
-    previousMessageCountRef.current = messages.length;
-
-    // Mark unread messages as read
+    // Check for unread messages
     const hasUnreadMessages = messages.some(m => !m.read && m.sender_id !== user?.id);
     if (hasUnreadMessages) {
       markAsReadMutation.mutate();
