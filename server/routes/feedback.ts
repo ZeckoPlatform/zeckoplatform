@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@db";
 import { feedback } from "@db/schema";
 import { sendEmail } from "../services/email";
-import { createNotification, type NotificationType } from "../services/notifications";
+import { createNotification, NotificationTypes } from "../services/notifications";
 
 const router = Router();
 
@@ -49,7 +49,7 @@ router.post("/api/feedback", async (req, res) => {
         const notificationData = {
           title: `New ${type} Report`,
           message: truncatedMessage,
-          type: "info" as NotificationType,
+          type: NotificationTypes.INFO,
           metadata: {
             feedbackId: result.id,
             feedbackType: type,
