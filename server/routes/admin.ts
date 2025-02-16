@@ -470,13 +470,13 @@ router.post("/admin/mass-email", authenticateToken, checkSuperAdminAccess, async
   }
 });
 
-// Get all products
+// Get all products - Remove superAdmin check
 router.get("/products", authenticateToken, async (req, res) => {
   try {
     const allProducts = await db
       .select()
       .from(products)
-      .orderBy(products.createdAt);
+      .orderBy(desc(products.createdAt));
 
     return res.json(allProducts);
   } catch (error) {
@@ -485,8 +485,7 @@ router.get("/products", authenticateToken, async (req, res) => {
   }
 });
 
-
-// Update product
+// Update product - Keep superAdmin check
 router.patch("/products/:productId", authenticateToken, checkSuperAdminAccess, async (req, res) => {
   try {
     const [product] = await db
@@ -506,7 +505,7 @@ router.patch("/products/:productId", authenticateToken, checkSuperAdminAccess, a
   }
 });
 
-// Delete product
+// Delete product - Keep superAdmin check
 router.delete("/products/:productId", authenticateToken, checkSuperAdminAccess, async (req, res) => {
   try {
     const [product] = await db
