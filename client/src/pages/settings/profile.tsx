@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, User, Bell } from "lucide-react";
 
 const profileSchema = z.object({
-  displayName: z.string().min(2, "Display name must be at least 2 characters"),
+  name: z.string().min(2, "Name must be at least 2 characters"),
   bio: z.string().optional(),
   email: z.string().email("Please enter a valid email address"),
   notificationsEnabled: z.boolean().optional(),
@@ -40,9 +40,9 @@ export default function ProfilePage() {
   const { register, handleSubmit, formState: { errors }, watch, setValue } = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
-      displayName: user?.profile?.displayName || "",
+      name: user?.profile?.name || "",
       bio: user?.profile?.bio || "",
-      email: user?.username || "",
+      email: user?.email || "",
       notificationsEnabled: user?.profile?.notifications?.enabled || false,
       marketingEmails: user?.profile?.notifications?.marketing || false,
       profileVisibility: user?.profile?.visibility || "public",
@@ -93,19 +93,19 @@ export default function ProfilePage() {
             Personal Information
           </CardTitle>
           <CardDescription>
-            Manage your personal profile information
+            Manage your basic profile information
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit((data) => updateProfileMutation.mutate(data))} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="displayName">Display Name</Label>
+              <Label htmlFor="name">Name</Label>
               <Input
-                id="displayName"
-                {...register("displayName")}
+                id="name"
+                {...register("name")}
               />
-              {errors.displayName && (
-                <p className="text-sm text-destructive">{errors.displayName.message}</p>
+              {errors.name && (
+                <p className="text-sm text-destructive">{errors.name.message}</p>
               )}
             </div>
 
