@@ -25,7 +25,7 @@ import { SubscriptionRequiredModal } from "@/components/subscription-required-mo
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const PHONE_COUNTRY_CODES = {
- GB: {
+  GB: {
     code: "44",
     format: "+44 XXXX XXXXXX",
     pattern: /^\+44\s\d{4}\s\d{6}$/
@@ -41,7 +41,6 @@ const COUNTRIES = {
   "GB": "United Kingdom",
   "US": "United States"
 };
-
 
 export const BUSINESS_CATEGORIES = {
   "IT & Software Development": [
@@ -657,11 +656,13 @@ const BusinessLeadsView = ({
                                 )}
                               </Button>
                             </DialogTrigger>
-                            <MessageDialogContent
-                              leadId={lead.id}
-                              receiverId={user?.id === lead.user_id ? response.business_id : lead.user_id}
-                              onClose={() => queryClient.invalidateQueries({ queryKey: ["/api/leads"] })}
-                            />
+                            <DialogContent>
+                              <MessageDialogContent
+                                leadId={lead.id}
+                                receiverId={user?.id === lead.user_id ? response.business_id : lead.user_id}
+                                onClose={() => queryClient.invalidateQueries({ queryKey: ["/api/leads"] })}
+                              />
+                            </DialogContent>
                           </Dialog>
                         </div>
                       </div>
@@ -821,7 +822,9 @@ const FreeUserLeadsView = ({
   editingLead,
   setEditingLead,
   deleteLeadMutation,
-  user
+  user,
+  acceptProposalMutation,
+  rejectProposalMutation
 }: FreeUserLeadsViewProps) => {
   const editForm = useForm<LeadFormData>({
     defaultValues: {
@@ -834,6 +837,31 @@ const FreeUserLeadsView = ({
       phoneNumber: editingLead?.phoneNumber || ""
     },
   });
+  const form = useForm<AcceptProposalData>({
+    defaultValues: { contactDetails: "" }
+  });
+
+  const rejectProposalMutation = useMutation({
+    mutationFn: async ({ leadId, responseId }: { leadId: number; responseId: number }) => {
+      const res = await apiRequest("PATCH", `/api/leads/${leadId}/responses/${responseId}`, { status: "rejected" });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      toast({
+        title: "Success",
+        description: "Proposal rejected successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to reject proposal",
+        variant: "destructive",
+      });
+    }
+  });
+
 
   return (
     <Tabs defaultValue="my-leads">
@@ -981,7 +1009,7 @@ const FreeUserLeadsView = ({
                           <div className="flex justify-between items-start mb-2">
                             <div>
                               <p className="font-medium">
-                                From: {response.business?.profile?.name || response.business?.username}
+                                {response.business?.profile?.name || "Anonymous Business"}
                               </p>
                               <p className="text-sm text-muted-foreground">
                                 Sent: {response.created_at ? format(new Date(response.created_at), 'PPp') : 'Recently'}
@@ -1002,7 +1030,7 @@ const FreeUserLeadsView = ({
                               <div className="p-4 bg-background rounded-lg border">
                                 <h4 className="font-medium mb-2">Contact Information</h4>
                                 <p className="text-sm whitespace-pre-wrap">
-                                  {response.contactDetails || "No contact details provided yet."}
+                                  {response.contactDetails || ""No contact details provided yet."}
                                 </p>
                               </div>
 
@@ -1011,19 +1039,88 @@ const FreeUserLeadsView = ({
                                   <h4 className="font-medium">Messages</h4>
                                   <Dialog>
                                     <DialogTrigger asChild>
-                                      <Button variant="outline" size="sm">
+                                      <Button variant="outline" size="sm" className="relative">
                                         <Send className="h-4 w-4 mr-2" />
                                         Open Messages
+                                        {lead.unreadMessages > 0 && (
+                                          <span className="absolute -top-1 -right-1 h-3 w-3 bg-destructive rounded-full" />
+                                        )}
                                       </Button>
                                     </DialogTrigger>
-                                    <MessageDialogContent
-                                      leadId={lead.id}
-                                      receiverId={response.business_id}
-                                      onClose={() => queryClient.invalidateQueries({ queryKey: ["/api/leads"] })}
-                                    />
+                                    <DialogContent>
+                                      <MessageDialogContent
+                                        leadId={lead.id}
+                                        receiverId={response.business_id}
+                                        onClose={() => queryClient.invalidateQueries({ queryKey: ["/api/leads"] })}
+                                      />
+                                    </DialogContent>
                                   </Dialog>
                                 </div>
                               </div>
+                            </div>
+                          ) : response.status === "pending" && (
+                            <div className="flex gap-2 mt-4">
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button size="sm">Accept</Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                  <DialogHeader>
+                                    <DialogTitle>Accept Proposal</DialogTitle>
+                                    <DialogDescription>
+                                      Please provide your contact details for the business.
+                                    </DialogDescription>
+                                  </DialogHeader>
+                                  <form onSubmit={form.handleSubmit((data) => {
+                                    acceptProposalMutation.mutate({
+                                      leadId: lead.id,
+                                      responseId: response.id,
+                                      contactDetails: data.contactDetails
+                                    });
+                                  })}>
+                                    <div className="space-y-4">
+                                      <div>
+                                        <Label htmlFor="contactDetails">Contact Details</Label>
+                                        <Textarea
+                                          id="contactDetails"
+                                          placeholder="Provide your contact information (phone, email, etc.)"
+                                          className="min-h-[100px]"
+                                          {...form.register("contactDetails")}
+                                          required
+                                        />
+                                      </div>
+                                      <Button
+                                        type="submit"
+                                        className="w-full"
+                                        disabled={acceptProposalMutation.isPending}
+                                      >
+                                        {acceptProposalMutation.isPending ? (
+                                          <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Accepting...
+                                          </>
+                                        ) : (
+                                          'Accept and Share Contact Details'
+                                        )}
+                                      </Button>
+                                    </div>
+                                  </form>
+                                </DialogContent>
+                              </Dialog>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  if (confirm('Are you sure you want to reject this proposal?')) {
+                                    rejectProposalMutation.mutate({
+                                      leadId: lead.id,
+                                      responseId: response.id
+                                    });
+                                  }
+                                }}
+                              >
+                                Reject
+                              </Button>
                             </div>
                           )}
                         </div>
@@ -1064,66 +1161,6 @@ const FreeUserLeadsView = ({
     </Tabs>
   );
 };
-
-function calculateMatchScore(lead: SelectLead, user: SelectUser | null): {
-  totalScore: number;
-  categoryScore: number;
-  locationScore: number;
-  budgetScore: number;
-  industryScore: number;
-} {
-  let totalScore = 0;
-  let categoryScore = 0;
-  let locationScore = 0;
-  let budgetScore = 0;
-  let industryScore = 0;
-
-  if (user?.profile?.categories?.includes(lead.category)) {
-    categoryScore = 25;
-  }
-  if (user?.profile?.location === lead.location) {
-    locationScore = 25;
-  }
-  if (user?.profile?.budget && lead.budget &&
-    Math.abs(lead.budget - user.profile.budget) < 1000) {
-    budgetScore = 25;
-  }
-  if (user?.profile?.industries?.includes(lead.industry)) {
-    industryScore = 25;
-  }
-
-  totalScore = categoryScore + locationScore + budgetScore + industryScore;
-  return { totalScore, categoryScore, locationScore, budgetScore, industryScore };
-}
-
-function MessageDialogContent({
-  leadId,
-  receiverId,
-  onClose,
-}: {
-  leadId: number;
-  receiverId: number;
-  onClose?: () => void;
-}) {
-  const [open, setOpen] = useState(true);
-
-  const handleOpenChange = (newOpen: boolean) => {
-    setOpen(newOpen);
-    if (!newOpen && onClose) {
-      onClose();
-    }
-  };
-
-  return (
-    <MessageDialog
-      leadId={leadId}
-      receiverId={receiverId}
-      isOpen={open}
-      onOpenChange={handleOpenChange}
-      onMessagesRead={onClose}
-    />
-  );
-}
 
 const BusinessProfileForm = () => {
   const { user, setUser } = useAuth();
@@ -1326,6 +1363,27 @@ export default function LeadsPage() {
     }
   });
 
+  const rejectProposalMutation = useMutation({
+    mutationFn: async ({ leadId, responseId }: { leadId: number; responseId: number }) => {
+      const res = await apiRequest("PATCH", `/api/leads/${leadId}/responses/${responseId}`, { status: "rejected" });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      toast({
+        title: "Success",
+        description: "Proposal rejected successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to reject proposal",
+        variant: "destructive",
+      });
+    }
+  });
+
   if (isLoadingLeads) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -1361,8 +1419,74 @@ export default function LeadsPage() {
           setEditingLead={setEditingLead}
           deleteLeadMutation={deleteLeadMutation}
           user={user}
+          acceptProposalMutation={acceptProposalMutation}
+          rejectProposalMutation={rejectProposalMutation}
         />
       )}
     </div>
   );
+}
+
+function MessageDialogContent({
+  leadId,
+  receiverId,
+  onClose,
+}: {
+  leadId: number;
+  receiverId: number;
+  onClose?: () => void;
+}) {
+  const [open, setOpen] = useState(true);
+
+  const handleOpenChange = (newOpen: boolean) => {
+    setOpen(newOpen);
+    if (!newOpen && onClose) {
+      onClose();
+    }
+  };
+
+  return (
+    <DialogHeader>
+      <DialogTitle>Messages</DialogTitle>
+      <MessageDialog
+        leadId={leadId}
+        receiverId={receiverId}
+        isOpen={open}
+        onOpenChange={handleOpenChange}
+        onMessagesRead={onClose}
+      />
+    </DialogHeader>
+  );
+}
+
+function calculateMatchScore(lead: any, user: any): {
+  totalScore: number;
+  categoryScore: number;
+  locationScore: number;
+  budgetScore: number;
+  industryScore: number;
+} {
+  let totalScore = 0;
+  let categoryScore = 0;
+  let locationScore = 0;
+  let budgetScore = 0;
+  let industryScore = 0;
+
+  if (user?.profile?.categories?.includes(lead.category)) {
+    categoryScore = 25;
+  }
+  if (user?.profile?.location === lead.location) {
+    locationScore = 25;
+  }
+  if (user?.profile?.matchPreferences?.budgetRange?.min && lead.budget &&
+    Math.abs(lead.budget - user.profile.matchPreferences.budgetRange.min) < 1000) {
+    budgetScore = 25;
+  }
+  if (user?.profile?.matchPreferences?.industries?.some((industry: string) =>
+    lead.industries?.includes(industry))) {
+    industryScore = 25;
+  }
+
+  totalScore = categoryScore + locationScore + budgetScore + industryScore;
+  return { totalScore, categoryScore, locationScore, budgetScore, industryScore };
 }
