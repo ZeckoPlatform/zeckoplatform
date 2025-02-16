@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@db";
 import { feedback } from "@db/schema";
 import { sendEmail } from "../services/email";
-import { createAdminNotification } from "../services/notifications";
+import { createNotification } from "../services/notifications";
 
 const router = Router();
 
@@ -27,26 +27,36 @@ router.post("/api/feedback", async (req, res) => {
       await sendEmail({
         to: notifyEmail,
         subject: `New ${type} Report - Zecko Platform`,
+        html: `
+          <h2>New ${type} Report</h2>
+          <p><strong>Type:</strong> ${type}</p>
+          <p><strong>Description:</strong> ${description}</p>
+          <p><strong>User:</strong> ${technicalContext.userEmail}</p>
+          <p><strong>Path:</strong> ${path}</p>
+          <p><strong>Technical Context:</strong></p>
+          <pre>${JSON.stringify(technicalContext, null, 2)}</pre>
+        `,
         text: `
 Type: ${type}
 Description: ${description}
 User: ${technicalContext.userEmail}
 Path: ${path}
 Technical Context: ${JSON.stringify(technicalContext, null, 2)}
-        `,
+        `
       });
     }
 
     // Create admin notification
     if (notifyAdmins) {
-      await createAdminNotification({
+      await createNotification({
         title: `New ${type} Report`,
         message: `${technicalContext.userEmail} submitted a ${type} report: ${description.substring(0, 100)}${description.length > 100 ? '...' : ''}`,
         type: 'feedback',
         metadata: {
           feedbackId: result.id,
           feedbackType: type,
-        }
+        },
+        notifyAdmins: true
       });
     }
 
