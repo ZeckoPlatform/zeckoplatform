@@ -118,14 +118,24 @@ const registerSchema = z.object({
   userType: z.enum(["free", "business", "vendor"]),
   countryCode: z.enum(["GB", "US"]),
   phoneNumber: z.string().min(1, "Phone number is required"),
-  businessName: z.string().min(2, "Company name must be at least 2 characters").optional(),
-  companyNumber: z.string().optional(),
-  vatNumber: z.string().optional(),
-  utrNumber: z.string().optional(),
-  einNumber: z.string().optional(),
-  registeredState: z.string().optional(),
-  stateRegistrationNumber: z.string().optional(),
-  paymentFrequency: z.enum(["monthly", "annual"]).optional(),
+  // Make business fields optional and only validate them for business/vendor users
+  businessName: z.string().min(2, "Company name must be at least 2 characters").optional().nullable(),
+  companyNumber: z.string().optional().nullable(),
+  vatNumber: z.string().optional().nullable(),
+  utrNumber: z.string().optional().nullable(),
+  einNumber: z.string().optional().nullable(),
+  registeredState: z.string().optional().nullable(),
+  stateRegistrationNumber: z.string().optional().nullable(),
+  paymentFrequency: z.enum(["monthly", "annual"]).optional().nullable(),
+}).refine((data) => {
+  // Only validate business fields if user type is business or vendor
+  if (data.userType !== "free") {
+    return !!data.businessName; // Require business name for business/vendor
+  }
+  return true; // No additional validation for free users
+}, {
+  message: "Business name is required for business/vendor accounts",
+  path: ["businessName"],
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -196,7 +206,6 @@ export default function AuthPage() {
 
       // Only add business-specific fields if not a free user
       if (data.userType !== "free") {
-        // Validate business/vendor specific fields
         if (!data.businessName) {
           console.log('Business name validation failed');
           registerForm.setError("businessName", {
