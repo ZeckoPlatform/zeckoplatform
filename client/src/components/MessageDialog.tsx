@@ -55,31 +55,37 @@ export function MessageDialog({
   // Background query for messages
   const { data: messages = [], isLoading } = useQuery<Message[]>({
     queryKey: messagesQueryKey,
-    enabled: !!user?.id,
-    refetchInterval: 3000,
-    onSuccess: (newMessages) => {
-      const unreadCount = newMessages.filter(m => !m.read && m.sender.id !== user?.id).length;
+    enabled: !!user?.id && isOpen,
+    refetchInterval: isOpen ? 3000 : false
+  });
 
-      // Show notification only if not first mount and dialog is closed
-      if (!isFirstMount.current && !isOpen && unreadCount > 0) {
-        toast({
-          title: "New Messages",
-          description: `You have ${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`,
-          duration: 5000,
-        });
-        playNotification('receive');
+  // Mark messages as read when dialog opens
+  useEffect(() => {
+    if (isOpen && messages.length > 0) {
+      const hasUnread = messages.some(m => !m.read && m.sender.id !== user?.id);
+      if (hasUnread) {
+        markAsReadMutation.mutate();
       }
+    }
+  }, [isOpen, messages]);
 
-      // Check for new messages during active chat
-      if (isOpen && newMessages.length > previousMessagesCount.current) {
-        const lastMessage = newMessages[newMessages.length - 1];
-        if (lastMessage?.sender.id !== user?.id) {
-          playNotification('receive');
-        }
-      }
-
-      previousMessagesCount.current = newMessages.length;
-      isFirstMount.current = false;
+  const markAsReadMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", `/api/leads/${leadId}/messages/read`);
+      if (!response.ok) throw new Error("Failed to mark messages as read");
+      return response.json();
+    },
+    onSuccess: () => {
+      // Update the messages in the cache to mark them as read
+      queryClient.setQueryData<Message[]>(messagesQueryKey, oldMessages => 
+        oldMessages?.map(m => ({
+          ...m,
+          read: m.sender.id !== user?.id ? true : m.read
+        }))
+      );
+      // Invalidate the leads query to update unread counts
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      if (onMessagesRead) onMessagesRead();
     }
   });
 
@@ -105,32 +111,9 @@ export function MessageDialog({
     if (isOpen && messages.length > 0) {
       // Scroll to bottom when opening
       lastMessageRef.current?.scrollIntoView({ behavior: 'auto' });
-
-      // Mark messages as read
-      const hasUnread = messages.some(m => !m.read && m.sender.id !== user?.id);
-      if (hasUnread) {
-        markAsReadMutation.mutate();
-      }
     }
   }, [isOpen, messages.length]);
 
-  const markAsReadMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", `/api/leads/${leadId}/messages/read`);
-      if (!response.ok) throw new Error("Failed to mark messages as read");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.setQueryData<Message[]>(messagesQueryKey, oldMessages => 
-        oldMessages?.map(m => ({
-          ...m,
-          read: m.sender.id !== user?.id ? true : m.read
-        }))
-      );
-      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-      if (onMessagesRead) onMessagesRead();
-    }
-  });
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {

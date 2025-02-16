@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
 import { Redirect } from "wouter";
@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { apiRequest } from "@/lib/queryClient";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient as globalQueryClient } from "@/lib/queryClient";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -941,9 +941,8 @@ const FreeUserLeadsView = ({
 }: FreeUserLeadsViewProps) => {
   const { toast } = useToast();
   const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
-  const form = useForm<AcceptProposalData>({
-    defaultValues: { contactDetails: "" }
-  });
+  const [messageDialogOpen, setMessageDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   const editForm = useForm<LeadFormData>({
     defaultValues: {
@@ -1044,7 +1043,7 @@ const FreeUserLeadsView = ({
                             <p className="font-medium">
                               {response.business?.profile?.name || "Anonymous Business"}
                             </p>
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-sm text-mutedforeground">
                               Sent: {response.created_at ? format(new Date(response.created_at), 'PPp') : 'Recently'}
                             </p>
                           </div>
@@ -1070,7 +1069,7 @@ const FreeUserLeadsView = ({
                             <div className="p-4 bg-background rounded-lg border">
                               <div className="flex justify-between items-center mb-4">
                                 <h4 className="font-medium">Messages</h4>
-                                <Dialog>
+                                <Dialog open={messageDialogOpen} onOpenChange={setMessageDialogOpen}>
                                   <DialogTrigger asChild>
                                     <Button variant="outline" size="sm" className="relative">
                                       <Send className="h-4 w-4 mr-2" />
@@ -1089,8 +1088,9 @@ const FreeUserLeadsView = ({
                                     <MessageDialog
                                       leadId={lead.id}
                                       receiverId={response.business_id}
-                                      isOpen={true}
+                                      isOpen={messageDialogOpen}
                                       onOpenChange={(open) => {
+                                        setMessageDialogOpen(open);
                                         if (!open) {
                                           queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
                                         }
@@ -1215,7 +1215,7 @@ const BusinessProfileForm = () => {
     try {
       await apiRequest('POST', '/api/users/profile', data);
       setUser({...user, profile: data});
-      queryClient.invalidateQueries({queryKey: ['/api/leads']});
+      globalQueryClient.invalidateQueries({queryKey: ['/api/leads']});
 
     } catch (error) {
       console.error("Error updating profile:", error);
@@ -1323,7 +1323,7 @@ export default function LeadsPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      globalQueryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       toast({
         title: "Success",
         description: "Your lead has been posted successfully.",
@@ -1347,7 +1347,7 @@ export default function LeadsPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      globalQueryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       toast({
         title: "Success",
         description: "Lead updated successfully.",
@@ -1368,7 +1368,7 @@ export default function LeadsPage() {
       await apiRequest("DELETE", `/api/leads/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      globalQueryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       toast({
         title: "Success",
         description: "Lead deleted successfully.",
@@ -1395,7 +1395,7 @@ export default function LeadsPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      globalQueryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       toast({
         title: "Success",
         description: "Proposal accepted successfully.",
@@ -1416,7 +1416,7 @@ export default function LeadsPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      globalQueryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       toast({
         title: "Success",
         description: "Proposal rejected successfully.",
