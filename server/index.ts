@@ -52,15 +52,43 @@ const createServer = (): Server => {
   return server;
 };
 
-const startServer = async (server: Server, port: number): Promise<boolean> => {
+// Add process termination handlers
+process.on('SIGTERM', () => {
+  log('SIGTERM signal received: closing HTTP server');
+  if (global.server && global.server.listening) {
+    global.server.close(() => {
+      log('HTTP server closed');
+      process.exit(0);
+    });
+  } else {
+    process.exit(0);
+  }
+});
+
+process.on('SIGINT', () => {
+  log('SIGINT signal received: closing HTTP server');
+  if (global.server && global.server.listening) {
+    global.server.close(() => {
+      log('HTTP server closed');
+      process.exit(0);
+    });
+  } else {
+    process.exit(0);
+  }
+});
+
+const startServer = async (server: Server): Promise<boolean> => {
   return new Promise((resolve) => {
     let isResolved = false;
+    const PORT = 5000; // Force port 5000 for Replit
 
     const cleanup = () => {
       if (!isResolved) {
         server.removeAllListeners();
         if (server.listening) {
-          server.close();
+          server.close(() => {
+            log('Server closed during cleanup');
+          });
         }
       }
     };
@@ -69,20 +97,15 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
       if (isResolved) return;
 
       cleanup();
-      if (error.code === 'EADDRINUSE') {
-        log(`Port ${port} is in use, will try next port`);
-        resolve(false);
-      } else {
-        log(`Server error on port ${port}: ${error.message}`);
-        resolve(false);
-      }
+      log(`Server error on port ${PORT}: ${error.message}`);
+      resolve(false);
       isResolved = true;
     };
 
     const onListening = () => {
       if (isResolved) return;
 
-      log(`Server successfully started on port ${port}`);
+      log(`Server successfully started on port ${PORT}`);
       resolve(true);
       isResolved = true;
     };
@@ -93,7 +116,7 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
     // Set a timeout for the port binding attempt
     const timeout = setTimeout(() => {
       if (!isResolved) {
-        log(`Timeout while attempting to bind to port ${port}`);
+        log(`Timeout while attempting to bind to port ${PORT}`);
         cleanup();
         resolve(false);
         isResolved = true;
@@ -101,8 +124,10 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
     }, 5000); // 5 second timeout
 
     try {
-      log(`Attempting to bind to port ${port}...`);
-      server.listen(port, '0.0.0.0');
+      log(`Attempting to bind to port ${PORT}...`);
+      server.listen(PORT, '0.0.0.0');
+      // Store server reference globally for cleanup
+      global.server = server;
     } catch (error) {
       if (!isResolved) {
         cleanup();
@@ -121,45 +146,32 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
     // Log environment information
     log('=== Environment Information ===');
     log(`NODE_ENV: ${process.env.NODE_ENV}`);
-    log(`PORT: ${process.env.PORT}`);
-    log(`REPLIT_PORT: ${process.env.REPLIT_PORT}`);
+    log(`Using fixed port: 5000 for Replit compatibility`);
     log('=== End Environment Information ===');
 
     log('Initializing server...');
     const server = createServer();
 
-    // Define ports to try in order of preference
-    const preferredPort = process.env.PORT || process.env.REPLIT_PORT || 3000;
-    const ports = [parseInt(preferredPort.toString()), 3000, 8080, 4000];
-
-    log(`Will try ports in order: ${ports.join(', ')}`);
-    let serverStarted = false;
-
-    // Try each port until one works
-    for (const port of ports) {
-      log(`Attempting to start server on port ${port}...`);
-      serverStarted = await startServer(server, port);
-      if (serverStarted) {
-        // Setup Vite or static serving after successful port binding
-        try {
-          if (app.get("env") === "development") {
-            log('Setting up Vite development server...');
-            await setupVite(app, server);
-            log('Vite setup completed successfully');
-          } else {
-            log('Production mode: Setting up static file serving...');
-            serveStatic(app);
-          }
-          break;
-        } catch (error) {
-          log(`Warning: Failed to setup Vite/static serving: ${error}`);
-          // Continue running even if Vite setup fails
-        }
-      }
-    }
+    log('Starting server...');
+    const serverStarted = await startServer(server);
 
     if (!serverStarted) {
-      throw new Error('Could not start server on any available port');
+      throw new Error('Could not start server on port 5000');
+    }
+
+    // Setup Vite or static serving after successful port binding
+    try {
+      if (app.get("env") === "development") {
+        log('Setting up Vite development server...');
+        await setupVite(app, server);
+        log('Vite setup completed successfully');
+      } else {
+        log('Production mode: Setting up static file serving...');
+        serveStatic(app);
+      }
+    } catch (error) {
+      log(`Warning: Failed to setup Vite/static serving: ${error}`);
+      // Continue running even if Vite setup fails
     }
 
   } catch (error) {
@@ -167,3 +179,8 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
     process.exit(1);
   }
 })();
+
+// Add type declaration for global server
+declare global {
+  var server: Server | undefined;
+}
