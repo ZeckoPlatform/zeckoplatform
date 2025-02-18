@@ -38,14 +38,8 @@ interface LeadWithUnreadCount extends SelectLead {
   unreadCount?: number;
 }
 
-// Single source of truth for unread count calculation
-function getUnreadCount(messages: Message[] | undefined, userId: number): number {
-  if (!messages || !Array.isArray(messages)) return 0;
-  return messages.filter(m => !m.read && m.sender_id !== userId).length;
-}
-
 // Type definitions for database entities
-interface SelectLead {
+export interface SelectLead {
   id: number;
   title: string;
   description: string;
@@ -85,7 +79,7 @@ interface SelectLead {
   }>;
 }
 
-interface SelectUser {
+export interface SelectUser {
   id: number;
   email: string;
   userType: "free" | "business" | "vendor" | "superAdmin";
@@ -107,7 +101,6 @@ interface SelectUser {
   };
 }
 
-
 const PHONE_COUNTRY_CODES = {
   GB: {
     code: "44",
@@ -119,7 +112,7 @@ const PHONE_COUNTRY_CODES = {
     format: "+1 (XXX) XXX-XXXX",
     pattern: /^\+1\s\(\d{3}\)\s\d{3}-\d{4}$/
   }
-};
+} as const;
 
 const COUNTRIES = {
   "GB": "United Kingdom",
@@ -481,61 +474,48 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
     },
   });
 
+  // Handle form submission
+  const handleSubmit = form.handleSubmit((data) => {
+    onSubmit(data);
+  });
+
   const formatPhoneNumber = (value: string, country: "GB" | "US") => {
     // Remove all non-digits but keep the plus sign if it exists
     const digits = value.replace(/[^\d+]/g, "");
 
-    // US Phone number formatting
+    if (digits.length <= 1) return digits;
+
+    // Format based on country
     if (country === "US") {
-      // If empty or just has plus, return as is
-      if (digits.length <= 1) return digits;
+      const formatted = digits.startsWith('+1') ? digits : `+1${digits}`;
+      const digitsOnly = formatted.slice(2);
 
-      // Add country code if missing
-      let formattedNumber = digits.startsWith('+1') ? digits : `+1${digits}`;
-
-      // Format rest of the number
-      formattedNumber = formattedNumber.replace(/[^\d+]/g, '');
-
-      if (formattedNumber.length > 2) {
-        const nationalNumber = formattedNumber.slice(2);
-        if (nationalNumber.length <= 3) {
-          return `+1 (${nationalNumber}`;
-        }
-        if (nationalNumber.length <= 6) {
-          return `+1 (${nationalNumber.slice(0, 3)}) ${nationalNumber.slice(3)}`;
-        }
-        return `+1 (${nationalNumber.slice(0, 3)}) ${nationalNumber.slice(3, 6)}-${nationalNumber.slice(6, 10)}`;
+      if (digitsOnly.length <= 3) {
+        return `+1 (${digitsOnly}`;
       }
-
-      return formattedNumber;
-    }
-
-    // UK Phone number formatting
-    else {
-      // If empty or just has plus, return as is
-      if (digits.length <= 1) return digits;
-
-      // Add country code if missing
-      let formattedNumber = digits.startsWith('+44') ? digits : `+44${digits}`;
-
-      // Format rest of the number
-      formattedNumber = formattedNumber.replace(/[^\d+]/g, '');
-
-      if (formattedNumber.length > 3) {
-        const nationalNumber = formattedNumber.slice(3);
-        if (nationalNumber.length <= 4) {
-          return `+44 ${nationalNumber}`;
-        }
-        return `+44 ${nationalNumber.slice(0, 4)} ${nationalNumber.slice(4, 10)}`;
+      if (digitsOnly.length <= 6) {
+        return `+1 (${digitsOnly.slice(0, 3)}) ${digitsOnly.slice(3)}`;
       }
+      if (digitsOnly.length > 6) {
+        return `+1 (${digitsOnly.slice(0, 3)}) ${digitsOnly.slice(3, 6)}-${digitsOnly.slice(6, 10)}`;
+      }
+      return formatted;
+    } else {
+      const formatted = digits.startsWith('+44') ? digits : `+44${digits}`;
+      const digitsOnly = formatted.slice(3);
 
-      return formattedNumber;
+      if (digitsOnly.length <= 4) {
+        return `+44 ${digitsOnly}`;
+      }
+      if (digitsOnly.length > 4) {
+        return `+44 ${digitsOnly.slice(0, 4)} ${digitsOnly.slice(4, 10)}`;
+      }
+      return formatted;
     }
   };
 
-
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <Label htmlFor="title">Title</Label>
         <Input id="title" {...form.register("title")} />
@@ -543,6 +523,7 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
           <p className="text-sm text-destructive">{form.formState.errors.title.message}</p>
         )}
       </div>
+
       <div>
         <Label htmlFor="description">Description</Label>
         <Textarea
@@ -553,6 +534,7 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
           <p className="text-sm text-destructive">{form.formState.errors.description.message}</p>
         )}
       </div>
+
       <div className="space-y-4">
         <div>
           <Label htmlFor="category">Main Category</Label>
@@ -602,6 +584,7 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
           </div>
         )}
       </div>
+
       <div>
         <Label htmlFor="budget">Budget (£)</Label>
         <Input
@@ -613,6 +596,7 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
           <p className="text-sm text-destructive">{form.formState.errors.budget.message}</p>
         )}
       </div>
+
       <div>
         <Label htmlFor="location">Location</Label>
         <Input id="location" {...form.register("location")} />
@@ -620,6 +604,7 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
           <p className="text-sm text-destructive">{form.formState.errors.location.message}</p>
         )}
       </div>
+
       <div>
         <Label htmlFor="phoneNumber">Phone Number (Optional)</Label>
         <Input
@@ -627,14 +612,15 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
           {...form.register("phoneNumber")}
           placeholder={PHONE_COUNTRY_CODES[countryCode].format}
           onChange={(e) => {
-            const formatted = formatPhoneNumber(e.target.value, countryCode as "GB" | "US");
-            form.setValue("phoneNumber", formatted);
+            const formatted = formatPhoneNumber(e.target.value, countryCode);
+            form.setValue("phoneNumber", formatted, { shouldValidate: true });
           }}
         />
         {form.formState.errors.phoneNumber && (
           <p className="text-sm text-destructive">{form.formState.errors.phoneNumber.message}</p>
         )}
       </div>
+
       <Button
         type="submit"
         className="w-full"
@@ -650,6 +636,209 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
         )}
       </Button>
     </form>
+  );
+};
+
+const FreeUserLeadsView = ({
+  leads,
+  createLeadMutation,
+  updateLeadMutation,
+  editingLead,
+  setEditingLead,
+  deleteLeadMutation,
+  user,
+  acceptProposalMutation,
+  rejectProposalMutation,
+}: FreeUserLeadsViewProps) => {
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const { toast } = useToast();
+
+  const handleCreateSubmit = async (data: LeadFormData) => {
+    try {
+      await createLeadMutation.mutateAsync({
+        ...data,
+        budget: parseInt(data.budget),
+      });
+      setCreateDialogOpen(false);
+      toast({
+        title: "Success",
+        description: "Lead created successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create lead",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return (
+    <div className="space-y-8">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Your Leads</h2>
+        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              Create New Lead
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create New Lead</DialogTitle>
+              <DialogDescription>
+                Fill out the form below to create a new business lead
+              </DialogDescription>
+            </DialogHeader>
+            <CreateLeadForm
+              onSubmit={handleCreateSubmit}
+              isSubmitting={createLeadMutation.isPending}
+            />
+          </DialogContent>
+        </Dialog>
+      </div>
+      <div className="grid gap-4">
+        {leads.map((lead) => {
+          const unreadCount = getUnreadCount(lead.messages, user.id);
+
+          return (
+            <Card key={lead.id}>
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <CardTitle>{lead.title}</CardTitle>
+                  {lead.user_id === user?.id && (
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEditingLead(lead)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deleteLeadMutation.mutate(lead.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground mb-4">{lead.description}</p>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium">Category:</span> {lead.category}
+                  </div>
+                  <div>
+                    <span className="font-medium">Budget:</span> £{lead.budget}
+                  </div>
+                  <div>
+                    <span className="font-medium">Location:</span> {lead.location}
+                  </div>
+                </div>
+
+                {lead.responses && lead.responses.length > 0 && (
+                  <div className="space-y-4 mt-6">
+                    <h3 className="font-semibold">Proposals</h3>
+                    {lead.responses.map((response) => (
+                      <div
+                        key={response.id}
+                        className="border rounded-lg p-4"
+                      >
+                        <div className="flex justify-between items-center">
+                          <p className="font-medium">
+                            {response.business?.profile?.name || "Business"}
+                          </p>
+                          <Badge variant={
+                            response.status === "accepted" ? "success" :
+                              response.status === "rejected" ? "destructive" :
+                                "secondary"
+                          }>
+                            {response.status.charAt(0).toUpperCase() + response.status.slice(1)}
+                          </Badge>
+                        </div>
+
+                        <p className="text-sm mt-2">{response.proposal}</p>
+
+                        {response.status === "accepted" && (
+                          <div className="mt-4 flex items-center gap2">
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button variant="outline" size="sm" className="relative">
+                                  <Send className="h-4 w-4 mr-2" />
+                                  Open Messages
+                                  {unreadCount > 0 && (
+                                    <Badge
+                                      variant="destructive"
+                                      className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
+                                    >
+                                      {unreadCount}
+                                    </Badge>
+                                  )}
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Message Thread</DialogTitle>
+                                  <DialogDescription>
+                                    View and send messages for this lead
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <MessageDialog
+                                  leadId={lead.id}
+                                  receiverId={response.business_id} // Send to business
+                                  isOpen={true}
+                                  onOpenChange={(open) => {
+                                    if (!open) {
+                                      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+                                    }
+                                  }}
+                                  onMessagesRead={() => {
+                                    queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+                                  }}
+                                />
+                              </DialogContent>
+                            </Dialog>
+                          </div>
+                        )}
+
+                        {response.status === "pending" && (
+                          <div className="mt-4 flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => acceptProposalMutation.mutate({
+                                leadId: lead.id,
+                                responseId: response.id
+                              })}
+                            >
+                              Accept
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => rejectProposalMutation.mutate({
+                                leadId: lead.id,
+                                responseId: response.id
+                              })}
+                            >
+                              Reject
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+    </div>
   );
 };
 
@@ -1006,244 +1195,8 @@ const BusinessLeadsView = ({
   );
 };
 
-const FreeUserLeadsView = ({
-  leads,
-  createLeadMutation,
-  updateLeadMutation,
-  editingLead,
-  setEditingLead,
-  deleteLeadMutation,
-  user,
-  acceptProposalMutation,
-  rejectProposalMutation,
-}: FreeUserLeadsViewProps) => {
-  const { toast } = useToast();
-  const [messageDialogOpen, setMessageDialogOpen] = useState(false);
-  const queryClient = useQueryClient();
-
-  const editForm = useForm<LeadFormData>({
-    defaultValues: {
-      title: editingLead?.title || "",
-      description: editingLead?.description || "",
-      category: editingLead?.category || "",
-      subcategory: editingLead?.subcategory || "",
-      budget: editingLead?.budget?.toString() || "",
-      location: editingLead?.location || "",
-      phoneNumber: editingLead?.phoneNumber || ""
-    },
-  });
-
-  return (
-    <Tabs defaultValue="browse" className="space-y-4">
-      <div className="flex justify-between items-center">
-        <TabsList>
-          <TabsTrigger value="browse">Browse Leads</TabsTrigger>
-          <TabsTrigger value="post">Post a Lead</TabsTrigger>
-        </TabsList>
-        {user.superAdmin && (
-          <div className="flex items-center gap-2">
-            <ImportLeadsDialog />
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <Info className="h-5 w-5" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Importing Business Leads</DialogTitle>
-                  <DialogDescription>
-                    You can import leads from various sources to populate your marketplace:
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="font-medium mb-2">Preset Sources</h4>
-                    <ul className="list-disc list-inside space-y-2">
-                      <li>UK Business Forums - Latest business opportunities</li>
-                      <li>US Small Business Administration - Official government opportunities</li>
-                      <li>UK Government Contracts - Official contract listings</li>
-                      <li>US Federal Business Opportunities - Federal contract database</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 className="font-medium mb-2">Custom Sources</h4>
-                    <p className="text-sm text-muted-foreground">
-                      You can also add custom RSS feeds or API endpoints to import leads from other sources:
-                    </p>
-                    <ul className="list-disc list-inside space-y-2 mt-2 text-sm text-muted-foreground">
-                      <li>Business forums and job boards</li>
-                      <li>Industry-specific marketplaces</li>
-                      <li>Regional business directories</li>
-                    </ul>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-        )}
-      </div>
-      <TabsContent value="browse">
-        <div className="grid gap-4">
-          {leads.map((lead) => {
-            const unreadCount = getUnreadCount(lead.messages, user.id);
-
-            return (
-              <Card key={lead.id}>
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <CardTitle>{lead.title}</CardTitle>
-                    {lead.user_id === user?.id && (
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setEditingLead(lead)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => deleteLeadMutation.mutate(lead.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground mb-4">{lead.description}</p>
-                  <div className="grid grid-cols-3 gap-4 text-sm">
-                    <div>
-                      <span className="font-medium">Category:</span> {lead.category}
-                    </div>
-                    <div>
-                      <span className="font-medium">Budget:</span> £{lead.budget}
-                    </div>
-                    <div>
-                      <span className="font-medium">Location:</span> {lead.location}
-                    </div>
-                  </div>
-
-                  {lead.responses && lead.responses.length > 0 && (
-                    <div className="space-y-4 mt-6">
-                      <h3 className="font-semibold">Proposals</h3>
-                      {lead.responses.map((response) => (
-                        <div
-                          key={response.id}
-                          className="border rounded-lg p-4"
-                        >
-                          <div className="flex justify-between items-center">
-                            <p className="font-medium">
-                              {response.business?.profile?.name || "Business"}
-                            </p>
-                            <Badge variant={
-                              response.status === "accepted" ? "success" :
-                                response.status === "rejected" ? "destructive" :
-                                  "secondary"
-                            }>
-                              {response.status.charAt(0).toUpperCase() + response.status.slice(1)}
-                            </Badge>
-                          </div>
-
-                          <p className="text-sm mt-2">{response.proposal}</p>
-
-                        {response.status === "accepted" && (
-                          <div className="mt-4 flex items-center gap2">
-                            <Dialog>
-                              <DialogTrigger asChild>
-                                <Button variant="outline" size="sm" className="relative">
-                                  <Send className="h-4 w-4 mr-2"/>
-                                  Open Messages
-                                  {unreadCount > 0 && (
-                                    <Badge
-                                      variant="destructive"
-                                      className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
-                                    >
-                                      {unreadCount}
-                                    </Badge>
-                                  )}
-                                </Button>
-                              </DialogTrigger>
-                              <DialogContent>
-                                <DialogHeader>
-                                  <DialogTitle>Message Thread</DialogTitle>
-                                  <DialogDescription>
-                                    View and send messages for this lead
-                                  </DialogDescription>
-                                </DialogHeader>
-                                <MessageDialog
-                                  leadId={lead.id}
-                                  receiverId={response.business_id} // Send to business
-                                  isOpen={true}
-                                  onOpenChange={(open) => {
-                                    if (!open) {
-                                      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-                                    }
-                                  }}
-                                  onMessagesRead={() => {
-                                    queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-                                  }}
-                                />
-                              </DialogContent>
-                            </Dialog>
-                          </div>
-                        )}
-
-                        {response.status === "pending" && (
-                          <div className="mt-4 flex items-center gap-2">
-                            <Button
-                              size="sm"
-                              onClick={() => acceptProposalMutation.mutate({
-                                leadId: lead.id,
-                                responseId: response.id
-                              })}
-                            >
-                              Accept
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => rejectProposalMutation.mutate({
-                                leadId: lead.id,
-                                responseId: response.id
-                              })}
-                            >
-                              Reject
-                            </Button>
-                          </div>
-                        )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      </TabsContent>
-
-      <TabsContent value="post">
-        <Card>
-          <CardHeader>
-            <CardTitle>Post a New Lead</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <CreateLeadForm
-              onSubmit={(data) => createLeadMutation.mutate(data)}
-              isSubmitting={createLeadMutation.isPending}
-            />
-          </CardContent>
-        </Card>
-      </TabsContent>
-    </Tabs>
-  );
-};
-
 export default function LeadsPage() {
+  const queryClient = useQueryClient();
   const { user, setUser } = useAuth();
   const { toast } = useToast();
   const playNotification = useNotificationSound();
@@ -1498,34 +1451,63 @@ export function MessageDialogContent({ leadId, receiverId, onClose }: MessageDia
   );
 }
 
-function calculateMatchScore(lead: any, user: any): {
+interface Message {
+  id: number;
+  content: string;
+  sender_id: number;
+  receiver_id: number;
+  lead_id: number;
+  read: boolean;
+  created_at: string;
+}
+
+export function getUnreadCount(messages: Message[] | undefined, userId: number): number {
+  if (!messages || !Array.isArray(messages)) return 0;
+  return messages.filter(m => !m.read && m.sender_id !== userId).length;
+}
+
+interface MatchScore {
   totalScore: number;
   categoryScore: number;
   locationScore: number;
   budgetScore: number;
   industryScore: number;
-} {
+}
+
+function calculateMatchScore(lead: SelectLead, user: SelectUser): MatchScore {
   let totalScore = 0;
   let categoryScore = 0;
   let locationScore = 0;
   let budgetScore = 0;
   let industryScore = 0;
 
-  if (user?.profile?.categories?.includes(lead.category)) {
-    categoryScore = 25;
-  }
-  if (user?.profile?.location === lead.location) {
-    locationScore = 25;
-  }
-  if (user?.profile?.matchPreferences?.budgetRange?.min && lead.budget &&
-    Math.abs(lead.budget - user.profile.matchPreferences.budgetRange.min) < 1000) {
-    budgetScore = 25;
-  }
-  if (user?.profile?.matchPreferences?.industries?.some((industry: string) =>
-    lead.industries?.includes(industry))) {
-    industryScore = 25;
+  if (user.profile) {
+    // Category matching
+    if (user.profile.categories?.includes(lead.category)) {
+      categoryScore = 25;
+    }
+
+    // Location matching
+    if (user.profile.location && lead.location.toLowerCase().includes(user.profile.location.toLowerCase())) {
+      locationScore = 25;
+    }
+
+    // Budget matching
+    if (user.profile.matchPreferences?.budgetRange) {
+      const { min, max } = user.profile.matchPreferences.budgetRange;
+      if (lead.budget >= min && lead.budget <= max) {
+        budgetScore = 25;
+      }
+    }
+
+    // Industry matching
+    if (user.profile.industries?.includes(lead.subcategory)) {
+      industryScore = 25;
+    }
   }
 
   totalScore = categoryScore + locationScore + budgetScore + industryScore;
   return { totalScore, categoryScore, locationScore, budgetScore, industryScore };
 }
+
+export { FreeUserLeadsView, BusinessLeadsView };
