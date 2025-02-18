@@ -468,19 +468,37 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
   });
 
   const formatPhoneNumber = (value: string, country: "GB" | "US") => {
-    const rawDigits = value.replace(/[^\d+]/g, '');
-    const digits = rawDigits.replace(/^\+?(44|1)/, '');
+    // Remove all non-digits but keep the plus sign if it exists
+    const digits = value.replace(/[^\d+]/g, "");
 
+    // US Phone number formatting
     if (country === "US") {
-      if (digits.length === 0) return "";
-      if (digits.length <= 3) return `+1 (${digits}`;
-      if (digits.length <= 6) return `+1 (${digits.slice(0, 3)}) ${digits.slice(3)}`;
-      return `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
-    } else {
-      if (digits.length === 0) return "";
-      if (digits.length <= 4) return `+44 ${digits}`;
-      if (digits.length <= 10) return `+44 ${digits.slice(0, 4)} ${digits.slice(4)}`;
-      return `+44 ${digits.slice(0, 4)} ${digits.slice(4, 10)}`;
+      // If empty or just has plus, return as is
+      if (digits.length <= 1) return digits;
+
+      // If less than full number, just return the digits with +1 prefix
+      if (digits.length < 11) {
+        return digits.startsWith('+1') ? digits : `+1${digits}`;
+      }
+
+      // Format complete number
+      const number = digits.startsWith('+1') ? digits.slice(2) : digits;
+      return `+1 (${number.slice(0, 3)}) ${number.slice(3, 6)}-${number.slice(6, 10)}`;
+    }
+
+    // UK Phone number formatting
+    else {
+      // If empty or just has plus, return as is
+      if (digits.length <= 1) return digits;
+
+      // If less than full number, just return the digits with +44 prefix
+      if (digits.length < 11) {
+        return digits.startsWith('+44') ? digits : `+44${digits}`;
+      }
+
+      // Format complete number
+      const number = digits.startsWith('+44') ? digits.slice(3) : digits;
+      return `+44 ${number.slice(0, 4)} ${number.slice(4, 10)}`;
     }
   };
 
