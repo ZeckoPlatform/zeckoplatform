@@ -955,9 +955,6 @@ const FreeUserLeadsView = ({
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
   const queryClient = useQueryClient();
 
-  // Show notification banner if there are unread messages
-  const hasUnreadMessages = leads.some(lead => getUnreadCount(lead.messages, user.id) > 0);
-
   const editForm = useForm<LeadFormData>({
     defaultValues: {
       title: editingLead?.title || "",
@@ -977,17 +974,50 @@ const FreeUserLeadsView = ({
           <TabsTrigger value="browse">Browse Leads</TabsTrigger>
           <TabsTrigger value="post">Post a Lead</TabsTrigger>
         </TabsList>
-        <ImportLeadsDialog />
+        <div className="flex items-center gap-2">
+          <ImportLeadsDialog />
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Info className="h-5 w-5" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Importing Business Leads</DialogTitle>
+                <DialogDescription>
+                  You can import leads from various sources to populate your marketplace:
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-medium mb-2">Preset Sources</h4>
+                  <ul className="list-disc list-inside space-y-2">
+                    <li>UK Business Forums - Latest business opportunities</li>
+                    <li>US Small Business Administration - Official government opportunities</li>
+                    <li>UK Government Contracts - Official contract listings</li>
+                    <li>US Federal Business Opportunities - Federal contract database</li>
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="font-medium mb-2">Custom Sources</h4>
+                  <p className="text-sm text-muted-foreground">
+                    You can also add custom RSS feeds or API endpoints to import leads from other sources:
+                  </p>
+                  <ul className="list-disc list-inside space-y-2 mt-2 text-sm text-muted-foreground">
+                    <li>Business forums and job boards</li>
+                    <li>Industry-specific marketplaces</li>
+                    <li>Regional business directories</li>
+                  </ul>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <TabsContent value="browse">
         <div className="grid gap-4">
-          {hasUnreadMessages && (
-            <div className="bg-muted/50 p-4 rounded-lg flex items-center gap-2">
-              <Info className="h-5 w-5 text-primary" />
-              <p className="text-sm">You have unread messages in your leads</p>
-            </div>
-          )}
           {leads.map((lead) => {
             const unreadCount = getUnreadCount(lead.messages, user.id);
 
