@@ -15,12 +15,12 @@ export const PHONE_COUNTRY_CODES = {
   GB: {
     code: "44",
     format: "+44 XXXX XXXXXX",
-    pattern: /^\+44\s\d{4}\s\d{6}$/
+    pattern: /^\+44\s*\d{4}\s*\d{6}$/
   },
   US: {
     code: "1",
     format: "+1 (XXX) XXX-XXXX",
-    pattern: /^\+1\s\(\d{3}\)\s\d{3}-\d{4}$/
+    pattern: /^\+1\s*\(?\d{3}\)?\s*\d{3}[-\s]?\d{4}$/
   }
 } as const;
 
@@ -61,8 +61,12 @@ export const createLeadSchema = z.object({
     .refine((val) => {
       if (!val) return true; // Optional field
       const country = window.localStorage.getItem('userCountry') as CountryCode || 'GB';
-      return PHONE_COUNTRY_CODES[country].pattern.test(val);
-    }, "Invalid phone number format")
+      // Remove all spaces and special characters before testing the pattern
+      const cleanNumber = val.replace(/[\s()-]/g, '');
+      return PHONE_COUNTRY_CODES[country].pattern.test(cleanNumber);
+    }, {
+      message: "Please enter a valid phone number"
+    })
 });
 
 export type LeadFormData = z.infer<typeof createLeadSchema>;
@@ -78,10 +82,13 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
   const countryCode = (user?.countryCode || "GB") as CountryCode;
 
   const formatPhoneNumber = (value: string, country: CountryCode): string => {
+    // Remove all non-digits and the plus sign
     const digits = value.replace(/[^\d+]/g, "");
+
     if (digits.length <= 1) return digits;
 
     if (country === "US") {
+      // Format for US: +1 (XXX) XXX-XXXX
       const formatted = digits.startsWith('+1') ? digits : `+1${digits}`;
       const digitsOnly = formatted.slice(2);
 
@@ -91,21 +98,16 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
       if (digitsOnly.length <= 6) {
         return `+1 (${digitsOnly.slice(0, 3)}) ${digitsOnly.slice(3)}`;
       }
-      if (digitsOnly.length > 6) {
-        return `+1 (${digitsOnly.slice(0, 3)}) ${digitsOnly.slice(3, 6)}-${digitsOnly.slice(6, 10)}`;
-      }
-      return formatted;
+      return `+1 (${digitsOnly.slice(0, 3)}) ${digitsOnly.slice(3, 6)}-${digitsOnly.slice(6, 10)}`;
     } else {
+      // Format for GB: +44 XXXX XXXXXX
       const formatted = digits.startsWith('+44') ? digits : `+44${digits}`;
       const digitsOnly = formatted.slice(3);
 
       if (digitsOnly.length <= 4) {
         return `+44 ${digitsOnly}`;
       }
-      if (digitsOnly.length > 4) {
-        return `+44 ${digitsOnly.slice(0, 4)} ${digitsOnly.slice(4, 10)}`;
-      }
-      return formatted;
+      return `+44 ${digitsOnly.slice(0, 4)} ${digitsOnly.slice(4, 10)}`;
     }
   };
 
@@ -123,7 +125,6 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
   });
 
   const handleSubmit = form.handleSubmit((data) => {
-    console.log("Form data before submission:", data);
     onSubmit(data);
   });
 
@@ -226,7 +227,6 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
           placeholder={PHONE_COUNTRY_CODES[countryCode].format}
           onChange={(e) => {
             const formatted = formatPhoneNumber(e.target.value, countryCode);
-            console.log("Formatted phone number:", formatted);
             form.setValue("phoneNumber", formatted, { shouldValidate: true });
           }}
         />
