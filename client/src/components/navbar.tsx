@@ -64,7 +64,11 @@ export default function Navbar() {
             </div>
             <div className="flex items-center ml-8 space-x-2">
               <Button
-                variant={isCurrentPath("/social") ? "default" : "secondary"}
+                variant="ghost"
+                className={cn(
+                  "text-sm font-medium transition-colors hover:bg-primary/10 hover:text-primary",
+                  isCurrentPath("/social") && "bg-primary/10 text-primary"
+                )}
                 onClick={() => handleNavigation("/social")}
               >
                 Social Feed
@@ -72,7 +76,11 @@ export default function Navbar() {
 
               {user?.userType !== "vendor" && (
                 <Button
-                  variant={isCurrentPath("/leads") ? "default" : "secondary"}
+                  variant="ghost"
+                  className={cn(
+                    "text-sm font-medium transition-colors hover:bg-primary/10 hover:text-primary",
+                    isCurrentPath("/leads") && "bg-primary/10 text-primary"
+                  )}
                   onClick={() => handleNavigation("/leads")}
                 >
                   Leads
@@ -80,7 +88,11 @@ export default function Navbar() {
               )}
 
               <Button
-                variant={isCurrentPath("/marketplace") ? "default" : "secondary"}
+                variant="ghost"
+                className={cn(
+                  "text-sm font-medium transition-colors hover:bg-primary/10 hover:text-primary",
+                  isCurrentPath("/marketplace") && "bg-primary/10 text-primary"
+                )}
                 onClick={() => handleNavigation("/marketplace")}
               >
                 Marketplace
@@ -88,7 +100,11 @@ export default function Navbar() {
 
               {user?.userType === "vendor" && (
                 <Button
-                  variant={isCurrentPath("/vendor/dashboard") ? "default" : "secondary"}
+                  variant="ghost"
+                  className={cn(
+                    "text-sm font-medium transition-colors hover:bg-primary/10 hover:text-primary",
+                    isCurrentPath("/vendor/dashboard") && "bg-primary/10 text-primary"
+                  )}
                   onClick={() => handleNavigation("/vendor/dashboard")}
                 >
                   Vendor Dashboard
@@ -98,13 +114,21 @@ export default function Navbar() {
               {user && user.userType !== "free" && (
                 <>
                   <Button
-                    variant={isCurrentPath("/subscription") ? "default" : "secondary"}
+                    variant="ghost"
+                    className={cn(
+                      "text-sm font-medium transition-colors hover:bg-primary/10 hover:text-primary",
+                      isCurrentPath("/subscription") && "bg-primary/10 text-primary"
+                    )}
                     onClick={() => handleNavigation("/subscription")}
                   >
                     Subscription
                   </Button>
                   <Button
-                    variant={isCurrentPath("/analytics") ? "default" : "secondary"}
+                    variant="ghost"
+                    className={cn(
+                      "text-sm font-medium transition-colors hover:bg-primary/10 hover:text-primary",
+                      isCurrentPath("/analytics") && "bg-primary/10 text-primary"
+                    )}
                     onClick={() => handleNavigation("/analytics")}
                   >
                     Analytics
@@ -114,7 +138,11 @@ export default function Navbar() {
 
               {user?.superAdmin && (
                 <Button
-                  variant={isCurrentPath("/admin-management") ? "default" : "secondary"}
+                  variant="ghost"
+                  className={cn(
+                    "text-sm font-medium transition-colors hover:bg-primary/10 hover:text-primary",
+                    isCurrentPath("/admin-management") && "bg-primary/10 text-primary"
+                  )}
                   onClick={() => handleNavigation("/admin-management")}
                 >
                   Admin
