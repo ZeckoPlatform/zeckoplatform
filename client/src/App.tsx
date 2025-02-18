@@ -28,6 +28,7 @@ import ReviewsDashboard from "@/pages/reviews-dashboard";
 import NotificationsPage from "@/pages/notifications-page";
 import { FeedbackDialog } from "@/components/FeedbackDialog";
 import FeedbackManagementPage from "@/pages/admin/feedback-management";
+import SocialFeedPage from "@/pages/social-feed";
 
 function Router() {
   return (
@@ -49,6 +50,7 @@ function Router() {
         <Route path="/admin-management" component={() => <ProtectedRoute component={AdminManagementPage} />} />
         <Route path="/reviews" component={() => <ProtectedRoute component={ReviewsDashboard} />} />
         <Route path="/notifications" component={() => <ProtectedRoute component={NotificationsPage} />} />
+        <Route path="/social" component={() => <ProtectedRoute component={SocialFeedPage} />} />
 
         {/* Settings Routes */}
         <Route path="/settings/profile">

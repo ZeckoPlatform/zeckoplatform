@@ -608,6 +608,87 @@ export const feedbackResponses = pgTable("feedback_responses", {
   created_at: timestamp("created_at").defaultNow(),
 });
 
+export const socialPosts = pgTable("social_posts", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  content: text("content").notNull(),
+  mediaUrls: text("media_urls").array(),
+  type: text("type", {
+    enum: ["update", "article", "success_story", "market_insight", "opportunity"]
+  }).notNull(),
+  visibility: text("visibility", {
+    enum: ["public", "connections", "private"]
+  }).default("public"),
+  tags: text("tags").array(),
+  mentionedUsers: integer("mentioned_users").array(),
+  status: text("status", {
+    enum: ["draft", "published", "archived", "flagged"]
+  }).default("published"),
+  engagement: jsonb("engagement").$type<{
+    views: number;
+    likes: number;
+    comments: number;
+    shares: number;
+  }>().default({ views: 0, likes: 0, comments: 0, shares: 0 }),
+  metadata: jsonb("metadata").$type<{
+    location?: string;
+    businessContext?: string;
+    industry?: string[];
+  }>(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const postComments = pgTable("post_comments", {
+  id: serial("id").primaryKey(),
+  postId: integer("post_id").references(() => socialPosts.id).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  content: text("content").notNull(),
+  parentCommentId: integer("parent_comment_id").references(() => postComments.id),
+  status: text("status", {
+    enum: ["active", "hidden", "flagged"]
+  }).default("active"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const postReactions = pgTable("post_reactions", {
+  id: serial("id").primaryKey(),
+  postId: integer("post_id").references(() => socialPosts.id),
+  commentId: integer("comment_id").references(() => postComments.id),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  type: text("type", {
+    enum: ["like", "celebrate", "support", "insightful"]
+  }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const userConnections = pgTable("user_connections", {
+  id: serial("id").primaryKey(),
+  followerId: integer("follower_id").references(() => users.id).notNull(),
+  followingId: integer("following_id").references(() => users.id).notNull(),
+  status: text("status", {
+    enum: ["pending", "accepted", "blocked"]
+  }).default("pending"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const hashtags = pgTable("hashtags", {
+  id: serial("id").primaryKey(),
+  name: text("name").unique().notNull(),
+  postCount: integer("post_count").default(0),
+  trending: boolean("trending").default(false),
+  category: text("category"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const postHashtags = pgTable("post_hashtags", {
+  id: serial("id").primaryKey(),
+  postId: integer("post_id").references(() => socialPosts.id).notNull(),
+  hashtagId: integer("hashtag_id").references(() => hashtags.id).notNull(),
+});
+
 export const feedbackRelations = relations(feedback, ({ one, many }) => ({
   user: one(users, {
     fields: [feedback.user_id],
@@ -645,7 +726,12 @@ export const usersRelations = relations(users, ({ many }) => ({
   vendorOrders: many(orders, { relationName: "vendorOrders" }),
   orderHistory: many(orderHistory),
   orderCommunications: many(orderCommunication),
-  feedback: many(feedback)
+  feedback: many(feedback),
+  socialPosts: many(socialPosts),
+  postComments: many(postComments),
+  postReactions: many(postReactions),
+  followers: many(userConnections, { relationName: "followers" }),
+  following: many(userConnections, { relationName: "following" }),
 }));
 
 export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
@@ -937,5 +1023,72 @@ export const productInventoryRelations = relations(productInventory, ({ one }) =
   variation: one(productVariations, {
     fields: [productInventory.variationId],
     references: [productVariations.id],
+  }),
+}));
+
+export const socialPostsRelations = relations(socialPosts, ({ one, many }) => ({
+  author: one(users, {
+    fields: [socialPosts.userId],
+    references: [users.id],
+  }),
+  comments: many(postComments),
+  reactions: many(postReactions),
+  hashtags: many(postHashtags),
+}));
+
+export const postCommentsRelations = relations(postComments, ({ one, many }) => ({
+  post: one(socialPosts, {
+    fields: [postComments.postId],
+    references: [socialPosts.id],
+  }),
+  author: one(users, {
+    fields: [postComments.userId],
+    references: [users.id],
+  }),
+  parentComment: one(postComments, {
+    fields: [postComments.parentCommentId],
+    references: [postComments.id],
+  }),
+  reactions: many(postReactions),
+}));
+
+export const postReactionsRelations = relations(postReactions, ({ one }) => ({
+  post: one(socialPosts, {
+    fields: [postReactions.postId],
+    references: [socialPosts.id],
+  }),
+  comment: one(postComments, {
+    fields: [postReactions.commentId],
+    references: [postComments.id],
+  }),
+  user: one(users, {
+    fields: [postReactions.userId],
+    references: [users.id],
+  }),
+}));
+
+export const userConnectionsRelations = relations(userConnections, ({ one }) => ({
+  follower: one(users, {
+    fields: [userConnections.followerId],
+    references: [users.id],
+  }),
+  following: one(users, {
+    fields: [userConnections.followingId],
+    references: [users.id],
+  }),
+}));
+
+export const hashtagsRelations = relations(hashtags, ({ many }) => ({
+  posts: many(postHashtags),
+}));
+
+export const postHashtagsRelations = relations(postHashtags, ({ one }) => ({
+  post: one(socialPosts, {
+    fields: [postHashtags.postId],
+    references: [socialPosts.id],
+  }),
+  hashtag: one(hashtags, {
+    fields: [postHashtags.hashtagId],
+    references: [hashtags.id],
   }),
 }));

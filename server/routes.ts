@@ -23,6 +23,7 @@ import reviewRoutes from './routes/reviews';
 import orderRoutes from './routes/orders';
 import { cleanupExpiredLeads } from './services/cleanup';
 import feedbackRoutes from './routes/feedback';
+import socialRoutes from './routes/social';
 
 interface User {
   id: number;
@@ -68,7 +69,7 @@ export function registerRoutes(app: Express): Server {
     authenticateToken(req, res, next);
   });
 
-  // Register all other route modules
+  // Register all route modules
   app.use('/api', authRoutes);
   app.use('/api', subscriptionRoutes);
   app.use('/api', invoiceRoutes);
@@ -78,6 +79,7 @@ export function registerRoutes(app: Express): Server {
   app.use('/api', documentRoutes);
   app.use('/api', reviewRoutes);
   app.use('/api', orderRoutes);
+  app.use('/api', socialRoutes);
 
   const httpServer = createServer(app);
   return httpServer;
