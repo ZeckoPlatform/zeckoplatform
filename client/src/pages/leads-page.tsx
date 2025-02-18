@@ -18,6 +18,7 @@ import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
+import { ImportLeadsDialog } from "@/components/ImportLeadsDialog";
 
 // Clean interface for messages
 interface Message {
@@ -448,7 +449,6 @@ interface FreeUserLeadsViewProps {
   acceptProposalMutation: any;
   rejectProposalMutation: any;
 }
-
 
 const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
@@ -949,7 +949,7 @@ const FreeUserLeadsView = ({
   deleteLeadMutation,
   user,
   acceptProposalMutation,
-  rejectProposalMutation
+  rejectProposalMutation,
 }: FreeUserLeadsViewProps) => {
   const { toast } = useToast();
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
@@ -971,13 +971,17 @@ const FreeUserLeadsView = ({
   });
 
   return (
-    <Tabs defaultValue="my-leads">
-      <TabsList>
-        <TabsTrigger value="my-leads">My Posted Leads</TabsTrigger>
-        <TabsTrigger value="post">Post New Lead</TabsTrigger>
-      </TabsList>
-      <TabsContent value="my-leads" className="mt-4">
-        <div className="grid gap-6">
+    <Tabs defaultValue="browse" className="space-y-4">
+      <div className="flex justify-between items-center">
+        <TabsList>
+          <TabsTrigger value="browse">Browse Leads</TabsTrigger>
+          <TabsTrigger value="post">Post a Lead</TabsTrigger>
+        </TabsList>
+        <ImportLeadsDialog />
+      </div>
+
+      <TabsContent value="browse">
+        <div className="grid gap-4">
           {hasUnreadMessages && (
             <div className="bg-muted/50 p-4 rounded-lg flex items-center gap-2">
               <Info className="h-5 w-5 text-primary" />
