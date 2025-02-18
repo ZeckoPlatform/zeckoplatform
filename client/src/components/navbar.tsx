@@ -19,12 +19,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useCart } from "@/hooks/use-cart";
 import { useQuery } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
 
 export default function Navbar() {
   const { user, logoutMutation } = useAuth();
   const cart = useCart();
   const cartItemCount = cart.getItemCount();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
 
   // Fetch notifications
   const { data: notifications = [] } = useQuery({
@@ -55,20 +56,26 @@ export default function Navbar() {
     setLocation(path);
   };
 
+  const isCurrentPath = (path: string) => location === path;
+
   return (
-    <nav className="border-b">
+    <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
-          <div className="flex">
-            <div className="flex items-center font-bold text-xl">
-              <Link href="/">Zecko</Link>
+          <div className="flex items-center">
+            <div className="flex items-center">
+              <Link href="/" className="text-xl font-bold text-primary hover:text-primary/90 transition-colors">
+                Zecko
+              </Link>
             </div>
-            <NavigationMenu className="ml-8">
-              <NavigationMenuList>
-                {/* Social Feed - Available to all users */}
+            <NavigationMenu className="ml-8 hidden md:flex">
+              <NavigationMenuList className="gap-2">
                 <NavigationMenuItem>
                   <NavigationMenuLink
-                    className="cursor-pointer"
+                    className={cn(
+                      "px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+                      isCurrentPath("/social") ? "bg-accent text-accent-foreground font-medium" : "text-foreground/70"
+                    )}
                     onClick={() => handleNavigation("/social")}
                   >
                     Social Feed
@@ -77,7 +84,10 @@ export default function Navbar() {
                 {user?.userType !== "vendor" && (
                   <NavigationMenuItem>
                     <NavigationMenuLink
-                      className="cursor-pointer"
+                      className={cn(
+                        "px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+                        isCurrentPath("/leads") ? "bg-accent text-accent-foreground font-medium" : "text-foreground/70"
+                      )}
                       onClick={() => handleNavigation("/leads")}
                     >
                       Leads
@@ -86,7 +96,10 @@ export default function Navbar() {
                 )}
                 <NavigationMenuItem>
                   <NavigationMenuLink
-                    className="cursor-pointer"
+                    className={cn(
+                      "px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+                      isCurrentPath("/marketplace") ? "bg-accent text-accent-foreground font-medium" : "text-foreground/70"
+                    )}
                     onClick={() => handleNavigation("/marketplace")}
                   >
                     Marketplace
@@ -95,7 +108,10 @@ export default function Navbar() {
                 {user?.userType === "vendor" && (
                   <NavigationMenuItem>
                     <NavigationMenuLink
-                      className="cursor-pointer"
+                      className={cn(
+                        "px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+                        isCurrentPath("/vendor/dashboard") ? "bg-accent text-accent-foreground font-medium" : "text-foreground/70"
+                      )}
                       onClick={() => handleNavigation("/vendor/dashboard")}
                     >
                       Vendor Dashboard
@@ -106,7 +122,10 @@ export default function Navbar() {
                   <>
                     <NavigationMenuItem>
                       <NavigationMenuLink
-                        className="cursor-pointer"
+                        className={cn(
+                          "px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+                          isCurrentPath("/subscription") ? "bg-accent text-accent-foreground font-medium" : "text-foreground/70"
+                        )}
                         onClick={() => handleNavigation("/subscription")}
                       >
                         Subscription
@@ -114,7 +133,10 @@ export default function Navbar() {
                     </NavigationMenuItem>
                     <NavigationMenuItem>
                       <NavigationMenuLink
-                        className="cursor-pointer"
+                        className={cn(
+                          "px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+                          isCurrentPath("/analytics") ? "bg-accent text-accent-foreground font-medium" : "text-foreground/70"
+                        )}
                         onClick={() => handleNavigation("/analytics")}
                       >
                         Analytics
@@ -126,26 +148,13 @@ export default function Navbar() {
                   <>
                     <NavigationMenuItem>
                       <NavigationMenuLink
-                        className="cursor-pointer"
+                        className={cn(
+                          "px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+                          isCurrentPath("/admin-management") ? "bg-accent text-accent-foreground font-medium" : "text-foreground/70"
+                        )}
                         onClick={() => handleNavigation("/admin-management")}
                       >
-                        Admin Management
-                      </NavigationMenuLink>
-                    </NavigationMenuItem>
-                    <NavigationMenuItem>
-                      <NavigationMenuLink
-                        className="cursor-pointer"
-                        onClick={() => handleNavigation("/admin/feedback")}
-                      >
-                        Feedback Management
-                      </NavigationMenuLink>
-                    </NavigationMenuItem>
-                    <NavigationMenuItem>
-                      <NavigationMenuLink
-                        className="cursor-pointer"
-                        onClick={() => handleNavigation("/admin/settings/notifications")}
-                      >
-                        Notification Settings
+                        Admin
                       </NavigationMenuLink>
                     </NavigationMenuItem>
                   </>
@@ -153,7 +162,7 @@ export default function Navbar() {
               </NavigationMenuList>
             </NavigationMenu>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
             {user && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -182,7 +191,6 @@ export default function Navbar() {
                         key={notification.id}
                         className="p-4 cursor-pointer"
                         onClick={() => {
-                          // Handle notification click
                           if (notification.link) {
                             handleNavigation(notification.link);
                           }
@@ -226,8 +234,8 @@ export default function Navbar() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="flex items-center gap-2">
-                    <UserCircle className="h-6 w-6" />
-                    <span>{user.email}</span>
+                    <UserCircle className="h-5 w-5" />
+                    <span className="hidden md:inline">{user.email}</span>
                     {user.superAdmin && (
                       <Shield className="h-4 w-4 text-primary" />
                     )}
