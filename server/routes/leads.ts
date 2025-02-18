@@ -23,7 +23,12 @@ router.post("/api/leads/import", async (req, res) => {
     if (validatedData.type === "rss") {
       importedLeads = await importLeadsFromRSS(validatedData.url, req.user.id);
     } else {
-      importedLeads = await importLeadsFromAPI(validatedData.url, validatedData.apiKey, req.user.id);
+      // For API requests, use empty string if apiKey is not provided
+      importedLeads = await importLeadsFromAPI(
+        validatedData.url,
+        validatedData.apiKey || "",
+        req.user.id
+      );
     }
 
     res.json({ success: true, leads: importedLeads });
