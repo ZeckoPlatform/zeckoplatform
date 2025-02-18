@@ -3,7 +3,6 @@ import { useAuth } from "@/hooks/use-auth";
 import {
   NavigationMenu,
   NavigationMenuItem,
-  NavigationMenuLink,
   NavigationMenuList,
 } from "@/components/ui/navigation-menu";
 import { Button } from "@/components/ui/button";
@@ -68,76 +67,65 @@ export default function Navbar() {
                 Zecko
               </Link>
             </div>
-            <NavigationMenu className="ml-8 hidden md:flex">
-              <NavigationMenuList className="gap-2">
-                <NavigationMenuItem>
+            <div className="hidden md:flex ml-8 space-x-2">
+              <Button
+                variant={isCurrentPath("/social") ? "default" : "outline"}
+                onClick={() => handleNavigation("/social")}
+              >
+                Social Feed
+              </Button>
+
+              {user?.userType !== "vendor" && (
+                <Button
+                  variant={isCurrentPath("/leads") ? "default" : "outline"}
+                  onClick={() => handleNavigation("/leads")}
+                >
+                  Leads
+                </Button>
+              )}
+
+              <Button
+                variant={isCurrentPath("/marketplace") ? "default" : "outline"}
+                onClick={() => handleNavigation("/marketplace")}
+              >
+                Marketplace
+              </Button>
+
+              {user?.userType === "vendor" && (
+                <Button
+                  variant={isCurrentPath("/vendor/dashboard") ? "default" : "outline"}
+                  onClick={() => handleNavigation("/vendor/dashboard")}
+                >
+                  Vendor Dashboard
+                </Button>
+              )}
+
+              {user && user.userType !== "free" && (
+                <>
                   <Button
-                    variant={isCurrentPath("/social") ? "default" : "outline"}
-                    onClick={() => handleNavigation("/social")}
+                    variant={isCurrentPath("/subscription") ? "default" : "outline"}
+                    onClick={() => handleNavigation("/subscription")}
                   >
-                    Social Feed
+                    Subscription
                   </Button>
-                </NavigationMenuItem>
-                {user?.userType !== "vendor" && (
-                  <NavigationMenuItem>
-                    <Button
-                      variant={isCurrentPath("/leads") ? "default" : "outline"}
-                      onClick={() => handleNavigation("/leads")}
-                    >
-                      Leads
-                    </Button>
-                  </NavigationMenuItem>
-                )}
-                <NavigationMenuItem>
                   <Button
-                    variant={isCurrentPath("/marketplace") ? "default" : "outline"}
-                    onClick={() => handleNavigation("/marketplace")}
+                    variant={isCurrentPath("/analytics") ? "default" : "outline"}
+                    onClick={() => handleNavigation("/analytics")}
                   >
-                    Marketplace
+                    Analytics
                   </Button>
-                </NavigationMenuItem>
-                {user?.userType === "vendor" && (
-                  <NavigationMenuItem>
-                    <Button
-                      variant={isCurrentPath("/vendor/dashboard") ? "default" : "outline"}
-                      onClick={() => handleNavigation("/vendor/dashboard")}
-                    >
-                      Vendor Dashboard
-                    </Button>
-                  </NavigationMenuItem>
-                )}
-                {user && user.userType !== "free" && (
-                  <>
-                    <NavigationMenuItem>
-                      <Button
-                        variant={isCurrentPath("/subscription") ? "default" : "outline"}
-                        onClick={() => handleNavigation("/subscription")}
-                      >
-                        Subscription
-                      </Button>
-                    </NavigationMenuItem>
-                    <NavigationMenuItem>
-                      <Button
-                        variant={isCurrentPath("/analytics") ? "default" : "outline"}
-                        onClick={() => handleNavigation("/analytics")}
-                      >
-                        Analytics
-                      </Button>
-                    </NavigationMenuItem>
-                  </>
-                )}
-                {user?.superAdmin && (
-                  <NavigationMenuItem>
-                    <Button
-                      variant={isCurrentPath("/admin-management") ? "default" : "outline"}
-                      onClick={() => handleNavigation("/admin-management")}
-                    >
-                      Admin
-                    </Button>
-                  </NavigationMenuItem>
-                )}
-              </NavigationMenuList>
-            </NavigationMenu>
+                </>
+              )}
+
+              {user?.superAdmin && (
+                <Button
+                  variant={isCurrentPath("/admin-management") ? "default" : "outline"}
+                  onClick={() => handleNavigation("/admin-management")}
+                >
+                  Admin
+                </Button>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {user && (
