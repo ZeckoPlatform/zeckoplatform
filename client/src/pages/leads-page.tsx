@@ -19,6 +19,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { ImportLeadsDialog } from "@/components/ImportLeadsDialog";
+import * as z from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
 
 // Clean interface for messages
 interface Message {
@@ -450,12 +452,24 @@ interface FreeUserLeadsViewProps {
   rejectProposalMutation: any;
 }
 
+// Business form validation schema
+const createLeadSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  description: z.string().min(1, "Description is required"),
+  category: z.string().min(1, "Category is required"),
+  subcategory: z.string().min(1, "Subcategory is required"),
+  budget: z.string().min(1, "Budget is required"),
+  location: z.string().min(1, "Location is required"),
+  phoneNumber: z.string().optional(),
+});
+
 const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const { user } = useAuth();
   const countryCode = user?.countryCode || "GB";
 
   const form = useForm<LeadFormData>({
+    resolver: zodResolver(createLeadSchema),
     defaultValues: {
       title: "",
       description: "",
@@ -524,15 +538,20 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
       <div>
         <Label htmlFor="title">Title</Label>
-        <Input id="title" {...form.register("title")} required />
+        <Input id="title" {...form.register("title")} />
+        {form.formState.errors.title && (
+          <p className="text-sm text-destructive">{form.formState.errors.title.message}</p>
+        )}
       </div>
       <div>
         <Label htmlFor="description">Description</Label>
         <Textarea
           id="description"
           {...form.register("description")}
-          required
         />
+        {form.formState.errors.description && (
+          <p className="text-sm text-destructive">{form.formState.errors.description.message}</p>
+        )}
       </div>
       <div className="space-y-4">
         <div>
@@ -543,7 +562,6 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
               form.setValue("category", value);
               form.setValue("subcategory", "");
             }}
-            defaultValue={form.getValues("category")}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select a main category" />
@@ -556,6 +574,9 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
               ))}
             </SelectContent>
           </Select>
+          {form.formState.errors.category && (
+            <p className="text-sm text-destructive">{form.formState.errors.category.message}</p>
+          )}
         </div>
 
         {selectedCategory && (
@@ -563,7 +584,6 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
             <Label htmlFor="subcategory">Subcategory</Label>
             <Select
               onValueChange={(value) => form.setValue("subcategory", value)}
-              defaultValue={form.getValues("subcategory")}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select a subcategory" />
@@ -576,6 +596,9 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
                 ))}
               </SelectContent>
             </Select>
+            {form.formState.errors.subcategory && (
+              <p className="text-sm text-destructive">{form.formState.errors.subcategory.message}</p>
+            )}
           </div>
         )}
       </div>
@@ -585,12 +608,17 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
           id="budget"
           type="number"
           {...form.register("budget")}
-          required
         />
+        {form.formState.errors.budget && (
+          <p className="text-sm text-destructive">{form.formState.errors.budget.message}</p>
+        )}
       </div>
       <div>
         <Label htmlFor="location">Location</Label>
-        <Input id="location" {...form.register("location")} required />
+        <Input id="location" {...form.register("location")} />
+        {form.formState.errors.location && (
+          <p className="text-sm text-destructive">{form.formState.errors.location.message}</p>
+        )}
       </div>
       <div>
         <Label htmlFor="phoneNumber">Phone Number (Optional)</Label>
@@ -603,6 +631,9 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
             form.setValue("phoneNumber", formatted);
           }}
         />
+        {form.formState.errors.phoneNumber && (
+          <p className="text-sm text-destructive">{form.formState.errors.phoneNumber.message}</p>
+        )}
       </div>
       <Button
         type="submit"
