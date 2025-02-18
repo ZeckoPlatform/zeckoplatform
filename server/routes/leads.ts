@@ -11,14 +11,9 @@ const createLeadSchema = z.object({
   description: z.string().min(1, "Description is required"),
   category: z.string().min(1, "Category is required"),
   subcategory: z.string().optional(),
-  budget: z.number().min(0, "Budget must be a positive number").optional(),
-  location: z.string().optional(),
+  budget: z.number().min(0, "Budget must be a positive number"),
+  location: z.string().min(1, "Location is required"),
   phoneNumber: z.string().optional().nullable(),
-  expires_at: z.string().datetime().optional().default(() => {
-    const date = new Date();
-    date.setDate(date.getDate() + 30); // Default expiry of 30 days
-    return date.toISOString();
-  }),
 });
 
 // Create a new lead
@@ -41,13 +36,14 @@ router.post("/api/leads", async (req, res) => {
       title: validatedData.title,
       description: validatedData.description,
       category: validatedData.category,
-      subcategory: validatedData.subcategory,
+      subcategory: validatedData.subcategory || null,
       budget: validatedData.budget,
       location: validatedData.location,
+      phone_number: validatedData.phoneNumber,
       user_id: req.user.id,
       region: req.user.countryCode || "GB",
-      status: "open",
-      expires_at: validatedData.expires_at,
+      status: "open" as const,
+      expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
     }).returning();
 
     console.log("Successfully created lead:", JSON.stringify(newLead[0], null, 2));
