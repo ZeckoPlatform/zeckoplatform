@@ -13,10 +13,7 @@ const createLeadSchema = z.object({
   subcategory: z.string().optional(),
   budget: z.number().min(0, "Budget must be a positive number").optional(),
   location: z.string().optional(),
-  phoneNumber: z.string()
-    .regex(/^\+(?:44|1)[\d\s\-()]+$/, "Phone number must start with +44 (UK) or +1 (US)")
-    .optional()
-    .nullable(),
+  phoneNumber: z.string().optional().nullable(),
   expires_at: z.string().datetime().optional().default(() => {
     const date = new Date();
     date.setDate(date.getDate() + 30); // Default expiry of 30 days
@@ -31,30 +28,34 @@ router.post("/api/leads", async (req, res) => {
       return res.status(401).json({ error: "Authentication required" });
     }
 
-    console.log("Received lead data:", req.body);
+    console.log("Received lead creation request with body:", JSON.stringify(req.body, null, 2));
 
     const validatedData = createLeadSchema.parse({
       ...req.body,
       budget: req.body.budget ? Number(req.body.budget) : undefined
     });
 
-    console.log("Validated lead data:", validatedData);
-
-    // Extract only the fields that exist in the leads table
-    const { subcategory, phoneNumber, ...leadData } = validatedData;
+    console.log("Validated lead data:", JSON.stringify(validatedData, null, 2));
 
     const newLead = await db.insert(leads).values({
-      ...leadData,
+      title: validatedData.title,
+      description: validatedData.description,
+      category: validatedData.category,
+      subcategory: validatedData.subcategory,
+      budget: validatedData.budget,
+      location: validatedData.location,
       user_id: req.user.id,
-      region: req.user.countryCode || "GB", // Default to GB if not specified
+      region: req.user.countryCode || "GB",
       status: "open",
+      expires_at: validatedData.expires_at,
     }).returning();
 
+    console.log("Successfully created lead:", JSON.stringify(newLead[0], null, 2));
     res.json(newLead[0]);
   } catch (error) {
-    console.error("Lead creation failed:", error);
+    console.error("Lead creation failed. Error details:", error);
     if (error instanceof z.ZodError) {
-      console.log("Validation errors:", error.errors);
+      console.error("Validation errors:", JSON.stringify(error.errors, null, 2));
       return res.status(400).json({ 
         error: "Validation failed", 
         details: error.errors.map(e => ({
