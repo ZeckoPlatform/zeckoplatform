@@ -11,8 +11,10 @@ const createLeadSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().min(1, "Description is required"),
   category: z.string().min(1, "Category is required"),
+  subcategory: z.string().optional(),
   budget: z.number().min(0, "Budget must be a positive number").optional(),
   location: z.string().optional(),
+  phoneNumber: z.string().optional(),
   expires_at: z.string().datetime().optional().default(() => {
     const date = new Date();
     date.setDate(date.getDate() + 30); // Default expiry of 30 days
@@ -36,8 +38,11 @@ router.post("/api/leads", async (req, res) => {
 
     console.log("Validated lead data:", validatedData);
 
+    // Extract only the fields that exist in the leads table
+    const { subcategory, phoneNumber, ...leadData } = validatedData;
+
     const newLead = await db.insert(leads).values({
-      ...validatedData,
+      ...leadData,
       user_id: req.user.id,
       region: req.user.countryCode || "GB", // Default to GB if not specified
     }).returning();
