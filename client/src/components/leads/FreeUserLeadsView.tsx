@@ -41,7 +41,6 @@ export function FreeUserLeadsView({
   const queryClient = useQueryClient();
 
   const handleCreateSubmit = async (data: any) => {
-    console.log("Submitting lead data:", data);
     try {
       await createLeadMutation.mutateAsync({
         ...data,
@@ -53,7 +52,6 @@ export function FreeUserLeadsView({
         description: "Lead created successfully",
       });
     } catch (error) {
-      console.error("Lead creation error:", error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to create lead",
@@ -72,7 +70,7 @@ export function FreeUserLeadsView({
               Create New Lead
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create New Lead</DialogTitle>
               <DialogDescription>
@@ -144,7 +142,7 @@ export function FreeUserLeadsView({
                           </p>
                           <Badge 
                             variant={
-                              response.status === "accepted" ? "default" :
+                              response.status === "accepted" ? "success" :
                               response.status === "rejected" ? "destructive" :
                               "secondary"
                             }
