@@ -65,6 +65,15 @@ export default function Navbar() {
             </div>
             <NavigationMenu className="ml-8">
               <NavigationMenuList>
+                {/* Social Feed - Available to all users */}
+                <NavigationMenuItem>
+                  <NavigationMenuLink
+                    className="cursor-pointer"
+                    onClick={() => handleNavigation("/social")}
+                  >
+                    Social Feed
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
                 {user?.userType !== "vendor" && (
                   <NavigationMenuItem>
                     <NavigationMenuLink
