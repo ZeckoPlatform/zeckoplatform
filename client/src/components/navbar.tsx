@@ -50,7 +50,10 @@ export default function Navbar() {
     setLocation(path);
   };
 
-  const isCurrentPath = (path: string) => location === path;
+  const isCurrentPath = (path: string) => {
+    // Ensure exact path matching by comparing the full path
+    return location === path;
+  };
 
   return (
     <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
