@@ -74,7 +74,9 @@ export default function Navbar() {
                   <NavigationMenuLink
                     className={cn(
                       "px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
-                      isCurrentPath("/social") ? "bg-accent text-accent-foreground font-medium" : "text-foreground/70"
+                      isCurrentPath("/social") 
+                        ? "bg-primary text-primary-foreground font-medium" 
+                        : "text-foreground hover:text-foreground"
                     )}
                     onClick={() => handleNavigation("/social")}
                   >
@@ -86,7 +88,9 @@ export default function Navbar() {
                     <NavigationMenuLink
                       className={cn(
                         "px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
-                        isCurrentPath("/leads") ? "bg-accent text-accent-foreground font-medium" : "text-foreground/70"
+                        isCurrentPath("/leads")
+                          ? "bg-primary text-primary-foreground font-medium"
+                          : "text-foreground hover:text-foreground"
                       )}
                       onClick={() => handleNavigation("/leads")}
                     >
@@ -98,7 +102,9 @@ export default function Navbar() {
                   <NavigationMenuLink
                     className={cn(
                       "px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
-                      isCurrentPath("/marketplace") ? "bg-accent text-accent-foreground font-medium" : "text-foreground/70"
+                      isCurrentPath("/marketplace")
+                        ? "bg-primary text-primary-foreground font-medium"
+                        : "text-foreground hover:text-foreground"
                     )}
                     onClick={() => handleNavigation("/marketplace")}
                   >
@@ -110,7 +116,9 @@ export default function Navbar() {
                     <NavigationMenuLink
                       className={cn(
                         "px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
-                        isCurrentPath("/vendor/dashboard") ? "bg-accent text-accent-foreground font-medium" : "text-foreground/70"
+                        isCurrentPath("/vendor/dashboard")
+                          ? "bg-primary text-primary-foreground font-medium"
+                          : "text-foreground hover:text-foreground"
                       )}
                       onClick={() => handleNavigation("/vendor/dashboard")}
                     >
@@ -124,7 +132,9 @@ export default function Navbar() {
                       <NavigationMenuLink
                         className={cn(
                           "px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
-                          isCurrentPath("/subscription") ? "bg-accent text-accent-foreground font-medium" : "text-foreground/70"
+                          isCurrentPath("/subscription")
+                            ? "bg-primary text-primary-foreground font-medium"
+                            : "text-foreground hover:text-foreground"
                         )}
                         onClick={() => handleNavigation("/subscription")}
                       >
@@ -135,7 +145,9 @@ export default function Navbar() {
                       <NavigationMenuLink
                         className={cn(
                           "px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
-                          isCurrentPath("/analytics") ? "bg-accent text-accent-foreground font-medium" : "text-foreground/70"
+                          isCurrentPath("/analytics")
+                            ? "bg-primary text-primary-foreground font-medium"
+                            : "text-foreground hover:text-foreground"
                         )}
                         onClick={() => handleNavigation("/analytics")}
                       >
@@ -145,19 +157,19 @@ export default function Navbar() {
                   </>
                 )}
                 {user?.superAdmin && (
-                  <>
-                    <NavigationMenuItem>
-                      <NavigationMenuLink
-                        className={cn(
-                          "px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
-                          isCurrentPath("/admin-management") ? "bg-accent text-accent-foreground font-medium" : "text-foreground/70"
-                        )}
-                        onClick={() => handleNavigation("/admin-management")}
-                      >
-                        Admin
-                      </NavigationMenuLink>
-                    </NavigationMenuItem>
-                  </>
+                  <NavigationMenuItem>
+                    <NavigationMenuLink
+                      className={cn(
+                        "px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+                        isCurrentPath("/admin-management")
+                          ? "bg-primary text-primary-foreground font-medium"
+                          : "text-foreground hover:text-foreground"
+                      )}
+                      onClick={() => handleNavigation("/admin-management")}
+                    >
+                      Admin
+                    </NavigationMenuLink>
+                  </NavigationMenuItem>
                 )}
               </NavigationMenuList>
             </NavigationMenu>
