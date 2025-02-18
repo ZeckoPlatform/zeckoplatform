@@ -476,14 +476,18 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
       // If empty or just has plus, return as is
       if (digits.length <= 1) return digits;
 
-      // If less than full number, just return the digits with +1 prefix
-      if (digits.length < 11) {
-        return digits.startsWith('+1') ? digits : `+1${digits}`;
-      }
+      // If no country code, add it
+      const withCountryCode = digits.startsWith('+1') ? digits : `+1${digits}`;
 
-      // Format complete number
-      const number = digits.startsWith('+1') ? digits.slice(2) : digits;
-      return `+1 (${number.slice(0, 3)}) ${number.slice(3, 6)}-${number.slice(6, 10)}`;
+      // Format the remaining digits
+      const nationalNumber = withCountryCode.slice(2);
+      if (nationalNumber.length <= 3) {
+        return `+1 (${nationalNumber}`;
+      }
+      if (nationalNumber.length <= 6) {
+        return `+1 (${nationalNumber.slice(0, 3)}) ${nationalNumber.slice(3)}`;
+      }
+      return `+1 (${nationalNumber.slice(0, 3)}) ${nationalNumber.slice(3, 6)}-${nationalNumber.slice(6, 10)}`;
     }
 
     // UK Phone number formatting
@@ -491,14 +495,15 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
       // If empty or just has plus, return as is
       if (digits.length <= 1) return digits;
 
-      // If less than full number, just return the digits with +44 prefix
-      if (digits.length < 11) {
-        return digits.startsWith('+44') ? digits : `+44${digits}`;
-      }
+      // If no country code, add it
+      const withCountryCode = digits.startsWith('+44') ? digits : `+44${digits}`;
 
-      // Format complete number
-      const number = digits.startsWith('+44') ? digits.slice(3) : digits;
-      return `+44 ${number.slice(0, 4)} ${number.slice(4, 10)}`;
+      // Format the remaining digits
+      const nationalNumber = withCountryCode.slice(3);
+      if (nationalNumber.length <= 4) {
+        return `+44 ${nationalNumber}`;
+      }
+      return `+44 ${nationalNumber.slice(0, 4)} ${nationalNumber.slice(4, 10)}`;
     }
   };
 

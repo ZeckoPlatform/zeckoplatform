@@ -6,9 +6,10 @@ import { z } from "zod";
 
 const router = Router();
 
+// More permissive phone number validation
 const PHONE_PATTERNS = {
-  GB: /^\+44[0-9\s]+$/,  // More permissive pattern for UK numbers
-  US: /^\+1[0-9\s]+$/,   // More permissive pattern for US numbers
+  GB: /^\+44[\d\s-]+$/,  // Accepts any combination of digits, spaces, and hyphens after +44
+  US: /^\+1[\d\s()-]+$/, // Accepts any combination of digits, spaces, parentheses, and hyphens after +1
 };
 
 // Schema for lead creation
@@ -20,9 +21,14 @@ const createLeadSchema = z.object({
   budget: z.number().min(0, "Budget must be a positive number").optional(),
   location: z.string().optional(),
   phoneNumber: z.string()
-    .regex(PHONE_PATTERNS.GB, "Invalid UK phone number format. Must start with +44")
-    .or(z.string().regex(PHONE_PATTERNS.US, "Invalid US phone number format. Must start with +1"))
-    .optional(),
+    .transform(val => val?.replace(/\s+/g, ' ').trim()) // Normalize spaces
+    .pipe(
+      z.string()
+        .regex(PHONE_PATTERNS.GB, "Invalid UK phone number format. Must start with +44")
+        .or(z.string().regex(PHONE_PATTERNS.US, "Invalid US phone number format. Must start with +1"))
+    )
+    .optional()
+    .nullable(),
   expires_at: z.string().datetime().optional().default(() => {
     const date = new Date();
     date.setDate(date.getDate() + 30); // Default expiry of 30 days
