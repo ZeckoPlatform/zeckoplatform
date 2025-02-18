@@ -1,10 +1,64 @@
 import { Router } from "express";
 import { db } from "@db";
+import { leads } from "@db/schema";
 import { importLeadsFromRSS, importLeadsFromAPI } from "../services/external-leads";
 import { z } from "zod";
 
 const router = Router();
 
+// Schema for lead creation
+const createLeadSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  description: z.string().min(1, "Description is required"),
+  category: z.string().min(1, "Category is required"),
+  budget: z.number().min(0, "Budget must be a positive number").optional(),
+  location: z.string().optional(),
+  expires_at: z.string().datetime().optional().default(() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 30); // Default expiry of 30 days
+    return date.toISOString();
+  }),
+});
+
+// Create a new lead
+router.post("/api/leads", async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    console.log("Received lead data:", req.body);
+
+    const validatedData = createLeadSchema.parse({
+      ...req.body,
+      budget: req.body.budget ? Number(req.body.budget) : undefined
+    });
+
+    console.log("Validated lead data:", validatedData);
+
+    const newLead = await db.insert(leads).values({
+      ...validatedData,
+      user_id: req.user.id,
+      region: req.user.countryCode || "GB", // Default to GB if not specified
+    }).returning();
+
+    res.json(newLead[0]);
+  } catch (error) {
+    console.error("Lead creation failed:", error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ 
+        error: "Validation failed", 
+        details: error.errors.map(e => ({
+          field: e.path.join('.'),
+          message: e.message
+        }))
+      });
+    }
+    res.status(500).json({ error: "Failed to create lead" });
+  }
+});
+
+// Schema for importing leads from external sources
 const importSourceSchema = z.object({
   type: z.enum(["rss", "api"]),
   url: z.string().url(),
@@ -28,7 +82,6 @@ router.post("/api/leads/import", async (req, res) => {
     if (validatedData.type === "rss") {
       importedLeads = await importLeadsFromRSS(validatedData.url, req.user.id);
     } else {
-      // For API requests, use empty string if apiKey is not provided
       importedLeads = await importLeadsFromAPI(
         validatedData.url,
         validatedData.apiKey || "",
