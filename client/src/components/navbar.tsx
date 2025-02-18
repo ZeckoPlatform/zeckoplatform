@@ -1,10 +1,5 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import {
-  NavigationMenu,
-  NavigationMenuItem,
-  NavigationMenuList,
-} from "@/components/ui/navigation-menu";
 import { Button } from "@/components/ui/button";
 import { UserCircle, ShoppingCart, Shield, Bell } from "lucide-react";
 import {
@@ -67,9 +62,9 @@ export default function Navbar() {
                 Zecko
               </Link>
             </div>
-            <div className="hidden md:flex ml-8 space-x-2">
+            <div className="flex items-center ml-8 space-x-2">
               <Button
-                variant={isCurrentPath("/social") ? "default" : "outline"}
+                variant={isCurrentPath("/social") ? "default" : "secondary"}
                 onClick={() => handleNavigation("/social")}
               >
                 Social Feed
@@ -77,7 +72,7 @@ export default function Navbar() {
 
               {user?.userType !== "vendor" && (
                 <Button
-                  variant={isCurrentPath("/leads") ? "default" : "outline"}
+                  variant={isCurrentPath("/leads") ? "default" : "secondary"}
                   onClick={() => handleNavigation("/leads")}
                 >
                   Leads
@@ -85,7 +80,7 @@ export default function Navbar() {
               )}
 
               <Button
-                variant={isCurrentPath("/marketplace") ? "default" : "outline"}
+                variant={isCurrentPath("/marketplace") ? "default" : "secondary"}
                 onClick={() => handleNavigation("/marketplace")}
               >
                 Marketplace
@@ -93,7 +88,7 @@ export default function Navbar() {
 
               {user?.userType === "vendor" && (
                 <Button
-                  variant={isCurrentPath("/vendor/dashboard") ? "default" : "outline"}
+                  variant={isCurrentPath("/vendor/dashboard") ? "default" : "secondary"}
                   onClick={() => handleNavigation("/vendor/dashboard")}
                 >
                   Vendor Dashboard
@@ -103,13 +98,13 @@ export default function Navbar() {
               {user && user.userType !== "free" && (
                 <>
                   <Button
-                    variant={isCurrentPath("/subscription") ? "default" : "outline"}
+                    variant={isCurrentPath("/subscription") ? "default" : "secondary"}
                     onClick={() => handleNavigation("/subscription")}
                   >
                     Subscription
                   </Button>
                   <Button
-                    variant={isCurrentPath("/analytics") ? "default" : "outline"}
+                    variant={isCurrentPath("/analytics") ? "default" : "secondary"}
                     onClick={() => handleNavigation("/analytics")}
                   >
                     Analytics
@@ -119,7 +114,7 @@ export default function Navbar() {
 
               {user?.superAdmin && (
                 <Button
-                  variant={isCurrentPath("/admin-management") ? "default" : "outline"}
+                  variant={isCurrentPath("/admin-management") ? "default" : "secondary"}
                   onClick={() => handleNavigation("/admin-management")}
                 >
                   Admin
