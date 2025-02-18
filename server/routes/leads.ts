@@ -1,16 +1,9 @@
 import { Router } from "express";
 import { db } from "@db";
 import { leads } from "@db/schema";
-import { importLeadsFromRSS, importLeadsFromAPI } from "../services/external-leads";
 import { z } from "zod";
 
 const router = Router();
-
-// More permissive phone number validation
-const PHONE_PATTERNS = {
-  GB: /^\+44[\d\s-]+$/,  // Accepts any combination of digits, spaces, and hyphens after +44
-  US: /^\+1[\d\s()-]+$/, // Accepts any combination of digits, spaces, parentheses, and hyphens after +1
-};
 
 // Schema for lead creation
 const createLeadSchema = z.object({
@@ -21,12 +14,7 @@ const createLeadSchema = z.object({
   budget: z.number().min(0, "Budget must be a positive number").optional(),
   location: z.string().optional(),
   phoneNumber: z.string()
-    .transform(val => val?.replace(/\s+/g, ' ').trim()) // Normalize spaces
-    .pipe(
-      z.string()
-        .regex(PHONE_PATTERNS.GB, "Invalid UK phone number format. Must start with +44")
-        .or(z.string().regex(PHONE_PATTERNS.US, "Invalid US phone number format. Must start with +1"))
-    )
+    .regex(/^\+(?:44|1)[\d\s\-()]+$/, "Phone number must start with +44 (UK) or +1 (US)")
     .optional()
     .nullable(),
   expires_at: z.string().datetime().optional().default(() => {
