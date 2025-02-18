@@ -7,8 +7,8 @@ import { z } from "zod";
 const router = Router();
 
 const PHONE_PATTERNS = {
-  GB: /^\+44\s?\d{4}\s?\d{6}$/,  // Made spaces optional
-  US: /^\+1\s?\(\d{3}\)\s?\d{3}-\d{4}$/,
+  GB: /^\+44\s*\d+$/,  // Simplified pattern to match +44 followed by any digits
+  US: /^\+1\s*\d+$/,  // Simplified pattern to match +1 followed by any digits
 };
 
 // Schema for lead creation
@@ -19,9 +19,10 @@ const createLeadSchema = z.object({
   subcategory: z.string().optional(),
   budget: z.number().min(0, "Budget must be a positive number").optional(),
   location: z.string().optional(),
-  phoneNumber: z.string().regex(PHONE_PATTERNS.GB, "Invalid UK phone number format").or(
-    z.string().regex(PHONE_PATTERNS.US, "Invalid US phone number format")
-  ).optional(),
+  phoneNumber: z.string()
+    .regex(PHONE_PATTERNS.GB, "Invalid UK phone number format. Must start with +44")
+    .or(z.string().regex(PHONE_PATTERNS.US, "Invalid US phone number format. Must start with +1"))
+    .optional(),
   expires_at: z.string().datetime().optional().default(() => {
     const date = new Date();
     date.setDate(date.getDate() + 30); // Default expiry of 30 days
@@ -58,6 +59,7 @@ router.post("/api/leads", async (req, res) => {
   } catch (error) {
     console.error("Lead creation failed:", error);
     if (error instanceof z.ZodError) {
+      console.log("Validation errors:", error.errors);
       return res.status(400).json({ 
         error: "Validation failed", 
         details: error.errors.map(e => ({
