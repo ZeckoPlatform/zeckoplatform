@@ -7,8 +7,8 @@ import { z } from "zod";
 const router = Router();
 
 const PHONE_PATTERNS = {
-  GB: /^\+44\s*\d+$/,  // Simplified pattern to match +44 followed by any digits
-  US: /^\+1\s*\d+$/,  // Simplified pattern to match +1 followed by any digits
+  GB: /^\+44[0-9\s]+$/,  // More permissive pattern for UK numbers
+  US: /^\+1[0-9\s]+$/,   // More permissive pattern for US numbers
 };
 
 // Schema for lead creation
