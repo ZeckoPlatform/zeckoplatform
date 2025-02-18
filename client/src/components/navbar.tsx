@@ -71,104 +71,69 @@ export default function Navbar() {
             <NavigationMenu className="ml-8 hidden md:flex">
               <NavigationMenuList className="gap-2">
                 <NavigationMenuItem>
-                  <NavigationMenuLink
-                    className={cn(
-                      "px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
-                      isCurrentPath("/social") 
-                        ? "bg-primary text-primary-foreground font-medium" 
-                        : "text-foreground hover:text-foreground"
-                    )}
+                  <Button
+                    variant={isCurrentPath("/social") ? "default" : "outline"}
                     onClick={() => handleNavigation("/social")}
                   >
                     Social Feed
-                  </NavigationMenuLink>
+                  </Button>
                 </NavigationMenuItem>
                 {user?.userType !== "vendor" && (
                   <NavigationMenuItem>
-                    <NavigationMenuLink
-                      className={cn(
-                        "px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
-                        isCurrentPath("/leads")
-                          ? "bg-primary text-primary-foreground font-medium"
-                          : "text-foreground hover:text-foreground"
-                      )}
+                    <Button
+                      variant={isCurrentPath("/leads") ? "default" : "outline"}
                       onClick={() => handleNavigation("/leads")}
                     >
                       Leads
-                    </NavigationMenuLink>
+                    </Button>
                   </NavigationMenuItem>
                 )}
                 <NavigationMenuItem>
-                  <NavigationMenuLink
-                    className={cn(
-                      "px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
-                      isCurrentPath("/marketplace")
-                        ? "bg-primary text-primary-foreground font-medium"
-                        : "text-foreground hover:text-foreground"
-                    )}
+                  <Button
+                    variant={isCurrentPath("/marketplace") ? "default" : "outline"}
                     onClick={() => handleNavigation("/marketplace")}
                   >
                     Marketplace
-                  </NavigationMenuLink>
+                  </Button>
                 </NavigationMenuItem>
                 {user?.userType === "vendor" && (
                   <NavigationMenuItem>
-                    <NavigationMenuLink
-                      className={cn(
-                        "px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
-                        isCurrentPath("/vendor/dashboard")
-                          ? "bg-primary text-primary-foreground font-medium"
-                          : "text-foreground hover:text-foreground"
-                      )}
+                    <Button
+                      variant={isCurrentPath("/vendor/dashboard") ? "default" : "outline"}
                       onClick={() => handleNavigation("/vendor/dashboard")}
                     >
                       Vendor Dashboard
-                    </NavigationMenuLink>
+                    </Button>
                   </NavigationMenuItem>
                 )}
                 {user && user.userType !== "free" && (
                   <>
                     <NavigationMenuItem>
-                      <NavigationMenuLink
-                        className={cn(
-                          "px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
-                          isCurrentPath("/subscription")
-                            ? "bg-primary text-primary-foreground font-medium"
-                            : "text-foreground hover:text-foreground"
-                        )}
+                      <Button
+                        variant={isCurrentPath("/subscription") ? "default" : "outline"}
                         onClick={() => handleNavigation("/subscription")}
                       >
                         Subscription
-                      </NavigationMenuLink>
+                      </Button>
                     </NavigationMenuItem>
                     <NavigationMenuItem>
-                      <NavigationMenuLink
-                        className={cn(
-                          "px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
-                          isCurrentPath("/analytics")
-                            ? "bg-primary text-primary-foreground font-medium"
-                            : "text-foreground hover:text-foreground"
-                        )}
+                      <Button
+                        variant={isCurrentPath("/analytics") ? "default" : "outline"}
                         onClick={() => handleNavigation("/analytics")}
                       >
                         Analytics
-                      </NavigationMenuLink>
+                      </Button>
                     </NavigationMenuItem>
                   </>
                 )}
                 {user?.superAdmin && (
                   <NavigationMenuItem>
-                    <NavigationMenuLink
-                      className={cn(
-                        "px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
-                        isCurrentPath("/admin-management")
-                          ? "bg-primary text-primary-foreground font-medium"
-                          : "text-foreground hover:text-foreground"
-                      )}
+                    <Button
+                      variant={isCurrentPath("/admin-management") ? "default" : "outline"}
                       onClick={() => handleNavigation("/admin-management")}
                     >
                       Admin
-                    </NavigationMenuLink>
+                    </Button>
                   </NavigationMenuItem>
                 )}
               </NavigationMenuList>
