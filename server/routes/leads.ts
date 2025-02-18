@@ -17,6 +17,11 @@ router.post("/api/leads/import", async (req, res) => {
       return res.status(401).json({ error: "Authentication required" });
     }
 
+    // Check if user is super admin
+    if (!req.user.superAdmin) {
+      return res.status(403).json({ error: "Only super admins can import leads" });
+    }
+
     const validatedData = importSourceSchema.parse(req.body);
     let importedLeads;
 

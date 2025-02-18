@@ -86,7 +86,7 @@ interface SelectLead {
 interface SelectUser {
   id: number;
   email: string;
-  userType: "free" | "business" | "vendor";
+  userType: "free" | "business" | "vendor" | "superAdmin";
   countryCode: "GB" | "US";
   subscriptionActive: boolean;
   profile?: {
@@ -974,48 +974,49 @@ const FreeUserLeadsView = ({
           <TabsTrigger value="browse">Browse Leads</TabsTrigger>
           <TabsTrigger value="post">Post a Lead</TabsTrigger>
         </TabsList>
-        <div className="flex items-center gap-2">
-          <ImportLeadsDialog />
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Info className="h-5 w-5" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Importing Business Leads</DialogTitle>
-                <DialogDescription>
-                  You can import leads from various sources to populate your marketplace:
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <h4 className="font-medium mb-2">Preset Sources</h4>
-                  <ul className="list-disc list-inside space-y-2">
-                    <li>UK Business Forums - Latest business opportunities</li>
-                    <li>US Small Business Administration - Official government opportunities</li>
-                    <li>UK Government Contracts - Official contract listings</li>
-                    <li>US Federal Business Opportunities - Federal contract database</li>
-                  </ul>
+        {user.superAdmin && (
+          <div className="flex items-center gap-2">
+            <ImportLeadsDialog />
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Info className="h-5 w-5" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Importing Business Leads</DialogTitle>
+                  <DialogDescription>
+                    You can import leads from various sources to populate your marketplace:
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-medium mb-2">Preset Sources</h4>
+                    <ul className="list-disc list-inside space-y-2">
+                      <li>UK Business Forums - Latest business opportunities</li>
+                      <li>US Small Business Administration - Official government opportunities</li>
+                      <li>UK Government Contracts - Official contract listings</li>
+                      <li>US Federal Business Opportunities - Federal contract database</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4 className="font-medium mb-2">Custom Sources</h4>
+                    <p className="text-sm text-muted-foreground">
+                      You can also add custom RSS feeds or API endpoints to import leads from other sources:
+                    </p>
+                    <ul className="list-disc list-inside space-y-2 mt-2 text-sm text-muted-foreground">
+                      <li>Business forums and job boards</li>
+                      <li>Industry-specific marketplaces</li>
+                      <li>Regional business directories</li>
+                    </ul>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-medium mb-2">Custom Sources</h4>
-                  <p className="text-sm text-muted-foreground">
-                    You can also add custom RSS feeds or API endpoints to import leads from other sources:
-                  </p>
-                  <ul className="list-disc list-inside space-y-2 mt-2 text-sm text-muted-foreground">
-                    <li>Business forums and job boards</li>
-                    <li>Industry-specific marketplaces</li>
-                    <li>Regional business directories</li>
-                  </ul>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        )}
       </div>
-
       <TabsContent value="browse">
         <div className="grid gap-4">
           {leads.map((lead) => {
