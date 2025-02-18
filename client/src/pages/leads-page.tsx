@@ -476,18 +476,24 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
       // If empty or just has plus, return as is
       if (digits.length <= 1) return digits;
 
-      // If no country code, add it
-      const withCountryCode = digits.startsWith('+1') ? digits : `+1${digits}`;
+      // Add country code if missing
+      let formattedNumber = digits.startsWith('+1') ? digits : `+1${digits}`;
 
-      // Format the remaining digits
-      const nationalNumber = withCountryCode.slice(2);
-      if (nationalNumber.length <= 3) {
-        return `+1 (${nationalNumber}`;
+      // Format rest of the number
+      formattedNumber = formattedNumber.replace(/[^\d+]/g, '');
+
+      if (formattedNumber.length > 2) {
+        const nationalNumber = formattedNumber.slice(2);
+        if (nationalNumber.length <= 3) {
+          return `+1 (${nationalNumber}`;
+        }
+        if (nationalNumber.length <= 6) {
+          return `+1 (${nationalNumber.slice(0, 3)}) ${nationalNumber.slice(3)}`;
+        }
+        return `+1 (${nationalNumber.slice(0, 3)}) ${nationalNumber.slice(3, 6)}-${nationalNumber.slice(6, 10)}`;
       }
-      if (nationalNumber.length <= 6) {
-        return `+1 (${nationalNumber.slice(0, 3)}) ${nationalNumber.slice(3)}`;
-      }
-      return `+1 (${nationalNumber.slice(0, 3)}) ${nationalNumber.slice(3, 6)}-${nationalNumber.slice(6, 10)}`;
+
+      return formattedNumber;
     }
 
     // UK Phone number formatting
@@ -495,15 +501,21 @@ const CreateLeadForm = ({ onSubmit, isSubmitting }: CreateLeadFormProps) => {
       // If empty or just has plus, return as is
       if (digits.length <= 1) return digits;
 
-      // If no country code, add it
-      const withCountryCode = digits.startsWith('+44') ? digits : `+44${digits}`;
+      // Add country code if missing
+      let formattedNumber = digits.startsWith('+44') ? digits : `+44${digits}`;
 
-      // Format the remaining digits
-      const nationalNumber = withCountryCode.slice(3);
-      if (nationalNumber.length <= 4) {
-        return `+44 ${nationalNumber}`;
+      // Format rest of the number
+      formattedNumber = formattedNumber.replace(/[^\d+]/g, '');
+
+      if (formattedNumber.length > 3) {
+        const nationalNumber = formattedNumber.slice(3);
+        if (nationalNumber.length <= 4) {
+          return `+44 ${nationalNumber}`;
+        }
+        return `+44 ${nationalNumber.slice(0, 4)} ${nationalNumber.slice(4, 10)}`;
       }
-      return `+44 ${nationalNumber.slice(0, 4)} ${nationalNumber.slice(4, 10)}`;
+
+      return formattedNumber;
     }
   };
 

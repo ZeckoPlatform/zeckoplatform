@@ -59,6 +59,7 @@ router.post("/api/leads", async (req, res) => {
       ...leadData,
       user_id: req.user.id,
       region: req.user.countryCode || "GB", // Default to GB if not specified
+      status: "open",
     }).returning();
 
     res.json(newLead[0]);
