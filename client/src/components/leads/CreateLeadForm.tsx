@@ -9,9 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { BUSINESS_CATEGORIES } from "@/pages/leads-page";
+import { BUSINESS_CATEGORIES } from "@/types/leads";
 
-// Phone country codes remain unchanged
 export const PHONE_COUNTRY_CODES = {
   GB: {
     code: "44",
@@ -27,7 +26,6 @@ export const PHONE_COUNTRY_CODES = {
 
 // Types
 type CountryCode = keyof typeof PHONE_COUNTRY_CODES;
-type BusinessCategory = keyof typeof BUSINESS_CATEGORIES;
 
 export const createLeadSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -103,136 +101,138 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
   });
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Title field */}
-      <div className="space-y-2">
-        <Label htmlFor="title">Title</Label>
-        <Input id="title" {...form.register("title")} />
-        {form.formState.errors.title && (
-          <p className="text-sm text-destructive">{form.formState.errors.title.message}</p>
-        )}
-      </div>
-
-      {/* Description field */}
-      <div className="space-y-2">
-        <Label htmlFor="description">Description</Label>
-        <Textarea
-          id="description"
-          {...form.register("description")}
-          className="min-h-[100px]"
-        />
-        {form.formState.errors.description && (
-          <p className="text-sm text-destructive">{form.formState.errors.description.message}</p>
-        )}
-      </div>
-
-      {/* Category fields */}
-      <div className="grid gap-6">
+    <div className="max-h-[60vh] overflow-y-auto px-4">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Title field */}
         <div className="space-y-2">
-          <Label htmlFor="category">Main Category</Label>
-          <Select
-            onValueChange={(value) => {
-              setSelectedCategory(value);
-              form.setValue("category", value);
-              form.setValue("subcategory", "");
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select a main category" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.keys(BUSINESS_CATEGORIES).map((category) => (
-                <SelectItem key={category} value={category}>
-                  {category}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {form.formState.errors.category && (
-            <p className="text-sm text-destructive">{form.formState.errors.category.message}</p>
+          <Label htmlFor="title">Title</Label>
+          <Input id="title" {...form.register("title")} />
+          {form.formState.errors.title && (
+            <p className="text-sm text-destructive">{form.formState.errors.title.message}</p>
           )}
         </div>
 
-        {selectedCategory && (
+        {/* Description field */}
+        <div className="space-y-2">
+          <Label htmlFor="description">Description</Label>
+          <Textarea
+            id="description"
+            {...form.register("description")}
+            className="min-h-[100px]"
+          />
+          {form.formState.errors.description && (
+            <p className="text-sm text-destructive">{form.formState.errors.description.message}</p>
+          )}
+        </div>
+
+        {/* Category fields */}
+        <div className="grid gap-6">
           <div className="space-y-2">
-            <Label htmlFor="subcategory">Subcategory</Label>
+            <Label htmlFor="category">Main Category</Label>
             <Select
-              onValueChange={(value) => form.setValue("subcategory", value)}
+              onValueChange={(value) => {
+                setSelectedCategory(value);
+                form.setValue("category", value);
+                form.setValue("subcategory", "");
+              }}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select a subcategory" />
+                <SelectValue placeholder="Select a main category" />
               </SelectTrigger>
               <SelectContent>
-                {BUSINESS_CATEGORIES[selectedCategory as BusinessCategory].map((subcategory) => (
-                  <SelectItem key={subcategory} value={subcategory}>
-                    {subcategory}
+                {Object.keys(BUSINESS_CATEGORIES).map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {form.formState.errors.subcategory && (
-              <p className="text-sm text-destructive">{form.formState.errors.subcategory.message}</p>
+            {form.formState.errors.category && (
+              <p className="text-sm text-destructive">{form.formState.errors.category.message}</p>
             )}
           </div>
-        )}
-      </div>
 
-      {/* Budget field */}
-      <div className="space-y-2">
-        <Label htmlFor="budget">Budget (£)</Label>
-        <Input
-          id="budget"
-          type="number"
-          min="0"
-          step="1"
-          {...form.register("budget", { valueAsNumber: true })}
-        />
-        {form.formState.errors.budget && (
-          <p className="text-sm text-destructive">{form.formState.errors.budget.message}</p>
-        )}
-      </div>
+          {selectedCategory && (
+            <div className="space-y-2">
+              <Label htmlFor="subcategory">Subcategory</Label>
+              <Select
+                onValueChange={(value) => form.setValue("subcategory", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a subcategory" />
+                </SelectTrigger>
+                <SelectContent>
+                  {BUSINESS_CATEGORIES[selectedCategory]?.map((subcategory) => (
+                    <SelectItem key={subcategory} value={subcategory}>
+                      {subcategory}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.formState.errors.subcategory && (
+                <p className="text-sm text-destructive">{form.formState.errors.subcategory.message}</p>
+              )}
+            </div>
+          )}
+        </div>
 
-      {/* Location field */}
-      <div className="space-y-2">
-        <Label htmlFor="location">Location</Label>
-        <Input id="location" {...form.register("location")} />
-        {form.formState.errors.location && (
-          <p className="text-sm text-destructive">{form.formState.errors.location.message}</p>
-        )}
-      </div>
+        {/* Budget field */}
+        <div className="space-y-2">
+          <Label htmlFor="budget">Budget (£)</Label>
+          <Input
+            id="budget"
+            type="number"
+            min="0"
+            step="1"
+            {...form.register("budget", { valueAsNumber: true })}
+          />
+          {form.formState.errors.budget && (
+            <p className="text-sm text-destructive">{form.formState.errors.budget.message}</p>
+          )}
+        </div>
 
-      {/* Phone Number field */}
-      <div className="space-y-2">
-        <Label htmlFor="phoneNumber">Phone Number (Optional)</Label>
-        <Input
-          id="phoneNumber"
-          {...form.register("phoneNumber")}
-          placeholder={PHONE_COUNTRY_CODES[countryCode].format}
-          onChange={(e) => {
-            const formatted = formatPhoneNumber(e.target.value, countryCode);
-            form.setValue("phoneNumber", formatted, { shouldValidate: true });
-          }}
-        />
-        {form.formState.errors.phoneNumber && (
-          <p className="text-sm text-destructive">{form.formState.errors.phoneNumber.message}</p>
-        )}
-      </div>
+        {/* Location field */}
+        <div className="space-y-2">
+          <Label htmlFor="location">Location</Label>
+          <Input id="location" {...form.register("location")} />
+          {form.formState.errors.location && (
+            <p className="text-sm text-destructive">{form.formState.errors.location.message}</p>
+          )}
+        </div>
 
-      {/* Submit button */}
-      <Button
-        type="submit"
-        className="w-full"
-        disabled={isSubmitting}
-      >
-        {isSubmitting ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Posting...
-          </>
-        ) : (
-          'Post Lead'
-        )}
-      </Button>
-    </form>
+        {/* Phone Number field */}
+        <div className="space-y-2">
+          <Label htmlFor="phoneNumber">Phone Number (Optional)</Label>
+          <Input
+            id="phoneNumber"
+            {...form.register("phoneNumber")}
+            placeholder={PHONE_COUNTRY_CODES[countryCode].format}
+            onChange={(e) => {
+              const formatted = formatPhoneNumber(e.target.value, countryCode);
+              form.setValue("phoneNumber", formatted, { shouldValidate: true });
+            }}
+          />
+          {form.formState.errors.phoneNumber && (
+            <p className="text-sm text-destructive">{form.formState.errors.phoneNumber.message}</p>
+          )}
+        </div>
+
+        {/* Submit button */}
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Posting...
+            </>
+          ) : (
+            'Post Lead'
+          )}
+        </Button>
+      </form>
+    </div>
   );
 }
