@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
-// Constants
+// Constants remain unchanged
 export const PHONE_COUNTRY_CODES = {
   GB: {
     code: "44",
@@ -54,20 +54,15 @@ export const createLeadSchema = z.object({
   description: z.string().min(1, "Description is required"),
   category: z.string().min(1, "Category is required"),
   subcategory: z.string().min(1, "Subcategory is required"),
-  budget: z.string()
-    .min(1, "Budget is required")
-    .refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
-      message: "Budget must be a positive number"
-    }),
+  budget: z.number().min(0, "Budget must be a positive number"),
   location: z.string().min(1, "Location is required"),
   phoneNumber: z.string()
     .optional()
     .nullable()
     .transform(val => val || null)
     .refine((val) => {
-      if (!val) return true; // Optional field
+      if (!val) return true;
       const country = window.localStorage.getItem('userCountry') as CountryCode || 'GB';
-      // Remove all spaces and special characters before testing the pattern
       const cleanNumber = val.replace(/[\s()-]/g, '');
       return PHONE_COUNTRY_CODES[country].pattern.test(cleanNumber);
     }, {
@@ -88,31 +83,19 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
   const countryCode = (user?.countryCode || "GB") as CountryCode;
 
   const formatPhoneNumber = (value: string, country: CountryCode): string => {
-    // Remove all non-digits and the plus sign
     const digits = value.replace(/[^\d+]/g, "");
-
     if (digits.length <= 1) return digits;
 
     if (country === "US") {
-      // Format for US: +1 (XXX) XXX-XXXX
       const formatted = digits.startsWith('+1') ? digits : `+1${digits}`;
       const digitsOnly = formatted.slice(2);
-
-      if (digitsOnly.length <= 3) {
-        return `+1 (${digitsOnly}`;
-      }
-      if (digitsOnly.length <= 6) {
-        return `+1 (${digitsOnly.slice(0, 3)}) ${digitsOnly.slice(3)}`;
-      }
+      if (digitsOnly.length <= 3) return `+1 (${digitsOnly}`;
+      if (digitsOnly.length <= 6) return `+1 (${digitsOnly.slice(0, 3)}) ${digitsOnly.slice(3)}`;
       return `+1 (${digitsOnly.slice(0, 3)}) ${digitsOnly.slice(3, 6)}-${digitsOnly.slice(6, 10)}`;
     } else {
-      // Format for GB: +44 XXXX XXXXXX
       const formatted = digits.startsWith('+44') ? digits : `+44${digits}`;
       const digitsOnly = formatted.slice(3);
-
-      if (digitsOnly.length <= 4) {
-        return `+44 ${digitsOnly}`;
-      }
+      if (digitsOnly.length <= 4) return `+44 ${digitsOnly}`;
       return `+44 ${digitsOnly.slice(0, 4)} ${digitsOnly.slice(4, 10)}`;
     }
   };
@@ -124,22 +107,25 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
       description: "",
       category: "",
       subcategory: "",
-      budget: "",
+      budget: 0,
       location: "",
       phoneNumber: "",
     },
   });
 
   const handleSubmit = form.handleSubmit((data) => {
-    onSubmit({
+    // Ensure budget is a number before submitting
+    const formattedData = {
       ...data,
-      budget: Number(data.budget), //Explicitly convert budget to number here.
+      budget: Number(data.budget),
       phoneNumber: data.phoneNumber || null
-    });
+    };
+    onSubmit(formattedData);
   });
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Title field */}
       <div>
         <Label htmlFor="title">Title</Label>
         <Input id="title" {...form.register("title")} />
@@ -148,6 +134,7 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
         )}
       </div>
 
+      {/* Description field */}
       <div>
         <Label htmlFor="description">Description</Label>
         <Textarea
@@ -159,6 +146,7 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
         )}
       </div>
 
+      {/* Category fields */}
       <div className="space-y-4">
         <div>
           <Label htmlFor="category">Main Category</Label>
@@ -209,6 +197,7 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
         )}
       </div>
 
+      {/* Budget field */}
       <div>
         <Label htmlFor="budget">Budget (£)</Label>
         <Input
@@ -216,13 +205,14 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
           type="number"
           min="0"
           step="1"
-          {...form.register("budget")}
+          {...form.register("budget", { valueAsNumber: true })}
         />
         {form.formState.errors.budget && (
           <p className="text-sm text-destructive">{form.formState.errors.budget.message}</p>
         )}
       </div>
 
+      {/* Location field */}
       <div>
         <Label htmlFor="location">Location</Label>
         <Input id="location" {...form.register("location")} />
@@ -231,6 +221,7 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
         )}
       </div>
 
+      {/* Phone Number field */}
       <div>
         <Label htmlFor="phoneNumber">Phone Number (Optional)</Label>
         <Input
@@ -247,6 +238,7 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
         )}
       </div>
 
+      {/* Submit button */}
       <Button
         type="submit"
         className="w-full"
