@@ -39,12 +39,18 @@ export const createLeadSchema = z.object({
   phoneNumber: z.string()
     .optional()
     .nullable()
-    .transform(val => val || null)
+    .transform(val => {
+      console.log('Phone validation - input value:', val);
+      return val || null;
+    })
     .refine((val) => {
-      if (!val) return true;
-      // Check if it matches either US or UK pattern
-      return PHONE_COUNTRY_CODES.US.pattern.test(val) || PHONE_COUNTRY_CODES.GB.pattern.test(val);
-    }, "Please enter a valid phone number")
+      if (!val) return true; // Allow empty values
+      console.log('Phone validation - testing pattern for:', val);
+      const isValidGB = PHONE_COUNTRY_CODES.GB.pattern.test(val);
+      const isValidUS = PHONE_COUNTRY_CODES.US.pattern.test(val);
+      console.log('Phone validation - GB valid:', isValidGB, 'US valid:', isValidUS);
+      return isValidGB || isValidUS;
+    }, "Please enter a valid phone number in the format shown")
 });
 
 export type LeadFormData = z.infer<typeof createLeadSchema>;
@@ -60,48 +66,37 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
   const countryCode = (user?.countryCode || "GB") as CountryCode;
 
   const formatPhoneNumber = (value: string, country: CountryCode) => {
-    // Remove all non-digit characters except + 
     const cleaned = value.replace(/[^\d+]/g, '');
 
     if (cleaned === '') return '';
 
+    // For US numbers
     if (country === 'US') {
       if (!cleaned.startsWith('+1')) {
         const digits = cleaned.replace(/\D/g, '');
         if (digits.length === 0) return '';
-        if (digits.length <= 3) {
-          return `+1 (${digits}`;
-        } else if (digits.length <= 6) {
-          return `+1 (${digits.slice(0, 3)}) ${digits.slice(3)}`;
-        }
-        return `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+        if (digits.length <= 3) return `+1 (${digits}`;
+        if (digits.length <= 6) return `+1 (${digits.slice(0,3)}) ${digits.slice(3)}`;
+        return `+1 (${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6,10)}`;
       }
-
       const digits = cleaned.slice(2);
       if (digits.length === 0) return '+1 ';
-      if (digits.length <= 3) {
-        return `+1 (${digits}`;
-      } else if (digits.length <= 6) {
-        return `+1 (${digits.slice(0, 3)}) ${digits.slice(3)}`;
-      }
-      return `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
-    } else {
-      if (!cleaned.startsWith('+44')) {
-        const digits = cleaned.replace(/\D/g, '');
-        if (digits.length === 0) return '';
-        if (digits.length <= 4) {
-          return `+44 ${digits}`;
-        }
-        return `+44 ${digits.slice(0, 4)} ${digits.slice(4, 10)}`;
-      }
-
-      const digits = cleaned.slice(3);
-      if (digits.length === 0) return '+44 ';
-      if (digits.length <= 4) {
-        return `+44 ${digits}`;
-      }
-      return `+44 ${digits.slice(0, 4)} ${digits.slice(4, 10)}`;
+      if (digits.length <= 3) return `+1 (${digits}`;
+      if (digits.length <= 6) return `+1 (${digits.slice(0,3)}) ${digits.slice(3)}`;
+      return `+1 (${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6,10)}`;
     }
+
+    // For UK numbers
+    if (!cleaned.startsWith('+44')) {
+      const digits = cleaned.replace(/\D/g, '');
+      if (digits.length === 0) return '';
+      if (digits.length <= 4) return `+44 ${digits}`;
+      return `+44 ${digits.slice(0,4)} ${digits.slice(4,10)}`;
+    }
+    const digits = cleaned.slice(3);
+    if (digits.length === 0) return '+44 ';
+    if (digits.length <= 4) return `+44 ${digits}`;
+    return `+44 ${digits.slice(0,4)} ${digits.slice(4,10)}`;
   };
 
   const form = useForm<LeadFormData>({
@@ -118,6 +113,7 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
   });
 
   const handleSubmit = form.handleSubmit((data) => {
+    console.log('Form submission - phone number:', data.phoneNumber);
     onSubmit({
       ...data,
       budget: Number(data.budget),
@@ -234,6 +230,7 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
             placeholder={PHONE_COUNTRY_CODES[countryCode].example}
             onChange={(e) => {
               const formatted = formatPhoneNumber(e.target.value, countryCode);
+              console.log('Phone formatting - input:', e.target.value, 'formatted:', formatted);
               e.target.value = formatted;
               form.setValue("phoneNumber", formatted);
             }}
@@ -241,6 +238,9 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
           {form.formState.errors.phoneNumber?.message && (
             <p className="text-sm text-destructive">{form.formState.errors.phoneNumber.message}</p>
           )}
+          <p className="text-sm text-muted-foreground">
+            Format: {PHONE_COUNTRY_CODES[countryCode].format}
+          </p>
         </div>
 
         {/* Submit button */}
