@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { BUSINESS_CATEGORIES } from "@/types/leads";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const PHONE_COUNTRY_CODES = {
   GB: {
@@ -41,8 +42,8 @@ export const createLeadSchema = z.object({
     .transform(val => val || null)
     .refine((val) => {
       if (!val) return true;
-      const countryCode = val.startsWith('+1') ? 'US' : 'GB';
-      return PHONE_COUNTRY_CODES[countryCode].pattern.test(val);
+      // Check if it matches either US or UK pattern
+      return PHONE_COUNTRY_CODES.US.pattern.test(val) || PHONE_COUNTRY_CODES.GB.pattern.test(val);
     }, "Please enter a valid phone number")
 });
 
@@ -53,7 +54,7 @@ interface CreateLeadFormProps {
   isSubmitting: boolean;
 }
 
-export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) {
+function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const { user } = useAuth();
   const countryCode = (user?.countryCode || "GB") as CountryCode;
@@ -259,5 +260,13 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
         </Button>
       </form>
     </div>
+  );
+}
+
+export function CreateLeadForm(props: CreateLeadFormProps) {
+  return (
+    <ErrorBoundary>
+      <CreateLeadFormInner {...props} />
+    </ErrorBoundary>
   );
 }
