@@ -107,7 +107,7 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
                 <SelectValue placeholder="Select a subcategory" />
               </SelectTrigger>
               <SelectContent>
-                {BUSINESS_CATEGORIES[selectedCategory]?.map((subcategory) => (
+                {BUSINESS_CATEGORIES[selectedCategory as keyof typeof BUSINESS_CATEGORIES]?.map((subcategory) => (
                   <SelectItem key={subcategory} value={subcategory}>
                     {subcategory}
                   </SelectItem>

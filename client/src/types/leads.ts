@@ -25,6 +25,7 @@ export interface SelectLead {
   subcategory?: string;
   budget: number;
   location: string;
+  phone_number?: string;
   status: string;
   messages: Message[];
   responses?: Array<{
@@ -69,11 +70,7 @@ export interface SelectUser {
   };
 }
 
-type BusinessCategories = {
-  [key: string]: string[];
-};
-
-export const BUSINESS_CATEGORIES: BusinessCategories = {
+export const BUSINESS_CATEGORIES = {
   "IT & Software Development": [
     "Web Development",
     "Mobile App Development",
