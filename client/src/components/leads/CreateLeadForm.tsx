@@ -44,8 +44,13 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
     },
   });
 
+  const handleSubmit = (data: LeadFormData) => {
+    console.log('Form submission data:', data);
+    onSubmit(data);
+  };
+
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
       <div className="space-y-2">
         <Label htmlFor="title">Title</Label>
         <Input id="title" {...form.register("title")} />
@@ -66,9 +71,9 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
         )}
       </div>
 
-      <div className="grid gap-6">
+      <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="category">Main Category</Label>
+          <Label htmlFor="category">Category</Label>
           <Select
             onValueChange={(value) => {
               setSelectedCategory(value);
@@ -77,9 +82,9 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
             }}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Select a main category" />
+              <SelectValue placeholder="Select a category" />
             </SelectTrigger>
-            <SelectContent className="max-h-[200px]">
+            <SelectContent>
               {Object.keys(BUSINESS_CATEGORIES).map((category) => (
                 <SelectItem key={category} value={category}>
                   {category}
@@ -101,7 +106,7 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
               <SelectTrigger>
                 <SelectValue placeholder="Select a subcategory" />
               </SelectTrigger>
-              <SelectContent className="max-h-[200px]">
+              <SelectContent>
                 {BUSINESS_CATEGORIES[selectedCategory]?.map((subcategory) => (
                   <SelectItem key={subcategory} value={subcategory}>
                     {subcategory}
@@ -142,6 +147,7 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
         <Label htmlFor="phoneNumber">Phone Number (Optional)</Label>
         <Input
           id="phoneNumber"
+          type="tel"
           {...form.register("phoneNumber")}
           placeholder="Enter phone number (optional)"
         />
@@ -158,10 +164,10 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
         {isSubmitting ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Posting...
+            Creating Lead...
           </>
         ) : (
-          'Post Lead'
+          'Create Lead'
         )}
       </Button>
     </form>

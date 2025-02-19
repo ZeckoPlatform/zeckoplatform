@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { apiRequest } from "@/lib/queryClient";
 import { SelectLead, BUSINESS_CATEGORIES } from "@/types/leads";
 import { CreateLeadForm, LeadFormData } from "@/components/leads/CreateLeadForm";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export { BUSINESS_CATEGORIES } from '@/types/leads';
 
@@ -30,26 +31,31 @@ const LeadsPage = () => {
 
   const createLeadMutation = useMutation({
     mutationFn: async (formData: LeadFormData) => {
-      // Log the form data for debugging
-      console.log('Form data received:', formData);
+      // Log the incoming form data
+      console.log('Creating lead with form data:', formData);
 
       // Prepare the data for submission
       const data = {
-        title: formData.title,
-        description: formData.description,
+        title: formData.title.trim(),
+        description: formData.description.trim(),
         category: formData.category,
         subcategory: formData.subcategory,
-        budget: Number(formData.budget),
-        location: formData.location,
+        budget: parseInt(formData.budget, 10),
+        location: formData.location.trim(),
         phoneNumber: formData.phoneNumber?.trim() || null
       };
 
-      // Log the prepared data
-      console.log('Prepared data for submission:', data);
+      // Log the processed data
+      console.log('Processed data for submission:', data);
 
       try {
         const response = await apiRequest('POST', '/api/leads', data);
-        console.log('Response status:', response.status);
+
+        // Log the full response
+        console.log('Server response:', {
+          status: response.status,
+          statusText: response.statusText,
+        });
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -58,10 +64,10 @@ const LeadsPage = () => {
         }
 
         const result = await response.json();
-        console.log('Success response:', result);
+        console.log('Successfully created lead:', result);
         return result;
       } catch (error) {
-        console.error('Lead creation error details:', error);
+        console.error('Lead creation error:', error);
         throw error;
       }
     },
@@ -74,7 +80,7 @@ const LeadsPage = () => {
       });
     },
     onError: (error: Error) => {
-      console.error('Mutation error handler:', error);
+      console.error('Lead creation mutation error:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to create lead",
@@ -91,18 +97,23 @@ const LeadsPage = () => {
           <DialogTrigger asChild>
             <Button>Create New Lead</Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl h-[90vh]">
+          <DialogContent className="max-w-2xl">
             <DialogHeader className="px-6 py-4 border-b">
               <DialogTitle>Create New Lead</DialogTitle>
               <DialogDescription>
                 Fill out the form below to create a new business lead
               </DialogDescription>
             </DialogHeader>
-            <div className="px-6 py-4 overflow-y-auto h-[calc(90vh-120px)]">
-              <CreateLeadForm
-                onSubmit={(data) => createLeadMutation.mutate(data)}
-                isSubmitting={createLeadMutation.isPending}
-              />
+            <div className="px-6 py-4 overflow-y-auto">
+              <ErrorBoundary>
+                <CreateLeadForm
+                  onSubmit={(data) => {
+                    console.log('Form submitted with data:', data);
+                    createLeadMutation.mutate(data);
+                  }}
+                  isSubmitting={createLeadMutation.isPending}
+                />
+              </ErrorBoundary>
             </div>
           </DialogContent>
         </Dialog>
@@ -115,15 +126,13 @@ const LeadsPage = () => {
               <div className="flex justify-between items-start">
                 <CardTitle>{lead.title}</CardTitle>
                 {lead.user_id === user?.id && (
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setEditingLead(lead)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEditingLead(lead)}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
                 )}
               </div>
             </CardHeader>
