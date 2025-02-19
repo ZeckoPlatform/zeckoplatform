@@ -59,15 +59,15 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
   const countryCode = (user?.countryCode || "GB") as CountryCode;
 
   const formatPhoneNumber = (value: string, country: CountryCode) => {
-    // Only keep digits and plus sign from input
+    // Remove all non-digit characters except + 
     const cleaned = value.replace(/[^\d+]/g, '');
 
     if (cleaned === '') return '';
 
     if (country === 'US') {
       if (!cleaned.startsWith('+1')) {
-        // Add +1 prefix if not present
         const digits = cleaned.replace(/\D/g, '');
+        if (digits.length === 0) return '';
         if (digits.length <= 3) {
           return `+1 (${digits}`;
         } else if (digits.length <= 6) {
@@ -75,8 +75,9 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
         }
         return `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
       }
-      // Handle case where +1 is already present
+
       const digits = cleaned.slice(2);
+      if (digits.length === 0) return '+1 ';
       if (digits.length <= 3) {
         return `+1 (${digits}`;
       } else if (digits.length <= 6) {
@@ -85,21 +86,18 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
       return `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
     } else {
       if (!cleaned.startsWith('+44')) {
-        // Add +44 prefix if not present
         const digits = cleaned.replace(/\D/g, '');
+        if (digits.length === 0) return '';
         if (digits.length <= 4) {
           return `+44 ${digits}`;
-        } else if (digits.length <= 10) {
-          return `+44 ${digits.slice(0, 4)} ${digits.slice(4)}`;
         }
         return `+44 ${digits.slice(0, 4)} ${digits.slice(4, 10)}`;
       }
-      // Handle case where +44 is already present
+
       const digits = cleaned.slice(3);
+      if (digits.length === 0) return '+44 ';
       if (digits.length <= 4) {
         return `+44 ${digits}`;
-      } else if (digits.length <= 10) {
-        return `+44 ${digits.slice(0, 4)} ${digits.slice(4)}`;
       }
       return `+44 ${digits.slice(0, 4)} ${digits.slice(4, 10)}`;
     }

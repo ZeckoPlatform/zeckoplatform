@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMutation } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
+import { ErrorBoundary } from "./ErrorBoundary";
 
 const COUNTRIES = {
   GB: "United Kingdom",
@@ -522,5 +523,13 @@ export function UserProfileForm() {
         </Card>
       </TabsContent>
     </Tabs>
+  );
+}
+
+export function UserProfileFormWrapper() {
+  return (
+    <ErrorBoundary>
+      <UserProfileForm />
+    </ErrorBoundary>
   );
 }

@@ -43,28 +43,28 @@ export interface SelectLead {
 export interface SelectUser {
   id: number;
   email: string;
-  countryCode?: 'GB' | 'US';
+  countryCode: 'GB' | 'US';
   profile: {
-    name?: string;
-    bio?: string;
-    phoneNumber?: string;
-    company?: string;
-    jobTitle?: string;
-    website?: string;
-    address?: string;
-    socialLinks?: {
-      linkedin?: string;
-      twitter?: string;
-      facebook?: string;
+    name: string;
+    bio: string;
+    phoneNumber: string;
+    company: string;
+    jobTitle: string;
+    website: string;
+    address: string;
+    professionalTitle: string;
+    skills: string[];
+    languages: string[];
+    timezone: string;
+    socialLinks: {
+      linkedin: string;
+      twitter: string;
+      facebook: string;
     };
-    professionalTitle?: string;
-    skills?: string[];
-    languages?: string[];
-    timezone?: string;
-    notifications?: {
-      email?: boolean;
-      sms?: boolean;
-      marketing?: boolean;
+    notifications: {
+      email: boolean;
+      sms: boolean;
+      marketing: boolean;
     };
   };
 }
