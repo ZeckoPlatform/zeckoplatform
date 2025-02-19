@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Edit, Trash2, Send } from "lucide-react";
 import { MessageDialog } from "@/components/MessageDialog";
 import { useToast } from "@/hooks/use-toast";
-import { SelectLead, SelectUser, getUnreadCount } from '@/pages/leads-page';
+import { SelectLead, SelectUser, getUnreadCount } from '@/types/leads';
 import { CreateLeadForm, LeadFormData } from './CreateLeadForm';
 
 interface FreeUserLeadsViewProps {

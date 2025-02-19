@@ -7,8 +7,11 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { apiRequest } from "@/lib/queryClient";
-import { SelectLead } from "@/types/leads";
+import { SelectLead, BUSINESS_CATEGORIES } from "@/types/leads";
 import { CreateLeadForm } from "@/components/leads/CreateLeadForm";
+
+// Re-export BUSINESS_CATEGORIES for backward compatibility
+export { BUSINESS_CATEGORIES } from '@/types/leads';
 
 const LeadsPage = () => {
   const { user } = useAuth();
