@@ -30,49 +30,28 @@ const LeadsPage = () => {
 
   const createLeadMutation = useMutation({
     mutationFn: async (data: LeadFormData) => {
-      try {
-        const response = await apiRequest('POST', '/api/leads', {
-          ...data,
-          budget: Number(data.budget),
-          phoneNumber: data.phoneNumber || null
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(errorText || 'Failed to create lead');
-        }
-
-        const result = await response.json();
-        return result;
-      } catch (error) {
-        console.error('Lead creation error:', error);
-        throw error;
+      const response = await apiRequest('POST', '/api/leads', data);
+      if (!response.ok) {
+        throw new Error('Failed to create lead');
       }
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/leads'] });
+      setCreateDialogOpen(false);
       toast({
         title: "Success",
         description: "Lead created successfully",
       });
-      setCreateDialogOpen(false);
     },
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to create lead",
+        description: "Failed to create lead",
         variant: "destructive",
       });
     }
   });
-
-  const handleCreateSubmit = async (data: LeadFormData) => {
-    try {
-      await createLeadMutation.mutateAsync(data);
-    } catch (error) {
-      console.error('Submit error:', error);
-    }
-  };
 
   return (
     <div className="container mx-auto p-6">
@@ -91,7 +70,7 @@ const LeadsPage = () => {
             </DialogHeader>
             <div className="px-6 py-4 overflow-y-auto h-[calc(90vh-120px)]">
               <CreateLeadForm
-                onSubmit={handleCreateSubmit}
+                onSubmit={(data) => createLeadMutation.mutate(data)}
                 isSubmitting={createLeadMutation.isPending}
               />
             </div>

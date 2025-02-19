@@ -12,25 +12,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { BUSINESS_CATEGORIES } from "@/types/leads";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
-const PHONE_COUNTRY_CODES = {
-  GB: {
-    code: "44",
-    format: "+44 XXXX XXXXXX",
-    example: "+44 7911 123456",
-    pattern: /^\+44\s\d{4}\s\d{6}$/,
-    partialPattern: /^\+44(\s\d{0,4})?(\s\d{0,6})?$/
-  },
-  US: {
-    code: "1",
-    format: "+1 (XXX) XXX-XXXX",
-    example: "+1 (555) 123-4567",
-    pattern: /^\+1\s\(\d{3}\)\s\d{3}-\d{4}$/,
-    partialPattern: /^\+1(\s\(\d{0,3}\))?(\s\d{0,3})?(-\d{0,4})?$/
-  }
-} as const;
-
-type CountryCode = keyof typeof PHONE_COUNTRY_CODES;
-
 export const createLeadSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().min(1, "Description is required"),
@@ -38,10 +19,7 @@ export const createLeadSchema = z.object({
   subcategory: z.string().min(1, "Subcategory is required"),
   budget: z.number().min(0, "Budget must be a positive number"),
   location: z.string().min(1, "Location is required"),
-  phoneNumber: z.string()
-    .optional()
-    .nullable()
-    .transform(val => (!val || val.trim() === '') ? null : val)
+  phoneNumber: z.string().optional().nullable()
 });
 
 export type LeadFormData = z.infer<typeof createLeadSchema>;
@@ -54,7 +32,6 @@ interface CreateLeadFormProps {
 function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const { user } = useAuth();
-  const countryCode = (user?.countryCode || "GB") as CountryCode;
 
   const form = useForm<LeadFormData>({
     resolver: zodResolver(createLeadSchema),
@@ -65,55 +42,12 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
       subcategory: "",
       budget: 0,
       location: "",
-      phoneNumber: "",
+      phoneNumber: null
     },
   });
 
-  const handleSubmit = form.handleSubmit((data) => {
-    // Transform the data before submission
-    const submissionData = {
-      ...data,
-      budget: Number(data.budget),
-      phoneNumber: data.phoneNumber?.trim() || null
-    };
-    onSubmit(submissionData);
-  });
-
-  const formatPhoneNumber = (value: string, country: CountryCode) => {
-    if (!value || value.trim() === '') return '';
-
-    const cleaned = value.replace(/[^\d+]/g, '');
-
-    if (country === 'GB') {
-      if (!cleaned.startsWith('+44')) {
-        const digits = cleaned.replace(/\D/g, '');
-        if (digits.length === 0) return '';
-        if (digits.length <= 4) return `+44 ${digits}`;
-        return `+44 ${digits.slice(0,4)} ${digits.slice(4,10)}`;
-      }
-      const digits = cleaned.slice(3);
-      if (digits.length === 0) return '+44 ';
-      if (digits.length <= 4) return `+44 ${digits}`;
-      return `+44 ${digits.slice(0,4)} ${digits.slice(4,10)}`;
-    }
-
-    // US format
-    if (!cleaned.startsWith('+1')) {
-      const digits = cleaned.replace(/\D/g, '');
-      if (digits.length === 0) return '';
-      if (digits.length <= 3) return `+1 (${digits}`;
-      if (digits.length <= 6) return `+1 (${digits.slice(0,3)}) ${digits.slice(3)}`;
-      return `+1 (${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6,10)}`;
-    }
-    const digits = cleaned.slice(2);
-    if (digits.length === 0) return '+1 ';
-    if (digits.length <= 3) return `+1 (${digits}`;
-    if (digits.length <= 6) return `+1 (${digits.slice(0,3)}) ${digits.slice(3)}`;
-    return `+1 (${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6,10)}`;
-  };
-
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
       <div className="space-y-2">
         <Label htmlFor="title">Title</Label>
         <Input id="title" {...form.register("title")} />
@@ -211,18 +145,10 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
         <Input
           id="phoneNumber"
           {...form.register("phoneNumber")}
-          placeholder={PHONE_COUNTRY_CODES[countryCode].example}
-          onChange={(e) => {
-            const formatted = formatPhoneNumber(e.target.value, countryCode);
-            form.setValue("phoneNumber", formatted, { shouldValidate: true });
-          }}
         />
         {form.formState.errors.phoneNumber?.message && (
           <p className="text-sm text-destructive">{form.formState.errors.phoneNumber.message}</p>
         )}
-        <p className="text-sm text-muted-foreground">
-          Format: {PHONE_COUNTRY_CODES[countryCode].format}
-        </p>
       </div>
 
       <Button
