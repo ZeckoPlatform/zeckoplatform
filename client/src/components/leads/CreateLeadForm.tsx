@@ -41,23 +41,7 @@ export const createLeadSchema = z.object({
   phoneNumber: z.string()
     .optional()
     .nullable()
-    .transform(val => {
-      if (!val || val.trim() === '') return null;
-      return val;
-    })
-    .refine((val) => {
-      if (!val) return true;
-      const gbValid = PHONE_COUNTRY_CODES.GB.pattern.test(val);
-      const usValid = PHONE_COUNTRY_CODES.US.pattern.test(val);
-      const gbPartial = PHONE_COUNTRY_CODES.GB.partialPattern.test(val);
-      const usPartial = PHONE_COUNTRY_CODES.US.partialPattern.test(val);
-
-      // If it's a partial match, allow it to pass validation
-      if (gbPartial || usPartial) return true;
-
-      // For complete numbers, must match exactly
-      return gbValid || usValid;
-    }, "Please enter a valid phone number in the exact format shown")
+    .transform(val => (!val || val.trim() === '') ? null : val)
 });
 
 export type LeadFormData = z.infer<typeof createLeadSchema>;
@@ -86,6 +70,7 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
   });
 
   const handleSubmit = form.handleSubmit((data) => {
+    // Transform the data before submission
     const submissionData = {
       ...data,
       budget: Number(data.budget),
@@ -95,6 +80,8 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
   });
 
   const formatPhoneNumber = (value: string, country: CountryCode) => {
+    if (!value || value.trim() === '') return '';
+
     const cleaned = value.replace(/[^\d+]/g, '');
 
     if (country === 'GB') {
@@ -227,7 +214,6 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
           placeholder={PHONE_COUNTRY_CODES[countryCode].example}
           onChange={(e) => {
             const formatted = formatPhoneNumber(e.target.value, countryCode);
-            e.target.value = formatted;
             form.setValue("phoneNumber", formatted, { shouldValidate: true });
           }}
         />
