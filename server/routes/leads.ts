@@ -10,12 +10,8 @@ const createLeadSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().min(1, "Description is required"),
   category: z.string().min(1, "Category is required"),
-  subcategory: z.string().min(1, "Subcategory is required"),
   budget: z.number().min(0, "Budget must be a positive number").or(z.string().transform(val => Number(val))),
   location: z.string().min(1, "Location is required"),
-  phoneNumber: z.string().optional().nullable(),
-  status: z.enum(["open", "closed", "in_progress"]).optional(),
-  region: z.string().optional()
 });
 
 // Create a new lead
@@ -34,19 +30,24 @@ router.post("/api/leads", async (req, res) => {
 
     console.log("Validated lead data:", JSON.stringify(validatedData, null, 2));
 
-    const newLead = await db.insert(leads).values({
+    const expiryDate = new Date();
+    expiryDate.setDate(expiryDate.getDate() + 30); // 30 days from now
+
+    const insertData = {
       user_id: req.user.id,
       title: validatedData.title,
       description: validatedData.description,
       category: validatedData.category,
-      subcategory: validatedData.subcategory,
       budget: validatedData.budget,
       location: validatedData.location,
-      phone_number: validatedData.phoneNumber,
       region: req.user.countryCode || "GB",
       status: "open",
-      expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-    }).returning();
+      expires_at: expiryDate,
+    };
+
+    console.log("Attempting to insert lead with data:", JSON.stringify(insertData, null, 2));
+
+    const newLead = await db.insert(leads).values(insertData).returning();
 
     console.log("Successfully created lead:", JSON.stringify(newLead[0], null, 2));
     res.json(newLead[0]);
@@ -62,48 +63,9 @@ router.post("/api/leads", async (req, res) => {
         }))
       });
     }
-    res.status(500).json({ error: "Failed to create lead", details: error.message });
-  }
-});
-
-// Schema for importing leads from external sources
-const importSourceSchema = z.object({
-  type: z.enum(["rss", "api"]),
-  url: z.string().url(),
-  apiKey: z.string().optional(),
-});
-
-router.post("/api/leads/import", async (req, res) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ error: "Authentication required" });
-    }
-
-    // Check if user is super admin
-    if (!req.user.superAdmin) {
-      return res.status(403).json({ error: "Only super admins can import leads" });
-    }
-
-    const validatedData = importSourceSchema.parse(req.body);
-    let importedLeads;
-
-    if (validatedData.type === "rss") {
-      importedLeads = await importLeadsFromRSS(validatedData.url, req.user.id);
-    } else {
-      importedLeads = await importLeadsFromAPI(
-        validatedData.url,
-        validatedData.apiKey || "",
-        req.user.id
-      );
-    }
-
-    res.json({ success: true, leads: importedLeads });
-  } catch (error) {
-    console.error("Lead import failed:", error);
-    res.status(400).json({ 
-      error: error instanceof z.ZodError 
-        ? error.errors[0].message 
-        : "Failed to import leads" 
+    res.status(500).json({ 
+      error: "Failed to create lead", 
+      details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });
