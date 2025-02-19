@@ -21,6 +21,7 @@ import adminRoutes from './routes/admin';
 import documentRoutes from './routes/documents';
 import reviewRoutes from './routes/reviews';
 import orderRoutes from './routes/orders';
+import leadsRoutes from './routes/leads';
 import { cleanupExpiredLeads } from './services/cleanup';
 import feedbackRoutes from './routes/feedback';
 import socialRoutes from './routes/social';
@@ -80,6 +81,7 @@ export function registerRoutes(app: Express): Server {
   app.use('/api', reviewRoutes);
   app.use('/api', orderRoutes);
   app.use('/api', socialRoutes);
+  app.use('/api', leadsRoutes); // Add leads routes
 
   const httpServer = createServer(app);
   return httpServer;

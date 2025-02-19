@@ -13,11 +13,11 @@ const createLeadSchema = z.object({
   subcategory: z.string().optional(),
   budget: z.number().min(0, "Budget must be a positive number").or(z.string().transform(val => Number(val))),
   location: z.string().min(1, "Location is required"),
-  phone_number: z.string().optional(),
+  phone_number: z.string().optional()
 });
 
 // Create a new lead
-router.post("/api/leads", async (req, res) => {
+router.post("/leads", async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: "Authentication required" });
