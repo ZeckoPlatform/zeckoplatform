@@ -67,7 +67,11 @@ export const BUSINESS_CATEGORIES: BusinessCategories = {
     "IoT Solutions",
     "Game Development",
     "UI/UX Design",
-    "Technical Support"
+    "Technical Support",
+    "System Administration",
+    "Network Security",
+    "Data Science",
+    "VR/AR Development"
   ],
   "Marketing & Advertising": [
     "Digital Marketing",
@@ -85,7 +89,11 @@ export const BUSINESS_CATEGORIES: BusinessCategories = {
     "Public Relations",
     "Event Marketing",
     "Marketing Automation",
-    "Outdoor Advertising"
+    "Outdoor Advertising",
+    "Guerrilla Marketing",
+    "Trade Show Marketing",
+    "Direct Mail Marketing",
+    "Marketing Strategy"
   ],
   "Business Services": [
     "Business Consulting",
@@ -103,7 +111,11 @@ export const BUSINESS_CATEGORIES: BusinessCategories = {
     "Business Process Optimization",
     "Change Management",
     "Mergers & Acquisitions",
-    "Corporate Training"
+    "Corporate Training",
+    "Business Intelligence",
+    "Quality Management",
+    "Crisis Management",
+    "International Business"
   ],
   "Professional Services": [
     "Management Consulting",
@@ -120,7 +132,12 @@ export const BUSINESS_CATEGORIES: BusinessCategories = {
     "Business Valuation",
     "Recruitment Services",
     "Virtual Assistant Services",
-    "Office Administration"
+    "Office Administration",
+    "Document Management",
+    "Legal Consulting",
+    "Financial Advisory",
+    "Risk Assessment",
+    "Business Development"
   ],
   "Cleaning & Maintenance": [
     "Residential Cleaning",
@@ -137,7 +154,12 @@ export const BUSINESS_CATEGORIES: BusinessCategories = {
     "Garden Maintenance",
     "Pest Control",
     "Air Duct Cleaning",
-    "Disaster Recovery Cleaning"
+    "Disaster Recovery Cleaning",
+    "Sanitization Services",
+    "Green Cleaning",
+    "Equipment Maintenance",
+    "Floor Care",
+    "Pressure Washing"
   ],
   "Construction & Trades": [
     "General Contracting",
@@ -155,7 +177,11 @@ export const BUSINESS_CATEGORIES: BusinessCategories = {
     "Building Inspection",
     "Flooring Installation",
     "Solar Installation",
-    "Home Automation"
+    "Home Automation",
+    "Concrete Work",
+    "Demolition Services",
+    "Fencing",
+    "Custom Cabinetry"
   ],
   "Healthcare & Medical": [
     "Medical Services",
@@ -172,7 +198,12 @@ export const BUSINESS_CATEGORIES: BusinessCategories = {
     "Nutrition Services",
     "Medical Research",
     "Elder Care Services",
-    "Medical Training"
+    "Medical Training",
+    "Home Healthcare",
+    "Occupational Therapy",
+    "Speech Therapy",
+    "Diagnostic Services",
+    "Medical Transportation"
   ],
   "Education & Training": [
     "Professional Training",
@@ -189,7 +220,12 @@ export const BUSINESS_CATEGORIES: BusinessCategories = {
     "Art Education",
     "Special Education",
     "Adult Education",
-    "Early Childhood Education"
+    "Early Childhood Education",
+    "STEM Education",
+    "Distance Learning",
+    "Career Counseling",
+    "Educational Assessment",
+    "Teacher Training"
   ],
   "Retail & E-commerce": [
     "Online Retail",
@@ -203,7 +239,15 @@ export const BUSINESS_CATEGORIES: BusinessCategories = {
     "Payment Processing",
     "Marketplace Management",
     "Product Photography",
-    "Retail Consulting"
+    "Retail Consulting",
+    "Visual Merchandising",
+    "Point of Sale Systems",
+    "Retail Security",
+    "Store Design",
+    "Retail Marketing",
+    "Fulfillment Services",
+    "Category Management",
+    "Retail Training"
   ],
   "Transportation & Logistics": [
     "Freight Services",
@@ -215,7 +259,39 @@ export const BUSINESS_CATEGORIES: BusinessCategories = {
     "Supply Chain Optimization",
     "International Shipping",
     "Cold Chain Logistics",
-    "Transportation Technology"
+    "Transportation Technology",
+    "Customs Brokerage",
+    "Cross-Border Logistics",
+    "Inventory Management",
+    "Route Optimization",
+    "Packaging Solutions",
+    "Asset Tracking",
+    "Reverse Logistics",
+    "Freight Forwarding",
+    "Transportation Safety",
+    "Logistics Training"
+  ],
+  "Creative & Design": [
+    "Graphic Design",
+    "Web Design",
+    "Brand Identity Design",
+    "Packaging Design",
+    "Motion Graphics",
+    "3D Modeling",
+    "Animation",
+    "Illustration",
+    "Print Design",
+    "Product Design",
+    "UX/UI Design",
+    "Art Direction",
+    "Visual Effects",
+    "Logo Design",
+    "Interior Design",
+    "Fashion Design",
+    "Industrial Design",
+    "Exhibition Design",
+    "Environmental Design",
+    "Design Consulting"
   ]
 };
 

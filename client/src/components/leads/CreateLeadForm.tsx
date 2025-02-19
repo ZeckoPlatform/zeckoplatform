@@ -138,7 +138,7 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
               <SelectTrigger>
                 <SelectValue placeholder="Select a main category" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-[300px] overflow-y-auto">
                 {Object.keys(BUSINESS_CATEGORIES).map((category) => (
                   <SelectItem key={category} value={category}>
                     {category}
@@ -160,7 +160,7 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
                 <SelectTrigger>
                   <SelectValue placeholder="Select a subcategory" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[300px] overflow-y-auto">
                   {BUSINESS_CATEGORIES[selectedCategory]?.map((subcategory) => (
                     <SelectItem key={subcategory} value={subcategory}>
                       {subcategory}
