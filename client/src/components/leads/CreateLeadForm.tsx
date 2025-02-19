@@ -86,15 +86,11 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
   });
 
   const handleSubmit = form.handleSubmit((data) => {
-    console.log('Form data before submission:', data);
-    // Transform the data before submission
     const submissionData = {
       ...data,
       budget: Number(data.budget),
       phoneNumber: data.phoneNumber?.trim() || null
     };
-
-    console.log('Transformed submission data:', submissionData);
     onSubmit(submissionData);
   });
 
@@ -131,7 +127,6 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Title field */}
       <div className="space-y-2">
         <Label htmlFor="title">Title</Label>
         <Input id="title" {...form.register("title")} />
@@ -140,7 +135,6 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
         )}
       </div>
 
-      {/* Description field */}
       <div className="space-y-2">
         <Label htmlFor="description">Description</Label>
         <Textarea
@@ -153,7 +147,6 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
         )}
       </div>
 
-      {/* Category fields */}
       <div className="grid gap-6">
         <div className="space-y-2">
           <Label htmlFor="category">Main Category</Label>
@@ -167,7 +160,7 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
             <SelectTrigger>
               <SelectValue placeholder="Select a main category" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-h-[200px]">
               {Object.keys(BUSINESS_CATEGORIES).map((category) => (
                 <SelectItem key={category} value={category}>
                   {category}
@@ -189,7 +182,7 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
               <SelectTrigger>
                 <SelectValue placeholder="Select a subcategory" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-[200px]">
                 {BUSINESS_CATEGORIES[selectedCategory]?.map((subcategory) => (
                   <SelectItem key={subcategory} value={subcategory}>
                     {subcategory}
@@ -204,7 +197,6 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
         )}
       </div>
 
-      {/* Budget field */}
       <div className="space-y-2">
         <Label htmlFor="budget">Budget (£)</Label>
         <Input
@@ -219,7 +211,6 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
         )}
       </div>
 
-      {/* Location field */}
       <div className="space-y-2">
         <Label htmlFor="location">Location</Label>
         <Input id="location" {...form.register("location")} />
@@ -228,7 +219,6 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
         )}
       </div>
 
-      {/* Phone Number field */}
       <div className="space-y-2">
         <Label htmlFor="phoneNumber">Phone Number (Optional)</Label>
         <Input
@@ -249,7 +239,6 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
         </p>
       </div>
 
-      {/* Submit button */}
       <Button
         type="submit"
         className="w-full"

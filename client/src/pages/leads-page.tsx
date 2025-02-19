@@ -10,7 +10,6 @@ import { apiRequest } from "@/lib/queryClient";
 import { SelectLead, BUSINESS_CATEGORIES } from "@/types/leads";
 import { CreateLeadForm, LeadFormData } from "@/components/leads/CreateLeadForm";
 
-// Re-export BUSINESS_CATEGORIES for backward compatibility
 export { BUSINESS_CATEGORIES } from '@/types/leads';
 
 const LeadsPage = () => {
@@ -83,17 +82,19 @@ const LeadsPage = () => {
           <DialogTrigger asChild>
             <Button>Create New Lead</Button>
           </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden">
+            <DialogHeader className="px-6 py-4 border-b">
               <DialogTitle>Create New Lead</DialogTitle>
               <DialogDescription>
                 Fill out the form below to create a new business lead
               </DialogDescription>
             </DialogHeader>
-            <CreateLeadForm
-              onSubmit={handleCreateSubmit}
-              isSubmitting={createLeadMutation.isPending}
-            />
+            <div className="px-6 py-4 flex-1 overflow-y-auto">
+              <CreateLeadForm
+                onSubmit={handleCreateSubmit}
+                isSubmitting={createLeadMutation.isPending}
+              />
+            </div>
           </DialogContent>
         </Dialog>
       </div>
