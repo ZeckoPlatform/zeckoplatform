@@ -52,6 +52,20 @@ export interface SelectUser {
     jobTitle?: string;
     website?: string;
     address?: string;
+    socialLinks?: {
+      linkedin?: string;
+      twitter?: string;
+      facebook?: string;
+    };
+    professionalTitle?: string;
+    skills?: string[];
+    languages?: string[];
+    timezone?: string;
+    notifications?: {
+      email?: boolean;
+      sms?: boolean;
+      marketing?: boolean;
+    };
   };
 }
 

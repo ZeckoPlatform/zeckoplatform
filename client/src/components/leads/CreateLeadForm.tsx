@@ -59,27 +59,50 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
   const countryCode = (user?.countryCode || "GB") as CountryCode;
 
   const formatPhoneNumber = (value: string, country: CountryCode) => {
-    const cleaned = value.replace(/\D/g, '');
+    // Only keep digits and plus sign from input
+    const cleaned = value.replace(/[^\d+]/g, '');
 
     if (cleaned === '') return '';
 
-    // US Phone number formatting
-    if (country === "US") {
-      if (cleaned.length <= 3) {
-        return `+1 (${cleaned}`;
-      } else if (cleaned.length <= 6) {
-        return `+1 (${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
+    if (country === 'US') {
+      if (!cleaned.startsWith('+1')) {
+        // Add +1 prefix if not present
+        const digits = cleaned.replace(/\D/g, '');
+        if (digits.length <= 3) {
+          return `+1 (${digits}`;
+        } else if (digits.length <= 6) {
+          return `+1 (${digits.slice(0, 3)}) ${digits.slice(3)}`;
+        }
+        return `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
       }
-      return `+1 (${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+      // Handle case where +1 is already present
+      const digits = cleaned.slice(2);
+      if (digits.length <= 3) {
+        return `+1 (${digits}`;
+      } else if (digits.length <= 6) {
+        return `+1 (${digits.slice(0, 3)}) ${digits.slice(3)}`;
+      }
+      return `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+    } else {
+      if (!cleaned.startsWith('+44')) {
+        // Add +44 prefix if not present
+        const digits = cleaned.replace(/\D/g, '');
+        if (digits.length <= 4) {
+          return `+44 ${digits}`;
+        } else if (digits.length <= 10) {
+          return `+44 ${digits.slice(0, 4)} ${digits.slice(4)}`;
+        }
+        return `+44 ${digits.slice(0, 4)} ${digits.slice(4, 10)}`;
+      }
+      // Handle case where +44 is already present
+      const digits = cleaned.slice(3);
+      if (digits.length <= 4) {
+        return `+44 ${digits}`;
+      } else if (digits.length <= 10) {
+        return `+44 ${digits.slice(0, 4)} ${digits.slice(4)}`;
+      }
+      return `+44 ${digits.slice(0, 4)} ${digits.slice(4, 10)}`;
     }
-
-    // UK Phone number formatting
-    if (cleaned.length <= 4) {
-      return `+44 ${cleaned}`;
-    } else if (cleaned.length <= 10) {
-      return `+44 ${cleaned.slice(0, 4)} ${cleaned.slice(4)}`;
-    }
-    return `+44 ${cleaned.slice(0, 4)} ${cleaned.slice(4, 10)}`;
   };
 
   const form = useForm<LeadFormData>({

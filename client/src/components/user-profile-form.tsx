@@ -46,13 +46,25 @@ const userProfileSchema = z.object({
     .refine((val) => {
       const countryCode = val.startsWith('+1') ? 'US' : 'GB';
       return PHONE_COUNTRY_CODES[countryCode].pattern.test(val);
-    }, {
-      message: "Please enter a valid phone number"
-    }),
+    }, "Please enter a valid phone number"),
   company: z.string().optional(),
   jobTitle: z.string().optional(),
   website: z.string().url("Please enter a valid URL").optional().or(z.literal('')),
   address: z.string().optional(),
+  professionalTitle: z.string().optional(),
+  skills: z.array(z.string()).optional(),
+  languages: z.array(z.string()).optional(),
+  timezone: z.string().optional(),
+  socialLinks: z.object({
+    linkedin: z.string().url("Please enter a valid LinkedIn URL").optional().or(z.literal('')),
+    twitter: z.string().url("Please enter a valid Twitter URL").optional().or(z.literal('')),
+    facebook: z.string().url("Please enter a valid Facebook URL").optional().or(z.literal('')),
+  }).optional(),
+  notifications: z.object({
+    email: z.boolean().optional(),
+    sms: z.boolean().optional(),
+    marketing: z.boolean().optional(),
+  }).optional(),
 });
 
 const passwordChangeSchema = z.object({
@@ -89,6 +101,20 @@ export function UserProfileForm() {
       jobTitle: user?.profile?.jobTitle || "",
       website: user?.profile?.website || "",
       address: user?.profile?.address || "",
+      professionalTitle: user?.profile?.professionalTitle || "",
+      skills: user?.profile?.skills || [],
+      languages: user?.profile?.languages || [],
+      timezone: user?.profile?.timezone || "",
+      socialLinks: {
+        linkedin: user?.profile?.socialLinks?.linkedin || "",
+        twitter: user?.profile?.socialLinks?.twitter || "",
+        facebook: user?.profile?.socialLinks?.facebook || "",
+      },
+      notifications: {
+        email: user?.profile?.notifications?.email || true,
+        sms: user?.profile?.notifications?.sms || false,
+        marketing: user?.profile?.notifications?.marketing || false,
+      },
     },
   });
 
@@ -176,6 +202,7 @@ export function UserProfileForm() {
     <Tabs defaultValue="profile" className="w-full">
       <TabsList>
         <TabsTrigger value="profile">Profile Information</TabsTrigger>
+        <TabsTrigger value="preferences">Preferences</TabsTrigger>
         <TabsTrigger value="security">Security Settings</TabsTrigger>
       </TabsList>
 
@@ -189,68 +216,77 @@ export function UserProfileForm() {
           </CardHeader>
           <CardContent>
             <form onSubmit={profileForm.handleSubmit((data) => updateProfileMutation.mutate(data))} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  {...profileForm.register("email")}
-                />
-                {profileForm.formState.errors.email && (
-                  <p className="text-sm text-destructive">{profileForm.formState.errors.email.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
-                <Input
-                  id="name"
-                  {...profileForm.register("name")}
-                />
-                {profileForm.formState.errors.name && (
-                  <p className="text-sm text-destructive">{profileForm.formState.errors.name.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="bio">Bio</Label>
-                <Textarea
-                  id="bio"
-                  {...profileForm.register("bio")}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+              {/* Basic Information */}
+              <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="company">Company</Label>
+                  <Label htmlFor="email">Email</Label>
                   <Input
-                    id="company"
-                    {...profileForm.register("company")}
+                    id="email"
+                    type="email"
+                    {...profileForm.register("email")}
                   />
+                  {profileForm.formState.errors.email?.message && (
+                    <p className="text-sm text-destructive">{profileForm.formState.errors.email.message}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="jobTitle">Job Title</Label>
+                  <Label htmlFor="name">Full Name</Label>
                   <Input
-                    id="jobTitle"
-                    {...profileForm.register("jobTitle")}
+                    id="name"
+                    {...profileForm.register("name")}
+                  />
+                  {profileForm.formState.errors.name?.message && (
+                    <p className="text-sm text-destructive">{profileForm.formState.errors.name.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="bio">Bio</Label>
+                  <Textarea
+                    id="bio"
+                    {...profileForm.register("bio")}
+                    placeholder="Tell us about yourself"
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="website">Website</Label>
-                <Input
-                  id="website"
-                  type="url"
-                  {...profileForm.register("website")}
-                  placeholder="https://"
-                />
-                {profileForm.formState.errors.website && (
-                  <p className="text-sm text-destructive">{profileForm.formState.errors.website.message}</p>
-                )}
+              {/* Professional Information */}
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="professionalTitle">Professional Title</Label>
+                    <Input
+                      id="professionalTitle"
+                      {...profileForm.register("professionalTitle")}
+                      placeholder="e.g. Senior Developer"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="company">Company</Label>
+                    <Input
+                      id="company"
+                      {...profileForm.register("company")}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="website">Website</Label>
+                  <Input
+                    id="website"
+                    type="url"
+                    {...profileForm.register("website")}
+                    placeholder="https://"
+                  />
+                  {profileForm.formState.errors.website?.message && (
+                    <p className="text-sm text-destructive">{profileForm.formState.errors.website.message}</p>
+                  )}
+                </div>
               </div>
 
+              {/* Contact Information */}
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="country">Country</Label>
@@ -258,7 +294,7 @@ export function UserProfileForm() {
                     onValueChange={(value: "GB" | "US") => {
                       setSelectedCountry(value);
                       profileForm.setValue("country", value);
-                      profileForm.setValue("phoneNumber", ""); // Reset phone number when country changes
+                      profileForm.setValue("phoneNumber", "");
                     }}
                     defaultValue={profileForm.getValues("country")}
                   >
@@ -286,20 +322,54 @@ export function UserProfileForm() {
                       profileForm.setValue("phoneNumber", formatted);
                     }}
                   />
-                  {profileForm.formState.errors.phoneNumber && (
+                  {profileForm.formState.errors.phoneNumber?.message && (
                     <p className="text-sm text-destructive">
                       {profileForm.formState.errors.phoneNumber.message}
                     </p>
                   )}
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="address">Address</Label>
+                  <Textarea
+                    id="address"
+                    {...profileForm.register("address")}
+                  />
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="address">Address</Label>
-                <Textarea
-                  id="address"
-                  {...profileForm.register("address")}
-                />
+              {/* Social Links */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Social Links</h3>
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="linkedin">LinkedIn</Label>
+                    <Input
+                      id="linkedin"
+                      type="url"
+                      {...profileForm.register("socialLinks.linkedin")}
+                      placeholder="https://linkedin.com/in/username"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="twitter">Twitter</Label>
+                    <Input
+                      id="twitter"
+                      type="url"
+                      {...profileForm.register("socialLinks.twitter")}
+                      placeholder="https://twitter.com/username"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="facebook">Facebook</Label>
+                    <Input
+                      id="facebook"
+                      type="url"
+                      {...profileForm.register("socialLinks.facebook")}
+                      placeholder="https://facebook.com/username"
+                    />
+                  </div>
+                </div>
               </div>
 
               <Button
@@ -314,6 +384,66 @@ export function UserProfileForm() {
                   </>
                 ) : (
                   'Save Profile'
+                )}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      {/* Preferences Tab */}
+      <TabsContent value="preferences">
+        <Card>
+          <CardHeader>
+            <CardTitle>Notification Preferences</CardTitle>
+            <CardDescription>
+              Manage your notification settings
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={profileForm.handleSubmit((data) => updateProfileMutation.mutate(data))} className="space-y-4">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="emailNotifications">Email Notifications</Label>
+                  <Input
+                    id="emailNotifications"
+                    type="checkbox"
+                    className="h-4 w-4"
+                    {...profileForm.register("notifications.email")}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="smsNotifications">SMS Notifications</Label>
+                  <Input
+                    id="smsNotifications"
+                    type="checkbox"
+                    className="h-4 w-4"
+                    {...profileForm.register("notifications.sms")}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="marketingNotifications">Marketing Updates</Label>
+                  <Input
+                    id="marketingNotifications"
+                    type="checkbox"
+                    className="h-4 w-4"
+                    {...profileForm.register("notifications.marketing")}
+                  />
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={updateProfileMutation.isPending}
+              >
+                {updateProfileMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  'Save Preferences'
                 )}
               </Button>
             </form>
