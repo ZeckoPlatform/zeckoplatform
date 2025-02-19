@@ -15,16 +15,17 @@ export const PHONE_COUNTRY_CODES = {
   GB: {
     code: "44",
     format: "+44 XXXX XXXXXX",
-    pattern: /^(?:\+44|0)?[1-9]\d{9}$/
+    example: "+44 7911 123456",
+    pattern: /^\+44\s\d{4}\s\d{6}$/
   },
   US: {
     code: "1",
     format: "+1 (XXX) XXX-XXXX",
-    pattern: /^(?:\+1|1)?[2-9]\d{9}$/
+    example: "+1 (555) 123-4567",
+    pattern: /^\+1\s\(\d{3}\)\s\d{3}-\d{4}$/
   }
 } as const;
 
-// Types
 type CountryCode = keyof typeof PHONE_COUNTRY_CODES;
 
 export const createLeadSchema = z.object({
@@ -39,16 +40,19 @@ export const createLeadSchema = z.object({
     .nullable()
     .transform(val => {
       if (!val) return null;
-      const cleaned = val.replace(/[^\d]/g, '');
-      if (cleaned.length === 0) return null;
-      return cleaned;
+      // Remove validation temporarily while typing
+      if (val.length < 10) return val;
+      return val;
     })
     .refine((val) => {
       if (!val) return true; // Optional field
-      const country = window.localStorage.getItem('userCountry') as CountryCode || 'GB';
-      return val.length >= 10 && val.length <= 11;
+      const countryCode = val.startsWith('+1') ? 'US' : 'GB';
+      return PHONE_COUNTRY_CODES[countryCode].pattern.test(val);
     }, {
-      message: "Please enter a valid phone number"
+      message: (val) => {
+        const country = window.localStorage.getItem('userCountry') as CountryCode || 'GB';
+        return `Please enter a valid phone number (e.g., ${PHONE_COUNTRY_CODES[country].example})`;
+      }
     })
 });
 
@@ -64,27 +68,31 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
   const { user } = useAuth();
   const countryCode = (user?.countryCode || "GB") as CountryCode;
 
-  const formatPhoneNumber = (value: string, country: CountryCode): string => {
-    const cleaned = value.replace(/\D/g, '');
+  const formatPhoneNumber = (value: string, country: CountryCode) => {
+    let cleaned = value.replace(/\D/g, '');
 
-    if (cleaned === '') return '';
+    // If empty or just has plus, return as is
+    if (cleaned.length === 0) return '';
 
-    if (country === 'US') {
+    // US Phone number formatting
+    if (country === "US") {
+      // Format complete number
       if (cleaned.length <= 3) {
-        return cleaned;
+        return `+1 (${cleaned}`;
       } else if (cleaned.length <= 6) {
-        return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
-      } else {
-        return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+        return `+1 (${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
       }
-    } else { // GB
+      return `+1 (${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+    }
+
+    // UK Phone number formatting
+    else {
       if (cleaned.length <= 4) {
-        return cleaned;
+        return `+44 ${cleaned}`;
       } else if (cleaned.length <= 7) {
-        return `${cleaned.slice(0, 4)} ${cleaned.slice(4)}`;
-      } else {
-        return `${cleaned.slice(0, 4)} ${cleaned.slice(4, 7)} ${cleaned.slice(7, 11)}`;
+        return `+44 ${cleaned.slice(0, 4)} ${cleaned.slice(4)}`;
       }
+      return `+44 ${cleaned.slice(0, 4)} ${cleaned.slice(4, 10)}`;
     }
   };
 
@@ -102,14 +110,7 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
   });
 
   const handleSubmit = form.handleSubmit((data) => {
-    const formattedData = {
-      ...data,
-      budget: Number(data.budget),
-      phoneNumber: data.phoneNumber ? 
-        `+${PHONE_COUNTRY_CODES[countryCode].code}${data.phoneNumber.replace(/\D/g, '')}` : 
-        null
-    };
-    onSubmit(formattedData);
+    onSubmit(data);
   });
 
   return (
@@ -218,7 +219,7 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
           <Input
             id="phoneNumber"
             {...form.register("phoneNumber")}
-            placeholder={PHONE_COUNTRY_CODES[countryCode].format}
+            placeholder={PHONE_COUNTRY_CODES[countryCode].example}
             onChange={(e) => {
               const formatted = formatPhoneNumber(e.target.value, countryCode);
               form.setValue("phoneNumber", formatted, { shouldValidate: true });
