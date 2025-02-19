@@ -39,32 +39,14 @@ export const createLeadSchema = z.object({
     .nullable()
     .transform(val => {
       if (!val) return null;
-      // Remove all non-digit characters
       const cleaned = val.replace(/[^\d]/g, '');
       if (cleaned.length === 0) return null;
-
-      const country = window.localStorage.getItem('userCountry') as CountryCode || 'GB';
-
-      // Handle UK numbers
-      if (country === 'GB') {
-        if (cleaned.startsWith('44')) return `+${cleaned}`;
-        if (cleaned.startsWith('0')) return `+44${cleaned.slice(1)}`;
-        return `+44${cleaned}`;
-      }
-
-      // Handle US numbers
-      if (country === 'US') {
-        if (cleaned.startsWith('1')) return `+${cleaned}`;
-        return `+1${cleaned}`;
-      }
-
-      return `+${cleaned}`;
+      return cleaned;
     })
     .refine((val) => {
       if (!val) return true; // Optional field
       const country = window.localStorage.getItem('userCountry') as CountryCode || 'GB';
-      const cleaned = val.replace(/[^\d]/g, '');
-      return PHONE_COUNTRY_CODES[country].pattern.test(cleaned);
+      return val.length >= 10 && val.length <= 11;
     }, {
       message: "Please enter a valid phone number"
     })
@@ -83,19 +65,27 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
   const countryCode = (user?.countryCode || "GB") as CountryCode;
 
   const formatPhoneNumber = (value: string, country: CountryCode): string => {
-    const cleaned = value.replace(/[^\d]/g, '');
+    const cleaned = value.replace(/\D/g, '');
+
+    if (cleaned === '') return '';
 
     if (country === 'US') {
-      if (cleaned.length === 0) return '';
-      if (cleaned.length <= 3) return `+1 (${cleaned}`;
-      if (cleaned.length <= 6) return `+1 (${cleaned.slice(0,3)}) ${cleaned.slice(3)}`;
-      return `+1 (${cleaned.slice(0,3)}) ${cleaned.slice(3,6)}-${cleaned.slice(6,10)}`;
+      if (cleaned.length <= 3) {
+        return cleaned;
+      } else if (cleaned.length <= 6) {
+        return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
+      } else {
+        return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+      }
+    } else { // GB
+      if (cleaned.length <= 4) {
+        return cleaned;
+      } else if (cleaned.length <= 7) {
+        return `${cleaned.slice(0, 4)} ${cleaned.slice(4)}`;
+      } else {
+        return `${cleaned.slice(0, 4)} ${cleaned.slice(4, 7)} ${cleaned.slice(7, 11)}`;
+      }
     }
-
-    // GB format
-    if (cleaned.length === 0) return '';
-    if (cleaned.length <= 4) return `+44 ${cleaned}`;
-    return `+44 ${cleaned.slice(0,4)} ${cleaned.slice(4,10)}`;
   };
 
   const form = useForm<LeadFormData>({
@@ -112,11 +102,14 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
   });
 
   const handleSubmit = form.handleSubmit((data) => {
-    onSubmit({
+    const formattedData = {
       ...data,
       budget: Number(data.budget),
-      phoneNumber: data.phoneNumber || null
-    });
+      phoneNumber: data.phoneNumber ? 
+        `+${PHONE_COUNTRY_CODES[countryCode].code}${data.phoneNumber.replace(/\D/g, '')}` : 
+        null
+    };
+    onSubmit(formattedData);
   });
 
   return (
