@@ -50,7 +50,7 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
   };
 
   return (
-    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 pb-6">
       <div className="space-y-2">
         <Label htmlFor="title">Title</Label>
         <Input id="title" {...form.register("title")} />

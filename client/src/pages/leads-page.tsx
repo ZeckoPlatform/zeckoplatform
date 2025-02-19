@@ -97,14 +97,14 @@ const LeadsPage = () => {
           <DialogTrigger asChild>
             <Button>Create New Lead</Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0">
             <DialogHeader className="px-6 py-4 border-b">
               <DialogTitle>Create New Lead</DialogTitle>
               <DialogDescription>
                 Fill out the form below to create a new business lead
               </DialogDescription>
             </DialogHeader>
-            <div className="px-6 py-4 overflow-y-auto">
+            <div className="px-6 py-4 flex-1 overflow-y-auto">
               <ErrorBoundary>
                 <CreateLeadForm
                   onSubmit={(data) => {
