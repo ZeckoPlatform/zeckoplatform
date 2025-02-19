@@ -43,7 +43,16 @@ export interface SelectLead {
 export interface SelectUser {
   id: number;
   email: string;
-  profile?: any;
+  countryCode?: 'GB' | 'US';
+  profile: {
+    name?: string;
+    bio?: string;
+    phoneNumber?: string;
+    company?: string;
+    jobTitle?: string;
+    website?: string;
+    address?: string;
+  };
 }
 
 type BusinessCategories = {

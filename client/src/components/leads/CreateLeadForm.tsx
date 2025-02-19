@@ -11,7 +11,7 @@ import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { BUSINESS_CATEGORIES } from "@/types/leads";
 
-export const PHONE_COUNTRY_CODES = {
+const PHONE_COUNTRY_CODES = {
   GB: {
     code: "44",
     format: "+44 XXXX XXXXXX",
@@ -38,22 +38,12 @@ export const createLeadSchema = z.object({
   phoneNumber: z.string()
     .optional()
     .nullable()
-    .transform(val => {
-      if (!val) return null;
-      // Remove validation temporarily while typing
-      if (val.length < 10) return val;
-      return val;
-    })
+    .transform(val => val || null)
     .refine((val) => {
-      if (!val) return true; // Optional field
+      if (!val) return true;
       const countryCode = val.startsWith('+1') ? 'US' : 'GB';
       return PHONE_COUNTRY_CODES[countryCode].pattern.test(val);
-    }, {
-      message: (val) => {
-        const country = window.localStorage.getItem('userCountry') as CountryCode || 'GB';
-        return `Please enter a valid phone number (e.g., ${PHONE_COUNTRY_CODES[country].example})`;
-      }
-    })
+    }, "Please enter a valid phone number")
 });
 
 export type LeadFormData = z.infer<typeof createLeadSchema>;
@@ -69,14 +59,12 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
   const countryCode = (user?.countryCode || "GB") as CountryCode;
 
   const formatPhoneNumber = (value: string, country: CountryCode) => {
-    let cleaned = value.replace(/\D/g, '');
+    const cleaned = value.replace(/\D/g, '');
 
-    // If empty or just has plus, return as is
-    if (cleaned.length === 0) return '';
+    if (cleaned === '') return '';
 
     // US Phone number formatting
     if (country === "US") {
-      // Format complete number
       if (cleaned.length <= 3) {
         return `+1 (${cleaned}`;
       } else if (cleaned.length <= 6) {
@@ -86,14 +74,12 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
     }
 
     // UK Phone number formatting
-    else {
-      if (cleaned.length <= 4) {
-        return `+44 ${cleaned}`;
-      } else if (cleaned.length <= 7) {
-        return `+44 ${cleaned.slice(0, 4)} ${cleaned.slice(4)}`;
-      }
-      return `+44 ${cleaned.slice(0, 4)} ${cleaned.slice(4, 10)}`;
+    if (cleaned.length <= 4) {
+      return `+44 ${cleaned}`;
+    } else if (cleaned.length <= 10) {
+      return `+44 ${cleaned.slice(0, 4)} ${cleaned.slice(4)}`;
     }
+    return `+44 ${cleaned.slice(0, 4)} ${cleaned.slice(4, 10)}`;
   };
 
   const form = useForm<LeadFormData>({
@@ -110,7 +96,11 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
   });
 
   const handleSubmit = form.handleSubmit((data) => {
-    onSubmit(data);
+    onSubmit({
+      ...data,
+      budget: Number(data.budget),
+      phoneNumber: data.phoneNumber || null
+    });
   });
 
   return (
@@ -120,7 +110,7 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
         <div className="space-y-2">
           <Label htmlFor="title">Title</Label>
           <Input id="title" {...form.register("title")} />
-          {form.formState.errors.title && (
+          {form.formState.errors.title?.message && (
             <p className="text-sm text-destructive">{form.formState.errors.title.message}</p>
           )}
         </div>
@@ -133,7 +123,7 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
             {...form.register("description")}
             className="min-h-[100px]"
           />
-          {form.formState.errors.description && (
+          {form.formState.errors.description?.message && (
             <p className="text-sm text-destructive">{form.formState.errors.description.message}</p>
           )}
         </div>
@@ -160,7 +150,7 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
                 ))}
               </SelectContent>
             </Select>
-            {form.formState.errors.category && (
+            {form.formState.errors.category?.message && (
               <p className="text-sm text-destructive">{form.formState.errors.category.message}</p>
             )}
           </div>
@@ -182,7 +172,7 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
                   ))}
                 </SelectContent>
               </Select>
-              {form.formState.errors.subcategory && (
+              {form.formState.errors.subcategory?.message && (
                 <p className="text-sm text-destructive">{form.formState.errors.subcategory.message}</p>
               )}
             </div>
@@ -199,7 +189,7 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
             step="1"
             {...form.register("budget", { valueAsNumber: true })}
           />
-          {form.formState.errors.budget && (
+          {form.formState.errors.budget?.message && (
             <p className="text-sm text-destructive">{form.formState.errors.budget.message}</p>
           )}
         </div>
@@ -208,7 +198,7 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
         <div className="space-y-2">
           <Label htmlFor="location">Location</Label>
           <Input id="location" {...form.register("location")} />
-          {form.formState.errors.location && (
+          {form.formState.errors.location?.message && (
             <p className="text-sm text-destructive">{form.formState.errors.location.message}</p>
           )}
         </div>
@@ -222,10 +212,11 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
             placeholder={PHONE_COUNTRY_CODES[countryCode].example}
             onChange={(e) => {
               const formatted = formatPhoneNumber(e.target.value, countryCode);
-              form.setValue("phoneNumber", formatted, { shouldValidate: true });
+              e.target.value = formatted;
+              form.setValue("phoneNumber", formatted);
             }}
           />
-          {form.formState.errors.phoneNumber && (
+          {form.formState.errors.phoneNumber?.message && (
             <p className="text-sm text-destructive">{form.formState.errors.phoneNumber.message}</p>
           )}
         </div>
