@@ -29,10 +29,18 @@ const LeadsPage = () => {
   });
 
   const createLeadMutation = useMutation({
-    mutationFn: async (data: LeadFormData) => {
+    mutationFn: async (formData: LeadFormData) => {
+      // Ensure data is properly formatted
+      const data = {
+        ...formData,
+        budget: Number(formData.budget),
+        phoneNumber: formData.phoneNumber?.trim() || null
+      };
+
       const response = await apiRequest('POST', '/api/leads', data);
       if (!response.ok) {
-        throw new Error('Failed to create lead');
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to create lead');
       }
       return response.json();
     },
@@ -45,9 +53,10 @@ const LeadsPage = () => {
       });
     },
     onError: (error: Error) => {
+      console.error('Lead creation error:', error);
       toast({
         title: "Error",
-        description: "Failed to create lead",
+        description: error.message || "Failed to create lead",
         variant: "destructive",
       });
     }

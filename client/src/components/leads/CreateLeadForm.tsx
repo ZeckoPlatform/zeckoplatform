@@ -8,7 +8,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
-import { useAuth } from "@/hooks/use-auth";
 import { BUSINESS_CATEGORIES } from "@/types/leads";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -31,7 +30,6 @@ interface CreateLeadFormProps {
 
 function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const { user } = useAuth();
 
   const form = useForm<LeadFormData>({
     resolver: zodResolver(createLeadSchema),
@@ -145,6 +143,7 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
         <Input
           id="phoneNumber"
           {...form.register("phoneNumber")}
+          placeholder="Enter phone number (optional)"
         />
         {form.formState.errors.phoneNumber?.message && (
           <p className="text-sm text-destructive">{form.formState.errors.phoneNumber.message}</p>
