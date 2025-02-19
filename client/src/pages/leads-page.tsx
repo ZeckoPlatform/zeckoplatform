@@ -31,18 +31,20 @@ const LeadsPage = () => {
 
   const createLeadMutation = useMutation({
     mutationFn: async (data: LeadFormData) => {
-      console.log('Creating lead with data:', data);
       try {
         const response = await apiRequest('POST', '/api/leads', {
           ...data,
           budget: Number(data.budget),
           phoneNumber: data.phoneNumber || null
         });
+
         if (!response.ok) {
           const errorText = await response.text();
           throw new Error(errorText || 'Failed to create lead');
         }
-        return response.json();
+
+        const result = await response.json();
+        return result;
       } catch (error) {
         console.error('Lead creation error:', error);
         throw error;
@@ -57,7 +59,6 @@ const LeadsPage = () => {
       setCreateDialogOpen(false);
     },
     onError: (error: Error) => {
-      console.error('Mutation error:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to create lead",
@@ -67,20 +68,10 @@ const LeadsPage = () => {
   });
 
   const handleCreateSubmit = async (data: LeadFormData) => {
-    console.log('Form submission data:', data);
     try {
-      await createLeadMutation.mutateAsync({
-        ...data,
-        budget: Number(data.budget),
-        phoneNumber: data.phoneNumber || null
-      });
+      await createLeadMutation.mutateAsync(data);
     } catch (error) {
       console.error('Submit error:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create lead",
-        variant: "destructive",
-      });
     }
   };
 
@@ -92,19 +83,17 @@ const LeadsPage = () => {
           <DialogTrigger asChild>
             <Button>Create New Lead</Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader className="px-6 py-4 border-b">
+          <DialogContent>
+            <DialogHeader>
               <DialogTitle>Create New Lead</DialogTitle>
               <DialogDescription>
                 Fill out the form below to create a new business lead
               </DialogDescription>
             </DialogHeader>
-            <div className="max-h-[calc(80vh-120px)] overflow-y-auto px-6 py-4">
-              <CreateLeadForm
-                onSubmit={handleCreateSubmit}
-                isSubmitting={createLeadMutation.isPending}
-              />
-            </div>
+            <CreateLeadForm
+              onSubmit={handleCreateSubmit}
+              isSubmitting={createLeadMutation.isPending}
+            />
           </DialogContent>
         </Dialog>
       </div>

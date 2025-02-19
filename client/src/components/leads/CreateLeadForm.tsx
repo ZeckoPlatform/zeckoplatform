@@ -72,39 +72,6 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
   const { user } = useAuth();
   const countryCode = (user?.countryCode || "GB") as CountryCode;
 
-  const formatPhoneNumber = (value: string, country: CountryCode) => {
-    // Remove all non-digit characters except +
-    const cleaned = value.replace(/[^\d+]/g, '');
-
-    // For UK numbers
-    if (country === 'GB') {
-      if (!cleaned.startsWith('+44')) {
-        const digits = cleaned.replace(/\D/g, '');
-        if (digits.length === 0) return '';
-        if (digits.length <= 4) return `+44 ${digits}`;
-        return `+44 ${digits.slice(0,4)} ${digits.slice(4,10)}`;
-      }
-      const digits = cleaned.slice(3);
-      if (digits.length === 0) return '+44 ';
-      if (digits.length <= 4) return `+44 ${digits}`;
-      return `+44 ${digits.slice(0,4)} ${digits.slice(4,10)}`;
-    }
-
-    // For US numbers
-    if (!cleaned.startsWith('+1')) {
-      const digits = cleaned.replace(/\D/g, '');
-      if (digits.length === 0) return '';
-      if (digits.length <= 3) return `+1 (${digits}`;
-      if (digits.length <= 6) return `+1 (${digits.slice(0,3)}) ${digits.slice(3)}`;
-      return `+1 (${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6,10)}`;
-    }
-    const digits = cleaned.slice(2);
-    if (digits.length === 0) return '+1 ';
-    if (digits.length <= 3) return `+1 (${digits}`;
-    if (digits.length <= 6) return `+1 (${digits.slice(0,3)}) ${digits.slice(3)}`;
-    return `+1 (${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6,10)}`;
-  };
-
   const form = useForm<LeadFormData>({
     resolver: zodResolver(createLeadSchema),
     defaultValues: {
@@ -120,19 +87,6 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
 
   const handleSubmit = form.handleSubmit((data) => {
     console.log('Form data before submission:', data);
-    // Only proceed if the phone number is either empty or matches the exact pattern
-    if (data.phoneNumber) {
-      const isValidGB = PHONE_COUNTRY_CODES.GB.pattern.test(data.phoneNumber);
-      const isValidUS = PHONE_COUNTRY_CODES.US.pattern.test(data.phoneNumber);
-      if (!isValidGB && !isValidUS) {
-        form.setError("phoneNumber", {
-          type: "manual",
-          message: "Please enter a complete valid phone number"
-        });
-        return;
-      }
-    }
-
     // Transform the data before submission
     const submissionData = {
       ...data,
@@ -144,144 +98,173 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
     onSubmit(submissionData);
   });
 
+  const formatPhoneNumber = (value: string, country: CountryCode) => {
+    const cleaned = value.replace(/[^\d+]/g, '');
+
+    if (country === 'GB') {
+      if (!cleaned.startsWith('+44')) {
+        const digits = cleaned.replace(/\D/g, '');
+        if (digits.length === 0) return '';
+        if (digits.length <= 4) return `+44 ${digits}`;
+        return `+44 ${digits.slice(0,4)} ${digits.slice(4,10)}`;
+      }
+      const digits = cleaned.slice(3);
+      if (digits.length === 0) return '+44 ';
+      if (digits.length <= 4) return `+44 ${digits}`;
+      return `+44 ${digits.slice(0,4)} ${digits.slice(4,10)}`;
+    }
+
+    // US format
+    if (!cleaned.startsWith('+1')) {
+      const digits = cleaned.replace(/\D/g, '');
+      if (digits.length === 0) return '';
+      if (digits.length <= 3) return `+1 (${digits}`;
+      if (digits.length <= 6) return `+1 (${digits.slice(0,3)}) ${digits.slice(3)}`;
+      return `+1 (${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6,10)}`;
+    }
+    const digits = cleaned.slice(2);
+    if (digits.length === 0) return '+1 ';
+    if (digits.length <= 3) return `+1 (${digits}`;
+    if (digits.length <= 6) return `+1 (${digits.slice(0,3)}) ${digits.slice(3)}`;
+    return `+1 (${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6,10)}`;
+  };
+
   return (
-    <div className="max-h-[60vh] overflow-y-auto px-4">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Title field */}
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Title field */}
+      <div className="space-y-2">
+        <Label htmlFor="title">Title</Label>
+        <Input id="title" {...form.register("title")} />
+        {form.formState.errors.title?.message && (
+          <p className="text-sm text-destructive">{form.formState.errors.title.message}</p>
+        )}
+      </div>
+
+      {/* Description field */}
+      <div className="space-y-2">
+        <Label htmlFor="description">Description</Label>
+        <Textarea
+          id="description"
+          {...form.register("description")}
+          className="min-h-[100px]"
+        />
+        {form.formState.errors.description?.message && (
+          <p className="text-sm text-destructive">{form.formState.errors.description.message}</p>
+        )}
+      </div>
+
+      {/* Category fields */}
+      <div className="grid gap-6">
         <div className="space-y-2">
-          <Label htmlFor="title">Title</Label>
-          <Input id="title" {...form.register("title")} />
-          {form.formState.errors.title?.message && (
-            <p className="text-sm text-destructive">{form.formState.errors.title.message}</p>
+          <Label htmlFor="category">Main Category</Label>
+          <Select
+            onValueChange={(value) => {
+              setSelectedCategory(value);
+              form.setValue("category", value);
+              form.setValue("subcategory", "");
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select a main category" />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.keys(BUSINESS_CATEGORIES).map((category) => (
+                <SelectItem key={category} value={category}>
+                  {category}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {form.formState.errors.category?.message && (
+            <p className="text-sm text-destructive">{form.formState.errors.category.message}</p>
           )}
         </div>
 
-        {/* Description field */}
-        <div className="space-y-2">
-          <Label htmlFor="description">Description</Label>
-          <Textarea
-            id="description"
-            {...form.register("description")}
-            className="min-h-[100px]"
-          />
-          {form.formState.errors.description?.message && (
-            <p className="text-sm text-destructive">{form.formState.errors.description.message}</p>
-          )}
-        </div>
-
-        {/* Category fields */}
-        <div className="grid gap-6">
+        {selectedCategory && (
           <div className="space-y-2">
-            <Label htmlFor="category">Main Category</Label>
+            <Label htmlFor="subcategory">Subcategory</Label>
             <Select
-              onValueChange={(value) => {
-                setSelectedCategory(value);
-                form.setValue("category", value);
-                form.setValue("subcategory", "");
-              }}
+              onValueChange={(value) => form.setValue("subcategory", value)}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select a main category" />
+                <SelectValue placeholder="Select a subcategory" />
               </SelectTrigger>
-              <SelectContent className="max-h-[300px] overflow-y-auto">
-                {Object.keys(BUSINESS_CATEGORIES).map((category) => (
-                  <SelectItem key={category} value={category}>
-                    {category}
+              <SelectContent>
+                {BUSINESS_CATEGORIES[selectedCategory]?.map((subcategory) => (
+                  <SelectItem key={subcategory} value={subcategory}>
+                    {subcategory}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {form.formState.errors.category?.message && (
-              <p className="text-sm text-destructive">{form.formState.errors.category.message}</p>
+            {form.formState.errors.subcategory?.message && (
+              <p className="text-sm text-destructive">{form.formState.errors.subcategory.message}</p>
             )}
           </div>
+        )}
+      </div>
 
-          {selectedCategory && (
-            <div className="space-y-2">
-              <Label htmlFor="subcategory">Subcategory</Label>
-              <Select
-                onValueChange={(value) => form.setValue("subcategory", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a subcategory" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[300px] overflow-y-auto">
-                  {BUSINESS_CATEGORIES[selectedCategory]?.map((subcategory) => (
-                    <SelectItem key={subcategory} value={subcategory}>
-                      {subcategory}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {form.formState.errors.subcategory?.message && (
-                <p className="text-sm text-destructive">{form.formState.errors.subcategory.message}</p>
-              )}
-            </div>
-          )}
-        </div>
+      {/* Budget field */}
+      <div className="space-y-2">
+        <Label htmlFor="budget">Budget (£)</Label>
+        <Input
+          id="budget"
+          type="number"
+          min="0"
+          step="1"
+          {...form.register("budget", { valueAsNumber: true })}
+        />
+        {form.formState.errors.budget?.message && (
+          <p className="text-sm text-destructive">{form.formState.errors.budget.message}</p>
+        )}
+      </div>
 
-        {/* Budget field */}
-        <div className="space-y-2">
-          <Label htmlFor="budget">Budget (£)</Label>
-          <Input
-            id="budget"
-            type="number"
-            min="0"
-            step="1"
-            {...form.register("budget", { valueAsNumber: true })}
-          />
-          {form.formState.errors.budget?.message && (
-            <p className="text-sm text-destructive">{form.formState.errors.budget.message}</p>
-          )}
-        </div>
+      {/* Location field */}
+      <div className="space-y-2">
+        <Label htmlFor="location">Location</Label>
+        <Input id="location" {...form.register("location")} />
+        {form.formState.errors.location?.message && (
+          <p className="text-sm text-destructive">{form.formState.errors.location.message}</p>
+        )}
+      </div>
 
-        {/* Location field */}
-        <div className="space-y-2">
-          <Label htmlFor="location">Location</Label>
-          <Input id="location" {...form.register("location")} />
-          {form.formState.errors.location?.message && (
-            <p className="text-sm text-destructive">{form.formState.errors.location.message}</p>
-          )}
-        </div>
+      {/* Phone Number field */}
+      <div className="space-y-2">
+        <Label htmlFor="phoneNumber">Phone Number (Optional)</Label>
+        <Input
+          id="phoneNumber"
+          {...form.register("phoneNumber")}
+          placeholder={PHONE_COUNTRY_CODES[countryCode].example}
+          onChange={(e) => {
+            const formatted = formatPhoneNumber(e.target.value, countryCode);
+            e.target.value = formatted;
+            form.setValue("phoneNumber", formatted, { shouldValidate: true });
+          }}
+        />
+        {form.formState.errors.phoneNumber?.message && (
+          <p className="text-sm text-destructive">{form.formState.errors.phoneNumber.message}</p>
+        )}
+        <p className="text-sm text-muted-foreground">
+          Format: {PHONE_COUNTRY_CODES[countryCode].format}
+        </p>
+      </div>
 
-        {/* Phone Number field */}
-        <div className="space-y-2">
-          <Label htmlFor="phoneNumber">Phone Number (Optional)</Label>
-          <Input
-            id="phoneNumber"
-            {...form.register("phoneNumber")}
-            placeholder={PHONE_COUNTRY_CODES[countryCode].example}
-            onChange={(e) => {
-              const formatted = formatPhoneNumber(e.target.value, countryCode);
-              e.target.value = formatted;
-              form.setValue("phoneNumber", formatted, { shouldValidate: true });
-            }}
-          />
-          {form.formState.errors.phoneNumber?.message && (
-            <p className="text-sm text-destructive">{form.formState.errors.phoneNumber.message}</p>
-          )}
-          <p className="text-sm text-muted-foreground">
-            Format: {PHONE_COUNTRY_CODES[countryCode].format}
-          </p>
-        </div>
-
-        {/* Submit button */}
-        <Button
-          type="submit"
-          className="w-full"
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Posting...
-            </>
-          ) : (
-            'Post Lead'
-          )}
-        </Button>
-      </form>
-    </div>
+      {/* Submit button */}
+      <Button
+        type="submit"
+        className="w-full"
+        disabled={isSubmitting}
+      >
+        {isSubmitting ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Posting...
+          </>
+        ) : (
+          'Post Lead'
+        )}
+      </Button>
+    </form>
   );
 }
 
