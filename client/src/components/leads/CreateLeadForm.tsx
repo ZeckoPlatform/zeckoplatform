@@ -15,12 +15,12 @@ export const PHONE_COUNTRY_CODES = {
   GB: {
     code: "44",
     format: "+44 XXXX XXXXXX",
-    pattern: /^\+?44\s*\d{4}\s*\d{6}$/
+    pattern: /^(\+?44|0)[-\s]?(\d[-\s]?){9,10}$/
   },
   US: {
     code: "1",
     format: "+1 (XXX) XXX-XXXX",
-    pattern: /^\+?1\s*\(?\d{3}\)?\s*\d{3}[-\s]?\d{4}$/
+    pattern: /^(\+?1|0)[-\s]?(\d[-\s]?){10}$/
   }
 } as const;
 
@@ -37,9 +37,9 @@ export const createLeadSchema = z.object({
   phoneNumber: z.string()
     .optional()
     .nullable()
-    .transform(val => val ? val.replace(/[\s()-]/g, '') : null)
+    .transform(val => val ? val.replace(/[^\d+]/g, '') : null)
     .refine((val) => {
-      if (!val) return true;
+      if (!val) return true; // Optional field
       const country = window.localStorage.getItem('userCountry') as CountryCode || 'GB';
       return PHONE_COUNTRY_CODES[country].pattern.test(val);
     }, {
