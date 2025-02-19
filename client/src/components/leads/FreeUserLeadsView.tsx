@@ -11,7 +11,7 @@ import { Edit, Trash2, Send } from "lucide-react";
 import { MessageDialog } from "@/components/MessageDialog";
 import { useToast } from "@/hooks/use-toast";
 import { SelectLead, SelectUser, getUnreadCount } from '@/pages/leads-page';
-import { CreateLeadForm } from './CreateLeadForm';
+import { CreateLeadForm, LeadFormData } from './CreateLeadForm';
 
 interface FreeUserLeadsViewProps {
   leads: SelectLead[];
@@ -40,11 +40,12 @@ export function FreeUserLeadsView({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const handleCreateSubmit = async (data: any) => {
+  const handleCreateSubmit = async (data: LeadFormData) => {
     try {
       await createLeadMutation.mutateAsync({
         ...data,
-        budget: parseInt(data.budget),
+        budget: Number(data.budget), // Ensure budget is converted to number
+        phoneNumber: data.phoneNumber || null
       });
       setCreateDialogOpen(false);
       toast({
@@ -140,11 +141,11 @@ export function FreeUserLeadsView({
                           <p className="font-medium">
                             {response.business?.profile?.name || "Business"}
                           </p>
-                          <Badge 
+                          <Badge
                             variant={
                               response.status === "accepted" ? "success" :
-                              response.status === "rejected" ? "destructive" :
-                              "secondary"
+                                response.status === "rejected" ? "destructive" :
+                                  "secondary"
                             }
                           >
                             {response.status.charAt(0).toUpperCase() + response.status.slice(1)}

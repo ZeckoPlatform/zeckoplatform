@@ -54,10 +54,16 @@ export const createLeadSchema = z.object({
   description: z.string().min(1, "Description is required"),
   category: z.string().min(1, "Category is required"),
   subcategory: z.string().min(1, "Subcategory is required"),
-  budget: z.string().min(1, "Budget is required"),
+  budget: z.string()
+    .min(1, "Budget is required")
+    .refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
+      message: "Budget must be a positive number"
+    }),
   location: z.string().min(1, "Location is required"),
   phoneNumber: z.string()
     .optional()
+    .nullable()
+    .transform(val => val || null)
     .refine((val) => {
       if (!val) return true; // Optional field
       const country = window.localStorage.getItem('userCountry') as CountryCode || 'GB';
@@ -125,7 +131,11 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
   });
 
   const handleSubmit = form.handleSubmit((data) => {
-    onSubmit(data);
+    onSubmit({
+      ...data,
+      budget: Number(data.budget), //Explicitly convert budget to number here.
+      phoneNumber: data.phoneNumber || null
+    });
   });
 
   return (
@@ -204,6 +214,8 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
         <Input
           id="budget"
           type="number"
+          min="0"
+          step="1"
           {...form.register("budget")}
         />
         {form.formState.errors.budget && (
