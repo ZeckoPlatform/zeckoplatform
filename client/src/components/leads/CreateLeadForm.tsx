@@ -9,8 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { BUSINESS_CATEGORIES } from "@/pages/leads-page";
 
-// Constants remain unchanged
+// Phone country codes remain unchanged
 export const PHONE_COUNTRY_CODES = {
   GB: {
     code: "44",
@@ -22,27 +23,6 @@ export const PHONE_COUNTRY_CODES = {
     format: "+1 (XXX) XXX-XXXX",
     pattern: /^\+1\s*\(?\d{3}\)?\s*\d{3}[-\s]?\d{4}$/
   }
-} as const;
-
-export const BUSINESS_CATEGORIES = {
-  "IT & Software Development": [
-    "Web Development",
-    "Mobile App Development",
-    "Cloud Services",
-    "DevOps & Infrastructure",
-    "Software Architecture",
-    "Database Development",
-    "Cybersecurity",
-    "AI & Machine Learning"
-  ],
-  "Marketing & Advertising": [
-    "Digital Marketing",
-    "Content Marketing",
-    "Social Media Marketing",
-    "SEO & SEM",
-    "Email Marketing",
-    "Brand Strategy"
-  ]
 } as const;
 
 // Types
