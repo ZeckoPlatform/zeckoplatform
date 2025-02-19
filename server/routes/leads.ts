@@ -14,6 +14,8 @@ const createLeadSchema = z.object({
   budget: z.number().min(0, "Budget must be a positive number"),
   location: z.string().min(1, "Location is required"),
   phoneNumber: z.string().optional().nullable(),
+  status: z.enum(["open", "closed"]).optional(),
+  region: z.string().optional()
 });
 
 // Create a new lead
@@ -27,7 +29,7 @@ router.post("/api/leads", async (req, res) => {
 
     const validatedData = createLeadSchema.parse({
       ...req.body,
-      budget: req.body.budget ? Number(req.body.budget) : undefined
+      budget: Number(req.body.budget)
     });
 
     console.log("Validated lead data:", JSON.stringify(validatedData, null, 2));
@@ -42,7 +44,7 @@ router.post("/api/leads", async (req, res) => {
       phone_number: validatedData.phoneNumber,
       user_id: req.user.id,
       region: req.user.countryCode || "GB",
-      status: "open" as const,
+      status: validatedData.status || "open",
       expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
     }).returning();
 
