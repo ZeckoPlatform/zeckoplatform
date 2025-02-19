@@ -40,17 +40,21 @@ export const createLeadSchema = z.object({
     .optional()
     .nullable()
     .transform(val => {
-      console.log('Phone validation - input value:', val);
-      return val || null;
+      console.log('Phone transform - input value:', val);
+      if (!val || val.trim() === '') return null;
+      return val;
     })
     .refine((val) => {
       if (!val) return true; // Allow empty values
       console.log('Phone validation - testing pattern for:', val);
-      const isValidGB = PHONE_COUNTRY_CODES.GB.pattern.test(val);
-      const isValidUS = PHONE_COUNTRY_CODES.US.pattern.test(val);
-      console.log('Phone validation - GB valid:', isValidGB, 'US valid:', isValidUS);
-      return isValidGB || isValidUS;
-    }, "Please enter a valid phone number in the format shown")
+      // Test against exact patterns
+      const gbMatch = PHONE_COUNTRY_CODES.GB.pattern.test(val);
+      const usMatch = PHONE_COUNTRY_CODES.US.pattern.test(val);
+      console.log('Phone validation - GB match:', gbMatch, 'US match:', usMatch);
+      return gbMatch || usMatch;
+    }, {
+      message: "Please enter a valid phone number in the exact format shown (including spaces and symbols)"
+    })
 });
 
 export type LeadFormData = z.infer<typeof createLeadSchema>;
@@ -66,6 +70,7 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
   const countryCode = (user?.countryCode || "GB") as CountryCode;
 
   const formatPhoneNumber = (value: string, country: CountryCode) => {
+    // Remove all non-digit characters except +
     const cleaned = value.replace(/[^\d+]/g, '');
 
     if (cleaned === '') return '';
@@ -232,7 +237,7 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
               const formatted = formatPhoneNumber(e.target.value, countryCode);
               console.log('Phone formatting - input:', e.target.value, 'formatted:', formatted);
               e.target.value = formatted;
-              form.setValue("phoneNumber", formatted);
+              form.setValue("phoneNumber", formatted, { shouldValidate: true });
             }}
           />
           {form.formState.errors.phoneNumber?.message && (
