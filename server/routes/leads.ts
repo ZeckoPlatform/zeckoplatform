@@ -10,11 +10,11 @@ const createLeadSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().min(1, "Description is required"),
   category: z.string().min(1, "Category is required"),
-  subcategory: z.string().optional(),
-  budget: z.number().min(0, "Budget must be a positive number"),
+  subcategory: z.string().min(1, "Subcategory is required"),
+  budget: z.number().min(0, "Budget must be a positive number").or(z.string().transform(val => Number(val))),
   location: z.string().min(1, "Location is required"),
   phoneNumber: z.string().optional().nullable(),
-  status: z.enum(["open", "closed"]).optional(),
+  status: z.enum(["open", "closed", "in_progress"]).optional(),
   region: z.string().optional()
 });
 
@@ -29,22 +29,22 @@ router.post("/api/leads", async (req, res) => {
 
     const validatedData = createLeadSchema.parse({
       ...req.body,
-      budget: Number(req.body.budget)
+      budget: typeof req.body.budget === 'string' ? Number(req.body.budget) : req.body.budget
     });
 
     console.log("Validated lead data:", JSON.stringify(validatedData, null, 2));
 
     const newLead = await db.insert(leads).values({
+      user_id: req.user.id,
       title: validatedData.title,
       description: validatedData.description,
       category: validatedData.category,
-      subcategory: validatedData.subcategory || null,
+      subcategory: validatedData.subcategory,
       budget: validatedData.budget,
       location: validatedData.location,
       phone_number: validatedData.phoneNumber,
-      user_id: req.user.id,
       region: req.user.countryCode || "GB",
-      status: validatedData.status || "open",
+      status: "open",
       expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
     }).returning();
 
@@ -62,7 +62,7 @@ router.post("/api/leads", async (req, res) => {
         }))
       });
     }
-    res.status(500).json({ error: "Failed to create lead" });
+    res.status(500).json({ error: "Failed to create lead", details: error.message });
   }
 });
 
