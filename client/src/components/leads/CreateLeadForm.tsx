@@ -15,12 +15,12 @@ export const PHONE_COUNTRY_CODES = {
   GB: {
     code: "44",
     format: "+44 XXXX XXXXXX",
-    pattern: /^(\+?44|0)7\d{9}$/
+    pattern: /^(?:\+44|0)?[1-9]\d{9}$/
   },
   US: {
     code: "1",
     format: "+1 (XXX) XXX-XXXX",
-    pattern: /^(\+?1)?[2-9]\d{9}$/
+    pattern: /^(?:\+1|1)?[2-9]\d{9}$/
   }
 } as const;
 
@@ -39,26 +39,32 @@ export const createLeadSchema = z.object({
     .nullable()
     .transform(val => {
       if (!val) return null;
-      // Remove all non-digit characters except +
-      const cleaned = val.replace(/[^\d+]/g, '');
-      // If it starts with a 0, replace it with the country code
-      if (cleaned.startsWith('0')) {
-        const country = window.localStorage.getItem('userCountry') as CountryCode || 'GB';
-        return `+${PHONE_COUNTRY_CODES[country].code}${cleaned.slice(1)}`;
+      // Remove all non-digit characters
+      const cleaned = val.replace(/[^\d]/g, '');
+      if (cleaned.length === 0) return null;
+
+      const country = window.localStorage.getItem('userCountry') as CountryCode || 'GB';
+
+      // Handle UK numbers
+      if (country === 'GB') {
+        if (cleaned.startsWith('44')) return `+${cleaned}`;
+        if (cleaned.startsWith('0')) return `+44${cleaned.slice(1)}`;
+        return `+44${cleaned}`;
       }
-      // If it doesn't start with +, add it
-      if (!cleaned.startsWith('+')) {
-        const country = window.localStorage.getItem('userCountry') as CountryCode || 'GB';
-        return `+${PHONE_COUNTRY_CODES[country].code}${cleaned}`;
+
+      // Handle US numbers
+      if (country === 'US') {
+        if (cleaned.startsWith('1')) return `+${cleaned}`;
+        return `+1${cleaned}`;
       }
-      return cleaned;
+
+      return `+${cleaned}`;
     })
     .refine((val) => {
       if (!val) return true; // Optional field
       const country = window.localStorage.getItem('userCountry') as CountryCode || 'GB';
-      // Remove the + and country code for validation
-      const numberWithoutCode = val.replace(new RegExp(`^\\+${PHONE_COUNTRY_CODES[country].code}`), '');
-      return PHONE_COUNTRY_CODES[country].pattern.test(numberWithoutCode);
+      const cleaned = val.replace(/[^\d]/g, '');
+      return PHONE_COUNTRY_CODES[country].pattern.test(cleaned);
     }, {
       message: "Please enter a valid phone number"
     })
@@ -77,32 +83,19 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
   const countryCode = (user?.countryCode || "GB") as CountryCode;
 
   const formatPhoneNumber = (value: string, country: CountryCode): string => {
-    const digits = value.replace(/[^\d+]/g, "");
-    if (digits.length <= 1) return digits;
+    const cleaned = value.replace(/[^\d]/g, '');
 
-    if (country === "US") {
-      if (digits.startsWith('+1')) {
-        const digitsOnly = digits.slice(2);
-        if (digitsOnly.length <= 3) return `+1 (${digitsOnly}`;
-        if (digitsOnly.length <= 6) return `+1 (${digitsOnly.slice(0, 3)}) ${digitsOnly.slice(3)}`;
-        return `+1 (${digitsOnly.slice(0, 3)}) ${digitsOnly.slice(3, 6)}-${digitsOnly.slice(6, 10)}`;
-      } else {
-        const digitsOnly = digits;
-        if (digitsOnly.length <= 3) return `+1 (${digitsOnly}`;
-        if (digitsOnly.length <= 6) return `+1 (${digitsOnly.slice(0, 3)}) ${digitsOnly.slice(3)}`;
-        return `+1 (${digitsOnly.slice(0, 3)}) ${digitsOnly.slice(3, 6)}-${digitsOnly.slice(6, 10)}`;
-      }
-    } else {
-      if (digits.startsWith('+44')) {
-        const digitsOnly = digits.slice(3);
-        if (digitsOnly.length <= 4) return `+44 ${digitsOnly}`;
-        return `+44 ${digitsOnly.slice(0, 4)} ${digitsOnly.slice(4, 10)}`;
-      } else {
-        const digitsOnly = digits;
-        if (digitsOnly.length <= 4) return `+44 ${digitsOnly}`;
-        return `+44 ${digitsOnly.slice(0, 4)} ${digitsOnly.slice(4, 10)}`;
-      }
+    if (country === 'US') {
+      if (cleaned.length === 0) return '';
+      if (cleaned.length <= 3) return `+1 (${cleaned}`;
+      if (cleaned.length <= 6) return `+1 (${cleaned.slice(0,3)}) ${cleaned.slice(3)}`;
+      return `+1 (${cleaned.slice(0,3)}) ${cleaned.slice(3,6)}-${cleaned.slice(6,10)}`;
     }
+
+    // GB format
+    if (cleaned.length === 0) return '';
+    if (cleaned.length <= 4) return `+44 ${cleaned}`;
+    return `+44 ${cleaned.slice(0,4)} ${cleaned.slice(4,10)}`;
   };
 
   const form = useForm<LeadFormData>({
@@ -119,12 +112,11 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
   });
 
   const handleSubmit = form.handleSubmit((data) => {
-    const formattedData = {
+    onSubmit({
       ...data,
       budget: Number(data.budget),
       phoneNumber: data.phoneNumber || null
-    };
-    onSubmit(formattedData);
+    });
   });
 
   return (
