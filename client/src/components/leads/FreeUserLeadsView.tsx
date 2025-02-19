@@ -44,7 +44,7 @@ export function FreeUserLeadsView({
     try {
       await createLeadMutation.mutateAsync({
         ...data,
-        budget: Number(data.budget), // Ensure budget is converted to number
+        budget: Number(data.budget),
         phoneNumber: data.phoneNumber || null
       });
       setCreateDialogOpen(false);
@@ -71,17 +71,19 @@ export function FreeUserLeadsView({
               Create New Lead
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader className="px-6 py-4 border-b">
               <DialogTitle>Create New Lead</DialogTitle>
               <DialogDescription>
                 Fill out the form below to create a new business lead
               </DialogDescription>
             </DialogHeader>
-            <CreateLeadForm
-              onSubmit={handleCreateSubmit}
-              isSubmitting={createLeadMutation.isPending}
-            />
+            <div className="max-h-[calc(80vh-120px)] overflow-y-auto px-6 py-4">
+              <CreateLeadForm
+                onSubmit={handleCreateSubmit}
+                isSubmitting={createLeadMutation.isPending}
+              />
+            </div>
           </DialogContent>
         </Dialog>
       </div>

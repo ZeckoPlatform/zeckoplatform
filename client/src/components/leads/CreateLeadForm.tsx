@@ -114,7 +114,6 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
   });
 
   const handleSubmit = form.handleSubmit((data) => {
-    // Ensure budget is a number before submitting
     const formattedData = {
       ...data,
       budget: Number(data.budget),
@@ -124,9 +123,9 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
   });
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-6">
       {/* Title field */}
-      <div>
+      <div className="space-y-2">
         <Label htmlFor="title">Title</Label>
         <Input id="title" {...form.register("title")} />
         {form.formState.errors.title && (
@@ -135,11 +134,12 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
       </div>
 
       {/* Description field */}
-      <div>
+      <div className="space-y-2">
         <Label htmlFor="description">Description</Label>
         <Textarea
           id="description"
           {...form.register("description")}
+          className="min-h-[100px]"
         />
         {form.formState.errors.description && (
           <p className="text-sm text-destructive">{form.formState.errors.description.message}</p>
@@ -147,8 +147,8 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
       </div>
 
       {/* Category fields */}
-      <div className="space-y-4">
-        <div>
+      <div className="grid gap-6">
+        <div className="space-y-2">
           <Label htmlFor="category">Main Category</Label>
           <Select
             onValueChange={(value) => {
@@ -174,7 +174,7 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
         </div>
 
         {selectedCategory && (
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="subcategory">Subcategory</Label>
             <Select
               onValueChange={(value) => form.setValue("subcategory", value)}
@@ -198,7 +198,7 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
       </div>
 
       {/* Budget field */}
-      <div>
+      <div className="space-y-2">
         <Label htmlFor="budget">Budget (£)</Label>
         <Input
           id="budget"
@@ -213,7 +213,7 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
       </div>
 
       {/* Location field */}
-      <div>
+      <div className="space-y-2">
         <Label htmlFor="location">Location</Label>
         <Input id="location" {...form.register("location")} />
         {form.formState.errors.location && (
@@ -222,7 +222,7 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
       </div>
 
       {/* Phone Number field */}
-      <div>
+      <div className="space-y-2">
         <Label htmlFor="phoneNumber">Phone Number (Optional)</Label>
         <Input
           id="phoneNumber"
