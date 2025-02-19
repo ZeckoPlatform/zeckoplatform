@@ -15,12 +15,12 @@ export const PHONE_COUNTRY_CODES = {
   GB: {
     code: "44",
     format: "+44 XXXX XXXXXX",
-    pattern: /^(\+?44|0)[-\s]?(\d[-\s]?){9,10}$/
+    pattern: /^(\+?44|0)7\d{9}$/
   },
   US: {
     code: "1",
     format: "+1 (XXX) XXX-XXXX",
-    pattern: /^(\+?1|0)[-\s]?(\d[-\s]?){10}$/
+    pattern: /^(\+?1)?[2-9]\d{9}$/
   }
 } as const;
 
@@ -37,11 +37,28 @@ export const createLeadSchema = z.object({
   phoneNumber: z.string()
     .optional()
     .nullable()
-    .transform(val => val ? val.replace(/[^\d+]/g, '') : null)
+    .transform(val => {
+      if (!val) return null;
+      // Remove all non-digit characters except +
+      const cleaned = val.replace(/[^\d+]/g, '');
+      // If it starts with a 0, replace it with the country code
+      if (cleaned.startsWith('0')) {
+        const country = window.localStorage.getItem('userCountry') as CountryCode || 'GB';
+        return `+${PHONE_COUNTRY_CODES[country].code}${cleaned.slice(1)}`;
+      }
+      // If it doesn't start with +, add it
+      if (!cleaned.startsWith('+')) {
+        const country = window.localStorage.getItem('userCountry') as CountryCode || 'GB';
+        return `+${PHONE_COUNTRY_CODES[country].code}${cleaned}`;
+      }
+      return cleaned;
+    })
     .refine((val) => {
       if (!val) return true; // Optional field
       const country = window.localStorage.getItem('userCountry') as CountryCode || 'GB';
-      return PHONE_COUNTRY_CODES[country].pattern.test(val);
+      // Remove the + and country code for validation
+      const numberWithoutCode = val.replace(new RegExp(`^\\+${PHONE_COUNTRY_CODES[country].code}`), '');
+      return PHONE_COUNTRY_CODES[country].pattern.test(numberWithoutCode);
     }, {
       message: "Please enter a valid phone number"
     })
@@ -64,16 +81,27 @@ export function CreateLeadForm({ onSubmit, isSubmitting }: CreateLeadFormProps) 
     if (digits.length <= 1) return digits;
 
     if (country === "US") {
-      const formatted = digits.startsWith('+1') ? digits : `+1${digits}`;
-      const digitsOnly = formatted.slice(2);
-      if (digitsOnly.length <= 3) return `+1 (${digitsOnly}`;
-      if (digitsOnly.length <= 6) return `+1 (${digitsOnly.slice(0, 3)}) ${digitsOnly.slice(3)}`;
-      return `+1 (${digitsOnly.slice(0, 3)}) ${digitsOnly.slice(3, 6)}-${digitsOnly.slice(6, 10)}`;
+      if (digits.startsWith('+1')) {
+        const digitsOnly = digits.slice(2);
+        if (digitsOnly.length <= 3) return `+1 (${digitsOnly}`;
+        if (digitsOnly.length <= 6) return `+1 (${digitsOnly.slice(0, 3)}) ${digitsOnly.slice(3)}`;
+        return `+1 (${digitsOnly.slice(0, 3)}) ${digitsOnly.slice(3, 6)}-${digitsOnly.slice(6, 10)}`;
+      } else {
+        const digitsOnly = digits;
+        if (digitsOnly.length <= 3) return `+1 (${digitsOnly}`;
+        if (digitsOnly.length <= 6) return `+1 (${digitsOnly.slice(0, 3)}) ${digitsOnly.slice(3)}`;
+        return `+1 (${digitsOnly.slice(0, 3)}) ${digitsOnly.slice(3, 6)}-${digitsOnly.slice(6, 10)}`;
+      }
     } else {
-      const formatted = digits.startsWith('+44') ? digits : `+44${digits}`;
-      const digitsOnly = formatted.slice(3);
-      if (digitsOnly.length <= 4) return `+44 ${digitsOnly}`;
-      return `+44 ${digitsOnly.slice(0, 4)} ${digitsOnly.slice(4, 10)}`;
+      if (digits.startsWith('+44')) {
+        const digitsOnly = digits.slice(3);
+        if (digitsOnly.length <= 4) return `+44 ${digitsOnly}`;
+        return `+44 ${digitsOnly.slice(0, 4)} ${digitsOnly.slice(4, 10)}`;
+      } else {
+        const digitsOnly = digits;
+        if (digitsOnly.length <= 4) return `+44 ${digitsOnly}`;
+        return `+44 ${digitsOnly.slice(0, 4)} ${digitsOnly.slice(4, 10)}`;
+      }
     }
   };
 
