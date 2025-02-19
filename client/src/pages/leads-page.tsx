@@ -82,14 +82,14 @@ const LeadsPage = () => {
           <DialogTrigger asChild>
             <Button>Create New Lead</Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden">
+          <DialogContent className="max-w-2xl h-[90vh]">
             <DialogHeader className="px-6 py-4 border-b">
               <DialogTitle>Create New Lead</DialogTitle>
               <DialogDescription>
                 Fill out the form below to create a new business lead
               </DialogDescription>
             </DialogHeader>
-            <div className="px-6 py-4 flex-1 overflow-y-auto">
+            <div className="px-6 py-4 overflow-y-auto h-[calc(90vh-120px)]">
               <CreateLeadForm
                 onSubmit={handleCreateSubmit}
                 isSubmitting={createLeadMutation.isPending}
