@@ -62,7 +62,12 @@ export const BUSINESS_CATEGORIES: BusinessCategories = {
     "AI & Machine Learning",
     "Enterprise Software",
     "API Development",
-    "Quality Assurance"
+    "Quality Assurance",
+    "Blockchain Development",
+    "IoT Solutions",
+    "Game Development",
+    "UI/UX Design",
+    "Technical Support"
   ],
   "Marketing & Advertising": [
     "Digital Marketing",
@@ -75,7 +80,12 @@ export const BUSINESS_CATEGORIES: BusinessCategories = {
     "Video Marketing",
     "Influencer Marketing",
     "PPC Advertising",
-    "Marketing Analytics"
+    "Marketing Analytics",
+    "Affiliate Marketing",
+    "Public Relations",
+    "Event Marketing",
+    "Marketing Automation",
+    "Outdoor Advertising"
   ],
   "Business Services": [
     "Business Consulting",
@@ -87,7 +97,13 @@ export const BUSINESS_CATEGORIES: BusinessCategories = {
     "Business Planning",
     "Market Analysis",
     "Risk Management",
-    "Supply Chain Management"
+    "Supply Chain Management",
+    "Strategic Planning",
+    "Operations Management",
+    "Business Process Optimization",
+    "Change Management",
+    "Mergers & Acquisitions",
+    "Corporate Training"
   ],
   "Professional Services": [
     "Management Consulting",
@@ -98,7 +114,13 @@ export const BUSINESS_CATEGORIES: BusinessCategories = {
     "Data Analysis",
     "Business Process Outsourcing",
     "Quality Management",
-    "Compliance Services"
+    "Compliance Services",
+    "Patent Services",
+    "Tax Consulting",
+    "Business Valuation",
+    "Recruitment Services",
+    "Virtual Assistant Services",
+    "Office Administration"
   ],
   "Cleaning & Maintenance": [
     "Residential Cleaning",
@@ -110,7 +132,12 @@ export const BUSINESS_CATEGORIES: BusinessCategories = {
     "Janitorial Services",
     "Window Cleaning",
     "Carpet Cleaning",
-    "Facility Management"
+    "Facility Management",
+    "Pool Maintenance",
+    "Garden Maintenance",
+    "Pest Control",
+    "Air Duct Cleaning",
+    "Disaster Recovery Cleaning"
   ],
   "Construction & Trades": [
     "General Contracting",
@@ -122,7 +149,13 @@ export const BUSINESS_CATEGORIES: BusinessCategories = {
     "Painting",
     "Roofing",
     "Landscaping",
-    "Interior Design"
+    "Interior Design",
+    "Architecture Services",
+    "Renovation Services",
+    "Building Inspection",
+    "Flooring Installation",
+    "Solar Installation",
+    "Home Automation"
   ],
   "Healthcare & Medical": [
     "Medical Services",
@@ -133,7 +166,13 @@ export const BUSINESS_CATEGORIES: BusinessCategories = {
     "Healthcare Technology",
     "Pharmaceutical Services",
     "Wellness Programs",
-    "Telemedicine"
+    "Telemedicine",
+    "Dental Services",
+    "Alternative Medicine",
+    "Nutrition Services",
+    "Medical Research",
+    "Elder Care Services",
+    "Medical Training"
   ],
   "Education & Training": [
     "Professional Training",
@@ -144,7 +183,39 @@ export const BUSINESS_CATEGORIES: BusinessCategories = {
     "Skills Development",
     "Curriculum Development",
     "Educational Technology",
-    "Vocational Training"
+    "Vocational Training",
+    "Test Preparation",
+    "Music Education",
+    "Art Education",
+    "Special Education",
+    "Adult Education",
+    "Early Childhood Education"
+  ],
+  "Retail & E-commerce": [
+    "Online Retail",
+    "Brick and Mortar Retail",
+    "Dropshipping",
+    "Inventory Management",
+    "E-commerce Platform Development",
+    "Retail Analytics",
+    "Customer Service",
+    "Supply Chain Solutions",
+    "Payment Processing",
+    "Marketplace Management",
+    "Product Photography",
+    "Retail Consulting"
+  ],
+  "Transportation & Logistics": [
+    "Freight Services",
+    "Courier Services",
+    "Warehousing",
+    "Fleet Management",
+    "Last-Mile Delivery",
+    "Logistics Consulting",
+    "Supply Chain Optimization",
+    "International Shipping",
+    "Cold Chain Logistics",
+    "Transportation Technology"
   ]
 };
 
