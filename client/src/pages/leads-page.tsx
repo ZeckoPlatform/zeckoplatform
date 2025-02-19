@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { apiRequest } from "@/lib/queryClient";
 import { SelectLead, BUSINESS_CATEGORIES } from "@/types/leads";
-import { CreateLeadForm } from "@/components/leads/CreateLeadForm";
+import { CreateLeadForm, LeadFormData } from "@/components/leads/CreateLeadForm";
 
 // Re-export BUSINESS_CATEGORIES for backward compatibility
 export { BUSINESS_CATEGORIES } from '@/types/leads';
@@ -30,9 +30,23 @@ const LeadsPage = () => {
   });
 
   const createLeadMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const response = await apiRequest('POST', '/api/leads', data);
-      return response.json();
+    mutationFn: async (data: LeadFormData) => {
+      console.log('Creating lead with data:', data);
+      try {
+        const response = await apiRequest('POST', '/api/leads', {
+          ...data,
+          budget: Number(data.budget),
+          phoneNumber: data.phoneNumber || null
+        });
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText || 'Failed to create lead');
+        }
+        return response.json();
+      } catch (error) {
+        console.error('Lead creation error:', error);
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/leads'] });
@@ -43,6 +57,7 @@ const LeadsPage = () => {
       setCreateDialogOpen(false);
     },
     onError: (error: Error) => {
+      console.error('Mutation error:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to create lead",
@@ -50,6 +65,24 @@ const LeadsPage = () => {
       });
     }
   });
+
+  const handleCreateSubmit = async (data: LeadFormData) => {
+    console.log('Form submission data:', data);
+    try {
+      await createLeadMutation.mutateAsync({
+        ...data,
+        budget: Number(data.budget),
+        phoneNumber: data.phoneNumber || null
+      });
+    } catch (error) {
+      console.error('Submit error:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create lead",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <div className="container mx-auto p-6">
@@ -59,17 +92,19 @@ const LeadsPage = () => {
           <DialogTrigger asChild>
             <Button>Create New Lead</Button>
           </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader className="px-6 py-4 border-b">
               <DialogTitle>Create New Lead</DialogTitle>
               <DialogDescription>
                 Fill out the form below to create a new business lead
               </DialogDescription>
             </DialogHeader>
-            <CreateLeadForm
-              onSubmit={(data) => createLeadMutation.mutate(data)}
-              isSubmitting={createLeadMutation.isPending}
-            />
+            <div className="max-h-[calc(80vh-120px)] overflow-y-auto px-6 py-4">
+              <CreateLeadForm
+                onSubmit={handleCreateSubmit}
+                isSubmitting={createLeadMutation.isPending}
+              />
+            </div>
           </DialogContent>
         </Dialog>
       </div>

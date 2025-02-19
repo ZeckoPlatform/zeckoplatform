@@ -119,6 +119,7 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
   });
 
   const handleSubmit = form.handleSubmit((data) => {
+    console.log('Form data before submission:', data);
     // Only proceed if the phone number is either empty or matches the exact pattern
     if (data.phoneNumber) {
       const isValidGB = PHONE_COUNTRY_CODES.GB.pattern.test(data.phoneNumber);
@@ -132,11 +133,15 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
       }
     }
 
-    onSubmit({
+    // Transform the data before submission
+    const submissionData = {
       ...data,
       budget: Number(data.budget),
-      phoneNumber: data.phoneNumber || null
-    });
+      phoneNumber: data.phoneNumber?.trim() || null
+    };
+
+    console.log('Transformed submission data:', submissionData);
+    onSubmit(submissionData);
   });
 
   return (
