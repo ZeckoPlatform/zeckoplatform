@@ -30,19 +30,40 @@ const LeadsPage = () => {
 
   const createLeadMutation = useMutation({
     mutationFn: async (formData: LeadFormData) => {
-      // Ensure data is properly formatted
+      // Log the form data for debugging
+      console.log('Form data received:', formData);
+
+      // Prepare the data for submission
       const data = {
-        ...formData,
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        subcategory: formData.subcategory,
         budget: Number(formData.budget),
+        location: formData.location,
         phoneNumber: formData.phoneNumber?.trim() || null
       };
 
-      const response = await apiRequest('POST', '/api/leads', data);
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Failed to create lead');
+      // Log the prepared data
+      console.log('Prepared data for submission:', data);
+
+      try {
+        const response = await apiRequest('POST', '/api/leads', data);
+        console.log('Response status:', response.status);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Server error response:', errorText);
+          throw new Error(errorText || 'Failed to create lead');
+        }
+
+        const result = await response.json();
+        console.log('Success response:', result);
+        return result;
+      } catch (error) {
+        console.error('Lead creation error details:', error);
+        throw error;
       }
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/leads'] });
@@ -53,7 +74,7 @@ const LeadsPage = () => {
       });
     },
     onError: (error: Error) => {
-      console.error('Lead creation error:', error);
+      console.error('Mutation error handler:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to create lead",

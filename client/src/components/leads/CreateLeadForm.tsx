@@ -16,9 +16,9 @@ export const createLeadSchema = z.object({
   description: z.string().min(1, "Description is required"),
   category: z.string().min(1, "Category is required"),
   subcategory: z.string().min(1, "Subcategory is required"),
-  budget: z.number().min(0, "Budget must be a positive number"),
+  budget: z.string().min(1, "Budget is required"),
   location: z.string().min(1, "Location is required"),
-  phoneNumber: z.string().optional().nullable()
+  phoneNumber: z.string().optional()
 });
 
 export type LeadFormData = z.infer<typeof createLeadSchema>;
@@ -38,9 +38,9 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
       description: "",
       category: "",
       subcategory: "",
-      budget: 0,
+      budget: "",
       location: "",
-      phoneNumber: null
+      phoneNumber: ""
     },
   });
 
@@ -123,7 +123,7 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
           type="number"
           min="0"
           step="1"
-          {...form.register("budget", { valueAsNumber: true })}
+          {...form.register("budget")}
         />
         {form.formState.errors.budget?.message && (
           <p className="text-sm text-destructive">{form.formState.errors.budget.message}</p>
