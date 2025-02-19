@@ -59,7 +59,10 @@ export const BUSINESS_CATEGORIES: BusinessCategories = {
     "Software Architecture",
     "Database Development",
     "Cybersecurity",
-    "AI & Machine Learning"
+    "AI & Machine Learning",
+    "Enterprise Software",
+    "API Development",
+    "Quality Assurance"
   ],
   "Marketing & Advertising": [
     "Digital Marketing",
@@ -67,7 +70,35 @@ export const BUSINESS_CATEGORIES: BusinessCategories = {
     "Social Media Marketing",
     "SEO & SEM",
     "Email Marketing",
-    "Brand Strategy"
+    "Brand Strategy",
+    "Market Research",
+    "Video Marketing",
+    "Influencer Marketing",
+    "PPC Advertising",
+    "Marketing Analytics"
+  ],
+  "Business Services": [
+    "Business Consulting",
+    "Financial Services",
+    "Legal Services",
+    "Accounting & Bookkeeping",
+    "Human Resources",
+    "Project Management",
+    "Business Planning",
+    "Market Analysis",
+    "Risk Management",
+    "Supply Chain Management"
+  ],
+  "Professional Services": [
+    "Management Consulting",
+    "Training & Development",
+    "Research Services",
+    "Technical Writing",
+    "Translation Services",
+    "Data Analysis",
+    "Business Process Outsourcing",
+    "Quality Management",
+    "Compliance Services"
   ],
   "Cleaning & Maintenance": [
     "Residential Cleaning",
@@ -75,7 +106,45 @@ export const BUSINESS_CATEGORIES: BusinessCategories = {
     "Industrial Cleaning",
     "Specialized Cleaning",
     "Property Maintenance",
-    "Waste Management"
+    "Waste Management",
+    "Janitorial Services",
+    "Window Cleaning",
+    "Carpet Cleaning",
+    "Facility Management"
+  ],
+  "Construction & Trades": [
+    "General Contracting",
+    "Electrical Services",
+    "Plumbing Services",
+    "HVAC Services",
+    "Carpentry",
+    "Masonry",
+    "Painting",
+    "Roofing",
+    "Landscaping",
+    "Interior Design"
+  ],
+  "Healthcare & Medical": [
+    "Medical Services",
+    "Healthcare Consulting",
+    "Mental Health Services",
+    "Physical Therapy",
+    "Medical Equipment",
+    "Healthcare Technology",
+    "Pharmaceutical Services",
+    "Wellness Programs",
+    "Telemedicine"
+  ],
+  "Education & Training": [
+    "Professional Training",
+    "Corporate Training",
+    "E-Learning Development",
+    "Educational Consulting",
+    "Language Training",
+    "Skills Development",
+    "Curriculum Development",
+    "Educational Technology",
+    "Vocational Training"
   ]
 };
 
