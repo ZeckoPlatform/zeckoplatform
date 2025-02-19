@@ -17,13 +17,15 @@ const PHONE_COUNTRY_CODES = {
     code: "44",
     format: "+44 XXXX XXXXXX",
     example: "+44 7911 123456",
-    pattern: /^\+44\s\d{4}\s\d{6}$/
+    pattern: /^\+44\s\d{4}\s\d{6}$/,
+    partialPattern: /^\+44(\s\d{0,4})?(\s\d{0,6})?$/
   },
   US: {
     code: "1",
     format: "+1 (XXX) XXX-XXXX",
     example: "+1 (555) 123-4567",
-    pattern: /^\+1\s\(\d{3}\)\s\d{3}-\d{4}$/
+    pattern: /^\+1\s\(\d{3}\)\s\d{3}-\d{4}$/,
+    partialPattern: /^\+1(\s\(\d{0,3}\))?(\s\d{0,3})?(-\d{0,4})?$/
   }
 } as const;
 
@@ -40,21 +42,22 @@ export const createLeadSchema = z.object({
     .optional()
     .nullable()
     .transform(val => {
-      console.log('Phone transform - input value:', val);
       if (!val || val.trim() === '') return null;
       return val;
     })
     .refine((val) => {
-      if (!val) return true; // Allow empty values
-      console.log('Phone validation - testing pattern for:', val);
-      // Test against exact patterns
-      const gbMatch = PHONE_COUNTRY_CODES.GB.pattern.test(val);
-      const usMatch = PHONE_COUNTRY_CODES.US.pattern.test(val);
-      console.log('Phone validation - GB match:', gbMatch, 'US match:', usMatch);
-      return gbMatch || usMatch;
-    }, {
-      message: "Please enter a valid phone number in the exact format shown (including spaces and symbols)"
-    })
+      if (!val) return true;
+      const gbValid = PHONE_COUNTRY_CODES.GB.pattern.test(val);
+      const usValid = PHONE_COUNTRY_CODES.US.pattern.test(val);
+      const gbPartial = PHONE_COUNTRY_CODES.GB.partialPattern.test(val);
+      const usPartial = PHONE_COUNTRY_CODES.US.partialPattern.test(val);
+
+      // If it's a partial match, allow it to pass validation
+      if (gbPartial || usPartial) return true;
+
+      // For complete numbers, must match exactly
+      return gbValid || usValid;
+    }, "Please enter a valid phone number in the exact format shown")
 });
 
 export type LeadFormData = z.infer<typeof createLeadSchema>;
@@ -73,35 +76,33 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
     // Remove all non-digit characters except +
     const cleaned = value.replace(/[^\d+]/g, '');
 
-    if (cleaned === '') return '';
-
-    // For US numbers
-    if (country === 'US') {
-      if (!cleaned.startsWith('+1')) {
+    // For UK numbers
+    if (country === 'GB') {
+      if (!cleaned.startsWith('+44')) {
         const digits = cleaned.replace(/\D/g, '');
         if (digits.length === 0) return '';
-        if (digits.length <= 3) return `+1 (${digits}`;
-        if (digits.length <= 6) return `+1 (${digits.slice(0,3)}) ${digits.slice(3)}`;
-        return `+1 (${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6,10)}`;
+        if (digits.length <= 4) return `+44 ${digits}`;
+        return `+44 ${digits.slice(0,4)} ${digits.slice(4,10)}`;
       }
-      const digits = cleaned.slice(2);
-      if (digits.length === 0) return '+1 ';
+      const digits = cleaned.slice(3);
+      if (digits.length === 0) return '+44 ';
+      if (digits.length <= 4) return `+44 ${digits}`;
+      return `+44 ${digits.slice(0,4)} ${digits.slice(4,10)}`;
+    }
+
+    // For US numbers
+    if (!cleaned.startsWith('+1')) {
+      const digits = cleaned.replace(/\D/g, '');
+      if (digits.length === 0) return '';
       if (digits.length <= 3) return `+1 (${digits}`;
       if (digits.length <= 6) return `+1 (${digits.slice(0,3)}) ${digits.slice(3)}`;
       return `+1 (${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6,10)}`;
     }
-
-    // For UK numbers
-    if (!cleaned.startsWith('+44')) {
-      const digits = cleaned.replace(/\D/g, '');
-      if (digits.length === 0) return '';
-      if (digits.length <= 4) return `+44 ${digits}`;
-      return `+44 ${digits.slice(0,4)} ${digits.slice(4,10)}`;
-    }
-    const digits = cleaned.slice(3);
-    if (digits.length === 0) return '+44 ';
-    if (digits.length <= 4) return `+44 ${digits}`;
-    return `+44 ${digits.slice(0,4)} ${digits.slice(4,10)}`;
+    const digits = cleaned.slice(2);
+    if (digits.length === 0) return '+1 ';
+    if (digits.length <= 3) return `+1 (${digits}`;
+    if (digits.length <= 6) return `+1 (${digits.slice(0,3)}) ${digits.slice(3)}`;
+    return `+1 (${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6,10)}`;
   };
 
   const form = useForm<LeadFormData>({
@@ -118,7 +119,19 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
   });
 
   const handleSubmit = form.handleSubmit((data) => {
-    console.log('Form submission - phone number:', data.phoneNumber);
+    // Only proceed if the phone number is either empty or matches the exact pattern
+    if (data.phoneNumber) {
+      const isValidGB = PHONE_COUNTRY_CODES.GB.pattern.test(data.phoneNumber);
+      const isValidUS = PHONE_COUNTRY_CODES.US.pattern.test(data.phoneNumber);
+      if (!isValidGB && !isValidUS) {
+        form.setError("phoneNumber", {
+          type: "manual",
+          message: "Please enter a complete valid phone number"
+        });
+        return;
+      }
+    }
+
     onSubmit({
       ...data,
       budget: Number(data.budget),
@@ -235,7 +248,6 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
             placeholder={PHONE_COUNTRY_CODES[countryCode].example}
             onChange={(e) => {
               const formatted = formatPhoneNumber(e.target.value, countryCode);
-              console.log('Phone formatting - input:', e.target.value, 'formatted:', formatted);
               e.target.value = formatted;
               form.setValue("phoneNumber", formatted, { shouldValidate: true });
             }}
