@@ -15,8 +15,10 @@ export const createLeadSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().min(1, "Description is required"),
   category: z.string().min(1, "Category is required"),
+  subcategory: z.string().optional(),
   budget: z.string().min(1, "Budget is required"),
   location: z.string().min(1, "Location is required"),
+  phone_number: z.string().optional()
 });
 
 export type LeadFormData = z.infer<typeof createLeadSchema>;
@@ -35,8 +37,10 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
       title: "",
       description: "",
       category: "",
+      subcategory: "",
       budget: "",
       location: "",
+      phone_number: ""
     },
   });
 
@@ -67,27 +71,53 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
         )}
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="category">Category</Label>
-        <Select
-          onValueChange={(value) => {
-            setSelectedCategory(value);
-            form.setValue("category", value);
-          }}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select a category" />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.keys(BUSINESS_CATEGORIES).map((category) => (
-              <SelectItem key={category} value={category}>
-                {category}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {form.formState.errors.category?.message && (
-          <p className="text-sm text-destructive">{form.formState.errors.category.message}</p>
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="category">Category</Label>
+          <Select
+            onValueChange={(value) => {
+              setSelectedCategory(value);
+              form.setValue("category", value);
+              form.setValue("subcategory", "");
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select a category" />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.keys(BUSINESS_CATEGORIES).map((category) => (
+                <SelectItem key={category} value={category}>
+                  {category}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {form.formState.errors.category?.message && (
+            <p className="text-sm text-destructive">{form.formState.errors.category.message}</p>
+          )}
+        </div>
+
+        {selectedCategory && (
+          <div className="space-y-2">
+            <Label htmlFor="subcategory">Subcategory</Label>
+            <Select
+              onValueChange={(value) => form.setValue("subcategory", value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a subcategory" />
+              </SelectTrigger>
+              <SelectContent>
+                {BUSINESS_CATEGORIES[selectedCategory]?.map((subcategory) => (
+                  <SelectItem key={subcategory} value={subcategory}>
+                    {subcategory}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {form.formState.errors.subcategory?.message && (
+              <p className="text-sm text-destructive">{form.formState.errors.subcategory.message}</p>
+            )}
+          </div>
         )}
       </div>
 
@@ -110,6 +140,19 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
         <Input id="location" {...form.register("location")} />
         {form.formState.errors.location?.message && (
           <p className="text-sm text-destructive">{form.formState.errors.location.message}</p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="phone_number">Phone Number (Optional)</Label>
+        <Input
+          id="phone_number"
+          type="tel"
+          {...form.register("phone_number")}
+          placeholder="Enter phone number (optional)"
+        />
+        {form.formState.errors.phone_number?.message && (
+          <p className="text-sm text-destructive">{form.formState.errors.phone_number.message}</p>
         )}
       </div>
 

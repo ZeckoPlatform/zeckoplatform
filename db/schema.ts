@@ -121,13 +121,14 @@ export const leads = pgTable("leads", {
   title: text("title").notNull(),
   description: text("description").notNull(),
   category: text("category").notNull(),
+  subcategory: text("subcategory"),
   budget: integer("budget"),
   location: text("location"),
+  phone_number: text("phone_number"),
   status: text("status", { enum: ["open", "closed", "in_progress"] }).default("open"),
   created_at: timestamp("created_at").defaultNow(),
   expires_at: timestamp("expires_at").notNull(),
   archived: boolean("archived").default(false),
-  // Add region field that matches user's country code
   region: text("region", { enum: ["GB", "US"] }).notNull(),
 });
 

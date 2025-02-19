@@ -10,8 +10,10 @@ const createLeadSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().min(1, "Description is required"),
   category: z.string().min(1, "Category is required"),
+  subcategory: z.string().optional(),
   budget: z.number().min(0, "Budget must be a positive number").or(z.string().transform(val => Number(val))),
   location: z.string().min(1, "Location is required"),
+  phone_number: z.string().optional(),
 });
 
 // Create a new lead
@@ -38,10 +40,12 @@ router.post("/api/leads", async (req, res) => {
       title: validatedData.title,
       description: validatedData.description,
       category: validatedData.category,
+      subcategory: validatedData.subcategory || null,
       budget: validatedData.budget,
       location: validatedData.location,
+      phone_number: validatedData.phone_number || null,
       region: req.user.countryCode || "GB",
-      status: "open",
+      status: "open" as const,
       expires_at: expiryDate,
     };
 

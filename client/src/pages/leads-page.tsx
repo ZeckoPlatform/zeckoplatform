@@ -31,10 +31,7 @@ const LeadsPage = () => {
 
   const createLeadMutation = useMutation({
     mutationFn: async (formData: LeadFormData) => {
-      // Log the incoming form data
       console.log('Creating lead with form data:', formData);
-
-      // Prepare the data for submission
       const data = {
         title: formData.title.trim(),
         description: formData.description.trim(),
@@ -42,21 +39,13 @@ const LeadsPage = () => {
         subcategory: formData.subcategory,
         budget: parseInt(formData.budget, 10),
         location: formData.location.trim(),
-        phoneNumber: formData.phoneNumber?.trim() || null
+        phone_number: formData.phone_number?.trim() || null
       };
 
-      // Log the processed data
       console.log('Processed data for submission:', data);
 
       try {
         const response = await apiRequest('POST', '/api/leads', data);
-
-        // Log the full response
-        console.log('Server response:', {
-          status: response.status,
-          statusText: response.statusText,
-        });
-
         if (!response.ok) {
           const errorText = await response.text();
           console.error('Server error response:', errorText);
@@ -97,8 +86,8 @@ const LeadsPage = () => {
           <DialogTrigger asChild>
             <Button>Create New Lead</Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0">
-            <DialogHeader className="px-6 py-4 border-b">
+          <DialogContent className="sm:max-w-2xl h-[90vh] flex flex-col">
+            <DialogHeader className="px-6 py-4 border-b flex-shrink-0">
               <DialogTitle>Create New Lead</DialogTitle>
               <DialogDescription>
                 Fill out the form below to create a new business lead
@@ -138,9 +127,10 @@ const LeadsPage = () => {
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground mb-4">{lead.description}</p>
-              <div className="grid grid-cols-3 gap-4 text-sm">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                 <div>
                   <span className="font-medium">Category:</span> {lead.category}
+                  {lead.subcategory && ` > ${lead.subcategory}`}
                 </div>
                 <div>
                   <span className="font-medium">Budget:</span> £{lead.budget}
@@ -148,6 +138,11 @@ const LeadsPage = () => {
                 <div>
                   <span className="font-medium">Location:</span> {lead.location}
                 </div>
+                {lead.phone_number && (
+                  <div>
+                    <span className="font-medium">Phone:</span> {lead.phone_number}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
