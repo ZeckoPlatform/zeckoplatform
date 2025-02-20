@@ -101,4 +101,102 @@ router.post("/leads", async (req, res) => {
   }
 });
 
+// Delete a lead
+router.delete("/leads/:id", async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const leadId = parseInt(req.params.id);
+    if (isNaN(leadId)) {
+      return res.status(400).json({ error: "Invalid lead ID" });
+    }
+
+    console.log(`Attempting to delete lead ${leadId} for user ${req.user.id}`);
+
+    // First check if the lead exists and belongs to the user
+    const [lead] = await db.select()
+      .from(leads)
+      .where(eq(leads.id, leadId))
+      .where(eq(leads.user_id, req.user.id));
+
+    if (!lead) {
+      console.log(`Lead ${leadId} not found or does not belong to user ${req.user.id}`);
+      return res.status(404).json({ error: "Lead not found" });
+    }
+
+    // Delete the lead
+    const [deletedLead] = await db.delete(leads)
+      .where(eq(leads.id, leadId))
+      .where(eq(leads.user_id, req.user.id))
+      .returning();
+
+    console.log(`Successfully deleted lead:`, deletedLead);
+    res.json({ message: "Lead deleted successfully", lead: deletedLead });
+  } catch (error) {
+    console.error("Failed to delete lead:", error);
+    res.status(500).json({
+      error: "Failed to delete lead",
+      details: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
+// Update a lead
+router.patch("/leads/:id", async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const leadId = parseInt(req.params.id);
+    if (isNaN(leadId)) {
+      return res.status(400).json({ error: "Invalid lead ID" });
+    }
+
+    const validatedData = createLeadSchema.partial().parse({
+      ...req.body,
+      budget: req.body.budget ? Number(req.body.budget) : undefined
+    });
+
+    console.log(`Attempting to update lead ${leadId} with data:`, validatedData);
+
+    // First check if the lead exists and belongs to the user
+    const [existingLead] = await db.select()
+      .from(leads)
+      .where(eq(leads.id, leadId))
+      .where(eq(leads.user_id, req.user.id));
+
+    if (!existingLead) {
+      return res.status(404).json({ error: "Lead not found" });
+    }
+
+    // Update the lead
+    const [updatedLead] = await db.update(leads)
+      .set(validatedData)
+      .where(eq(leads.id, leadId))
+      .where(eq(leads.user_id, req.user.id))
+      .returning();
+
+    console.log("Successfully updated lead:", updatedLead);
+    res.json(updatedLead);
+  } catch (error) {
+    console.error("Failed to update lead:", error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: error.errors.map(e => ({
+          field: e.path.join('.'),
+          message: e.message
+        }))
+      });
+    }
+    res.status(500).json({
+      error: "Failed to update lead",
+      details: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
 export default router;

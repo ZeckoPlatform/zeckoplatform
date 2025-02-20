@@ -74,20 +74,65 @@ const LeadsPage = () => {
     }
   });
 
+  const updateLeadMutation = useMutation({
+    mutationFn: async (data: { id: number; formData: LeadFormData }) => {
+      const response = await apiRequest('PATCH', `/api/leads/${data.id}`, {
+        title: data.formData.title.trim(),
+        description: data.formData.description.trim(),
+        category: data.formData.category,
+        subcategory: data.formData.subcategory,
+        budget: parseInt(data.formData.budget, 10),
+        location: data.formData.location.trim(),
+        phone_number: data.formData.phone_number?.trim() || null
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update lead');
+      }
+
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/leads'] });
+      setEditingLead(null);
+      toast({
+        title: "Success",
+        description: "Lead updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update lead",
+        variant: "destructive",
+      });
+    }
+  });
+
   const deleteLeadMutation = useMutation({
     mutationFn: async (leadId: number) => {
       const response = await apiRequest('DELETE', `/api/leads/${leadId}`);
       if (!response.ok) {
-        throw new Error('Failed to delete lead');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to delete lead');
       }
+      return await response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/leads'] });
       toast({
         title: "Success",
         description: "Lead deleted successfully",
       });
     },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete lead",
+        variant: "destructive",
+      });
+    }
   });
 
   const acceptProposalMutation = useMutation({
@@ -168,7 +213,7 @@ const LeadsPage = () => {
           <FreeUserLeadsView
             leads={leads}
             createLeadMutation={createLeadMutation}
-            updateLeadMutation={undefined}
+            updateLeadMutation={updateLeadMutation}
             editingLead={editingLead}
             setEditingLead={setEditingLead}
             deleteLeadMutation={deleteLeadMutation}
