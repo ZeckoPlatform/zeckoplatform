@@ -70,9 +70,6 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
       if (isResolved) return;
 
       log(`Server error on port ${port}: ${error.message}`);
-      if (error.code === 'EADDRINUSE') {
-        log(`Port ${port} is in use, will try next port`);
-      }
       cleanup();
       resolve(false);
       isResolved = true;
@@ -97,7 +94,7 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
         resolve(false);
         isResolved = true;
       }
-    }, 5000); // 5 second timeout
+    }, 10000); // 10 second timeout
 
     try {
       log(`Attempting to bind to port ${port}...`);
@@ -128,8 +125,15 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
     const server = createServer();
 
     // Define ports to try in order of preference
-    const preferredPort = process.env.PORT || process.env.REPLIT_PORT || 5000;
-    const ports = [parseInt(preferredPort.toString()), 5000];  // Only try preferred port and 5000
+    const preferredPort = process.env.PORT || process.env.REPLIT_PORT;
+    const ports = [
+      preferredPort ? parseInt(preferredPort.toString()) : 3000,
+      3000,
+      3001,
+      5000,
+      5001,
+      8080
+    ].filter((p, i, arr) => arr.indexOf(p) === i); // Remove duplicates
 
     log(`Will try ports in order: ${ports.join(', ')}`);
     let serverStarted = false;
