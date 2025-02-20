@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@db";
 import { leads, messages, leadResponses } from "@db/schema";
 import { z } from "zod";
-import { eq, and, or, isNull } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 const router = Router();
 
@@ -24,16 +24,12 @@ router.get("/leads", async (req, res) => {
 
     console.log("Fetching leads for user:", req.user.id);
 
-    // Update query to handle both NULL and false values for archived
     const userLeads = await db
       .select()
       .from(leads)
       .where(and(
         eq(leads.user_id, req.user.id),
-        or(
-          isNull(leads.archived),
-          eq(leads.archived, false)
-        )
+        eq(leads.deleted_at, null)
       ))
       .orderBy(leads.created_at);
 
@@ -79,7 +75,6 @@ router.post("/leads", async (req, res) => {
       region: req.user.countryCode || "GB",
       status: "open" as const,
       expires_at: expiryDate,
-      archived: false
     };
 
     console.log("Attempting to insert lead with data:", JSON.stringify(insertData, null, 2));
@@ -118,15 +113,16 @@ router.delete("/leads/:id", async (req, res) => {
       return res.status(400).json({ error: "Invalid lead ID" });
     }
 
-    console.log(`Attempting to delete lead ${leadId} for user ${req.user.id}`);
+    console.log(`Attempting to soft delete lead ${leadId} for user ${req.user.id}`);
 
+    // First check if the lead exists and belongs to the user
     const [lead] = await db
       .select()
       .from(leads)
       .where(and(
         eq(leads.id, leadId),
         eq(leads.user_id, req.user.id),
-        eq(leads.archived, false)
+        eq(leads.deleted_at, null)
       ));
 
     if (!lead) {
@@ -134,18 +130,20 @@ router.delete("/leads/:id", async (req, res) => {
       return res.status(404).json({ error: "Lead not found" });
     }
 
-    // Instead of deleting, mark as archived
-    const [archivedLead] = await db
+    // Soft delete by setting deleted_at timestamp
+    const [deletedLead] = await db
       .update(leads)
-      .set({ archived: true })
+      .set({ 
+        deleted_at: new Date()
+      })
       .where(and(
         eq(leads.id, leadId),
         eq(leads.user_id, req.user.id)
       ))
       .returning();
 
-    console.log(`Successfully archived lead:`, archivedLead);
-    res.json({ message: "Lead deleted successfully", lead: archivedLead });
+    console.log(`Successfully soft deleted lead:`, deletedLead);
+    res.json({ message: "Lead deleted successfully", lead: deletedLead });
   } catch (error) {
     console.error("Failed to delete lead:", error);
     res.status(500).json({
@@ -178,8 +176,7 @@ router.patch("/leads/:id", async (req, res) => {
       .from(leads)
       .where(and(
         eq(leads.id, leadId),
-        eq(leads.user_id, req.user.id),
-        eq(leads.archived, false)
+        eq(leads.user_id, req.user.id)
       ));
 
     if (!existingLead) {
