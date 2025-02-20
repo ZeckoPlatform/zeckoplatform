@@ -26,8 +26,27 @@ const LeadsPage = () => {
       console.log('Fetching leads...');
       try {
         const response = await apiRequest('GET', '/api/leads');
-        const data = await response.json();
-        console.log('Fetched leads data:', data);
+        console.log('Response received:', response.status);
+
+        // Check if response is ok before trying to parse
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        // Get the raw text first to see what we're dealing with
+        const text = await response.text();
+        console.log('Raw response text:', text);
+
+        // Try to parse the text as JSON
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (parseError) {
+          console.error('JSON parse error:', parseError);
+          throw new Error('Failed to parse response as JSON');
+        }
+
+        console.log('Parsed leads data:', data);
 
         if (!Array.isArray(data)) {
           console.error('Invalid leads data format:', data);
