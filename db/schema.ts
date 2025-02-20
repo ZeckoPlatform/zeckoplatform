@@ -122,7 +122,7 @@ export const leads = pgTable("leads", {
   description: text("description").notNull(),
   category: text("category").notNull(),
   subcategory: text("subcategory"),
-  budget: integer("budget"),
+  budget: decimal("budget", { precision: 10, scale: 2 }),
   location: text("location"),
   phone_number: text("phone_number"),
   status: text("status", { enum: ["open", "closed", "in_progress"] }).default("open"),

@@ -11,7 +11,10 @@ const createLeadSchema = z.object({
   description: z.string().min(1, "Description is required"),
   category: z.string().min(1, "Category is required"),
   subcategory: z.string().optional(),
-  budget: z.number().min(0, "Budget must be a positive number").or(z.string().transform(val => Number(val))),
+  budget: z.string()
+    .min(1, "Budget is required")
+    .transform(val => parseFloat(val))
+    .refine(val => !isNaN(val) && val >= 0, "Budget must be a valid positive number"),
   location: z.string().min(1, "Location is required"),
   phone_number: z.string().optional().nullable()
 });
@@ -50,10 +53,7 @@ router.post("/leads", async (req, res) => {
 
     console.log("Received lead creation request with body:", JSON.stringify(req.body, null, 2));
 
-    const validatedData = createLeadSchema.parse({
-      ...req.body,
-      budget: typeof req.body.budget === 'string' ? Number(req.body.budget) : req.body.budget
-    });
+    const validatedData = createLeadSchema.parse(req.body);
 
     console.log("Validated lead data:", JSON.stringify(validatedData, null, 2));
 
@@ -157,10 +157,7 @@ router.patch("/leads/:id", async (req, res) => {
       return res.status(400).json({ error: "Invalid lead ID" });
     }
 
-    const validatedData = createLeadSchema.partial().parse({
-      ...req.body,
-      budget: req.body.budget ? Number(req.body.budget) : undefined
-    });
+    const validatedData = createLeadSchema.partial().parse(req.body);
 
     console.log(`Attempting to update lead ${leadId} with data:`, validatedData);
 

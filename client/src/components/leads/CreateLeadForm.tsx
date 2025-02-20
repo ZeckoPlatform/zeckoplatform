@@ -16,7 +16,12 @@ export const createLeadSchema = z.object({
   description: z.string().min(1, "Description is required"),
   category: z.string().min(1, "Category is required"),
   subcategory: z.string().optional(),
-  budget: z.string().min(1, "Budget is required"),
+  budget: z.string()
+    .min(1, "Budget is required")
+    .refine(
+      (val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0,
+      "Budget must be a valid positive number"
+    ),
   location: z.string().min(1, "Location is required"),
   phone_number: z.string().optional().nullable()
 });
@@ -47,13 +52,7 @@ function CreateLeadFormInner({ onSubmit, isSubmitting, defaultValues }: CreateLe
 
   const handleSubmit = (data: LeadFormData) => {
     console.log('Form submission data:', data);
-    const processedData = {
-      ...data,
-      budget: Number(data.budget),
-      phone_number: data.phone_number || undefined 
-    };
-    console.log('Processed data for submission:', processedData);
-    onSubmit(processedData);
+    onSubmit(data);
   };
 
   return (
@@ -136,7 +135,7 @@ function CreateLeadFormInner({ onSubmit, isSubmitting, defaultValues }: CreateLe
           id="budget"
           type="number"
           min="0"
-          step="1"
+          step="0.01"
           {...form.register("budget")}
         />
         {form.formState.errors.budget?.message && (
