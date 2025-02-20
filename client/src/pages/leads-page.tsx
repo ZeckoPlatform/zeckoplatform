@@ -20,14 +20,25 @@ const LeadsPage = () => {
 
   console.log('LeadsPage - Current user:', user);
 
-  const { data: leads = [], isLoading, error } = useQuery({
+  const { data: leads = [], isLoading, error } = useQuery<SelectLead[]>({
     queryKey: ['/api/leads'],
     queryFn: async () => {
       console.log('Fetching leads...');
-      const response = await apiRequest('GET', '/api/leads');
-      const data = await response.json();
-      console.log('Fetched leads data:', data);
-      return data;
+      try {
+        const response = await apiRequest('GET', '/api/leads');
+        const data = await response.json();
+        console.log('Fetched leads data:', data);
+
+        if (!Array.isArray(data)) {
+          console.error('Invalid leads data format:', data);
+          throw new Error('Invalid leads data format');
+        }
+
+        return data;
+      } catch (err) {
+        console.error('Error fetching leads:', err);
+        throw err;
+      }
     }
   });
 
@@ -173,17 +184,19 @@ const LeadsPage = () => {
         </Dialog>
       </div>
 
-      <FreeUserLeadsView
-        leads={leads}
-        createLeadMutation={createLeadMutation}
-        updateLeadMutation={undefined}
-        editingLead={editingLead}
-        setEditingLead={setEditingLead}
-        deleteLeadMutation={deleteLeadMutation}
-        user={user}
-        acceptProposalMutation={acceptProposalMutation}
-        rejectProposalMutation={rejectProposalMutation}
-      />
+      <ErrorBoundary>
+        <FreeUserLeadsView
+          leads={leads}
+          createLeadMutation={createLeadMutation}
+          updateLeadMutation={undefined}
+          editingLead={editingLead}
+          setEditingLead={setEditingLead}
+          deleteLeadMutation={deleteLeadMutation}
+          user={user}
+          acceptProposalMutation={acceptProposalMutation}
+          rejectProposalMutation={rejectProposalMutation}
+        />
+      </ErrorBoundary>
     </div>
   );
 };
