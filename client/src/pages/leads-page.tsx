@@ -21,11 +21,14 @@ const LeadsPage = () => {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<SelectLead | null>(null);
 
-  const { data: leads = [] } = useQuery({
+  const { data: leads = [], isLoading } = useQuery({
     queryKey: ['/api/leads'],
     queryFn: async () => {
+      console.log('Fetching leads...');
       const response = await apiRequest('GET', '/api/leads');
-      return response.json();
+      const data = await response.json();
+      console.log('Fetched leads:', data);
+      return data;
     }
   });
 
@@ -47,9 +50,9 @@ const LeadsPage = () => {
       try {
         const response = await apiRequest('POST', '/api/leads', data);
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Server error response:', errorText);
-          throw new Error(errorText || 'Failed to create lead');
+          const errorData = await response.json();
+          console.error('Server error response:', errorData);
+          throw new Error(errorData.message || 'Failed to create lead');
         }
 
         const result = await response.json();
@@ -77,6 +80,10 @@ const LeadsPage = () => {
       });
     }
   });
+
+  if (isLoading) {
+    return <div>Loading leads...</div>;
+  }
 
   return (
     <div className="container mx-auto p-6">

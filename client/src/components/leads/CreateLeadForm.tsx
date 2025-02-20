@@ -18,7 +18,7 @@ export const createLeadSchema = z.object({
   subcategory: z.string().optional(),
   budget: z.string().min(1, "Budget is required"),
   location: z.string().min(1, "Location is required"),
-  phone_number: z.string().optional()
+  phone_number: z.string().optional().nullable()
 });
 
 export type LeadFormData = z.infer<typeof createLeadSchema>;
@@ -46,7 +46,13 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
 
   const handleSubmit = (data: LeadFormData) => {
     console.log('Form submission data:', data);
-    onSubmit(data);
+    const processedData = {
+      ...data,
+      budget: Number(data.budget),
+      phone_number: data.phone_number || undefined 
+    };
+    console.log('Processed data for submission:', processedData);
+    onSubmit(processedData);
   };
 
   return (
