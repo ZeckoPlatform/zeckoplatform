@@ -17,6 +17,7 @@ const LeadsPage = () => {
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<SelectLead | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const { data: leads = [], isLoading, error } = useQuery<SelectLead[]>({
     queryKey: ['/api/leads'],
@@ -96,6 +97,7 @@ const LeadsPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/leads'] });
       setEditingLead(null);
+      setEditDialogOpen(false);
       toast({
         title: "Success",
         description: "Lead updated successfully",
@@ -204,6 +206,38 @@ const LeadsPage = () => {
         </Dialog>
       </div>
 
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-2xl h-[90vh] flex flex-col">
+          <DialogHeader className="px-6 py-4 border-b flex-shrink-0">
+            <DialogTitle>Edit Lead</DialogTitle>
+            <DialogDescription>
+              Update the lead information below
+            </DialogDescription>
+          </DialogHeader>
+          <div className="px-6 py-4 flex-1 overflow-y-auto">
+            {editingLead && (
+              <ErrorBoundary>
+                <CreateLeadForm
+                  onSubmit={(data) =>
+                    updateLeadMutation.mutate({ id: editingLead.id, formData: data })
+                  }
+                  isSubmitting={updateLeadMutation.isPending}
+                  defaultValues={{
+                    title: editingLead.title,
+                    description: editingLead.description,
+                    category: editingLead.category,
+                    subcategory: editingLead.subcategory || "",
+                    budget: editingLead.budget?.toString() || "",
+                    location: editingLead.location,
+                    phone_number: editingLead.phone_number || ""
+                  }}
+                />
+              </ErrorBoundary>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <ErrorBoundary>
         {isLoading ? (
           <div>Loading leads...</div>
@@ -215,7 +249,10 @@ const LeadsPage = () => {
             createLeadMutation={createLeadMutation}
             updateLeadMutation={updateLeadMutation}
             editingLead={editingLead}
-            setEditingLead={setEditingLead}
+            setEditingLead={(lead) => {
+              setEditingLead(lead);
+              if (lead) setEditDialogOpen(true);
+            }}
             deleteLeadMutation={deleteLeadMutation}
             user={userWithValidCountry}
             acceptProposalMutation={acceptProposalMutation}

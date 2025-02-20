@@ -1,12 +1,11 @@
 import { Router } from "express";
 import { db } from "@db";
-import { leads } from "@db/schema";
+import { leads, messages } from "@db/schema";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 
 const router = Router();
 
-// Schema for lead creation
 const createLeadSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().min(1, "Description is required"),
@@ -17,7 +16,6 @@ const createLeadSchema = z.object({
   phone_number: z.string().optional().nullable()
 });
 
-// Get all leads for the authenticated user
 router.get("/leads", async (req, res) => {
   try {
     if (!req.user) {
@@ -43,7 +41,6 @@ router.get("/leads", async (req, res) => {
   }
 });
 
-// Create a new lead
 router.post("/leads", async (req, res) => {
   try {
     if (!req.user) {
@@ -60,7 +57,7 @@ router.post("/leads", async (req, res) => {
     console.log("Validated lead data:", JSON.stringify(validatedData, null, 2));
 
     const expiryDate = new Date();
-    expiryDate.setDate(expiryDate.getDate() + 30); // 30 days from now
+    expiryDate.setDate(expiryDate.getDate() + 30); 
 
     const insertData = {
       user_id: req.user.id,
@@ -101,7 +98,6 @@ router.post("/leads", async (req, res) => {
   }
 });
 
-// Delete a lead
 router.delete("/leads/:id", async (req, res) => {
   try {
     if (!req.user) {
@@ -115,7 +111,6 @@ router.delete("/leads/:id", async (req, res) => {
 
     console.log(`Attempting to delete lead ${leadId} for user ${req.user.id}`);
 
-    // First check if the lead exists and belongs to the user
     const [lead] = await db.select()
       .from(leads)
       .where(eq(leads.id, leadId))
@@ -126,7 +121,9 @@ router.delete("/leads/:id", async (req, res) => {
       return res.status(404).json({ error: "Lead not found" });
     }
 
-    // Delete the lead
+    await db.delete(messages)
+      .where(eq(messages.lead_id, leadId));
+
     const [deletedLead] = await db.delete(leads)
       .where(eq(leads.id, leadId))
       .where(eq(leads.user_id, req.user.id))
@@ -143,7 +140,6 @@ router.delete("/leads/:id", async (req, res) => {
   }
 });
 
-// Update a lead
 router.patch("/leads/:id", async (req, res) => {
   try {
     if (!req.user) {
@@ -162,7 +158,6 @@ router.patch("/leads/:id", async (req, res) => {
 
     console.log(`Attempting to update lead ${leadId} with data:`, validatedData);
 
-    // First check if the lead exists and belongs to the user
     const [existingLead] = await db.select()
       .from(leads)
       .where(eq(leads.id, leadId))
@@ -172,7 +167,6 @@ router.patch("/leads/:id", async (req, res) => {
       return res.status(404).json({ error: "Lead not found" });
     }
 
-    // Update the lead
     const [updatedLead] = await db.update(leads)
       .set(validatedData)
       .where(eq(leads.id, leadId))

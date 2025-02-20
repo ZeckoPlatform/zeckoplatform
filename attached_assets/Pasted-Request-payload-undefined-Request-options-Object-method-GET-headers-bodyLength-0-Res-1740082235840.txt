@@ -1,0 +1,61 @@
+Request payload: undefined
+Request options: 
+Object {method: "GET", headers: {…}, bodyLength: 0}
+Response status: 200
+Rendering FreeUserLeadsView with leads: 
+(6) [{…}, {…}, {…}, {…}, {…}, {…}]
+Current user: 
+Object {id: 18, email: "bobolici1988@gmail.com", password: "46f36c5566b7f273ede96d285c4d2d57596b8b099300b001cd25aed598536c8244165e89fe63f4e4782839ace1e7f1a47a2…", userType: "free", superAdmin: false, …}
+API Request - DELETE /api/leads/5
+Request payload: undefined
+Request options: 
+Object {method: "DELETE", headers: {…}, bodyLength: 0}
+Rendering FreeUserLeadsView with leads: 
+(6) [{…}, {…}, {…}, {…}, {…}, {…}]
+Current user: 
+Object {id: 18, email: "bobolici1988@gmail.com", password: "46f36c5566b7f273ede96d285c4d2d57596b8b099300b001cd25aed598536c8244165e89fe63f4e4782839ace1e7f1a47a2…", userType: "free", superAdmin: false, …}
+Response status: 500
+Error response text: {"error":"Failed to delete lead","details":"update or delete on table \"leads\" violates foreign key constraint \"messages_lead_id_fkey\" on table \"messages\""}
+API request error: 
+Error {}
+
+Rendering FreeUserLeadsView with leads: 
+(6) [{…}, {…}, {…}, {…}, {…}, {…}]
+Current user: 
+Object {id: 18, email: "bobolici1988@gmail.com", password: "46f36c5566b7f273ede96d285c4d2d57596b8b099300b001cd25aed598536c8244165e89fe63f4e4782839ace1e7f1a47a2…", userType: "free", superAdmin: false, …}
+Rendering FreeUserLeadsView with leads: 
+(6) [{…}, {…}, {…}, {…}, {…}, {…}]
+Current user: 
+Object {id: 18, email: "bobolici1988@gmail.com", password: "46f36c5566b7f273ede96d285c4d2d57596b8b099300b001cd25aed598536c8244165e89fe63f4e4782839ace1e7f1a47a2…", userType: "free", superAdmin: false, …}
+Rendering FreeUserLeadsView with leads: 
+(6) [{…}, {…}, {…}, {…}, {…}, {…}]
+Current user: 
+Object {id: 18, email: "bobolici1988@gmail.com", password: "46f36c5566b7f273ede96d285c4d2d57596b8b099300b001cd25aed598536c8244165e89fe63f4e4782839ace1e7f1a47a2…", userType: "free", superAdmin: false, …}
+active: true
+businessName: null
+businessVerified: false
+companyNumber: null
+countryCode: "GB"
+deactivatedAt: null
+einNumber: null
+email: "bobolici1988@gmail.com"
+id: 18
+password: "46f36c5566b7f273ede96d285c4d2d57596b8b099300b001cd25aed598536c8244165e89fe63f4e4782839ace1e7f1a47a2a2adf7308e3421fc9fcf5d6fbcc04.d8e013a9b617f0d6600baa55023b8565"
+profile: Object
+registeredState: null
+stateRegistrationNumber: null
+stripeAccountId: null
+stripeAccountStatus: "pending"
+subscriptionActive: true
+subscriptionEndsAt: null
+subscriptionTier: "none"
+superAdmin: false
+userType: "free"
+utrNumber: null
+vatNumber: null
+verificationStatus: "pending"
+[[Prototype]]: Object
+Rendering FreeUserLeadsView with leads: 
+(6) [{…}, {…}, {…}, {…}, {…}, {…}]
+Current user: 
+Object {id: 18, email: "bobolici1988@gmail.com", password: "46f36c5566b7f273ede96d285c4d2d57596b8b099300b001cd25aed598536c8244165e89fe63f4e4782839ace1e7f1a47a2…", userType: "free", superAdmin: false, …}
