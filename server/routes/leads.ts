@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@db";
 import { leads } from "@db/schema";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 
 const router = Router();
 
@@ -14,6 +15,32 @@ const createLeadSchema = z.object({
   budget: z.number().min(0, "Budget must be a positive number").or(z.string().transform(val => Number(val))),
   location: z.string().min(1, "Location is required"),
   phone_number: z.string().optional().nullable()
+});
+
+// Get all leads for the authenticated user
+router.get("/leads", async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    console.log("Fetching leads for user:", req.user.id);
+
+    const userLeads = await db.select()
+      .from(leads)
+      .where(eq(leads.user_id, req.user.id))
+      .orderBy(leads.created_at);
+
+    console.log("Found leads:", userLeads.length);
+
+    return res.json(userLeads);
+  } catch (error) {
+    console.error("Error fetching leads:", error);
+    return res.status(500).json({ 
+      error: "Failed to fetch leads",
+      details: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
 });
 
 // Create a new lead
@@ -51,10 +78,10 @@ router.post("/leads", async (req, res) => {
 
     console.log("Attempting to insert lead with data:", JSON.stringify(insertData, null, 2));
 
-    const newLead = await db.insert(leads).values(insertData).returning();
+    const [newLead] = await db.insert(leads).values(insertData).returning();
 
-    console.log("Successfully created lead:", JSON.stringify(newLead[0], null, 2));
-    res.json(newLead[0]);
+    console.log("Successfully created lead:", JSON.stringify(newLead, null, 2));
+    res.json(newLead);
   } catch (error) {
     console.error("Lead creation failed. Error details:", error);
     if (error instanceof z.ZodError) {
