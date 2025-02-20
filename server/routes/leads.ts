@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@db";
 import { leads, messages, leadResponses } from "@db/schema";
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 
 const router = Router();
 
@@ -30,7 +30,12 @@ router.get("/leads", async (req, res) => {
     const userLeads = await db
       .select()
       .from(leads)
-      .where(eq(leads.user_id, req.user.id))
+      .where(
+        and(
+          eq(leads.user_id, req.user.id),
+          isNull(leads.deleted_at) // Only return non-deleted leads
+        )
+      )
       .orderBy(leads.created_at);
 
     console.log("Found leads:", userLeads.length);
