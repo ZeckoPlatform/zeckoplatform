@@ -9,6 +9,7 @@ import { SelectLead } from "@/types/leads";
 import { CreateLeadForm, LeadFormData } from "@/components/leads/CreateLeadForm";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { FreeUserLeadsView } from "@/components/leads/FreeUserLeadsView";
+import { BusinessLeadsView } from "@/components/leads/BusinessLeadsView";
 
 const LeadsPage = () => {
   const { user } = useAuth();
@@ -184,27 +185,29 @@ const LeadsPage = () => {
     <div className="container mx-auto p-6">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Leads</h1>
-        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>Create New Lead</Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-2xl h-[90vh] flex flex-col">
-            <DialogHeader className="px-6 py-4 border-b flex-shrink-0">
-              <DialogTitle>Create New Lead</DialogTitle>
-              <DialogDescription>
-                Fill out the form below to create a new business lead
-              </DialogDescription>
-            </DialogHeader>
-            <div className="px-6 py-4 flex-1 overflow-y-auto">
-              <ErrorBoundary>
-                <CreateLeadForm
-                  onSubmit={(data) => createLeadMutation.mutate(data)}
-                  isSubmitting={createLeadMutation.isPending}
-                />
-              </ErrorBoundary>
-            </div>
-          </DialogContent>
-        </Dialog>
+        {user.userType === 'free' && (
+          <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>Create New Lead</Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-2xl h-[90vh] flex flex-col">
+              <DialogHeader className="px-6 py-4 border-b flex-shrink-0">
+                <DialogTitle>Create New Lead</DialogTitle>
+                <DialogDescription>
+                  Fill out the form below to create a new business lead
+                </DialogDescription>
+              </DialogHeader>
+              <div className="px-6 py-4 flex-1 overflow-y-auto">
+                <ErrorBoundary>
+                  <CreateLeadForm
+                    onSubmit={(data) => createLeadMutation.mutate(data)}
+                    isSubmitting={createLeadMutation.isPending}
+                  />
+                </ErrorBoundary>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
@@ -244,7 +247,7 @@ const LeadsPage = () => {
           <div>Loading leads...</div>
         ) : error ? (
           <div className="text-red-500">Error loading leads. Please try again.</div>
-        ) : (
+        ) : user.userType === 'free' ? (
           <FreeUserLeadsView
             leads={leads}
             createLeadMutation={createLeadMutation}
@@ -258,6 +261,11 @@ const LeadsPage = () => {
             user={userWithValidCountry}
             acceptProposalMutation={acceptProposalMutation}
             rejectProposalMutation={rejectProposalMutation}
+          />
+        ) : (
+          <BusinessLeadsView
+            leads={leads}
+            user={userWithValidCountry}
           />
         )}
       </ErrorBoundary>

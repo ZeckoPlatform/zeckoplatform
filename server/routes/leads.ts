@@ -3,6 +3,7 @@ import { db } from "@db";
 import { leads, messages, leadResponses } from "@db/schema";
 import { z } from "zod";
 import { eq, and, isNull } from "drizzle-orm";
+import { calculateMatchScore } from "../utils/matching";
 
 const router = Router();
 
@@ -25,25 +26,52 @@ router.get("/leads", async (req, res) => {
       return res.status(401).json({ error: "Authentication required" });
     }
 
-    console.log("Fetching leads for user:", req.user.id);
+    console.log("Fetching leads for user:", req.user.id, "type:", req.user.userType);
 
-    const userLeads = await db
-      .select()
-      .from(leads)
-      .where(
-        and(
-          eq(leads.user_id, req.user.id),
-          isNull(leads.deleted_at) // Only return non-deleted leads
+    if (req.user.userType === 'free') {
+      // Free users see their own leads
+      const userLeads = await db
+        .select()
+        .from(leads)
+        .where(
+          and(
+            eq(leads.user_id, req.user.id),
+            isNull(leads.deleted_at)
+          )
         )
-      )
-      .orderBy(leads.created_at);
+        .orderBy(leads.created_at);
 
-    console.log("Found leads:", userLeads.length);
+      console.log("Found leads for free user:", userLeads.length);
+      return res.json(userLeads);
+    } else {
+      // Business users see leads from free users, filtered by match score
+      const allLeads = await db
+        .select()
+        .from(leads)
+        .where(
+          and(
+            isNull(leads.deleted_at),
+            eq(leads.status, 'open')
+          )
+        )
+        .orderBy(leads.created_at);
 
-    return res.json(userLeads);
+      // Filter and sort leads based on match score
+      const matchedLeads = allLeads
+        .map(lead => ({
+          lead,
+          score: calculateMatchScore(lead, req.user)
+        }))
+        .filter(({ score }) => score.totalScore > 0) // Only show leads with some match
+        .sort((a, b) => b.score.totalScore - a.score.totalScore)
+        .map(({ lead }) => lead);
+
+      console.log("Found matching leads for business:", matchedLeads.length);
+      return res.json(matchedLeads);
+    }
   } catch (error) {
     console.error("Error fetching leads:", error);
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: "Failed to fetch leads",
       details: error instanceof Error ? error.message : "Unknown error"
     });
@@ -63,7 +91,7 @@ router.post("/leads", async (req, res) => {
     console.log("Validated lead data:", JSON.stringify(validatedData, null, 2));
 
     const expiryDate = new Date();
-    expiryDate.setDate(expiryDate.getDate() + 30); 
+    expiryDate.setDate(expiryDate.getDate() + 30);
 
     const insertData = {
       user_id: req.user.id,
@@ -89,16 +117,16 @@ router.post("/leads", async (req, res) => {
     console.error("Lead creation failed. Error details:", error);
     if (error instanceof z.ZodError) {
       console.error("Validation errors:", JSON.stringify(error.errors, null, 2));
-      return res.status(400).json({ 
-        error: "Validation failed", 
+      return res.status(400).json({
+        error: "Validation failed",
         details: error.errors.map(e => ({
           field: e.path.join('.'),
           message: e.message
         }))
       });
     }
-    res.status(500).json({ 
-      error: "Failed to create lead", 
+    res.status(500).json({
+      error: "Failed to create lead",
       details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
@@ -122,7 +150,7 @@ router.delete("/leads/:id", async (req, res) => {
       .where(and(
         eq(leads.id, leadId),
         eq(leads.user_id, req.user.id),
-        isNull(leads.deleted_at) // Only check non-deleted leads
+        isNull(leads.deleted_at)
       ));
 
     if (!lead) {
@@ -133,7 +161,7 @@ router.delete("/leads/:id", async (req, res) => {
     // Soft delete the lead
     await db
       .update(leads)
-      .set({ 
+      .set({
         deleted_at: new Date()
       })
       .where(and(
