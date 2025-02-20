@@ -16,6 +16,8 @@ app.use((req, res, next) => {
     log('=== Request Debug Info ===');
     log(`Path: ${req.method} ${req.path}`);
     log(`Authorization: ${req.headers.authorization ? 'Present' : 'Missing'}`);
+    log(`Query params: ${JSON.stringify(req.query)}`);
+    log(`Body length: ${req.body ? JSON.stringify(req.body).length : 0}`);
     log('=== End Debug Info ===');
   }
   next();
@@ -49,6 +51,7 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 const createServer = (): Server => {
   log('Creating HTTP server...');
   const server = registerRoutes(app);
+  log('Routes registered successfully');
   return server;
 };
 
@@ -69,7 +72,13 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
     const onError = (error: NodeJS.ErrnoException) => {
       if (isResolved) return;
 
-      log(`Server error on port ${port}: ${error.message}`);
+      log(`Server error on port ${port}:`);
+      log(`Error name: ${error.name}`);
+      log(`Error message: ${error.message}`);
+      log(`Error code: ${error.code}`);
+      if (error.code === 'EADDRINUSE') {
+        log(`Port ${port} is already in use`);
+      }
       cleanup();
       resolve(false);
       isResolved = true;
@@ -78,7 +87,9 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
     const onListening = () => {
       if (isResolved) return;
 
-      log(`Server successfully started and listening on port ${port}`);
+      const addr = server.address();
+      const actualPort = typeof addr === 'string' ? addr : addr?.port;
+      log(`Server successfully started and listening on port ${actualPort}`);
       resolve(true);
       isResolved = true;
     };
@@ -86,19 +97,11 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
     server.once('error', onError);
     server.once('listening', onListening);
 
-    // Set a timeout for the port binding attempt
-    const timeout = setTimeout(() => {
-      if (!isResolved) {
-        log(`Timeout while attempting to bind to port ${port}`);
-        cleanup();
-        resolve(false);
-        isResolved = true;
-      }
-    }, 10000); // 10 second timeout
-
     try {
-      log(`Attempting to bind to port ${port}...`);
-      server.listen(port, '0.0.0.0');
+      // Hardcode port 5000 for testing
+      const PORT = 5000;
+      log(`Attempting to bind to port ${PORT} on address 0.0.0.0...`);
+      server.listen(PORT, '0.0.0.0');
     } catch (error) {
       if (!isResolved) {
         log(`Failed to start server: ${error}`);
@@ -106,8 +109,6 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
         resolve(false);
         isResolved = true;
       }
-    } finally {
-      clearTimeout(timeout);
     }
   });
 };
@@ -119,56 +120,39 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
     log(`NODE_ENV: ${process.env.NODE_ENV}`);
     log(`PORT: ${process.env.PORT}`);
     log(`REPLIT_PORT: ${process.env.REPLIT_PORT}`);
+    log(`Process ID: ${process.pid}`);
+    log(`Platform: ${process.platform}`);
+    log(`Node Version: ${process.version}`);
     log('=== End Environment Information ===');
 
     log('Initializing server...');
     const server = createServer();
 
-    // Define ports to try in order of preference
-    const preferredPort = process.env.PORT || process.env.REPLIT_PORT;
-    const ports = [
-      preferredPort ? parseInt(preferredPort.toString()) : 3000,
-      3000,
-      3001,
-      5000,
-      5001,
-      8080
-    ].filter((p, i, arr) => arr.indexOf(p) === i); // Remove duplicates
+    // Use hardcoded port 5000 for testing
+    const PORT = 5000;
+    log(`Testing server startup with fixed port ${PORT}`);
 
-    log(`Will try ports in order: ${ports.join(', ')}`);
-    let serverStarted = false;
-
-    // Try each port until one works
-    for (const port of ports) {
-      log(`Attempting to start server on port ${port}...`);
-      serverStarted = await startServer(server, port);
-      if (serverStarted) {
-        // Setup Vite or static serving after successful port binding
-        try {
-          if (app.get("env") === "development") {
-            log('Setting up Vite development server...');
-            await setupVite(app, server);
-            log('Vite setup completed successfully');
-          } else {
-            log('Production mode: Setting up static file serving...');
-            serveStatic(app);
-          }
-          log('Server setup completed successfully');
-          break;
-        } catch (error) {
-          log(`Error during Vite/static setup: ${error}`);
-          // Close the server and try the next port
-          server.close();
-          serverStarted = false;
-          continue;
+    const serverStarted = await startServer(server, PORT);
+    if (serverStarted) {
+      log('Server started successfully, setting up services...');
+      try {
+        if (app.get("env") === "development") {
+          log('Setting up Vite development server...');
+          await setupVite(app, server);
+          log('Vite setup completed successfully');
+        } else {
+          log('Production mode: Setting up static file serving...');
+          serveStatic(app);
+          log('Static file serving setup completed');
         }
+        log('Server setup completed successfully');
+      } catch (error) {
+        log(`Error during Vite/static setup: ${error}`);
+        throw error;
       }
+    } else {
+      throw new Error(`Could not start server on port ${PORT}`);
     }
-
-    if (!serverStarted) {
-      throw new Error('Could not start server on any available port');
-    }
-
   } catch (error) {
     log(`Fatal server startup error: ${error}`);
     process.exit(1);
