@@ -155,7 +155,6 @@ export function FreeUserLeadsView({
                               </Dialog>
                             </div>
                           )}
-
                           {response.status === "pending" && acceptProposalMutation && rejectProposalMutation && (
                             <div className="mt-4 flex items-center gap-2">
                               <Button
