@@ -10,6 +10,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { SelectLead, BUSINESS_CATEGORIES } from "@/types/leads";
 import { CreateLeadForm, LeadFormData } from "@/components/leads/CreateLeadForm";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { FreeUserLeadsView } from "@/components/leads/FreeUserLeadsView";
 
 export { BUSINESS_CATEGORIES } from '@/types/leads';
 
@@ -27,7 +28,7 @@ const LeadsPage = () => {
       console.log('Fetching leads...');
       const response = await apiRequest('GET', '/api/leads');
       const data = await response.json();
-      console.log('Fetched leads:', data);
+      console.log('Fetched leads data:', data);
       return data;
     }
   });
@@ -115,46 +116,17 @@ const LeadsPage = () => {
         </Dialog>
       </div>
 
-      <div className="grid gap-6">
-        {leads.map((lead: SelectLead) => (
-          <Card key={lead.id}>
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <CardTitle>{lead.title}</CardTitle>
-                {lead.user_id === user?.id && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setEditingLead(lead)}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground mb-4">{lead.description}</p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                <div>
-                  <span className="font-medium">Category:</span> {lead.category}
-                  {lead.subcategory && ` > ${lead.subcategory}`}
-                </div>
-                <div>
-                  <span className="font-medium">Budget:</span> £{lead.budget}
-                </div>
-                <div>
-                  <span className="font-medium">Location:</span> {lead.location}
-                </div>
-                {lead.phone_number && (
-                  <div>
-                    <span className="font-medium">Phone:</span> {lead.phone_number}
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <FreeUserLeadsView
+        leads={leads}
+        createLeadMutation={createLeadMutation}
+        updateLeadMutation={undefined}
+        editingLead={editingLead}
+        setEditingLead={setEditingLead}
+        deleteLeadMutation={undefined}
+        user={user}
+        acceptProposalMutation={undefined}
+        rejectProposalMutation={undefined}
+      />
     </div>
   );
 };
