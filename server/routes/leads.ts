@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@db";
 import { leads, messages, leadResponses } from "@db/schema";
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 
 const router = Router();
 
@@ -29,7 +29,7 @@ router.get("/leads", async (req, res) => {
       .from(leads)
       .where(and(
         eq(leads.user_id, req.user.id),
-        eq(leads.deleted_at, null)
+        isNull(leads.deleted_at)
       ))
       .orderBy(leads.created_at);
 
@@ -122,7 +122,7 @@ router.delete("/leads/:id", async (req, res) => {
       .where(and(
         eq(leads.id, leadId),
         eq(leads.user_id, req.user.id),
-        eq(leads.deleted_at, null)
+        isNull(leads.deleted_at)
       ));
 
     if (!lead) {
