@@ -45,7 +45,7 @@ const LeadsPage = () => {
         description: formData.description.trim(),
         category: formData.category,
         subcategory: formData.subcategory,
-        budget: parseInt(formData.budget, 10),
+        budget: formData.budget,  // Keep as string
         location: formData.location.trim(),
         phone_number: formData.phone_number?.trim() || null
       };
