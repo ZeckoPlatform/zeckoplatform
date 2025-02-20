@@ -26,14 +26,15 @@ export type LeadFormData = z.infer<typeof createLeadSchema>;
 interface CreateLeadFormProps {
   onSubmit: (data: LeadFormData) => void;
   isSubmitting: boolean;
+  defaultValues?: LeadFormData;
 }
 
-function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
+function CreateLeadFormInner({ onSubmit, isSubmitting, defaultValues }: CreateLeadFormProps) {
+  const [selectedCategory, setSelectedCategory] = useState<string>(defaultValues?.category || "");
 
   const form = useForm<LeadFormData>({
     resolver: zodResolver(createLeadSchema),
-    defaultValues: {
+    defaultValues: defaultValues || {
       title: "",
       description: "",
       category: "",
@@ -86,6 +87,7 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
               form.setValue("category", value);
               form.setValue("subcategory", "");
             }}
+            defaultValue={defaultValues?.category}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select a category" />
@@ -108,6 +110,7 @@ function CreateLeadFormInner({ onSubmit, isSubmitting }: CreateLeadFormProps) {
             <Label htmlFor="subcategory">Subcategory</Label>
             <Select
               onValueChange={(value) => form.setValue("subcategory", value)}
+              defaultValue={defaultValues?.subcategory}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select a subcategory" />

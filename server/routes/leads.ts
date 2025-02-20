@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@db";
-import { leads, messages } from "@db/schema";
+import { leads, messages, leadResponses } from "@db/schema";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 
@@ -121,8 +121,12 @@ router.delete("/leads/:id", async (req, res) => {
       return res.status(404).json({ error: "Lead not found" });
     }
 
+    // Delete related records in the correct order
     await db.delete(messages)
       .where(eq(messages.lead_id, leadId));
+
+    await db.delete(leadResponses)
+      .where(eq(leadResponses.lead_id, leadId));
 
     const [deletedLead] = await db.delete(leads)
       .where(eq(leads.id, leadId))
