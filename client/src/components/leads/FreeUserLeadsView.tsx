@@ -115,7 +115,7 @@ export function FreeUserLeadsView({
                           <p className="text-sm mt-2">{response.proposal}</p>
 
                           {response.status === "accepted" && (
-                            <div className="mt-4 flex items-center gap2">
+                            <div className="mt-4">
                               <Dialog>
                                 <DialogTrigger asChild>
                                   <Button variant="outline" size="sm" className="relative">
