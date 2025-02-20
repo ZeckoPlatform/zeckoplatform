@@ -37,6 +37,7 @@ export function FreeUserLeadsView({
 }: FreeUserLeadsViewProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [selectedMessageThread, setSelectedMessageThread] = useState<{ leadId: number; businessId: number } | null>(null);
 
   console.log('Rendering FreeUserLeadsView with leads:', leads);
   console.log('Current user:', user);
@@ -116,7 +117,7 @@ export function FreeUserLeadsView({
                           <p className="text-sm mt-2">{response.proposal}</p>
 
                           {/* Message Dialog for Accepted Proposals */}
-                          {response.status === "accepted" && (
+                          {response.status === "accepted" && response.business_id && (
                             <div className="mt-4">
                               <Dialog>
                                 <DialogTrigger asChild>
