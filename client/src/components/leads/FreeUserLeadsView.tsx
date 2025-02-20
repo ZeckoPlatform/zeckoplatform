@@ -46,6 +46,7 @@ export function FreeUserLeadsView({
       <div className="grid gap-4">
         {leads && leads.length > 0 ? (
           leads.map((lead) => {
+            // Get unread messages count for this lead
             const unreadCount = getUnreadCount(lead.messages, user.id);
 
             return (
@@ -114,6 +115,7 @@ export function FreeUserLeadsView({
 
                           <p className="text-sm mt-2">{response.proposal}</p>
 
+                          {/* Message Dialog for Accepted Proposals */}
                           {response.status === "accepted" && (
                             <div className="mt-4">
                               <Dialog>
