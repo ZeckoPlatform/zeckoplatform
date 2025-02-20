@@ -82,7 +82,7 @@ const LeadsPage = () => {
         description: data.formData.description.trim(),
         category: data.formData.category,
         subcategory: data.formData.subcategory,
-        budget: parseInt(data.formData.budget, 10),
+        budget: data.formData.budget,  // Keep as string
         location: data.formData.location.trim(),
         phone_number: data.formData.phone_number?.trim() || null
       });
@@ -121,7 +121,7 @@ const LeadsPage = () => {
       }
       return await response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/leads'] });
       toast({
         title: "Success",
