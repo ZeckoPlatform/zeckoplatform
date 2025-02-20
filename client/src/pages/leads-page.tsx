@@ -10,8 +10,6 @@ import { CreateLeadForm, LeadFormData } from "@/components/leads/CreateLeadForm"
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { FreeUserLeadsView } from "@/components/leads/FreeUserLeadsView";
 
-export { BUSINESS_CATEGORIES } from '@/types/leads';
-
 const LeadsPage = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -22,7 +20,7 @@ const LeadsPage = () => {
 
   console.log('LeadsPage - Current user:', user);
 
-  const { data: leads = [], isLoading } = useQuery({
+  const { data: leads = [], isLoading, error } = useQuery({
     queryKey: ['/api/leads'],
     queryFn: async () => {
       console.log('Fetching leads...');
@@ -82,12 +80,65 @@ const LeadsPage = () => {
     }
   });
 
+  const deleteLeadMutation = useMutation({
+    mutationFn: async (leadId: number) => {
+      const response = await apiRequest('DELETE', `/api/leads/${leadId}`);
+      if (!response.ok) {
+        throw new Error('Failed to delete lead');
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/leads'] });
+      toast({
+        title: "Success",
+        description: "Lead deleted successfully",
+      });
+    },
+  });
+
+  const acceptProposalMutation = useMutation({
+    mutationFn: async ({ leadId, responseId }: { leadId: number; responseId: number }) => {
+      const response = await apiRequest('POST', `/api/leads/${leadId}/responses/${responseId}/accept`);
+      if (!response.ok) {
+        throw new Error('Failed to accept proposal');
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/leads'] });
+      toast({
+        title: "Success",
+        description: "Proposal accepted successfully",
+      });
+    },
+  });
+
+  const rejectProposalMutation = useMutation({
+    mutationFn: async ({ leadId, responseId }: { leadId: number; responseId: number }) => {
+      const response = await apiRequest('POST', `/api/leads/${leadId}/responses/${responseId}/reject`);
+      if (!response.ok) {
+        throw new Error('Failed to reject proposal');
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/leads'] });
+      toast({
+        title: "Success",
+        description: "Proposal rejected successfully",
+      });
+    },
+  });
+
   if (!user) {
     return <div>Please log in to view leads.</div>;
   }
 
   if (isLoading) {
     return <div>Loading leads...</div>;
+  }
+
+  if (error) {
+    console.error('Error loading leads:', error);
+    return <div>Error loading leads. Please try again.</div>;
   }
 
   console.log('Rendering leads page with leads:', leads);
@@ -128,10 +179,10 @@ const LeadsPage = () => {
         updateLeadMutation={undefined}
         editingLead={editingLead}
         setEditingLead={setEditingLead}
-        deleteLeadMutation={undefined}
+        deleteLeadMutation={deleteLeadMutation}
         user={user}
-        acceptProposalMutation={undefined}
-        rejectProposalMutation={undefined}
+        acceptProposalMutation={acceptProposalMutation}
+        rejectProposalMutation={rejectProposalMutation}
       />
     </div>
   );

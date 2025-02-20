@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -13,9 +14,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ChevronLeft } from "lucide-react";
-import { BUSINESS_CATEGORIES } from "../leads-page";
+import { BUSINESS_CATEGORIES } from "@/types/leads";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useState } from "react";
 
 // Phone number formatting configuration
 const PHONE_COUNTRY_CODES = {
