@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@db";
 import { leads, messages, leadResponses } from "@db/schema";
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or, isNull } from "drizzle-orm";
 
 const router = Router();
 
@@ -24,13 +24,18 @@ router.get("/leads", async (req, res) => {
 
     console.log("Fetching leads for user:", req.user.id);
 
+    // Update query to handle both NULL and false values for archived
     const userLeads = await db
       .select()
       .from(leads)
       .where(and(
         eq(leads.user_id, req.user.id),
-        eq(leads.archived, false)
-      ));
+        or(
+          isNull(leads.archived),
+          eq(leads.archived, false)
+        )
+      ))
+      .orderBy(leads.created_at);
 
     console.log("Found leads:", userLeads.length);
 
