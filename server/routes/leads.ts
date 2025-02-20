@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@db";
 import { leads, messages, leadResponses } from "@db/schema";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 const router = Router();
 
@@ -24,10 +24,13 @@ router.get("/leads", async (req, res) => {
 
     console.log("Fetching leads for user:", req.user.id);
 
-    const userLeads = await db.select()
+    const userLeads = await db
+      .select()
       .from(leads)
-      .where(eq(leads.user_id, req.user.id))
-      .orderBy(leads.created_at);
+      .where(and(
+        eq(leads.user_id, req.user.id),
+        eq(leads.archived, false)
+      ));
 
     console.log("Found leads:", userLeads.length);
 
@@ -71,6 +74,7 @@ router.post("/leads", async (req, res) => {
       region: req.user.countryCode || "GB",
       status: "open" as const,
       expires_at: expiryDate,
+      archived: false
     };
 
     console.log("Attempting to insert lead with data:", JSON.stringify(insertData, null, 2));
@@ -111,30 +115,32 @@ router.delete("/leads/:id", async (req, res) => {
 
     console.log(`Attempting to delete lead ${leadId} for user ${req.user.id}`);
 
-    const [lead] = await db.select()
+    const [lead] = await db
+      .select()
       .from(leads)
-      .where(eq(leads.id, leadId))
-      .where(eq(leads.user_id, req.user.id));
+      .where(and(
+        eq(leads.id, leadId),
+        eq(leads.user_id, req.user.id),
+        eq(leads.archived, false)
+      ));
 
     if (!lead) {
       console.log(`Lead ${leadId} not found or does not belong to user ${req.user.id}`);
       return res.status(404).json({ error: "Lead not found" });
     }
 
-    // Delete related records in the correct order
-    await db.delete(messages)
-      .where(eq(messages.lead_id, leadId));
-
-    await db.delete(leadResponses)
-      .where(eq(leadResponses.lead_id, leadId));
-
-    const [deletedLead] = await db.delete(leads)
-      .where(eq(leads.id, leadId))
-      .where(eq(leads.user_id, req.user.id))
+    // Instead of deleting, mark as archived
+    const [archivedLead] = await db
+      .update(leads)
+      .set({ archived: true })
+      .where(and(
+        eq(leads.id, leadId),
+        eq(leads.user_id, req.user.id)
+      ))
       .returning();
 
-    console.log(`Successfully deleted lead:`, deletedLead);
-    res.json({ message: "Lead deleted successfully", lead: deletedLead });
+    console.log(`Successfully archived lead:`, archivedLead);
+    res.json({ message: "Lead deleted successfully", lead: archivedLead });
   } catch (error) {
     console.error("Failed to delete lead:", error);
     res.status(500).json({
@@ -162,19 +168,26 @@ router.patch("/leads/:id", async (req, res) => {
 
     console.log(`Attempting to update lead ${leadId} with data:`, validatedData);
 
-    const [existingLead] = await db.select()
+    const [existingLead] = await db
+      .select()
       .from(leads)
-      .where(eq(leads.id, leadId))
-      .where(eq(leads.user_id, req.user.id));
+      .where(and(
+        eq(leads.id, leadId),
+        eq(leads.user_id, req.user.id),
+        eq(leads.archived, false)
+      ));
 
     if (!existingLead) {
       return res.status(404).json({ error: "Lead not found" });
     }
 
-    const [updatedLead] = await db.update(leads)
+    const [updatedLead] = await db
+      .update(leads)
       .set(validatedData)
-      .where(eq(leads.id, leadId))
-      .where(eq(leads.user_id, req.user.id))
+      .where(and(
+        eq(leads.id, leadId),
+        eq(leads.user_id, req.user.id)
+      ))
       .returning();
 
     console.log("Successfully updated lead:", updatedLead);
