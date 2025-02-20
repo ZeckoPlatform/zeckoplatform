@@ -18,44 +18,20 @@ const LeadsPage = () => {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<SelectLead | null>(null);
 
-  console.log('LeadsPage - Current user:', user);
-
   const { data: leads = [], isLoading, error } = useQuery<SelectLead[]>({
     queryKey: ['/api/leads'],
     queryFn: async () => {
-      console.log('Fetching leads...');
       try {
         const response = await apiRequest('GET', '/api/leads');
-        console.log('Response received:', response.status);
-
-        // Check if response is ok before trying to parse
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-
-        // Get the raw text first to see what we're dealing with
-        const text = await response.text();
-        console.log('Raw response text:', text);
-
-        // Try to parse the text as JSON
-        let data;
-        try {
-          data = JSON.parse(text);
-        } catch (parseError) {
-          console.error('JSON parse error:', parseError);
-          throw new Error('Failed to parse response as JSON');
-        }
-
-        console.log('Parsed leads data:', data);
-
+        const data = await response.json();
         if (!Array.isArray(data)) {
-          console.error('Invalid leads data format:', data);
           throw new Error('Invalid leads data format');
         }
-
         return data;
       } catch (err) {
-        console.error('Error fetching leads:', err);
         throw err;
       }
     }
@@ -63,7 +39,6 @@ const LeadsPage = () => {
 
   const createLeadMutation = useMutation({
     mutationFn: async (formData: LeadFormData) => {
-      console.log('Creating lead with form data:', formData);
       const data = {
         title: formData.title.trim(),
         description: formData.description.trim(),
@@ -74,23 +49,13 @@ const LeadsPage = () => {
         phone_number: formData.phone_number?.trim() || null
       };
 
-      console.log('Processed data for submission:', data);
-
-      try {
-        const response = await apiRequest('POST', '/api/leads', data);
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error('Server error response:', errorData);
-          throw new Error(errorData.message || 'Failed to create lead');
-        }
-
-        const result = await response.json();
-        console.log('Successfully created lead:', result);
-        return result;
-      } catch (error) {
-        console.error('Lead creation error:', error);
-        throw error;
+      const response = await apiRequest('POST', '/api/leads', data);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create lead');
       }
+
+      return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/leads'] });
@@ -101,7 +66,6 @@ const LeadsPage = () => {
       });
     },
     onError: (error: Error) => {
-      console.error('Lead creation mutation error:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to create lead",
@@ -162,16 +126,11 @@ const LeadsPage = () => {
     return <div>Please log in to view leads.</div>;
   }
 
-  if (isLoading) {
-    return <div>Loading leads...</div>;
-  }
-
-  if (error) {
-    console.error('Error loading leads:', error);
-    return <div>Error loading leads. Please try again.</div>;
-  }
-
-  console.log('Rendering leads page with leads:', leads);
+  // Ensure countryCode is always a valid value for components
+  const userWithValidCountry = {
+    ...user,
+    countryCode: user.countryCode || "GB" // Default to GB if countryCode is null
+  };
 
   return (
     <div className="container mx-auto p-6">
@@ -191,10 +150,7 @@ const LeadsPage = () => {
             <div className="px-6 py-4 flex-1 overflow-y-auto">
               <ErrorBoundary>
                 <CreateLeadForm
-                  onSubmit={(data) => {
-                    console.log('Form submitted with data:', data);
-                    createLeadMutation.mutate(data);
-                  }}
+                  onSubmit={(data) => createLeadMutation.mutate(data)}
                   isSubmitting={createLeadMutation.isPending}
                 />
               </ErrorBoundary>
@@ -204,17 +160,23 @@ const LeadsPage = () => {
       </div>
 
       <ErrorBoundary>
-        <FreeUserLeadsView
-          leads={leads}
-          createLeadMutation={createLeadMutation}
-          updateLeadMutation={undefined}
-          editingLead={editingLead}
-          setEditingLead={setEditingLead}
-          deleteLeadMutation={deleteLeadMutation}
-          user={user}
-          acceptProposalMutation={acceptProposalMutation}
-          rejectProposalMutation={rejectProposalMutation}
-        />
+        {isLoading ? (
+          <div>Loading leads...</div>
+        ) : error ? (
+          <div className="text-red-500">Error loading leads. Please try again.</div>
+        ) : (
+          <FreeUserLeadsView
+            leads={leads}
+            createLeadMutation={createLeadMutation}
+            updateLeadMutation={undefined}
+            editingLead={editingLead}
+            setEditingLead={setEditingLead}
+            deleteLeadMutation={deleteLeadMutation}
+            user={userWithValidCountry}
+            acceptProposalMutation={acceptProposalMutation}
+            rejectProposalMutation={rejectProposalMutation}
+          />
+        )}
       </ErrorBoundary>
     </div>
   );
