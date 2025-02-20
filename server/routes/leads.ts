@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@db";
 import { leads, messages, leadResponses } from "@db/schema";
 import { z } from "zod";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 const router = Router();
 
@@ -27,10 +27,7 @@ router.get("/leads", async (req, res) => {
     const userLeads = await db
       .select()
       .from(leads)
-      .where(and(
-        eq(leads.user_id, req.user.id),
-        isNull(leads.deleted_at)
-      ))
+      .where(eq(leads.user_id, req.user.id))
       .orderBy(leads.created_at);
 
     console.log("Found leads:", userLeads.length);
@@ -113,16 +110,12 @@ router.delete("/leads/:id", async (req, res) => {
       return res.status(400).json({ error: "Invalid lead ID" });
     }
 
-    console.log(`Attempting to soft delete lead ${leadId} for user ${req.user.id}`);
-
-    // First check if the lead exists and belongs to the user
     const [lead] = await db
       .select()
       .from(leads)
       .where(and(
         eq(leads.id, leadId),
-        eq(leads.user_id, req.user.id),
-        isNull(leads.deleted_at)
+        eq(leads.user_id, req.user.id)
       ));
 
     if (!lead) {
@@ -130,7 +123,7 @@ router.delete("/leads/:id", async (req, res) => {
       return res.status(404).json({ error: "Lead not found" });
     }
 
-    // Soft delete by setting deleted_at timestamp
+    // Set deleted_at timestamp
     const [deletedLead] = await db
       .update(leads)
       .set({ 

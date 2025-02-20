@@ -130,6 +130,7 @@ export const leads = pgTable("leads", {
   expires_at: timestamp("expires_at").notNull(),
   archived: boolean("archived").default(false),
   region: text("region", { enum: ["GB", "US"] }).notNull(),
+  deleted_at: timestamp("deleted_at"),
 });
 
 export const leadResponses = pgTable("lead_responses", {
