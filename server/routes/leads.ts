@@ -317,4 +317,155 @@ router.post("/leads/:id/responses", async (req, res) => {
   }
 });
 
+// Add proposal acceptance route
+router.post("/leads/:id/responses/:responseId/accept", async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const leadId = parseInt(req.params.id);
+    const responseId = parseInt(req.params.responseId);
+
+    if (isNaN(leadId) || isNaN(responseId)) {
+      return res.status(400).json({ error: "Invalid lead or response ID" });
+    }
+
+    // Verify the lead belongs to the user and exists
+    const [lead] = await db
+      .select()
+      .from(leads)
+      .where(
+        and(
+          eq(leads.id, leadId),
+          eq(leads.user_id, req.user.id),
+          isNull(leads.deleted_at)
+        )
+      );
+
+    if (!lead) {
+      return res.status(404).json({ error: "Lead not found" });
+    }
+
+    // Get the response
+    const [response] = await db
+      .select()
+      .from(leadResponses)
+      .where(
+        and(
+          eq(leadResponses.id, responseId),
+          eq(leadResponses.lead_id, leadId)
+        )
+      );
+
+    if (!response) {
+      return res.status(404).json({ error: "Response not found" });
+    }
+
+    // Update response status to accepted
+    const [updatedResponse] = await db
+      .update(leadResponses)
+      .set({
+        status: 'accepted'
+      })
+      .where(eq(leadResponses.id, responseId))
+      .returning();
+
+    // Update lead status
+    await db
+      .update(leads)
+      .set({
+        status: 'in_progress'
+      })
+      .where(eq(leads.id, leadId));
+
+    // Reject all other responses
+    await db
+      .update(leadResponses)
+      .set({
+        status: 'rejected'
+      })
+      .where(
+        and(
+          eq(leadResponses.lead_id, leadId),
+          isNull(leadResponses.deleted_at),
+          eq(leadResponses.status, 'pending'),
+          isNull(leadResponses.deleted_at)
+        )
+      );
+
+    res.json(updatedResponse);
+  } catch (error) {
+    console.error("Failed to accept proposal:", error);
+    res.status(500).json({
+      error: "Failed to accept proposal",
+      details: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
+// Add proposal rejection route
+router.post("/leads/:id/responses/:responseId/reject", async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const leadId = parseInt(req.params.id);
+    const responseId = parseInt(req.params.responseId);
+
+    if (isNaN(leadId) || isNaN(responseId)) {
+      return res.status(400).json({ error: "Invalid lead or response ID" });
+    }
+
+    // Verify the lead belongs to the user and exists
+    const [lead] = await db
+      .select()
+      .from(leads)
+      .where(
+        and(
+          eq(leads.id, leadId),
+          eq(leads.user_id, req.user.id),
+          isNull(leads.deleted_at)
+        )
+      );
+
+    if (!lead) {
+      return res.status(404).json({ error: "Lead not found" });
+    }
+
+    // Get the response
+    const [response] = await db
+      .select()
+      .from(leadResponses)
+      .where(
+        and(
+          eq(leadResponses.id, responseId),
+          eq(leadResponses.lead_id, leadId)
+        )
+      );
+
+    if (!response) {
+      return res.status(404).json({ error: "Response not found" });
+    }
+
+    // Update response status to rejected
+    const [updatedResponse] = await db
+      .update(leadResponses)
+      .set({
+        status: 'rejected'
+      })
+      .where(eq(leadResponses.id, responseId))
+      .returning();
+
+    res.json(updatedResponse);
+  } catch (error) {
+    console.error("Failed to reject proposal:", error);
+    res.status(500).json({
+      error: "Failed to reject proposal",
+      details: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
 export default router;
