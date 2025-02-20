@@ -236,4 +236,85 @@ router.patch("/leads/:id", async (req, res) => {
   }
 });
 
+// Add new proposal submission route
+const proposalSchema = z.object({
+  proposal: z.string().min(1, "Proposal text is required"),
+});
+
+router.post("/leads/:id/responses", async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const leadId = parseInt(req.params.id);
+    if (isNaN(leadId)) {
+      return res.status(400).json({ error: "Invalid lead ID" });
+    }
+
+    // Validate proposal data
+    const validatedData = proposalSchema.parse(req.body);
+
+    // Check if lead exists and is open
+    const [lead] = await db
+      .select()
+      .from(leads)
+      .where(
+        and(
+          eq(leads.id, leadId),
+          isNull(leads.deleted_at),
+          eq(leads.status, 'open')
+        )
+      );
+
+    if (!lead) {
+      return res.status(404).json({ error: "Lead not found or not available" });
+    }
+
+    // Check if user has already submitted a proposal
+    const [existingResponse] = await db
+      .select()
+      .from(leadResponses)
+      .where(
+        and(
+          eq(leadResponses.lead_id, leadId),
+          eq(leadResponses.business_id, req.user.id)
+        )
+      );
+
+    if (existingResponse) {
+      return res.status(400).json({ error: "You have already submitted a proposal for this lead" });
+    }
+
+    // Create new proposal
+    const [newResponse] = await db
+      .insert(leadResponses)
+      .values({
+        lead_id: leadId,
+        business_id: req.user.id,
+        proposal: validatedData.proposal,
+        status: 'pending'
+      })
+      .returning();
+
+    console.log("Created new proposal response:", newResponse);
+    res.status(201).json(newResponse);
+  } catch (error) {
+    console.error("Failed to submit proposal:", error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: error.errors.map(e => ({
+          field: e.path.join('.'),
+          message: e.message
+        }))
+      });
+    }
+    res.status(500).json({
+      error: "Failed to submit proposal",
+      details: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
 export default router;
