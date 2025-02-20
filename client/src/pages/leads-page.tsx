@@ -122,6 +122,7 @@ const LeadsPage = () => {
       return await response.json();
     },
     onSuccess: () => {
+      // Immediately invalidate the query to refresh the list
       queryClient.invalidateQueries({ queryKey: ['/api/leads'] });
       toast({
         title: "Success",

@@ -115,12 +115,14 @@ router.delete("/leads/:id", async (req, res) => {
       return res.status(400).json({ error: "Invalid lead ID" });
     }
 
+    // First check if the lead exists and belongs to the user
     const [lead] = await db
       .select()
       .from(leads)
       .where(and(
         eq(leads.id, leadId),
-        eq(leads.user_id, req.user.id)
+        eq(leads.user_id, req.user.id),
+        isNull(leads.deleted_at) // Only check non-deleted leads
       ));
 
     if (!lead) {
@@ -128,8 +130,8 @@ router.delete("/leads/:id", async (req, res) => {
       return res.status(404).json({ error: "Lead not found" });
     }
 
-    // Set deleted_at timestamp
-    const [deletedLead] = await db
+    // Soft delete the lead
+    await db
       .update(leads)
       .set({ 
         deleted_at: new Date()
@@ -137,11 +139,10 @@ router.delete("/leads/:id", async (req, res) => {
       .where(and(
         eq(leads.id, leadId),
         eq(leads.user_id, req.user.id)
-      ))
-      .returning();
+      ));
 
-    console.log(`Successfully soft deleted lead:`, deletedLead);
-    res.json({ message: "Lead deleted successfully", lead: deletedLead });
+    console.log(`Successfully soft deleted lead: ${leadId}`);
+    res.json({ message: "Lead deleted successfully" });
   } catch (error) {
     console.error("Failed to delete lead:", error);
     res.status(500).json({
