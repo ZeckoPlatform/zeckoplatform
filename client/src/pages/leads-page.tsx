@@ -1,13 +1,11 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAuth } from "@/hooks/use-auth";
-import { Edit } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { SelectLead, BUSINESS_CATEGORIES } from "@/types/leads";
+import { SelectLead } from "@/types/leads";
 import { CreateLeadForm, LeadFormData } from "@/components/leads/CreateLeadForm";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { FreeUserLeadsView } from "@/components/leads/FreeUserLeadsView";
@@ -21,6 +19,8 @@ const LeadsPage = () => {
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<SelectLead | null>(null);
+
+  console.log('LeadsPage - Current user:', user);
 
   const { data: leads = [], isLoading } = useQuery({
     queryKey: ['/api/leads'],
@@ -81,6 +81,10 @@ const LeadsPage = () => {
       });
     }
   });
+
+  if (!user) {
+    return <div>Please log in to view leads.</div>;
+  }
 
   if (isLoading) {
     return <div>Loading leads...</div>;
