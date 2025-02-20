@@ -90,6 +90,8 @@ const LeadsPage = () => {
     return <div>Loading leads...</div>;
   }
 
+  console.log('Rendering leads page with leads:', leads);
+
   return (
     <div className="container mx-auto p-6">
       <div className="flex justify-between items-center mb-8">
