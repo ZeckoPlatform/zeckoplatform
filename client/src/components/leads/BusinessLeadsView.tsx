@@ -98,7 +98,7 @@ export function BusinessLeadsView({ leads, user }: BusinessLeadsViewProps) {
                           <DialogTrigger asChild>
                             <Button variant="outline" size="sm" className="relative">
                               <Send className="h-4 w-4 mr-2" />
-                              Open Messages
+                              Messages
                               {unreadCount > 0 && (
                                 <Badge
                                   variant="destructive"
