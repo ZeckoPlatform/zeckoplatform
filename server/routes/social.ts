@@ -12,7 +12,8 @@ const router = Router();
 // Configure multer for handling file uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadDir = path.join(process.cwd(), 'uploads');
+    // Create uploads directory in the public folder
+    const uploadDir = path.join(process.cwd(), 'client', 'public', 'uploads');
     // Create uploads directory if it doesn't exist
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
@@ -35,6 +36,7 @@ const upload = multer({
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
+      cb(null, false);
       cb(new Error("Invalid file type. Only JPEG, PNG and WebP are allowed."));
     }
   }
@@ -56,7 +58,7 @@ router.post("/api/upload", requireAuth, upload.single('file'), (req, res) => {
     }
 
     // Generate the URL for the uploaded file
-    const fileUrl = `/uploads/${req.file.filename}`;
+    const fileUrl = `/uploads/${path.basename(req.file.path)}`;
 
     res.json({
       url: fileUrl,
@@ -92,7 +94,7 @@ router.post("/api/social/posts", async (req, res) => {
       content: data.content,
       type: data.type,
       mediaUrls: data.mediaUrls || [],
-      metadata: data.linkUrl ? { linkUrl: data.linkUrl } : undefined
+      ...(data.linkUrl ? { metadata: { linkUrl: data.linkUrl } } : {})
     }).returning();
 
     res.json(post[0]);
