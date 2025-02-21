@@ -44,7 +44,6 @@ export function FreeUserLeadsView({
       <div className="grid gap-4">
         {leads && leads.length > 0 ? (
           leads.map((lead) => {
-            // Get unread messages count for this lead
             const unreadCount = getUnreadCount(lead.messages, user.id);
 
             return (
@@ -116,19 +115,52 @@ export function FreeUserLeadsView({
                           {/* Message Dialog for Accepted Proposals */}
                           {response.status === "accepted" && response.business_id && (
                             <div className="mt-4">
-                              <MessageDialog //Moved outside the Dialog component
-                                leadId={lead.id}
-                                receiverId={response.business_id}
-                                isOpen={true}
+                              <Dialog open={selectedMessageThread?.leadId === lead.id && selectedMessageThread?.businessId === response.business_id}
                                 onOpenChange={(open) => {
-                                  if (!open) {
+                                  if (open) {
+                                    setSelectedMessageThread({ leadId: lead.id, businessId: response.business_id });
+                                  } else {
+                                    setSelectedMessageThread(null);
                                     queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
                                   }
-                                }}
-                                onMessagesRead={() => {
-                                  queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-                                }}
-                              />
+                                }}>
+                                <DialogTrigger asChild>
+                                  <Button variant="outline" size="sm" className="relative">
+                                    <Send className="h-4 w-4 mr-2" />
+                                    Open Messages
+                                    {unreadCount > 0 && (
+                                      <Badge
+                                        variant="destructive"
+                                        className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
+                                      >
+                                        {unreadCount}
+                                      </Badge>
+                                    )}
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                  <DialogHeader>
+                                    <DialogTitle>Message Thread</DialogTitle>
+                                    <DialogDescription>
+                                      View and send messages for this lead
+                                    </DialogDescription>
+                                  </DialogHeader>
+                                  <MessageDialog
+                                    leadId={lead.id}
+                                    receiverId={response.business_id}
+                                    isOpen={true}
+                                    onOpenChange={(open) => {
+                                      if (!open) {
+                                        setSelectedMessageThread(null);
+                                        queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+                                      }
+                                    }}
+                                    onMessagesRead={() => {
+                                      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+                                    }}
+                                  />
+                                </DialogContent>
+                              </Dialog>
                             </div>
                           )}
 

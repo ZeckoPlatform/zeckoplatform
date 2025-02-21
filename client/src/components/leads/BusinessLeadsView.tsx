@@ -20,7 +20,7 @@ interface BusinessLeadsViewProps {
 export function BusinessLeadsView({ leads, user }: BusinessLeadsViewProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [selectedLead, setSelectedLead] = useState<SelectLead | null>(null);
+  const [selectedMessageThread, setSelectedMessageThread] = useState<{ leadId: number; businessId: number } | null>(null);
   const [proposalText, setProposalText] = useState<string>("");
 
   const submitProposalMutation = useMutation({
@@ -76,11 +76,7 @@ export function BusinessLeadsView({ leads, user }: BusinessLeadsViewProps) {
                     <div>
                       <span className="font-medium">Location:</span> {lead.location}
                     </div>
-                    <div>
-                      <span className="font-medium">Posted:</span>{' '}
-                      {new Date(lead.created_at).toLocaleDateString()}
                     </div>
-                  </div>
 
                   {existingResponse ? (
                     <div className="mt-4 border-t pt-4">
@@ -98,10 +94,20 @@ export function BusinessLeadsView({ leads, user }: BusinessLeadsViewProps) {
 
                       {existingResponse.status === "accepted" && (
                         <div className="mt-4">
-                          <Dialog>
+                          <Dialog 
+                            open={selectedMessageThread?.leadId === lead.id && selectedMessageThread?.businessId === user.id}
+                            onOpenChange={(open) => {
+                              if (open) {
+                                setSelectedMessageThread({ leadId: lead.id, businessId: user.id });
+                              } else {
+                                setSelectedMessageThread(null);
+                                queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+                              }
+                            }}
+                          >
                             <DialogTrigger asChild>
                               <Button variant="outline" size="sm" className="relative">
-                                <Send className="h-4 w-4 mr-2"/>
+                                <Send className="h-4 w-4 mr-2" />
                                 Open Messages
                                 {unreadCount > 0 && (
                                   <Badge
@@ -126,6 +132,7 @@ export function BusinessLeadsView({ leads, user }: BusinessLeadsViewProps) {
                                 isOpen={true}
                                 onOpenChange={(open) => {
                                   if (!open) {
+                                    setSelectedMessageThread(null);
                                     queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
                                   }
                                 }}
