@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
@@ -53,18 +53,24 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
+      try {
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+          credentials: 'include', // Include credentials for auth
+        });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to upload image');
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to upload image');
+        }
+
+        const data = await response.json();
+        return data.url;
+      } catch (error) {
+        console.error('Upload error:', error);
+        throw error;
       }
-
-      const data = await response.json();
-      return data.url;
     },
     onSuccess: (url) => {
       const currentUrls = form.getValues("mediaUrls") || [];
@@ -74,9 +80,10 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       setUploadType(null);
     },
     onError: (error: Error) => {
+      console.error('Upload mutation error:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to upload image",
+        description: error.message || "Failed to upload image. Please try again.",
         variant: "destructive",
       });
     },
@@ -146,7 +153,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       console.error('File upload error:', error);
       toast({
         title: "Error",
-        description: "Failed to upload image. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to upload image. Please try again.",
         variant: "destructive",
       });
     }
@@ -183,6 +190,9 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       <DialogContent className="sm:max-w-[525px]">
         <DialogHeader>
           <DialogTitle>Create Post</DialogTitle>
+          <DialogDescription>
+            Share your thoughts, insights, or opportunities with the community.
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -353,8 +363,8 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
               >
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={createPost.isPending || uploadImageMutation.isPending}
               >
                 {createPost.isPending || uploadImageMutation.isPending ? (
