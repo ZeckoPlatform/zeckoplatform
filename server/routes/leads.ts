@@ -90,7 +90,7 @@ router.get("/leads", async (req, res) => {
                   'status', lr.status,
                   'created_at', lr.created_at
                 )
-              ) FILTER (WHERE lr.id IS NOT NULL),
+              ) FILTER (WHERE lr.id IS NOT NULL AND lr.status IN ('pending', 'accepted')),
               '[]'
             ) as responses,
             COALESCE(
