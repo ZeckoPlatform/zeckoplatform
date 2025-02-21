@@ -77,29 +77,56 @@ router.get("/leads", async (req, res) => {
       return res.json(userLeads.rows);
     } else {
       // Business users see leads from free users, filtered by match score
-      const allLeads = await db
-        .select()
-        .from(leads)
-        .where(
-          and(
-            isNull(leads.deleted_at),
-            eq(leads.status, 'open')
+      const allLeads = await db.execute(sql`
+        WITH matched_leads AS (
+          SELECT 
+            l.*,
+            COALESCE(
+              json_agg(
+                DISTINCT jsonb_build_object(
+                  'id', lr.id,
+                  'business_id', lr.business_id,
+                  'proposal', lr.proposal,
+                  'status', lr.status,
+                  'created_at', lr.created_at
+                )
+              ) FILTER (WHERE lr.id IS NOT NULL),
+              '[]'
+            ) as responses,
+            COALESCE(
+              json_agg(
+                DISTINCT jsonb_build_object(
+                  'id', m.id,
+                  'sender_id', m.sender_id,
+                  'receiver_id', m.receiver_id,
+                  'content', m.content,
+                  'read', m.read,
+                  'created_at', m.created_at
+                )
+              ) FILTER (WHERE m.id IS NOT NULL),
+              '[]'
+            ) as messages
+          FROM leads l
+          LEFT JOIN lead_responses lr ON l.id = lr.lead_id
+          LEFT JOIN messages m ON l.id = m.lead_id
+          WHERE l.deleted_at IS NULL
+          AND (
+            (l.status = 'open') OR
+            (l.status = 'in_progress' AND EXISTS (
+              SELECT 1 FROM lead_responses lr2 
+              WHERE lr2.lead_id = l.id 
+              AND lr2.business_id = ${req.user!.id}
+              AND lr2.status = 'accepted'
+            ))
           )
+          GROUP BY l.id
         )
-        .orderBy(leads.created_at);
+        SELECT * FROM matched_leads
+        ORDER BY created_at DESC
+      `);
 
-      // Filter and sort leads based on match score
-      const matchedLeads = allLeads
-        .map(lead => ({
-          lead,
-          score: calculateMatchScore(lead, req.user!)
-        }))
-        .filter(({ score }) => score.totalScore > 0)
-        .sort((a, b) => b.score.totalScore - a.score.totalScore)
-        .map(({ lead }) => lead);
-
-      console.log("Found matching leads for business:", matchedLeads.length);
-      return res.json(matchedLeads);
+      console.log("Found matching leads for business:", allLeads.rows.length);
+      return res.json(allLeads.rows);
     }
   } catch (error) {
     console.error("Error fetching leads:", error);
