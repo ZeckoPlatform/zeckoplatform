@@ -624,20 +624,29 @@ router.get("/leads/:id/messages", async (req, res) => {
     }
 
     // Check if user has permission to view messages
+    if (lead.user_id === req.user.id) {
+      // Lead owner can always view messages
+      const messages = await db
+        .select()
+        .from(messages)
+        .where(eq(messages.lead_id, leadId))
+        .orderBy(messages.created_at);
+      return res.json(messages);
+    }
+
+    // For business users, check if they have a response
     const [response] = await db
       .select()
       .from(leadResponses)
       .where(
         and(
           eq(leadResponses.lead_id, leadId),
-          or(
-            eq(leadResponses.business_id, req.user.id),
-            eq(leads.user_id, req.user.id)
-          )
+          eq(leadResponses.business_id, req.user.id),
+          not(eq(leadResponses.status, 'rejected'))
         )
       );
 
-    if (!response && lead.user_id !== req.user.id) {
+    if (!response) {
       return res.status(403).json({ error: "No permission to view messages" });
     }
 
