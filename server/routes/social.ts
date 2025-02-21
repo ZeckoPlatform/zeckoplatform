@@ -6,6 +6,8 @@ import { z } from "zod";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { log } from "../vite";
+import { authenticateToken } from "../auth";
 
 const router = Router();
 
@@ -43,22 +45,13 @@ const upload = multer({
   }
 });
 
-// Auth middleware for upload endpoint
-const requireAuth = (req: any, res: any, next: any) => {
-  if (!req.user?.id) {
-    console.error("Auth check failed - user:", req.user);
-    return res.status(401).json({ error: "Authentication required" });
-  }
-  next();
-};
-
 // File upload endpoint with auth
-router.post("/api/upload", requireAuth, (req, res) => {
-  console.log("Upload request received - User:", req.user?.id);
+router.post("/api/upload", authenticateToken, (req, res) => {
+  log("Upload request received - User:", req.user?.id);
 
   upload.single('file')(req, res, (err) => {
     if (err) {
-      console.error("Upload error:", err);
+      log("Upload error:", err);
       if (err.name === "INVALID_FILE_TYPE") {
         return res.status(400).json({ error: err.message });
       }
@@ -69,21 +62,20 @@ router.post("/api/upload", requireAuth, (req, res) => {
     }
 
     if (!req.file) {
-      console.error("No file in request");
+      log("No file in request");
       return res.status(400).json({ error: "No file uploaded" });
     }
 
     try {
-      // Generate the URL for the uploaded file
       const fileUrl = `/uploads/${req.file.filename}`;
-      console.log("File uploaded successfully:", fileUrl);
+      log("File uploaded successfully:", fileUrl);
 
       res.json({
         url: fileUrl,
         filename: req.file.filename
       });
     } catch (error) {
-      console.error("Error processing uploaded file:", error);
+      log("Error processing uploaded file:", error);
       res.status(500).json({ 
         error: "Failed to process uploaded file",
         details: error instanceof Error ? error.message : "Unknown error"
@@ -93,7 +85,7 @@ router.post("/api/upload", requireAuth, (req, res) => {
 });
 
 // Create a new post
-router.post("/api/social/posts", requireAuth, async (req, res) => {
+router.post("/api/social/posts", authenticateToken, async (req, res) => {
   try {
     const schema = z.object({
       content: z.string().min(1),
@@ -105,7 +97,7 @@ router.post("/api/social/posts", requireAuth, async (req, res) => {
     const data = schema.parse(req.body);
 
     const post = await db.insert(socialPosts).values({
-      userId: req.user.id,
+      userId: req.user!.id,
       content: data.content,
       type: data.type,
       mediaUrls: data.mediaUrls || [],
@@ -114,7 +106,7 @@ router.post("/api/social/posts", requireAuth, async (req, res) => {
 
     res.json(post[0]);
   } catch (error) {
-    console.error("Failed to create post:", error);
+    log("Failed to create post:", error);
     res.status(400).json({ 
       error: "Failed to create post",
       details: error instanceof Error ? error.message : "Unknown error"
@@ -132,7 +124,7 @@ router.get("/api/social/posts", async (req, res) => {
 
     res.json(posts);
   } catch (error) {
-    console.error("Failed to fetch posts:", error);
+    log("Failed to fetch posts:", error);
     res.status(500).json({ error: "Failed to fetch posts" });
   }
 });

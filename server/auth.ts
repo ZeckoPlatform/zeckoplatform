@@ -1,4 +1,4 @@
-import { Express, Request, Response, NextFunction } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { users, insertUserSchema, type SelectUser } from "@db/schema";
@@ -26,25 +26,63 @@ export async function comparePasswords(supplied: string, stored: string) {
   return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
-async function getUserByEmail(email: string): Promise<SelectUser[]> {
-  if (!email) {
-    throw new Error('Email is required');
+export function generateToken(user: SelectUser) {
+  return jwt.sign(
+    { 
+      id: user.id, 
+      email: user.email,
+      userType: user.userType,
+      subscriptionActive: user.subscriptionActive,
+      subscriptionTier: user.subscriptionTier
+    },
+    JWT_SECRET,
+    { expiresIn: '24h' }
+  );
+}
+
+// Middleware to authenticate requests using either JWT token or session
+export function authenticateToken(req: Request, res: Response, next: NextFunction) {
+  // First check if user is authenticated via session
+  if (req.isAuthenticated && req.isAuthenticated()) {
+    log('User authenticated via session');
+    return next();
   }
 
-  try {
-    log(`Attempting to find user with email: ${email}`);
-    const result = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, email))
-      .limit(1);
+  // If not authenticated via session, check for JWT token
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
 
-    log(`Found ${result.length} users with email ${email}`);
-    return result;
-  } catch (error) {
-    log(`Database error in getUserByEmail: ${error}`);
-    throw error;
+  if (!token) {
+    log('No authentication token found');
+    return res.status(401).json({ message: "Authentication required" });
   }
+
+  jwt.verify(token, JWT_SECRET, async (err: any, decoded: any) => {
+    if (err) {
+      log('Invalid token:', err.message);
+      return res.status(401).json({ message: "Invalid or expired token" });
+    }
+
+    try {
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, decoded.id))
+        .limit(1);
+
+      if (!user) {
+        log('User not found for token');
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      req.user = user;
+      log('User authenticated via JWT token');
+      next();
+    } catch (error) {
+      log('Database error in auth middleware:', error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
 }
 
 export async function updateUserResetToken(userId: number, token: string | null, expiry: Date | null) {
@@ -72,51 +110,25 @@ export async function updateUserResetToken(userId: number, token: string | null,
   }
 }
 
-export function generateToken(user: SelectUser) {
-  return jwt.sign(
-    { 
-      id: user.id, 
-      email: user.email,
-      userType: user.userType,
-      subscriptionActive: user.subscriptionActive,
-      subscriptionTier: user.subscriptionTier
-    },
-    JWT_SECRET,
-    { expiresIn: '24h' }
-  );
-}
-
-export function authenticateToken(req: Request, res: Response, next: NextFunction) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ message: "Authentication required" });
+async function getUserByEmail(email: string): Promise<SelectUser[]> {
+  if (!email) {
+    throw new Error('Email is required');
   }
 
-  jwt.verify(token, JWT_SECRET, async (err: any, decoded: any) => {
-    if (err) {
-      return res.status(401).json({ message: "Invalid or expired token" });
-    }
+  try {
+    log(`Attempting to find user with email: ${email}`);
+    const result = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
 
-    try {
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, decoded.id), eq(users.active, true))
-        .limit(1);
-
-      if (!user) {
-        return res.status(401).json({ message: "User not found or inactive" });
-      }
-
-      req.user = user;
-      next();
-    } catch (error) {
-      log(`Database error in auth middleware: ${error}`);
-      return res.status(500).json({ message: "Internal server error" });
-    }
-  });
+    log(`Found ${result.length} users with email ${email}`);
+    return result;
+  } catch (error) {
+    log(`Database error in getUserByEmail: ${error}`);
+    throw error;
+  }
 }
 
 export function setupAuth(app: Express) {
