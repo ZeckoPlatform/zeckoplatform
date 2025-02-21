@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { MessageDialog } from "@/components/MessageDialog";
 import { Send } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { SelectLead, SelectUser, getUnreadCount } from '@/types/leads';
+import { SelectLead, SelectUser } from '@/types/leads';
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -28,7 +28,8 @@ export function BusinessLeadsView({ leads, user }: BusinessLeadsViewProps) {
     mutationFn: async ({ leadId, proposal }: { leadId: number; proposal: string }) => {
       const response = await apiRequest('POST', `/api/leads/${leadId}/responses`, { proposal });
       if (!response.ok) {
-        throw new Error('Failed to submit proposal');
+        const error = await response.text();
+        throw new Error(error || 'Failed to submit proposal');
       }
       return response.json();
     },
@@ -49,6 +50,14 @@ export function BusinessLeadsView({ leads, user }: BusinessLeadsViewProps) {
     },
   });
 
+  const getUnreadCount = (messages: any[] = [], userId: number) => {
+    return messages?.filter(m => !m.read && m.receiver_id === userId).length || 0;
+  };
+
+  const canMessage = (lead: SelectLead) => {
+    return lead.responses?.some(r => r.business_id === user.id);
+  };
+
   return (
     <>
       <div className="space-y-8">
@@ -57,6 +66,7 @@ export function BusinessLeadsView({ leads, user }: BusinessLeadsViewProps) {
             leads.map((lead) => {
               const existingResponse = lead.responses?.find(r => r.business_id === user.id);
               const unreadCount = getUnreadCount(lead.messages, user.id);
+              const hasSubmittedProposal = !!existingResponse;
 
               return (
                 <Card key={lead.id}>
@@ -67,29 +77,31 @@ export function BusinessLeadsView({ leads, user }: BusinessLeadsViewProps) {
                         <Badge variant="secondary">
                           Budget: £{lead.budget}
                         </Badge>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          className="relative"
-                          onClick={() => {
-                            setSelectedMessageThread({ 
-                              leadId: lead.id, 
-                              businessId: user.id 
-                            });
-                            setIsMessageOpen(true);
-                          }}
-                        >
-                          <Send className="h-4 w-4 mr-2" />
-                          Messages
-                          {unreadCount > 0 && (
-                            <Badge
-                              variant="destructive"
-                              className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
-                            >
-                              {unreadCount}
-                            </Badge>
-                          )}
-                        </Button>
+                        {hasSubmittedProposal && (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="relative"
+                            onClick={() => {
+                              setSelectedMessageThread({ 
+                                leadId: lead.id, 
+                                businessId: user.id 
+                              });
+                              setIsMessageOpen(true);
+                            }}
+                          >
+                            <Send className="h-4 w-4 mr-2" />
+                            Messages
+                            {unreadCount > 0 && (
+                              <Badge
+                                variant="destructive"
+                                className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
+                              >
+                                {unreadCount}
+                              </Badge>
+                            )}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </CardHeader>

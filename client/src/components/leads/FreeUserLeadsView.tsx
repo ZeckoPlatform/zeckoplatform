@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Edit, Trash2, Send } from "lucide-react";
 import { MessageDialog } from "@/components/MessageDialog";
 import { useToast } from "@/hooks/use-toast";
-import { SelectLead, SelectUser, getUnreadCount } from '@/types/leads';
+import { SelectLead, SelectUser } from '@/types/leads';
 import { useQueryClient } from "@tanstack/react-query";
 
 interface FreeUserLeadsViewProps {
@@ -42,7 +42,11 @@ export function FreeUserLeadsView({
   const [activeMessageThreads, setActiveMessageThreads] = useState<MessageThread[]>([]);
 
   const handleOpenMessage = (leadId: number, businessId: number) => {
-    setActiveMessageThreads(prev => [...prev, { leadId, businessId }]);
+    if (!activeMessageThreads.some(thread => 
+      thread.leadId === leadId && thread.businessId === businessId
+    )) {
+      setActiveMessageThreads(prev => [...prev, { leadId, businessId }]);
+    }
   };
 
   const handleCloseMessage = (leadId: number, businessId: number) => {
@@ -52,13 +56,16 @@ export function FreeUserLeadsView({
     queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
   };
 
+  const getUnreadCount = (messages: any[] = [], senderId: number) => {
+    return messages?.filter(m => !m.read && m.sender_id === senderId).length || 0;
+  };
+
   return (
     <>
       <div className="space-y-8">
         <div className="grid gap-4">
           {leads && leads.length > 0 ? (
             leads.map((lead) => {
-              const unreadCount = getUnreadCount(lead.messages, user.id);
               const hasResponses = lead.responses && lead.responses.length > 0;
 
               return (
@@ -104,16 +111,14 @@ export function FreeUserLeadsView({
                       </div>
                     </div>
 
+                    {/* Only show proposals section if there are responses */}
                     {hasResponses && (
                       <div className="space-y-4 mt-6">
-                        <h3 className="font-semibold">Proposals</h3>
-                        {lead.responses.map((response) => {
-                          const threadUnreadCount = getUnreadCount(
-                            lead.messages?.filter(m => 
-                              (m.sender_id === response.business_id && m.receiver_id === user.id) ||
-                              (m.sender_id === user.id && m.receiver_id === response.business_id)
-                            ) || [],
-                            user.id
+                        <h3 className="font-semibold">Proposals ({lead.responses?.length})</h3>
+                        {lead.responses?.map((response) => {
+                          const unreadCount = getUnreadCount(
+                            lead.messages,
+                            response.business_id
                           );
 
                           return (
@@ -144,12 +149,12 @@ export function FreeUserLeadsView({
                                     >
                                       <Send className="h-4 w-4 mr-2" />
                                       Messages
-                                      {threadUnreadCount > 0 && (
+                                      {unreadCount > 0 && (
                                         <Badge
                                           variant="destructive"
                                           className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
                                         >
-                                          {threadUnreadCount}
+                                          {unreadCount}
                                         </Badge>
                                       )}
                                     </Button>
@@ -199,7 +204,7 @@ export function FreeUserLeadsView({
         </div>
       </div>
 
-      {/* Multiple Message Dialogs */}
+      {/* Support multiple message dialogs */}
       {activeMessageThreads.map(thread => (
         <Dialog 
           key={`${thread.leadId}-${thread.businessId}`}

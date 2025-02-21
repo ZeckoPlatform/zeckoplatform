@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@db";
 import { leads, messages, leadResponses } from "@db/schema";
 import { z } from "zod";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, or } from "drizzle-orm";
 import { calculateMatchScore } from "../utils/matching";
 
 const router = Router();
@@ -312,6 +312,70 @@ router.post("/leads/:id/responses", async (req, res) => {
     }
     res.status(500).json({
       error: "Failed to submit proposal",
+      details: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
+// Add new message route
+router.post("/leads/:id/messages", async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const leadId = parseInt(req.params.id);
+    const { receiverId, content } = req.body;
+
+    if (!content?.trim()) {
+      return res.status(400).json({ error: "Message content is required" });
+    }
+
+    // Verify the lead exists
+    const [lead] = await db
+      .select()
+      .from(leads)
+      .where(eq(leads.id, leadId));
+
+    if (!lead) {
+      return res.status(404).json({ error: "Lead not found" });
+    }
+
+    // Verify that the sender has permission to message the receiver
+    const canMessage = await db
+      .select()
+      .from(leadResponses)
+      .where(
+        and(
+          eq(leadResponses.lead_id, leadId),
+          or(
+            and(eq(leadResponses.business_id, req.user.id), eq(lead.user_id, receiverId)),
+            and(eq(lead.user_id, req.user.id), eq(leadResponses.business_id, receiverId))
+          )
+        )
+      );
+
+    if (!canMessage.length) {
+      return res.status(403).json({ error: "You don't have permission to message this user" });
+    }
+
+    // Create the message
+    const [newMessage] = await db
+      .insert(messages)
+      .values({
+        lead_id: leadId,
+        sender_id: req.user.id,
+        receiver_id: receiverId,
+        content: content.trim(),
+        read: false
+      })
+      .returning();
+
+    res.status(201).json(newMessage);
+  } catch (error) {
+    console.error("Failed to send message:", error);
+    res.status(500).json({
+      error: "Failed to send message",
       details: error instanceof Error ? error.message : "Unknown error"
     });
   }
