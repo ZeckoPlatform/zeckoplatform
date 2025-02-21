@@ -43,16 +43,13 @@ export function MessageDialog({
   const playNotification = useNotificationSound();
   const { toast } = useToast();
 
-  console.log("MessageDialog render:", { leadId, receiverId, isOpen }); // Debug log
-
   const { data: messages = [], isLoading } = useQuery<Message[]>({
     queryKey: [`/api/leads/${leadId}/messages`],
-    enabled: isOpen && !!user?.id,
+    enabled: isOpen && !!user?.id && !!receiverId,
     refetchInterval: isOpen ? 3000 : false,
   });
 
   useEffect(() => {
-    console.log("MessageDialog effect:", { isOpen, messagesLength: messages.length }); // Debug log
     if (!isOpen || !messages.length) return;
 
     const lastMessage = messages[messages.length - 1];
@@ -95,7 +92,6 @@ export function MessageDialog({
         }))
       );
 
-      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       if (onMessagesRead) onMessagesRead();
     }
   });
@@ -105,6 +101,10 @@ export function MessageDialog({
       try {
         if (!content.trim()) {
           throw new Error("Message cannot be empty");
+        }
+
+        if (!receiverId) {
+          throw new Error("Invalid recipient");
         }
 
         const response = await apiRequest("POST", `/api/leads/${leadId}/messages`, {

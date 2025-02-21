@@ -21,6 +21,11 @@ interface FreeUserLeadsViewProps {
   rejectProposalMutation: any;
 }
 
+interface MessageThread {
+  leadId: number;
+  businessId: number;
+}
+
 export function FreeUserLeadsView({
   leads,
   createLeadMutation,
@@ -34,8 +39,18 @@ export function FreeUserLeadsView({
 }: FreeUserLeadsViewProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [selectedMessageThread, setSelectedMessageThread] = useState<{ leadId: number; businessId: number } | null>(null);
-  const [isMessageOpen, setIsMessageOpen] = useState(false);
+  const [activeMessageThreads, setActiveMessageThreads] = useState<MessageThread[]>([]);
+
+  const handleOpenMessage = (leadId: number, businessId: number) => {
+    setActiveMessageThreads(prev => [...prev, { leadId, businessId }]);
+  };
+
+  const handleCloseMessage = (leadId: number, businessId: number) => {
+    setActiveMessageThreads(prev => 
+      prev.filter(thread => !(thread.leadId === leadId && thread.businessId === businessId))
+    );
+    queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+  };
 
   return (
     <>
@@ -44,6 +59,7 @@ export function FreeUserLeadsView({
           {leads && leads.length > 0 ? (
             leads.map((lead) => {
               const unreadCount = getUnreadCount(lead.messages, user.id);
+              const hasResponses = lead.responses && lead.responses.length > 0;
 
               return (
                 <Card key={lead.id}>
@@ -71,32 +87,6 @@ export function FreeUserLeadsView({
                             )}
                           </>
                         )}
-                        {/* Show message button for both lead owners and when there are responses */}
-                        {(lead.user_id === user?.id || (lead.responses && lead.responses.length > 0)) && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="relative"
-                            onClick={() => {
-                              setSelectedMessageThread({
-                                leadId: lead.id,
-                                businessId: lead.responses?.[0]?.business_id || 0,
-                              });
-                              setIsMessageOpen(true);
-                            }}
-                          >
-                            <Send className="h-4 w-4 mr-2" />
-                            Messages
-                            {unreadCount > 0 && (
-                              <Badge
-                                variant="destructive"
-                                className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
-                              >
-                                {unreadCount}
-                              </Badge>
-                            )}
-                          </Button>
-                        )}
                       </div>
                     </div>
                   </CardHeader>
@@ -114,11 +104,17 @@ export function FreeUserLeadsView({
                       </div>
                     </div>
 
-                    {lead.responses && lead.responses.length > 0 && (
+                    {hasResponses && (
                       <div className="space-y-4 mt-6">
                         <h3 className="font-semibold">Proposals</h3>
                         {lead.responses.map((response) => {
-                          const unreadCount = getUnreadCount(lead.messages, user.id);
+                          const threadUnreadCount = getUnreadCount(
+                            lead.messages?.filter(m => 
+                              (m.sender_id === response.business_id && m.receiver_id === user.id) ||
+                              (m.sender_id === user.id && m.receiver_id === response.business_id)
+                            ) || [],
+                            user.id
+                          );
 
                           return (
                             <div
@@ -144,22 +140,16 @@ export function FreeUserLeadsView({
                                       variant="outline"
                                       size="sm"
                                       className="relative"
-                                      onClick={() => {
-                                        setSelectedMessageThread({
-                                          leadId: lead.id,
-                                          businessId: response.business_id
-                                        });
-                                        setIsMessageOpen(true);
-                                      }}
+                                      onClick={() => handleOpenMessage(lead.id, response.business_id)}
                                     >
                                       <Send className="h-4 w-4 mr-2" />
                                       Messages
-                                      {unreadCount > 0 && (
+                                      {threadUnreadCount > 0 && (
                                         <Badge
                                           variant="destructive"
                                           className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
                                         >
-                                          {unreadCount}
+                                          {threadUnreadCount}
                                         </Badge>
                                       )}
                                     </Button>
@@ -209,26 +199,28 @@ export function FreeUserLeadsView({
         </div>
       </div>
 
-      {/* Floating Message Dialog */}
-      {selectedMessageThread && (
-        <Dialog open={isMessageOpen} onOpenChange={setIsMessageOpen}>
+      {/* Multiple Message Dialogs */}
+      {activeMessageThreads.map(thread => (
+        <Dialog 
+          key={`${thread.leadId}-${thread.businessId}`}
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) handleCloseMessage(thread.leadId, thread.businessId);
+          }}
+        >
           <MessageDialog
-            leadId={selectedMessageThread.leadId}
-            receiverId={selectedMessageThread.businessId}
-            isOpen={isMessageOpen}
+            leadId={thread.leadId}
+            receiverId={thread.businessId}
+            isOpen={true}
             onOpenChange={(open) => {
-              setIsMessageOpen(open);
-              if (!open) {
-                setSelectedMessageThread(null);
-                queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-              }
+              if (!open) handleCloseMessage(thread.leadId, thread.businessId);
             }}
             onMessagesRead={() => {
               queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
             }}
           />
         </Dialog>
-      )}
+      ))}
     </>
   );
 }

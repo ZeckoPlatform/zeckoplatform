@@ -72,7 +72,10 @@ export function BusinessLeadsView({ leads, user }: BusinessLeadsViewProps) {
                           size="sm"
                           className="relative"
                           onClick={() => {
-                            setSelectedMessageThread({ leadId: lead.id, businessId: user.id });
+                            setSelectedMessageThread({ 
+                              leadId: lead.id, 
+                              businessId: user.id 
+                            });
                             setIsMessageOpen(true);
                           }}
                         >
@@ -150,9 +153,12 @@ export function BusinessLeadsView({ leads, user }: BusinessLeadsViewProps) {
         </div>
       </div>
 
-      {/* Floating Message Dialog */}
+      {/* Message Dialog */}
       {selectedMessageThread && (
-        <Dialog open={isMessageOpen} onOpenChange={setIsMessageOpen}>
+        <Dialog 
+          open={isMessageOpen} 
+          onOpenChange={setIsMessageOpen}
+        >
           <MessageDialog
             leadId={selectedMessageThread.leadId}
             receiverId={leads.find(l => l.id === selectedMessageThread.leadId)?.user_id || 0}
