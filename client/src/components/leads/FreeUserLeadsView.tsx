@@ -112,20 +112,9 @@ export function FreeUserLeadsView({
 
                           <p className="text-sm mt-2">{response.proposal}</p>
 
-                          {/* Full Messaging Integration */}
-                          {response.status === "accepted" && response.business_id && (
+                          {response.business_id && (
                             <div className="mt-4">
-                              <Dialog
-                                open={selectedMessageThread?.leadId === lead.id && selectedMessageThread?.businessId === response.business_id}
-                                onOpenChange={(open) => {
-                                  if (open) {
-                                    setSelectedMessageThread({ leadId: lead.id, businessId: response.business_id });
-                                  } else {
-                                    setSelectedMessageThread(null);
-                                    queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-                                  }
-                                }}
-                              >
+                              <Dialog>
                                 <DialogTrigger asChild>
                                   <Button variant="outline" size="sm" className="relative">
                                     <Send className="h-4 w-4 mr-2" />
@@ -150,9 +139,11 @@ export function FreeUserLeadsView({
                                   <MessageDialog
                                     leadId={lead.id}
                                     receiverId={response.business_id}
-                                    isOpen={true}
+                                    isOpen={selectedMessageThread?.leadId === lead.id && selectedMessageThread?.businessId === response.business_id}
                                     onOpenChange={(open) => {
-                                      if (!open) {
+                                      if (open) {
+                                        setSelectedMessageThread({ leadId: lead.id, businessId: response.business_id });
+                                      } else {
                                         setSelectedMessageThread(null);
                                         queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
                                       }

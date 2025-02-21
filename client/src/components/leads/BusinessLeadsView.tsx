@@ -92,19 +92,9 @@ export function BusinessLeadsView({ leads, user }: BusinessLeadsViewProps) {
                       </div>
                       <p className="text-sm text-muted-foreground">{existingResponse.proposal}</p>
 
-                      {/* Message Dialog */}
                       <div className="mt-4">
-                        <Dialog 
-                          open={selectedMessageThread?.leadId === lead.id}
-                          onOpenChange={(open) => {
-                            if (open) {
-                              setSelectedMessageThread({ leadId: lead.id, businessId: user.id });
-                            } else {
-                              setSelectedMessageThread(null);
-                              queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-                            }
-                          }}
-                        >
+                        {/* Message Dialog */}
+                        <Dialog>
                           <DialogTrigger asChild>
                             <Button variant="outline" size="sm" className="relative">
                               <Send className="h-4 w-4 mr-2" />
@@ -129,9 +119,11 @@ export function BusinessLeadsView({ leads, user }: BusinessLeadsViewProps) {
                             <MessageDialog
                               leadId={lead.id}
                               receiverId={lead.user_id}
-                              isOpen={true}
+                              isOpen={selectedMessageThread?.leadId === lead.id}
                               onOpenChange={(open) => {
-                                if (!open) {
+                                if (open) {
+                                  setSelectedMessageThread({ leadId: lead.id, businessId: user.id });
+                                } else {
                                   setSelectedMessageThread(null);
                                   queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
                                 }
