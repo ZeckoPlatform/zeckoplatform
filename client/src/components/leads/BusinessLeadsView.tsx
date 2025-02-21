@@ -76,7 +76,7 @@ export function BusinessLeadsView({ leads, user }: BusinessLeadsViewProps) {
                     <div>
                       <span className="font-medium">Location:</span> {lead.location}
                     </div>
-                    </div>
+                  </div>
 
                   {existingResponse ? (
                     <div className="mt-4 border-t pt-4">
@@ -92,58 +92,56 @@ export function BusinessLeadsView({ leads, user }: BusinessLeadsViewProps) {
                       </div>
                       <p className="text-sm text-muted-foreground">{existingResponse.proposal}</p>
 
-                      {existingResponse.status === "accepted" && (
-                        <div className="mt-4">
-                          <Dialog 
-                            open={selectedMessageThread?.leadId === lead.id && selectedMessageThread?.businessId === user.id}
-                            onOpenChange={(open) => {
-                              if (open) {
-                                setSelectedMessageThread({ leadId: lead.id, businessId: user.id });
-                              } else {
-                                setSelectedMessageThread(null);
-                                queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-                              }
-                            }}
-                          >
-                            <DialogTrigger asChild>
-                              <Button variant="outline" size="sm" className="relative">
-                                <Send className="h-4 w-4 mr-2" />
-                                Open Messages
-                                {unreadCount > 0 && (
-                                  <Badge
-                                    variant="destructive"
-                                    className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
-                                  >
-                                    {unreadCount}
-                                  </Badge>
-                                )}
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>Message Thread</DialogTitle>
-                                <DialogDescription>
-                                  View and send messages for this lead
-                                </DialogDescription>
-                              </DialogHeader>
-                              <MessageDialog
-                                leadId={lead.id}
-                                receiverId={lead.user_id}
-                                isOpen={true}
-                                onOpenChange={(open) => {
-                                  if (!open) {
-                                    setSelectedMessageThread(null);
-                                    queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-                                  }
-                                }}
-                                onMessagesRead={() => {
+                      <div className="mt-4">
+                        <Dialog 
+                          open={selectedMessageThread?.leadId === lead.id}
+                          onOpenChange={(open) => {
+                            if (open) {
+                              setSelectedMessageThread({ leadId: lead.id, businessId: user.id });
+                            } else {
+                              setSelectedMessageThread(null);
+                              queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+                            }
+                          }}
+                        >
+                          <DialogTrigger asChild>
+                            <Button variant="outline" size="sm" className="relative">
+                              <Send className="h-4 w-4 mr-2" />
+                              Open Messages
+                              {unreadCount > 0 && (
+                                <Badge
+                                  variant="destructive"
+                                  className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
+                                >
+                                  {unreadCount}
+                                </Badge>
+                              )}
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Message Thread</DialogTitle>
+                              <DialogDescription>
+                                View and send messages for this lead
+                              </DialogDescription>
+                            </DialogHeader>
+                            <MessageDialog
+                              leadId={lead.id}
+                              receiverId={lead.user_id}
+                              isOpen={true}
+                              onOpenChange={(open) => {
+                                if (!open) {
+                                  setSelectedMessageThread(null);
                                   queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-                                }}
-                              />
-                            </DialogContent>
-                          </Dialog>
-                        </div>
-                      )}
+                                }
+                              }}
+                              onMessagesRead={() => {
+                                queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+                              }}
+                            />
+                          </DialogContent>
+                        </Dialog>
+                      </div>
                     </div>
                   ) : (
                     <div className="mt-4 border-t pt-4">

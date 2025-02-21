@@ -112,7 +112,7 @@ export function FreeUserLeadsView({
 
                           <p className="text-sm mt-2">{response.proposal}</p>
 
-                          {/* Improved Messaging Integration */}
+                          {/* Full Messaging Integration */}
                           {response.status === "accepted" && response.business_id && (
                             <div className="mt-4">
                               <Dialog
@@ -150,7 +150,7 @@ export function FreeUserLeadsView({
                                   <MessageDialog
                                     leadId={lead.id}
                                     receiverId={response.business_id}
-                                    isOpen={true} // Ensure it's always open when the Dialog is open.
+                                    isOpen={true}
                                     onOpenChange={(open) => {
                                       if (!open) {
                                         setSelectedMessageThread(null);
