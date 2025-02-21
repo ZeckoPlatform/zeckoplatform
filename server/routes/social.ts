@@ -12,19 +12,24 @@ import { authenticateToken } from "../auth";
 const router = Router();
 
 // Configure multer for handling file uploads
-const uploadDir = path.join(process.cwd(), 'client', 'public', 'uploads');
-// Ensure upload directory exists
+const uploadDir = path.join(process.cwd(), 'uploads');
+// Ensure upload directory exists with proper permissions
 if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+  fs.mkdirSync(uploadDir, { recursive: true, mode: 0o755 });
 }
+
+log("Upload directory configured:", uploadDir);
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
+    log("Saving file to:", uploadDir);
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
+    const filename = uniqueSuffix + path.extname(file.originalname);
+    log("Generated filename:", filename);
+    cb(null, filename);
   }
 });
 
@@ -36,8 +41,10 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
     if (allowedTypes.includes(file.mimetype)) {
+      log("File type accepted:", file.mimetype);
       cb(null, true);
     } else {
+      log("File type rejected:", file.mimetype);
       const error = new Error("Invalid file type. Only JPEG, PNG and WebP are allowed.") as any;
       error.name = "INVALID_FILE_TYPE";
       cb(error);
@@ -58,7 +65,7 @@ router.post("/api/upload", authenticateToken, (req, res) => {
       if (err.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({ error: "File size should be less than 5MB" });
       }
-      return res.status(500).json({ error: "Failed to upload file" });
+      return res.status(500).json({ error: "Failed to upload file", details: err.message });
     }
 
     if (!req.file) {
@@ -67,8 +74,15 @@ router.post("/api/upload", authenticateToken, (req, res) => {
     }
 
     try {
+      // Store the file URL relative to the uploads directory
       const fileUrl = `/uploads/${req.file.filename}`;
       log("File uploaded successfully:", fileUrl);
+
+      // Ensure the file exists after upload
+      const filePath = path.join(uploadDir, req.file.filename);
+      if (!fs.existsSync(filePath)) {
+        throw new Error(`File not found after upload: ${filePath}`);
+      }
 
       res.json({
         url: fileUrl,
