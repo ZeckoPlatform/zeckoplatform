@@ -54,8 +54,8 @@ export function BusinessLeadsView({ leads, user }: BusinessLeadsViewProps) {
     return messages?.filter(m => !m.read && m.receiver_id === userId).length || 0;
   };
 
-  const canMessage = (lead: SelectLead) => {
-    return lead.responses?.some(r => r.business_id === user.id);
+  const hasExistingProposal = (lead: SelectLead) => {
+    return lead.responses?.some(r => r.business_id === user.id && r.status !== 'rejected');
   };
 
   return (
@@ -66,7 +66,6 @@ export function BusinessLeadsView({ leads, user }: BusinessLeadsViewProps) {
             leads.map((lead) => {
               const existingResponse = lead.responses?.find(r => r.business_id === user.id);
               const unreadCount = getUnreadCount(lead.messages, user.id);
-              const hasSubmittedProposal = !!existingResponse;
 
               return (
                 <Card key={lead.id}>
@@ -74,10 +73,7 @@ export function BusinessLeadsView({ leads, user }: BusinessLeadsViewProps) {
                     <div className="flex justify-between items-start">
                       <CardTitle>{lead.title}</CardTitle>
                       <div className="flex gap-2">
-                        <Badge variant="secondary">
-                          Budget: £{lead.budget}
-                        </Badge>
-                        {hasSubmittedProposal && (
+                        {existingResponse && existingResponse.status !== 'rejected' && (
                           <Button 
                             variant="outline" 
                             size="sm"
@@ -102,6 +98,9 @@ export function BusinessLeadsView({ leads, user }: BusinessLeadsViewProps) {
                             )}
                           </Button>
                         )}
+                        <Badge variant="secondary">
+                          Budget: £{lead.budget}
+                        </Badge>
                       </div>
                     </div>
                   </CardHeader>
