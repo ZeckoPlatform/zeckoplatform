@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@db";
-import { socialPosts, users, postComments, postReactions } from "@db/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { socialPosts } from "@db/schema";
+import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
@@ -37,49 +37,60 @@ const upload = multer({
       cb(null, true);
     } else {
       cb(null, false);
-      cb(new Error("Invalid file type. Only JPEG, PNG and WebP are allowed."));
+      const error = new Error("Invalid file type. Only JPEG, PNG and WebP are allowed.");
+      error.name = "INVALID_FILE_TYPE";
+      cb(error);
     }
   }
 });
 
 // Auth middleware for upload endpoint
 const requireAuth = (req: any, res: any, next: any) => {
-  if (!req.user) {
+  if (!req.user?.id) {
     return res.status(401).json({ error: "Authentication required" });
   }
   next();
 };
 
 // File upload endpoint with auth
-router.post("/api/upload", requireAuth, upload.single('file'), (req, res) => {
-  try {
+router.post("/api/upload", requireAuth, (req, res) => {
+  upload.single('file')(req, res, (err) => {
+    if (err) {
+      console.error("Upload error:", err);
+      if (err.name === "INVALID_FILE_TYPE") {
+        return res.status(400).json({ error: err.message });
+      }
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: "File size should be less than 5MB" });
+      }
+      return res.status(500).json({ error: "Failed to upload file" });
+    }
+
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    // Generate the URL for the uploaded file
-    const fileUrl = `/uploads/${path.basename(req.file.path)}`;
+    try {
+      // Generate the URL for the uploaded file
+      const fileUrl = `/uploads/${path.basename(req.file.path)}`;
 
-    res.json({
-      url: fileUrl,
-      filename: req.file.filename
-    });
-  } catch (error) {
-    console.error("Error uploading file:", error);
-    res.status(500).json({ 
-      error: "Failed to upload file",
-      details: error instanceof Error ? error.message : "Unknown error"
-    });
-  }
+      res.json({
+        url: fileUrl,
+        filename: req.file.filename
+      });
+    } catch (error) {
+      console.error("Error processing uploaded file:", error);
+      res.status(500).json({ 
+        error: "Failed to process uploaded file",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
 });
 
 // Create a new post
-router.post("/api/social/posts", async (req, res) => {
+router.post("/api/social/posts", requireAuth, async (req, res) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({ error: "Authentication required" });
-    }
-
     const schema = z.object({
       content: z.string().min(1),
       type: z.enum(["update", "article", "success_story", "market_insight", "opportunity"]),
@@ -111,15 +122,6 @@ router.post("/api/social/posts", async (req, res) => {
 router.get("/api/social/posts", async (req, res) => {
   try {
     const posts = await db.query.socialPosts.findMany({
-      with: {
-        author: {
-          columns: {
-            id: true,
-            email: true,
-            businessName: true,
-          },
-        },
-      },
       orderBy: desc(socialPosts.createdAt),
       limit: 20,
     });
