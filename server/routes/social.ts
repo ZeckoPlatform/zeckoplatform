@@ -40,8 +40,16 @@ const upload = multer({
   }
 });
 
-// File upload endpoint
-router.post("/api/upload", upload.single('file'), (req, res) => {
+// Auth middleware for upload endpoint
+const requireAuth = (req: any, res: any, next: any) => {
+  if (!req.user) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+  next();
+};
+
+// File upload endpoint with auth
+router.post("/api/upload", requireAuth, upload.single('file'), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
