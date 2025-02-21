@@ -31,78 +31,50 @@ router.get("/leads", async (req, res) => {
 
     if (req.user.userType === 'free') {
       // Free users see their own leads with responses and messages
-      const userLeads = await db
-        .select({
-          id: leads.id,
-          user_id: leads.user_id,
-          title: leads.title,
-          description: leads.description,
-          category: leads.category,
-          subcategory: leads.subcategory,
-          budget: leads.budget,
-          location: leads.location,
-          status: leads.status,
-          created_at: leads.created_at,
-          expires_at: leads.expires_at,
-          phone_number: leads.phone_number,
-          responses: sql`json_agg(
-            json_build_object(
-              'id', lr.id,
-              'business_id', lr.business_id,
-              'proposal', lr.proposal,
-              'status', lr.status,
-              'created_at', lr.created_at,
-              'business', json_build_object(
-                'id', u.id,
-                'profile', u.profile
+      const userLeads = await db.execute(sql`
+        SELECT 
+          l.*,
+          COALESCE(
+            json_agg(
+              DISTINCT jsonb_build_object(
+                'id', lr.id,
+                'business_id', lr.business_id,
+                'proposal', lr.proposal,
+                'status', lr.status,
+                'created_at', lr.created_at,
+                'business', jsonb_build_object(
+                  'id', u.id,
+                  'profile', u.profile
+                )
               )
-            )
-          )::json`,
-          messages: sql`json_agg(
-            json_build_object(
-              'id', m.id,
-              'sender_id', m.sender_id,
-              'receiver_id', m.receiver_id,
-              'content', m.content,
-              'read', m.read,
-              'created_at', m.created_at
-            )
-          )::json`
-        })
-        .from(leads)
-        .leftJoin(
-          leadResponses.as('lr'),
-          and(
-            eq(leads.id, leadResponses.lead_id),
-            isNull(leadResponses.deleted_at)
-          )
-        )
-        .leftJoin(
-          'users as u',
-          eq('lr.business_id', sql`u.id`)
-        )
-        .leftJoin(
-          messages.as('m'),
-          eq(leads.id, messages.lead_id)
-        )
-        .where(
-          and(
-            eq(leads.user_id, req.user.id),
-            isNull(leads.deleted_at)
-          )
-        )
-        .groupBy(leads.id)
-        .orderBy(leads.created_at);
+            ) FILTER (WHERE lr.id IS NOT NULL),
+            '[]'
+          ) as responses,
+          COALESCE(
+            json_agg(
+              DISTINCT jsonb_build_object(
+                'id', m.id,
+                'sender_id', m.sender_id,
+                'receiver_id', m.receiver_id,
+                'content', m.content,
+                'read', m.read,
+                'created_at', m.created_at
+              )
+            ) FILTER (WHERE m.id IS NOT NULL),
+            '[]'
+          ) as messages
+        FROM leads l
+        LEFT JOIN lead_responses lr ON l.id = lr.lead_id AND lr.deleted_at IS NULL
+        LEFT JOIN users u ON lr.business_id = u.id
+        LEFT JOIN messages m ON l.id = m.lead_id
+        WHERE l.user_id = ${req.user.id}
+        AND l.deleted_at IS NULL
+        GROUP BY l.id
+        ORDER BY l.created_at DESC
+      `);
 
-      // Clean up null arrays from json_agg
-      const cleanedLeads = userLeads.map(lead => ({
-        ...lead,
-        responses: lead.responses[0] === null ? [] : lead.responses,
-        messages: lead.messages[0] === null ? [] : lead.messages
-      }));
-
-      console.log("Found leads for free user:", cleanedLeads.length);
-      return res.json(cleanedLeads);
+      console.log("Found leads for free user:", userLeads.rows.length);
+      return res.json(userLeads.rows);
     } else {
       // Business users see leads from free users, filtered by match score
       const allLeads = await db
@@ -120,9 +92,9 @@ router.get("/leads", async (req, res) => {
       const matchedLeads = allLeads
         .map(lead => ({
           lead,
-          score: calculateMatchScore(lead, req.user)
+          score: calculateMatchScore(lead, req.user!)
         }))
-        .filter(({ score }) => score.totalScore > 0) // Only show leads with some match
+        .filter(({ score }) => score.totalScore > 0)
         .sort((a, b) => b.score.totalScore - a.score.totalScore)
         .map(({ lead }) => lead);
 
