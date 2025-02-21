@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
 import { useNotificationSound } from "@/lib/useNotificationSound";
+import { useToast } from "@/hooks/use-toast";
 
 interface Message {
   id: number;
@@ -40,13 +41,14 @@ export function MessageDialog({
   const messageContainerRef = useRef<HTMLDivElement>(null);
   const lastMessageIdRef = useRef<number | null>(null);
   const playNotification = useNotificationSound();
+  const { toast } = useToast();
 
   console.log("MessageDialog render:", { leadId, receiverId, isOpen }); // Debug log
 
   const { data: messages = [], isLoading } = useQuery<Message[]>({
     queryKey: [`/api/leads/${leadId}/messages`],
     enabled: isOpen && !!user?.id,
-    refetchInterval: isOpen ? 3000 : false, 
+    refetchInterval: isOpen ? 3000 : false,
   });
 
   useEffect(() => {
@@ -76,9 +78,14 @@ export function MessageDialog({
 
   const markAsReadMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", `/api/leads/${leadId}/messages/read`);
-      if (!response.ok) throw new Error("Failed to mark messages as read");
-      return response.json();
+      try {
+        const response = await apiRequest("POST", `/api/leads/${leadId}/messages/read`);
+        if (!response.ok) throw new Error("Failed to mark messages as read");
+        return response.json();
+      } catch (error) {
+        console.error("Mark as read error:", error);
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.setQueryData<Message[]>([`/api/leads/${leadId}/messages`],
@@ -95,12 +102,25 @@ export function MessageDialog({
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
-      const response = await apiRequest("POST", `/api/leads/${leadId}/messages`, {
-        receiverId,
-        content,
-      });
-      if (!response.ok) throw new Error("Failed to send message");
-      return response.json();
+      try {
+        const response = await apiRequest("POST", `/api/leads/${leadId}/messages`, {
+          receiverId,
+          content,
+        });
+        if (!response.ok) {
+          const error = await response.text();
+          throw new Error(error || "Failed to send message");
+        }
+        return response.json();
+      } catch (error) {
+        console.error("Send message error:", error);
+        toast({
+          title: "Error",
+          description: error instanceof Error ? error.message : "Failed to send message",
+          variant: "destructive",
+        });
+        throw error;
+      }
     },
     onSuccess: (newMessage) => {
       setNewMessage("");
@@ -111,6 +131,13 @@ export function MessageDialog({
       );
 
       scrollToBottom();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send message",
+        variant: "destructive",
+      });
     }
   });
 
@@ -179,7 +206,7 @@ export function MessageDialog({
           />
           <Button
             type="submit"
-            disabled={sendMessageMutation.isPending}
+            disabled={sendMessageMutation.isPending || !newMessage.trim()}
           >
             {sendMessageMutation.isPending ? (
               <>

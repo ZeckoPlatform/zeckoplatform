@@ -43,31 +43,60 @@ export function FreeUserLeadsView({
         <div className="grid gap-4">
           {leads && leads.length > 0 ? (
             leads.map((lead) => {
+              const unreadCount = getUnreadCount(lead.messages, user.id);
+
               return (
                 <Card key={lead.id}>
                   <CardHeader>
                     <div className="flex justify-between items-start">
                       <CardTitle>{lead.title}</CardTitle>
-                      {lead.user_id === user?.id && (
-                        <div className="flex gap-2">
+                      <div className="flex gap-2">
+                        {lead.user_id === user?.id && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setEditingLead(lead)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            {deleteLeadMutation && (
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => deleteLeadMutation.mutate(lead.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </>
+                        )}
+                        {lead.responses && lead.responses.length > 0 && (
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setEditingLead(lead)}
+                            className="relative"
+                            onClick={() => {
+                              setSelectedMessageThread({
+                                leadId: lead.id,
+                                businessId: lead.responses[0].business_id,
+                              });
+                              setIsMessageOpen(true);
+                            }}
                           >
-                            <Edit className="h-4 w-4" />
+                            <Send className="h-4 w-4 mr-2" />
+                            Messages
+                            {unreadCount > 0 && (
+                              <Badge
+                                variant="destructive"
+                                className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
+                              >
+                                {unreadCount}
+                              </Badge>
+                            )}
                           </Button>
-                          {deleteLeadMutation && (
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => deleteLeadMutation.mutate(lead.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -115,9 +144,9 @@ export function FreeUserLeadsView({
                                       size="sm"
                                       className="relative"
                                       onClick={() => {
-                                        setSelectedMessageThread({ 
-                                          leadId: lead.id, 
-                                          businessId: response.business_id 
+                                        setSelectedMessageThread({
+                                          leadId: lead.id,
+                                          businessId: response.business_id
                                         });
                                         setIsMessageOpen(true);
                                       }}
