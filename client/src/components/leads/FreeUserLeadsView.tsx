@@ -140,7 +140,7 @@ export function FreeUserLeadsView({
                                     )}
                                   </Button>
                                 </DialogTrigger>
-                                <DialogContent>
+                                <DialogContent className="sm:max-w-[500px]">
                                   <DialogHeader>
                                     <DialogTitle>Message Thread</DialogTitle>
                                     <DialogDescription>

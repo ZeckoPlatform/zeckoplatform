@@ -92,6 +92,7 @@ export function BusinessLeadsView({ leads, user }: BusinessLeadsViewProps) {
                       </div>
                       <p className="text-sm text-muted-foreground">{existingResponse.proposal}</p>
 
+                      {/* Message Dialog */}
                       <div className="mt-4">
                         <Dialog 
                           open={selectedMessageThread?.leadId === lead.id}
@@ -118,7 +119,7 @@ export function BusinessLeadsView({ leads, user }: BusinessLeadsViewProps) {
                               )}
                             </Button>
                           </DialogTrigger>
-                          <DialogContent>
+                          <DialogContent className="sm:max-w-[500px]">
                             <DialogHeader>
                               <DialogTitle>Message Thread</DialogTitle>
                               <DialogDescription>
