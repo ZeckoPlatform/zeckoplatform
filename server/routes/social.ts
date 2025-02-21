@@ -10,14 +10,14 @@ import fs from "fs";
 const router = Router();
 
 // Configure multer for handling file uploads
+const uploadDir = path.join(process.cwd(), 'client', 'public', 'uploads');
+// Ensure upload directory exists
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    // Create uploads directory in the public folder
-    const uploadDir = path.join(process.cwd(), 'client', 'public', 'uploads');
-    // Create uploads directory if it doesn't exist
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
@@ -36,8 +36,7 @@ const upload = multer({
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(null, false);
-      const error = new Error("Invalid file type. Only JPEG, PNG and WebP are allowed.");
+      const error = new Error("Invalid file type. Only JPEG, PNG and WebP are allowed.") as any;
       error.name = "INVALID_FILE_TYPE";
       cb(error);
     }
@@ -47,6 +46,7 @@ const upload = multer({
 // Auth middleware for upload endpoint
 const requireAuth = (req: any, res: any, next: any) => {
   if (!req.user?.id) {
+    console.error("Auth check failed - user:", req.user);
     return res.status(401).json({ error: "Authentication required" });
   }
   next();
@@ -54,6 +54,8 @@ const requireAuth = (req: any, res: any, next: any) => {
 
 // File upload endpoint with auth
 router.post("/api/upload", requireAuth, (req, res) => {
+  console.log("Upload request received - User:", req.user?.id);
+
   upload.single('file')(req, res, (err) => {
     if (err) {
       console.error("Upload error:", err);
@@ -67,12 +69,14 @@ router.post("/api/upload", requireAuth, (req, res) => {
     }
 
     if (!req.file) {
+      console.error("No file in request");
       return res.status(400).json({ error: "No file uploaded" });
     }
 
     try {
       // Generate the URL for the uploaded file
-      const fileUrl = `/uploads/${path.basename(req.file.path)}`;
+      const fileUrl = `/uploads/${req.file.filename}`;
+      console.log("File uploaded successfully:", fileUrl);
 
       res.json({
         url: fileUrl,

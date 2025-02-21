@@ -59,18 +59,23 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       formData.append('file', file);
 
       try {
+        console.log("Uploading file:", file.name);
         const response = await fetch('/api/upload', {
           method: 'POST',
           body: formData,
           credentials: 'include',
         });
 
+        const contentType = response.headers.get("content-type");
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to upload image');
+          const errorData = contentType?.includes("application/json") 
+            ? await response.json()
+            : { error: "Failed to upload image" };
+          throw new Error(errorData.error || "Failed to upload image");
         }
 
         const data = await response.json();
+        console.log("Upload successful:", data);
         return data.url;
       } catch (error) {
         console.error('Upload error:', error);
@@ -116,7 +121,6 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       return response.json();
     },
     onSuccess: () => {
-      // queryClient.invalidateQueries({ queryKey: ["/api/social/posts"] }); // Removed due to import error
       toast({
         title: "Success",
         description: "Your post has been shared successfully.",
@@ -223,7 +227,6 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
               )}
             />
 
-            {/* Selected Images Preview */}
             {selectedImages.length > 0 && (
               <div className="grid grid-cols-2 gap-2">
                 {selectedImages.map((url, index) => (
