@@ -65,7 +65,7 @@ router.get("/leads", async (req, res) => {
         FROM leads l
         LEFT JOIN lead_responses lr ON l.id = lr.lead_id
         LEFT JOIN users u ON lr.business_id = u.id
-        LEFT JOIN messages m ON l.id = m.lead_id
+        LEFT JOIN messages m ON l.id = m.lead_id 
         WHERE l.user_id = ${req.user.id}
         AND l.deleted_at IS NULL
         AND l.status != 'cancelled'
