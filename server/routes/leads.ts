@@ -626,12 +626,12 @@ router.get("/leads/:id/messages", async (req, res) => {
     // Check if user has permission to view messages
     if (lead.user_id === req.user.id) {
       // Lead owner can always view messages
-      const messages = await db
+      const leadMessages = await db
         .select()
         .from(messages)
         .where(eq(messages.lead_id, leadId))
         .orderBy(messages.created_at);
-      return res.json(messages);
+      return res.json(leadMessages);
     }
 
     // For business users, check if they have a response
@@ -651,13 +651,13 @@ router.get("/leads/:id/messages", async (req, res) => {
     }
 
     // Get all messages for this lead
-    const messages = await db
+    const leadMessages = await db
       .select()
       .from(messages)
       .where(eq(messages.lead_id, leadId))
       .orderBy(messages.created_at);
 
-    res.json(messages);
+    res.json(leadMessages);
   } catch (error) {
     console.error("Error fetching messages:", error);
     res.status(500).json({
@@ -667,7 +667,6 @@ router.get("/leads/:id/messages", async (req, res) => {
   }
 });
 
-// Add the message read status update endpoint
 router.post("/leads/:id/messages/read", async (req, res) => {
   try {
     if (!req.user) {
