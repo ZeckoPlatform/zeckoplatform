@@ -4,6 +4,7 @@ import { leads, messages, leadResponses } from "@db/schema";
 import { z } from "zod";
 import { eq, and, isNull, or } from "drizzle-orm";
 import { calculateMatchScore } from "../utils/matching";
+import { sql } from "drizzle-orm";
 
 const router = Router();
 
@@ -29,20 +30,79 @@ router.get("/leads", async (req, res) => {
     console.log("Fetching leads for user:", req.user.id, "type:", req.user.userType);
 
     if (req.user.userType === 'free') {
-      // Free users see their own leads
+      // Free users see their own leads with responses and messages
       const userLeads = await db
-        .select()
+        .select({
+          id: leads.id,
+          user_id: leads.user_id,
+          title: leads.title,
+          description: leads.description,
+          category: leads.category,
+          subcategory: leads.subcategory,
+          budget: leads.budget,
+          location: leads.location,
+          status: leads.status,
+          created_at: leads.created_at,
+          expires_at: leads.expires_at,
+          phone_number: leads.phone_number,
+          responses: sql`json_agg(
+            json_build_object(
+              'id', lr.id,
+              'business_id', lr.business_id,
+              'proposal', lr.proposal,
+              'status', lr.status,
+              'created_at', lr.created_at,
+              'business', json_build_object(
+                'id', u.id,
+                'profile', u.profile
+              )
+            )
+          )::json`,
+          messages: sql`json_agg(
+            json_build_object(
+              'id', m.id,
+              'sender_id', m.sender_id,
+              'receiver_id', m.receiver_id,
+              'content', m.content,
+              'read', m.read,
+              'created_at', m.created_at
+            )
+          )::json`
+        })
         .from(leads)
+        .leftJoin(
+          leadResponses.as('lr'),
+          and(
+            eq(leads.id, leadResponses.lead_id),
+            isNull(leadResponses.deleted_at)
+          )
+        )
+        .leftJoin(
+          'users as u',
+          eq('lr.business_id', sql`u.id`)
+        )
+        .leftJoin(
+          messages.as('m'),
+          eq(leads.id, messages.lead_id)
+        )
         .where(
           and(
             eq(leads.user_id, req.user.id),
             isNull(leads.deleted_at)
           )
         )
+        .groupBy(leads.id)
         .orderBy(leads.created_at);
 
-      console.log("Found leads for free user:", userLeads.length);
-      return res.json(userLeads);
+      // Clean up null arrays from json_agg
+      const cleanedLeads = userLeads.map(lead => ({
+        ...lead,
+        responses: lead.responses[0] === null ? [] : lead.responses,
+        messages: lead.messages[0] === null ? [] : lead.messages
+      }));
+
+      console.log("Found leads for free user:", cleanedLeads.length);
+      return res.json(cleanedLeads);
     } else {
       // Business users see leads from free users, filtered by match score
       const allLeads = await db
