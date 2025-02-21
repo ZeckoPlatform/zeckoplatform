@@ -68,6 +68,7 @@ router.get("/leads", async (req, res) => {
         LEFT JOIN messages m ON l.id = m.lead_id
         WHERE l.user_id = ${req.user.id}
         AND l.deleted_at IS NULL
+        AND l.status != 'cancelled'
         GROUP BY l.id
         ORDER BY l.created_at DESC
       `);

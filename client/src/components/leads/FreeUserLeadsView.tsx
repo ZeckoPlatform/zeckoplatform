@@ -41,6 +41,23 @@ export function FreeUserLeadsView({
   const { toast } = useToast();
   const [activeMessageThreads, setActiveMessageThreads] = useState<MessageThread[]>([]);
 
+  const handleDeleteLead = async (leadId: number) => {
+    try {
+      await deleteLeadMutation.mutateAsync(leadId);
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      toast({
+        title: "Success",
+        description: "Lead deleted successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete lead",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleOpenMessage = (leadId: number, businessId: number) => {
     setActiveMessageThreads(prev => [...prev, { leadId, businessId }]);
   };
@@ -79,11 +96,12 @@ export function FreeUserLeadsView({
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            {!hasResponses && deleteLeadMutation && (
+                            {!hasResponses && (
                               <Button
                                 variant="destructive"
                                 size="sm"
-                                onClick={() => deleteLeadMutation.mutate(lead.id)}
+                                onClick={() => handleDeleteLead(lead.id)}
+                                disabled={deleteLeadMutation.isPending}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
