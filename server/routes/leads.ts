@@ -158,23 +158,21 @@ router.delete("/leads/:id", async (req, res) => {
       return res.status(404).json({ error: "Lead not found" });
     }
 
-    // Soft delete the lead
+    // Update the lead status to cancelled instead of soft delete
     await db
       .update(leads)
-      .set({
-        deleted_at: new Date()
-      })
+      .set({ status: 'cancelled' })
       .where(and(
         eq(leads.id, leadId),
         eq(leads.user_id, req.user.id)
       ));
 
-    console.log(`Successfully soft deleted lead: ${leadId}`);
-    res.json({ message: "Lead deleted successfully" });
+    console.log(`Successfully cancelled lead: ${leadId}`);
+    res.json({ message: "Lead cancelled successfully" });
   } catch (error) {
-    console.error("Failed to delete lead:", error);
+    console.error("Failed to cancel lead:", error);
     res.status(500).json({
-      error: "Failed to delete lead",
+      error: "Failed to cancel lead",
       details: error instanceof Error ? error.message : "Unknown error"
     });
   }
@@ -273,20 +271,21 @@ router.post("/leads/:id/responses", async (req, res) => {
       return res.status(404).json({ error: "Lead not found or not available" });
     }
 
-    // Check if user has already submitted a proposal
+    // Check if user has an active proposal
     const [existingResponse] = await db
       .select()
       .from(leadResponses)
       .where(
         and(
           eq(leadResponses.lead_id, leadId),
-          eq(leadResponses.business_id, req.user.id)
+          eq(leadResponses.business_id, req.user.id),
+          eq(leadResponses.status, 'pending')
         )
       );
 
     if (existingResponse) {
-      console.log("Duplicate proposal attempt by business:", req.user.id, "for lead:", leadId);
-      return res.status(400).json({ error: "You have already submitted a proposal for this lead" });
+      console.log("Active proposal exists for business:", req.user.id, "for lead:", leadId);
+      return res.status(400).json({ error: "You already have an active proposal for this lead" });
     }
 
     // Create new proposal
