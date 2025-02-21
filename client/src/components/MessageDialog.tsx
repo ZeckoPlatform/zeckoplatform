@@ -41,6 +41,8 @@ export function MessageDialog({
   const lastMessageIdRef = useRef<number | null>(null);
   const playNotification = useNotificationSound();
 
+  console.log("MessageDialog render:", { leadId, receiverId, isOpen }); // Debug log
+
   const { data: messages = [], isLoading } = useQuery<Message[]>({
     queryKey: [`/api/leads/${leadId}/messages`],
     enabled: isOpen && !!user?.id,
@@ -48,6 +50,7 @@ export function MessageDialog({
   });
 
   useEffect(() => {
+    console.log("MessageDialog effect:", { isOpen, messagesLength: messages.length }); // Debug log
     if (!isOpen || !messages.length) return;
 
     const lastMessage = messages[messages.length - 1];
