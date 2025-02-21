@@ -60,6 +60,10 @@ export function FreeUserLeadsView({
     return messages?.filter(m => !m.read && m.sender_id === senderId).length || 0;
   };
 
+  const hasPendingProposals = (lead: SelectLead) => {
+    return lead.responses?.some(response => response.status === 'pending');
+  };
+
   return (
     <>
       <div className="space-y-8">
@@ -83,7 +87,7 @@ export function FreeUserLeadsView({
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            {deleteLeadMutation && (
+                            {deleteLeadMutation && !hasResponses && (
                               <Button
                                 variant="destructive"
                                 size="sm"
@@ -140,7 +144,7 @@ export function FreeUserLeadsView({
                                   >
                                     {response.status.charAt(0).toUpperCase() + response.status.slice(1)}
                                   </Badge>
-                                  {response.business_id && (
+                                  {response.business_id && response.status !== 'rejected' && (
                                     <Button
                                       variant="outline"
                                       size="sm"
