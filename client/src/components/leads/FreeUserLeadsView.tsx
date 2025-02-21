@@ -42,11 +42,7 @@ export function FreeUserLeadsView({
   const [activeMessageThreads, setActiveMessageThreads] = useState<MessageThread[]>([]);
 
   const handleOpenMessage = (leadId: number, businessId: number) => {
-    if (!activeMessageThreads.some(thread => 
-      thread.leadId === leadId && thread.businessId === businessId
-    )) {
-      setActiveMessageThreads(prev => [...prev, { leadId, businessId }]);
-    }
+    setActiveMessageThreads(prev => [...prev, { leadId, businessId }]);
   };
 
   const handleCloseMessage = (leadId: number, businessId: number) => {
@@ -87,7 +83,7 @@ export function FreeUserLeadsView({
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            {deleteLeadMutation && !hasResponses && (
+                            {!hasResponses && deleteLeadMutation && (
                               <Button
                                 variant="destructive"
                                 size="sm"
@@ -115,85 +111,89 @@ export function FreeUserLeadsView({
                       </div>
                     </div>
 
-                    {/* Only show proposals section if there are responses */}
+                    {/* Show proposals section if there are responses */}
                     {hasResponses && (
                       <div className="space-y-4 mt-6">
                         <h3 className="font-semibold">Proposals ({lead.responses?.length})</h3>
-                        {lead.responses?.map((response) => {
-                          const unreadCount = getUnreadCount(
-                            lead.messages,
-                            response.business_id
-                          );
+                        <div className="space-y-4">
+                          {lead.responses?.map((response) => {
+                            const unreadCount = getUnreadCount(
+                              lead.messages,
+                              response.business_id
+                            );
 
-                          return (
-                            <div
-                              key={response.id}
-                              className="border rounded-lg p-4"
-                            >
-                              <div className="flex justify-between items-center">
-                                <p className="font-medium">
-                                  {response.business?.profile?.name || "Business"}
-                                </p>
-                                <div className="flex items-center gap-2">
-                                  <Badge
-                                    variant={
-                                      response.status === "accepted" ? "success" :
-                                        response.status === "rejected" ? "destructive" :
-                                          "secondary"
-                                    }
-                                  >
-                                    {response.status.charAt(0).toUpperCase() + response.status.slice(1)}
-                                  </Badge>
-                                  {response.business_id && response.status !== 'rejected' && (
+                            return (
+                              <div
+                                key={response.id}
+                                className="border rounded-lg p-4"
+                              >
+                                <div className="flex justify-between items-center">
+                                  <p className="font-medium">
+                                    {response.business?.profile?.name || "Business"}
+                                  </p>
+                                  <div className="flex items-center gap-2">
+                                    <Badge
+                                      variant={
+                                        response.status === "accepted" ? "success" :
+                                          response.status === "rejected" ? "destructive" :
+                                            "secondary"
+                                      }
+                                    >
+                                      {response.status.charAt(0).toUpperCase() + response.status.slice(1)}
+                                    </Badge>
+                                    {/* Show message button for non-rejected proposals */}
+                                    {response.status !== 'rejected' && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="relative"
+                                        onClick={() => handleOpenMessage(lead.id, response.business_id)}
+                                      >
+                                        <Send className="h-4 w-4 mr-2" />
+                                        Messages
+                                        {unreadCount > 0 && (
+                                          <Badge
+                                            variant="destructive"
+                                            className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
+                                          >
+                                            {unreadCount}
+                                          </Badge>
+                                        )}
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <p className="text-sm mt-2">{response.proposal}</p>
+
+                                {/* Show accept/reject buttons for pending proposals */}
+                                {response.status === "pending" && (
+                                  <div className="mt-4 flex items-center gap-2">
+                                    <Button
+                                      size="sm"
+                                      onClick={() => acceptProposalMutation.mutate({
+                                        leadId: lead.id,
+                                        responseId: response.id
+                                      })}
+                                    >
+                                      Accept
+                                    </Button>
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      className="relative"
-                                      onClick={() => handleOpenMessage(lead.id, response.business_id)}
+                                      onClick={() => rejectProposalMutation.mutate({
+                                        leadId: lead.id,
+                                        responseId: response.id
+                                      })}
                                     >
-                                      <Send className="h-4 w-4 mr-2" />
-                                      Messages
-                                      {unreadCount > 0 && (
-                                        <Badge
-                                          variant="destructive"
-                                          className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
-                                        >
-                                          {unreadCount}
-                                        </Badge>
-                                      )}
+                                      Reject
                                     </Button>
-                                  )}
-                                </div>
+                                  </div>
+                                )}
                               </div>
-
-                              <p className="text-sm mt-2">{response.proposal}</p>
-
-                              {response.status === "pending" && acceptProposalMutation && rejectProposalMutation && (
-                                <div className="mt-4 flex items-center gap-2">
-                                  <Button
-                                    size="sm"
-                                    onClick={() => acceptProposalMutation.mutate({
-                                      leadId: lead.id,
-                                      responseId: response.id
-                                    })}
-                                  >
-                                    Accept
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => rejectProposalMutation.mutate({
-                                      leadId: lead.id,
-                                      responseId: response.id
-                                    })}
-                                  >
-                                    Reject
-                                  </Button>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
                   </CardContent>
@@ -208,7 +208,7 @@ export function FreeUserLeadsView({
         </div>
       </div>
 
-      {/* Support multiple message dialogs */}
+      {/* Message dialogs */}
       {activeMessageThreads.map(thread => (
         <Dialog 
           key={`${thread.leadId}-${thread.businessId}`}
