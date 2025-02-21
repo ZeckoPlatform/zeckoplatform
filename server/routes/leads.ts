@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@db";
 import { leads, messages, leadResponses } from "@db/schema";
 import { z } from "zod";
-import { eq, and, isNull, or } from "drizzle-orm";
+import { eq, and, isNull, or, not } from "drizzle-orm";
 import { calculateMatchScore } from "../utils/matching";
 import { sql } from "drizzle-orm";
 
@@ -30,7 +30,6 @@ router.get("/leads", async (req, res) => {
     console.log("Fetching leads for user:", req.user.id, "type:", req.user.userType);
 
     if (req.user.userType === 'free') {
-      // Free users see their own leads with responses and messages
       const userLeads = await db.execute(sql`
         SELECT 
           l.*,
@@ -47,7 +46,7 @@ router.get("/leads", async (req, res) => {
                   'profile', u.profile
                 )
               )
-            ) FILTER (WHERE lr.id IS NOT NULL),
+            ) FILTER (WHERE lr.id IS NOT NULL AND lr.status != 'cancelled'),
             '[]'
           ) as responses,
           COALESCE(
@@ -462,52 +461,38 @@ router.post("/leads/:id/responses/:responseId/accept", async (req, res) => {
       return res.status(404).json({ error: "Lead not found" });
     }
 
-    // Get the response
-    const [response] = await db
+    // Begin transaction
+    await db.transaction(async (tx) => {
+      // Update the accepted response
+      await tx
+        .update(leadResponses)
+        .set({ status: 'accepted' })
+        .where(eq(leadResponses.id, responseId));
+
+      // Update lead status
+      await tx
+        .update(leads)
+        .set({ status: 'in_progress' })
+        .where(eq(leads.id, leadId));
+
+      // Update all other pending responses to rejected
+      await tx
+        .update(leadResponses)
+        .set({ status: 'rejected' })
+        .where(
+          and(
+            eq(leadResponses.lead_id, leadId),
+            eq(leadResponses.status, 'pending'),
+            not(eq(leadResponses.id, responseId))
+          )
+        );
+    });
+
+    // Fetch and return the updated response
+    const [updatedResponse] = await db
       .select()
       .from(leadResponses)
-      .where(
-        and(
-          eq(leadResponses.id, responseId),
-          eq(leadResponses.lead_id, leadId)
-        )
-      );
-
-    if (!response) {
-      return res.status(404).json({ error: "Response not found" });
-    }
-
-    // Update response status to accepted
-    const [updatedResponse] = await db
-      .update(leadResponses)
-      .set({
-        status: 'accepted'
-      })
-      .where(eq(leadResponses.id, responseId))
-      .returning();
-
-    // Update lead status
-    await db
-      .update(leads)
-      .set({
-        status: 'in_progress'
-      })
-      .where(eq(leads.id, leadId));
-
-    // Reject all other responses
-    await db
-      .update(leadResponses)
-      .set({
-        status: 'rejected'
-      })
-      .where(
-        and(
-          eq(leadResponses.lead_id, leadId),
-          isNull(leadResponses.deleted_at),
-          eq(leadResponses.status, 'pending'),
-          isNull(leadResponses.deleted_at)
-        )
-      );
+      .where(eq(leadResponses.id, responseId));
 
     res.json(updatedResponse);
   } catch (error) {
