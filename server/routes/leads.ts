@@ -596,4 +596,100 @@ router.post("/leads/:id/responses/:responseId/reject", async (req, res) => {
   }
 });
 
+// Add the message retrieval endpoint
+router.get("/leads/:id/messages", async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const leadId = parseInt(req.params.id);
+    if (isNaN(leadId)) {
+      return res.status(400).json({ error: "Invalid lead ID" });
+    }
+
+    // Get the lead to verify permissions
+    const [lead] = await db
+      .select()
+      .from(leads)
+      .where(
+        and(
+          eq(leads.id, leadId),
+          isNull(leads.deleted_at)
+        )
+      );
+
+    if (!lead) {
+      return res.status(404).json({ error: "Lead not found" });
+    }
+
+    // Check if user has permission to view messages
+    const [response] = await db
+      .select()
+      .from(leadResponses)
+      .where(
+        and(
+          eq(leadResponses.lead_id, leadId),
+          or(
+            eq(leadResponses.business_id, req.user.id),
+            eq(leads.user_id, req.user.id)
+          )
+        )
+      );
+
+    if (!response && lead.user_id !== req.user.id) {
+      return res.status(403).json({ error: "No permission to view messages" });
+    }
+
+    // Get all messages for this lead
+    const messages = await db
+      .select()
+      .from(messages)
+      .where(eq(messages.lead_id, leadId))
+      .orderBy(messages.created_at);
+
+    res.json(messages);
+  } catch (error) {
+    console.error("Error fetching messages:", error);
+    res.status(500).json({
+      error: "Failed to fetch messages",
+      details: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
+// Add the message read status update endpoint
+router.post("/leads/:id/messages/read", async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const leadId = parseInt(req.params.id);
+    if (isNaN(leadId)) {
+      return res.status(400).json({ error: "Invalid lead ID" });
+    }
+
+    // Update all unread messages where the current user is the receiver
+    await db
+      .update(messages)
+      .set({ read: true })
+      .where(
+        and(
+          eq(messages.lead_id, leadId),
+          eq(messages.receiver_id, req.user.id),
+          eq(messages.read, false)
+        )
+      );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error marking messages as read:", error);
+    res.status(500).json({
+      error: "Failed to mark messages as read",
+      details: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
 export default router;
