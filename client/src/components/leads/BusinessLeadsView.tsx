@@ -69,7 +69,7 @@ export function BusinessLeadsView({ leads, user }: BusinessLeadsViewProps) {
                         </Badge>
                         <Button 
                           variant="outline" 
-                          size="sm" 
+                          size="sm"
                           className="relative"
                           onClick={() => {
                             setSelectedMessageThread({ leadId: lead.id, businessId: user.id });

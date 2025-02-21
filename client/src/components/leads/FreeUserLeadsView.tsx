@@ -1,8 +1,4 @@
 import { useState } from 'react';
-import { useForm } from "react-hook-form";
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -11,6 +7,7 @@ import { Edit, Trash2, Send } from "lucide-react";
 import { MessageDialog } from "@/components/MessageDialog";
 import { useToast } from "@/hooks/use-toast";
 import { SelectLead, SelectUser, getUnreadCount } from '@/types/leads';
+import { useQueryClient } from "@tanstack/react-query";
 
 interface FreeUserLeadsViewProps {
   leads: SelectLead[];
