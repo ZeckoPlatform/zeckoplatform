@@ -39,9 +39,6 @@ export function FreeUserLeadsView({
   const { toast } = useToast();
   const [selectedMessageThread, setSelectedMessageThread] = useState<{ leadId: number; businessId: number } | null>(null);
 
-  console.log('Rendering FreeUserLeadsView with leads:', leads);
-  console.log('Current user:', user);
-
   return (
     <div className="space-y-8">
       <div className="grid gap-4">
@@ -119,43 +116,19 @@ export function FreeUserLeadsView({
                           {/* Message Dialog for Accepted Proposals */}
                           {response.status === "accepted" && response.business_id && (
                             <div className="mt-4">
-                              <Dialog>
-                                <DialogTrigger asChild>
-                                  <Button variant="outline" size="sm" className="relative">
-                                    <Send className="h-4 w-4 mr-2"/>
-                                    Open Messages
-                                    {unreadCount > 0 && (
-                                      <Badge
-                                        variant="destructive"
-                                        className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full"
-                                      >
-                                        {unreadCount}
-                                      </Badge>
-                                    )}
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                  <DialogHeader>
-                                    <DialogTitle>Message Thread</DialogTitle>
-                                    <DialogDescription>
-                                      View and send messages for this lead
-                                    </DialogDescription>
-                                  </DialogHeader>
-                                  <MessageDialog
-                                    leadId={lead.id}
-                                    receiverId={response.business_id}
-                                    isOpen={true}
-                                    onOpenChange={(open) => {
-                                      if (!open) {
-                                        queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-                                      }
-                                    }}
-                                    onMessagesRead={() => {
-                                      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-                                    }}
-                                  />
-                                </DialogContent>
-                              </Dialog>
+                              <MessageDialog //Moved outside the Dialog component
+                                leadId={lead.id}
+                                receiverId={response.business_id}
+                                isOpen={true}
+                                onOpenChange={(open) => {
+                                  if (!open) {
+                                    queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+                                  }
+                                }}
+                                onMessagesRead={() => {
+                                  queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+                                }}
+                              />
                             </div>
                           )}
 
