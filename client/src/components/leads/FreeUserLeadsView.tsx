@@ -56,10 +56,6 @@ export function FreeUserLeadsView({
     return messages?.filter(m => !m.read && m.sender_id === senderId).length || 0;
   };
 
-  const hasPendingProposals = (lead: SelectLead) => {
-    return lead.responses?.some(response => response.status === 'pending');
-  };
-
   return (
     <>
       <div className="space-y-8">
@@ -99,7 +95,7 @@ export function FreeUserLeadsView({
                   </CardHeader>
                   <CardContent>
                     <p className="text-muted-foreground mb-4">{lead.description}</p>
-                    <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div className="grid grid-cols-3 gap-4 text-sm mb-4">
                       <div>
                         <span className="font-medium">Category:</span> {lead.category}
                       </div>
@@ -111,21 +107,20 @@ export function FreeUserLeadsView({
                       </div>
                     </div>
 
-                    {/* Show proposals section if there are responses */}
-                    {hasResponses && (
-                      <div className="space-y-4 mt-6">
-                        <h3 className="font-semibold">Proposals ({lead.responses?.length})</h3>
+                    {/* Show proposals section */}
+                    {lead.responses && lead.responses.length > 0 && (
+                      <div className="mt-6 space-y-4">
+                        <h3 className="font-semibold text-lg">
+                          Proposals ({lead.responses.length})
+                        </h3>
                         <div className="space-y-4">
-                          {lead.responses?.map((response) => {
-                            const unreadCount = getUnreadCount(
-                              lead.messages,
-                              response.business_id
-                            );
+                          {lead.responses.map((response) => {
+                            const unreadCount = getUnreadCount(lead.messages, response.business_id);
 
                             return (
                               <div
                                 key={response.id}
-                                className="border rounded-lg p-4"
+                                className="border rounded-lg p-4 space-y-4"
                               >
                                 <div className="flex justify-between items-center">
                                   <p className="font-medium">
@@ -141,7 +136,6 @@ export function FreeUserLeadsView({
                                     >
                                       {response.status.charAt(0).toUpperCase() + response.status.slice(1)}
                                     </Badge>
-                                    {/* Show message button for non-rejected proposals */}
                                     {response.status !== 'rejected' && (
                                       <Button
                                         variant="outline"
@@ -164,11 +158,12 @@ export function FreeUserLeadsView({
                                   </div>
                                 </div>
 
-                                <p className="text-sm mt-2">{response.proposal}</p>
+                                <p className="text-muted-foreground">
+                                  {response.proposal}
+                                </p>
 
-                                {/* Show accept/reject buttons for pending proposals */}
                                 {response.status === "pending" && (
-                                  <div className="mt-4 flex items-center gap-2">
+                                  <div className="flex items-center gap-2">
                                     <Button
                                       size="sm"
                                       onClick={() => acceptProposalMutation.mutate({
