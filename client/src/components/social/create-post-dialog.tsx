@@ -59,7 +59,8 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       });
 
       if (!response.ok) {
-        throw new Error('Failed to upload image');
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to upload image');
       }
 
       const data = await response.json();
@@ -69,6 +70,8 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       const currentUrls = form.getValues("mediaUrls") || [];
       form.setValue("mediaUrls", [...currentUrls, url]);
       setSelectedImages([...selectedImages, url]);
+      setShowMediaInput(false);
+      setUploadType(null);
     },
     onError: (error: Error) => {
       toast({
@@ -137,7 +140,16 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       return;
     }
 
-    await uploadImageMutation.mutateAsync(file);
+    try {
+      await uploadImageMutation.mutateAsync(file);
+    } catch (error) {
+      console.error('File upload error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to upload image. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleMediaAdd = (url: string) => {
