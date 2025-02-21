@@ -236,7 +236,7 @@ router.patch("/leads/:id", async (req, res) => {
   }
 });
 
-// Add new proposal submission route
+// Update the proposal submission route with better validation and error handling
 const proposalSchema = z.object({
   proposal: z.string().min(1, "Proposal text is required"),
 });
@@ -254,6 +254,7 @@ router.post("/leads/:id/responses", async (req, res) => {
 
     // Validate proposal data
     const validatedData = proposalSchema.parse(req.body);
+    console.log("Attempting to submit proposal for lead:", leadId, "by business:", req.user.id);
 
     // Check if lead exists and is open
     const [lead] = await db
@@ -268,6 +269,7 @@ router.post("/leads/:id/responses", async (req, res) => {
       );
 
     if (!lead) {
+      console.log("Lead not found or not available:", leadId);
       return res.status(404).json({ error: "Lead not found or not available" });
     }
 
@@ -283,10 +285,12 @@ router.post("/leads/:id/responses", async (req, res) => {
       );
 
     if (existingResponse) {
+      console.log("Duplicate proposal attempt by business:", req.user.id, "for lead:", leadId);
       return res.status(400).json({ error: "You have already submitted a proposal for this lead" });
     }
 
     // Create new proposal
+    console.log("Creating new proposal for lead:", leadId, "by business:", req.user.id);
     const [newResponse] = await db
       .insert(leadResponses)
       .values({
@@ -317,7 +321,7 @@ router.post("/leads/:id/responses", async (req, res) => {
   }
 });
 
-// Add new message route
+// Update the messaging route with better permission checks
 router.post("/leads/:id/messages", async (req, res) => {
   try {
     if (!req.user) {
@@ -327,39 +331,55 @@ router.post("/leads/:id/messages", async (req, res) => {
     const leadId = parseInt(req.params.id);
     const { receiverId, content } = req.body;
 
+    console.log("Message attempt - Lead:", leadId, "Sender:", req.user.id, "Receiver:", receiverId);
+
     if (!content?.trim()) {
       return res.status(400).json({ error: "Message content is required" });
     }
 
-    // Verify the lead exists
+    // Verify the lead exists and get additional details
     const [lead] = await db
       .select()
       .from(leads)
-      .where(eq(leads.id, leadId));
-
-    if (!lead) {
-      return res.status(404).json({ error: "Lead not found" });
-    }
-
-    // Verify that the sender has permission to message the receiver
-    const canMessage = await db
-      .select()
-      .from(leadResponses)
       .where(
         and(
-          eq(leadResponses.lead_id, leadId),
-          or(
-            and(eq(leadResponses.business_id, req.user.id), eq(lead.user_id, receiverId)),
-            and(eq(lead.user_id, req.user.id), eq(leadResponses.business_id, receiverId))
-          )
+          eq(leads.id, leadId),
+          isNull(leads.deleted_at)
         )
       );
 
-    if (!canMessage.length) {
+    if (!lead) {
+      console.log("Lead not found:", leadId);
+      return res.status(404).json({ error: "Lead not found" });
+    }
+
+    // Get all responses for this lead
+    const responses = await db
+      .select()
+      .from(leadResponses)
+      .where(eq(leadResponses.lead_id, leadId));
+
+    console.log("Found responses for lead:", responses.length);
+
+    // Check messaging permissions
+    let hasPermission = false;
+    if (req.user.id === lead.user_id) {
+      // Lead owner can message any business that has submitted a proposal
+      hasPermission = responses.some(r => r.business_id === receiverId);
+    } else {
+      // Business can only message if they have submitted a proposal
+      hasPermission = responses.some(r =>
+        r.business_id === req.user.id && lead.user_id === receiverId
+      );
+    }
+
+    if (!hasPermission) {
+      console.log("Permission denied - Lead owner:", lead.user_id, "Sender:", req.user.id, "Receiver:", receiverId);
       return res.status(403).json({ error: "You don't have permission to message this user" });
     }
 
     // Create the message
+    console.log("Creating message - Lead:", leadId, "Sender:", req.user.id, "Receiver:", receiverId);
     const [newMessage] = await db
       .insert(messages)
       .values({
@@ -371,6 +391,7 @@ router.post("/leads/:id/messages", async (req, res) => {
       })
       .returning();
 
+    console.log("Message created successfully:", newMessage);
     res.status(201).json(newMessage);
   } catch (error) {
     console.error("Failed to send message:", error);
@@ -381,7 +402,6 @@ router.post("/leads/:id/messages", async (req, res) => {
   }
 });
 
-// Add proposal acceptance route
 router.post("/leads/:id/responses/:responseId/accept", async (req, res) => {
   try {
     if (!req.user) {
