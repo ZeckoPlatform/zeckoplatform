@@ -71,7 +71,8 @@ export function FreeUserLeadsView({
                             )}
                           </>
                         )}
-                        {lead.responses && lead.responses.length > 0 && (
+                        {/* Show message button for both lead owners and when there are responses */}
+                        {(lead.user_id === user?.id || (lead.responses && lead.responses.length > 0)) && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -79,7 +80,7 @@ export function FreeUserLeadsView({
                             onClick={() => {
                               setSelectedMessageThread({
                                 leadId: lead.id,
-                                businessId: lead.responses[0].business_id,
+                                businessId: lead.responses?.[0]?.business_id || 0,
                               });
                               setIsMessageOpen(true);
                             }}

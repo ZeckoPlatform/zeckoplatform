@@ -103,20 +103,28 @@ export function MessageDialog({
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
       try {
+        if (!content.trim()) {
+          throw new Error("Message cannot be empty");
+        }
+
         const response = await apiRequest("POST", `/api/leads/${leadId}/messages`, {
           receiverId,
-          content,
+          content: content.trim(),
         });
+
         if (!response.ok) {
-          const error = await response.text();
-          throw new Error(error || "Failed to send message");
+          const errorText = await response.text();
+          throw new Error(errorText || "Failed to send message");
         }
-        return response.json();
+
+        const data = await response.json();
+        return data;
       } catch (error) {
         console.error("Send message error:", error);
+        const errorMessage = error instanceof Error ? error.message : "Failed to send message";
         toast({
-          title: "Error",
-          description: error instanceof Error ? error.message : "Failed to send message",
+          title: "Error sending message",
+          description: errorMessage,
           variant: "destructive",
         });
         throw error;
@@ -127,12 +135,13 @@ export function MessageDialog({
       playNotification('send');
 
       queryClient.setQueryData<Message[]>([`/api/leads/${leadId}/messages`],
-        old => [...(old || []), newMessage]
+        old => old ? [...old, newMessage] : [newMessage]
       );
 
       scrollToBottom();
     },
     onError: (error: Error) => {
+      console.error("Message mutation error:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to send message",
@@ -143,8 +152,20 @@ export function MessageDialog({
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim()) return;
-    await sendMessageMutation.mutateAsync(newMessage);
+    if (!newMessage.trim()) {
+      toast({
+        title: "Error",
+        description: "Message cannot be empty",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      await sendMessageMutation.mutateAsync(newMessage);
+    } catch (error) {
+      // Error is already handled in mutation
+      console.error("Handle send error:", error);
+    }
   };
 
   return (
