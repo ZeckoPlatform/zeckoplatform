@@ -64,7 +64,7 @@ router.get("/leads", async (req, res) => {
             '[]'
           ) as messages
         FROM leads l
-        LEFT JOIN lead_responses lr ON l.id = lr.lead_id AND lr.deleted_at IS NULL
+        LEFT JOIN lead_responses lr ON l.id = lr.lead_id
         LEFT JOIN users u ON lr.business_id = u.id
         LEFT JOIN messages m ON l.id = m.lead_id
         WHERE l.user_id = ${req.user.id}
