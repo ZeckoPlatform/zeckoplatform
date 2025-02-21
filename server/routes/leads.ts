@@ -46,7 +46,7 @@ router.get("/leads", async (req, res) => {
                   'profile', u.profile
                 )
               )
-            ) FILTER (WHERE lr.id IS NOT NULL AND lr.status != 'cancelled'),
+            ) FILTER (WHERE lr.id IS NOT NULL AND lr.status IN ('pending', 'accepted')),
             '[]'
           ) as responses,
           COALESCE(
