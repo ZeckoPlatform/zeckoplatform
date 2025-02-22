@@ -38,7 +38,7 @@ const upload = multer({
       cb(null, false);
     }
   }
-});
+}).single('file'); // Specify 'file' field for upload
 
 // File upload endpoint with auth
 router.post("/api/social/upload", authenticateToken, (req, res) => {

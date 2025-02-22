@@ -81,24 +81,33 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
 
       console.log('Uploading file:', file.name);
 
-      const response = await fetch('/api/social/upload', {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      try {
+        const response = await fetch('/api/social/upload', {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
 
-      console.log('Upload response status:', response.status);
+        console.log('Upload response status:', response.status);
 
-      const data = await response.json();
-      console.log('Upload response:', data);
+        if (!response.ok) {
+          throw new Error("Failed to upload image");
+        }
 
-      if (!data.success || !data.url) {
-        throw new Error(data.error || "Failed to upload image");
+        const data = await response.json();
+        console.log('Upload response:', data);
+
+        if (!data.success || !data.url) {
+          throw new Error(data.error || "Failed to upload image");
+        }
+
+        return data.url;
+      } catch (error) {
+        console.error('Upload error:', error);
+        throw error instanceof Error ? error : new Error("Upload failed");
       }
-
-      return data.url;
     },
     onSuccess: (url) => {
       const currentUrls = form.getValues("mediaUrls") || [];
