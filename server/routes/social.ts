@@ -45,56 +45,58 @@ const upload = multer({
       cb(null, true);
     } else {
       log("File type rejected:", file.mimetype);
-      const error = new Error("Invalid file type. Only JPEG, PNG and WebP are allowed.") as any;
-      error.name = "INVALID_FILE_TYPE";
-      cb(error);
+      cb(new Error("Invalid file type. Only JPEG, PNG and WebP are allowed."));
     }
   }
 });
 
 // File upload endpoint with auth
-router.post("/api/upload", authenticateToken, (req, res) => {
+router.post("/api/social/upload", authenticateToken, (req, res) => {
   log("Upload request received - User:", req.user?.id);
 
-  upload.single('file')(req, res, (err) => {
-    if (err) {
-      log("Upload error:", err);
-      if (err.name === "INVALID_FILE_TYPE") {
-        return res.status(400).json({ error: err.message });
-      }
-      if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({ error: "File size should be less than 5MB" });
-      }
-      return res.status(500).json({ error: "Failed to upload file", details: err.message });
-    }
-
-    if (!req.file) {
-      log("No file in request");
-      return res.status(400).json({ error: "No file uploaded" });
-    }
-
+  upload.single('file')(req, res, async (err) => {
     try {
-      // Store the file URL relative to the uploads directory
-      const fileUrl = `/uploads/${req.file.filename}`;
-      log("File uploaded successfully:", fileUrl);
-
-      // Ensure the file exists after upload
-      const filePath = path.join(uploadDir, req.file.filename);
-      if (!fs.existsSync(filePath)) {
-        throw new Error(`File not found after upload: ${filePath}`);
+      if (err) {
+        log("Upload error:", err);
+        return res.status(400).json({ 
+          error: err.message || "Failed to upload file" 
+        });
       }
 
-      // Send a properly formatted JSON response
+      if (!req.file) {
+        log("No file in request");
+        return res.status(400).json({ 
+          error: "No file uploaded" 
+        });
+      }
+
+      const fileUrl = `/uploads/${req.file.filename}`;
+      const filePath = path.join(uploadDir, req.file.filename);
+
+      // Verify file exists
+      if (!fs.existsSync(filePath)) {
+        log("File not found after upload:", filePath);
+        return res.status(500).json({ 
+          error: "File not saved properly" 
+        });
+      }
+
+      log("File upload successful:", {
+        url: fileUrl,
+        filename: req.file.filename
+      });
+
+      // Set proper content type header
+      res.setHeader('Content-Type', 'application/json');
       return res.json({
         success: true,
         url: fileUrl,
         filename: req.file.filename
       });
     } catch (error) {
-      log("Error processing uploaded file:", error);
+      log("Unexpected error during upload:", error);
       res.status(500).json({ 
-        error: "Failed to process uploaded file",
-        details: error instanceof Error ? error.message : "Unknown error"
+        error: "Internal server error during upload" 
       });
     }
   });

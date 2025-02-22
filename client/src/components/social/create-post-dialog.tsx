@@ -60,7 +60,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
 
       try {
         console.log("Uploading file:", file.name);
-        const response = await fetch('/api/upload', {
+        const response = await fetch('/api/social/upload', {
           method: 'POST',
           body: formData,
           headers: {
@@ -68,30 +68,21 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
           },
         });
 
-        let errorMessage = "Failed to upload image";
         if (!response.ok) {
+          const errorText = await response.text();
+          let errorMessage;
           try {
-            const contentType = response.headers.get("content-type");
-            if (contentType && contentType.includes("application/json")) {
-              const errorData = await response.json();
-              errorMessage = errorData.error || errorData.details || errorMessage;
-            } else {
-              errorMessage = await response.text() || errorMessage;
-            }
-          } catch (parseError) {
-            console.error('Error parsing response:', parseError);
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.error || errorData.details || "Failed to upload image";
+          } catch (e) {
+            errorMessage = errorText || "Failed to upload image";
           }
           throw new Error(errorMessage);
         }
 
-        try {
-          const data = await response.json();
-          console.log("Upload successful:", data);
-          return data.url;
-        } catch (parseError) {
-          console.error('Error parsing success response:', parseError);
-          throw new Error("Invalid response format from server");
-        }
+        const data = await response.json();
+        console.log("Upload successful:", data);
+        return data.url;
       } catch (error) {
         console.error('Upload error:', error);
         throw error;
