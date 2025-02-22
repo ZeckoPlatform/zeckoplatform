@@ -68,8 +68,16 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
           },
         });
 
-        const data = await response.json();
+        // Always try to parse response as JSON first
+        let data;
+        try {
+          data = await response.json();
+        } catch (e) {
+          console.error('Failed to parse response as JSON:', e);
+          throw new Error("Server returned invalid response format");
+        }
 
+        // Check for error responses
         if (!response.ok || !data.success) {
           throw new Error(data.error || "Failed to upload image");
         }
@@ -81,6 +89,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
         console.log("Upload successful:", data);
         return data.url;
       } catch (error) {
+        console.error('Upload error:', error);
         if (error instanceof Error) {
           throw error;
         }

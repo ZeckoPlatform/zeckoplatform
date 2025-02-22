@@ -52,11 +52,11 @@ const upload = multer({
 
 // File upload endpoint with auth
 router.post("/api/social/upload", authenticateToken, (req, res) => {
-  // Set JSON content type header early
+  // Set Content-Type header early
   res.setHeader('Content-Type', 'application/json');
 
-  upload.single('file')(req, res, (err) => {
-    try {
+  try {
+    upload.single('file')(req, res, (err) => {
       if (err) {
         log("Upload error:", err);
         return res.status(400).json({ 
@@ -95,14 +95,14 @@ router.post("/api/social/upload", authenticateToken, (req, res) => {
         url: fileUrl,
         filename: req.file.filename
       });
-    } catch (error) {
-      log("Unexpected error during upload:", error);
-      return res.status(500).json({ 
-        success: false,
-        error: "Internal server error during upload" 
-      });
-    }
-  });
+    });
+  } catch (error) {
+    log("Unexpected error during upload:", error);
+    return res.status(500).json({ 
+      success: false,
+      error: "Internal server error during upload" 
+    });
+  }
 });
 
 // Create a new post
