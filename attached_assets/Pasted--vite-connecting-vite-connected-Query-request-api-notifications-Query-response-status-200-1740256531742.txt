@@ -1,0 +1,47 @@
+[vite] connecting...
+[vite] connected.
+Query request - /api/notifications
+Query response status: 200
+Query request - /api/social/posts
+Query response status: 200
+Query request - /api/social/posts
+Query response status: 200
+Query request - /api/social/posts
+Query response status: 200
+Query request - /api/social/posts
+Query response status: 200
+Uploading file: 2024-04-13-2.png
+Error parsing success response: 
+DOMException {line: 90, column: 43, sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/socia…"}
+column: 43
+line: 90
+sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx"
+stack: "json@[native code]↵@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:90:43"
+[[Prototype]]: DOMException
+
+Upload error: 
+Error {}
+column: 26
+line: 95
+message: "Invalid response format from server"
+sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx"
+stack: "@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:95:26"
+[[Prototype]]: Object
+
+Upload mutation error: 
+Error {}
+column: 26
+line: 95
+message: "Invalid response format from server"
+sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx"
+stack: "@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:95:26"
+[[Prototype]]: Object
+
+File upload error: 
+Error {}
+column: 26
+line: 95
+message: "Invalid response format from server"
+sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx"
+stack: "@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:95:26"
+[[Prototype]]: Object

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { authenticateToken } from "../auth";
 import { db } from "@db";
 import { socialPosts } from "@db/schema";
 import { eq, desc } from "drizzle-orm";
@@ -7,7 +8,6 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { log } from "../vite";
-import { authenticateToken } from "../auth";
 
 const router = Router();
 
@@ -84,7 +84,9 @@ router.post("/api/upload", authenticateToken, (req, res) => {
         throw new Error(`File not found after upload: ${filePath}`);
       }
 
-      res.json({
+      // Send a properly formatted JSON response
+      return res.json({
+        success: true,
         url: fileUrl,
         filename: req.file.filename
       });
