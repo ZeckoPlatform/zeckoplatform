@@ -42,31 +42,45 @@ const upload = multer({
 
 // File upload endpoint with auth
 router.post("/api/social/upload", authenticateToken, (req, res) => {
+  // Ensure proper error handling for the upload process
   upload(req, res, function(err) {
-    res.setHeader('Content-Type', 'application/json');
+    try {
+      if (err instanceof multer.MulterError) {
+        log("Multer error:", err);
+        return res.status(400).json({
+          success: false,
+          error: err.message || "File upload failed"
+        });
+      } else if (err) {
+        log("Upload error:", err);
+        return res.status(400).json({
+          success: false,
+          error: "File upload failed"
+        });
+      }
 
-    if (err) {
-      console.error("Upload error:", err);
-      return res.status(400).json({
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          error: "Please upload a valid image file (JPEG, PNG or WebP)"
+        });
+      }
+
+      const fileUrl = `/uploads/${req.file.filename}`;
+      log("File uploaded successfully:", fileUrl);
+
+      return res.json({
+        success: true,
+        url: fileUrl,
+        filename: req.file.filename
+      });
+    } catch (error) {
+      log("Unexpected error during upload:", error);
+      return res.status(500).json({
         success: false,
-        error: err.message || "File upload failed"
+        error: "An unexpected error occurred during file upload"
       });
     }
-
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        error: "Please upload a valid image file (JPEG, PNG or WebP)"
-      });
-    }
-
-    const fileUrl = `/uploads/${req.file.filename}`;
-
-    res.json({
-      success: true,
-      url: fileUrl,
-      filename: req.file.filename
-    });
   });
 });
 

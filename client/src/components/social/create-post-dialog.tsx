@@ -85,15 +85,25 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
           body: formData,
           headers: {
             'Authorization': `Bearer ${token}`,
+            // Don't set Content-Type header, let the browser set it with the boundary
           },
+          credentials: 'same-origin'
         });
 
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || "Failed to upload image");
+          const errorText = await response.text();
+          console.error('Upload response:', errorText);
+          throw new Error("Failed to upload image. Please try again.");
         }
 
-        const data: UploadResponse = await response.json();
+        let data: UploadResponse;
+        try {
+          data = await response.json();
+        } catch (e) {
+          console.error('Failed to parse response:', e);
+          throw new Error("Invalid response from server");
+        }
+
         if (!data.success || !data.url) {
           throw new Error(data.error || "Failed to upload image");
         }
@@ -101,7 +111,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
         return data.url;
       } catch (error) {
         console.error("Upload error:", error);
-        throw new Error(error instanceof Error ? error.message : "Failed to upload image");
+        throw error instanceof Error ? error : new Error("Upload failed");
       }
     },
     onSuccess: (url) => {
