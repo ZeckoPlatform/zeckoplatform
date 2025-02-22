@@ -52,13 +52,15 @@ const upload = multer({
 
 // File upload endpoint with auth
 router.post("/api/social/upload", authenticateToken, (req, res) => {
-  log("Upload request received - User:", req.user?.id);
+  // Set JSON content type header early
+  res.setHeader('Content-Type', 'application/json');
 
-  upload.single('file')(req, res, async (err) => {
+  upload.single('file')(req, res, (err) => {
     try {
       if (err) {
         log("Upload error:", err);
         return res.status(400).json({ 
+          success: false,
           error: err.message || "Failed to upload file" 
         });
       }
@@ -66,6 +68,7 @@ router.post("/api/social/upload", authenticateToken, (req, res) => {
       if (!req.file) {
         log("No file in request");
         return res.status(400).json({ 
+          success: false,
           error: "No file uploaded" 
         });
       }
@@ -77,6 +80,7 @@ router.post("/api/social/upload", authenticateToken, (req, res) => {
       if (!fs.existsSync(filePath)) {
         log("File not found after upload:", filePath);
         return res.status(500).json({ 
+          success: false,
           error: "File not saved properly" 
         });
       }
@@ -86,8 +90,6 @@ router.post("/api/social/upload", authenticateToken, (req, res) => {
         filename: req.file.filename
       });
 
-      // Set proper content type header
-      res.setHeader('Content-Type', 'application/json');
       return res.json({
         success: true,
         url: fileUrl,
@@ -95,7 +97,8 @@ router.post("/api/social/upload", authenticateToken, (req, res) => {
       });
     } catch (error) {
       log("Unexpected error during upload:", error);
-      res.status(500).json({ 
+      return res.status(500).json({ 
+        success: false,
         error: "Internal server error during upload" 
       });
     }
