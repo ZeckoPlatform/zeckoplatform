@@ -115,10 +115,10 @@ router.post("/api/social/posts", authenticateToken, async (req, res) => {
     const data = schema.parse(req.body);
 
     const post = await db.insert(socialPosts).values({
-      userId: req.user!.id,
       content: data.content,
       type: data.type,
       mediaUrls: data.mediaUrls || [],
+      userId: req.user!.id,
       ...(data.linkUrl ? { metadata: { linkUrl: data.linkUrl } } : {})
     }).returning();
 
@@ -135,11 +135,7 @@ router.post("/api/social/posts", authenticateToken, async (req, res) => {
 // Get posts feed
 router.get("/api/social/posts", async (req, res) => {
   try {
-    const posts = await db.query.socialPosts.findMany({
-      orderBy: desc(socialPosts.createdAt),
-      limit: 20,
-    });
-
+    const posts = await db.select().from(socialPosts).orderBy(desc(socialPosts.createdAt)).limit(20);
     res.json(posts);
   } catch (error) {
     log("Failed to fetch posts:", error);

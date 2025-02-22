@@ -69,18 +69,30 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
         });
 
         if (!response.ok) {
-          const errorText = await response.text();
-          let errorMessage;
+          let errorMessage = "Failed to upload image";
           try {
-            const errorData = JSON.parse(errorText);
-            errorMessage = errorData.error || errorData.details || "Failed to upload image";
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorData.details || errorMessage;
           } catch (e) {
-            errorMessage = errorText || "Failed to upload image";
+            const errorText = await response.text();
+            errorMessage = errorText || errorMessage;
           }
           throw new Error(errorMessage);
         }
 
-        const data = await response.json();
+        const responseText = await response.text();
+        let data;
+        try {
+          data = JSON.parse(responseText);
+        } catch (e) {
+          console.error('Error parsing response:', e);
+          throw new Error("Invalid response format from server");
+        }
+
+        if (!data.url) {
+          throw new Error("Invalid response format: missing URL");
+        }
+
         console.log("Upload successful:", data);
         return data.url;
       } catch (error) {
