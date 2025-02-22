@@ -63,15 +63,15 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
         const response = await fetch('/api/upload', {
           method: 'POST',
           body: formData,
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
           credentials: 'include',
         });
 
-        const contentType = response.headers.get("content-type");
         if (!response.ok) {
-          const errorData = contentType?.includes("application/json") 
-            ? await response.json()
-            : { error: "Failed to upload image" };
-          throw new Error(errorData.error || "Failed to upload image");
+          const errorData = await response.json();
+          throw new Error(errorData.error || errorData.details || "Failed to upload image");
         }
 
         const data = await response.json();
