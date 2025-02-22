@@ -16,6 +16,13 @@ import { useAuth } from "@/hooks/use-auth";
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 
+interface UploadResponse {
+  success: boolean;
+  url?: string;
+  filename?: string;
+  error?: string;
+}
+
 const createPostSchema = z.object({
   content: z.string().min(1, "Post content is required"),
   type: z.enum(["update", "article", "success_story", "market_insight", "opportunity"]),
@@ -68,16 +75,25 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
           },
         });
 
-        // Always try to parse response as JSON first
-        let data;
+        let responseText;
         try {
-          data = await response.json();
+          responseText = await response.text();
+          console.log("Raw response:", responseText);
         } catch (e) {
-          console.error('Failed to parse response as JSON:', e);
+          console.error("Failed to read response:", e);
+          throw new Error("Failed to read server response");
+        }
+
+        let data: UploadResponse;
+        try {
+          data = JSON.parse(responseText);
+        } catch (e) {
+          console.error("Failed to parse response as JSON:", e);
           throw new Error("Server returned invalid response format");
         }
 
-        // Check for error responses
+        console.log("Parsed response:", data);
+
         if (!response.ok || !data.success) {
           throw new Error(data.error || "Failed to upload image");
         }
@@ -86,10 +102,9 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
           throw new Error("Invalid response: missing URL");
         }
 
-        console.log("Upload successful:", data);
         return data.url;
       } catch (error) {
-        console.error('Upload error:', error);
+        console.error("Upload error:", error);
         if (error instanceof Error) {
           throw error;
         }

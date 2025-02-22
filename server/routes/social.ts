@@ -13,7 +13,6 @@ const router = Router();
 
 // Configure multer for handling file uploads
 const uploadDir = path.join(process.cwd(), 'uploads');
-// Ensure upload directory exists with proper permissions
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true, mode: 0o755 });
 }
