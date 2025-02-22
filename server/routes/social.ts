@@ -38,22 +38,25 @@ const upload = multer({
       cb(null, false);
     }
   }
-}).single('file');
+});
 
 // File upload endpoint with auth
 router.post("/api/social/upload", authenticateToken, (req, res) => {
+  // Ensure JSON response type
   res.setHeader('Content-Type', 'application/json');
 
   upload(req, res, (err) => {
     try {
       if (err instanceof multer.MulterError) {
+        log('Multer error during upload:', err);
         return res.status(400).json({
           success: false,
           error: err.message || "File upload failed"
         });
-      } 
+      }
 
       if (err) {
+        log('General error during upload:', err);
         return res.status(400).json({
           success: false,
           error: "File upload failed"
@@ -68,6 +71,7 @@ router.post("/api/social/upload", authenticateToken, (req, res) => {
       }
 
       const fileUrl = `/uploads/${req.file.filename}`;
+      log('File uploaded successfully:', fileUrl);
 
       return res.status(200).json({
         success: true,
@@ -75,6 +79,7 @@ router.post("/api/social/upload", authenticateToken, (req, res) => {
         filename: req.file.filename
       });
     } catch (error) {
+      log('Unexpected error during file upload:', error);
       return res.status(500).json({
         success: false,
         error: "An unexpected error occurred during file upload"

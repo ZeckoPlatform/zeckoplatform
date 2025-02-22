@@ -79,6 +79,8 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
         throw new Error("Authentication token not found");
       }
 
+      console.log('Uploading file:', file.name);
+
       const response = await fetch('/api/social/upload', {
         method: 'POST',
         body: formData,
@@ -87,12 +89,10 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
         },
       });
 
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error("Server returned invalid response format");
-      }
+      console.log('Upload response status:', response.status);
 
       const data = await response.json();
+      console.log('Upload response:', data);
 
       if (!data.success || !data.url) {
         throw new Error(data.error || "Failed to upload image");
@@ -112,6 +112,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       });
     },
     onError: (error: Error) => {
+      console.error('Upload mutation error:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to upload image. Please try again.",
