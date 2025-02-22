@@ -75,31 +75,11 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
           },
         });
 
-        let responseText;
-        try {
-          responseText = await response.text();
-          console.log("Raw response:", responseText);
-        } catch (e) {
-          console.error("Failed to read response:", e);
-          throw new Error("Failed to read server response");
-        }
+        const data: UploadResponse = await response.json();
+        console.log("Upload response:", data);
 
-        let data: UploadResponse;
-        try {
-          data = JSON.parse(responseText);
-        } catch (e) {
-          console.error("Failed to parse response as JSON:", e);
-          throw new Error("Server returned invalid response format");
-        }
-
-        console.log("Parsed response:", data);
-
-        if (!response.ok || !data.success) {
+        if (!data.success || !data.url) {
           throw new Error(data.error || "Failed to upload image");
-        }
-
-        if (!data.url) {
-          throw new Error("Invalid response: missing URL");
         }
 
         return data.url;

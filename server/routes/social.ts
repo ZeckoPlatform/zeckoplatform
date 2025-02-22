@@ -17,17 +17,13 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true, mode: 0o755 });
 }
 
-log("Upload directory configured:", uploadDir);
-
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    log("Saving file to:", uploadDir);
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const filename = uniqueSuffix + path.extname(file.originalname);
-    log("Generated filename:", filename);
     cb(null, filename);
   }
 });
@@ -40,68 +36,61 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
     if (allowedTypes.includes(file.mimetype)) {
-      log("File type accepted:", file.mimetype);
       cb(null, true);
     } else {
-      log("File type rejected:", file.mimetype);
       cb(new Error("Invalid file type. Only JPEG, PNG and WebP are allowed."));
     }
   }
-});
+}).single('file');
 
 // File upload endpoint with auth
 router.post("/api/social/upload", authenticateToken, (req, res) => {
-  // Set Content-Type header early
-  res.setHeader('Content-Type', 'application/json');
+  upload(req, res, function(err) {
+    // Set JSON content type for all responses
+    res.setHeader('Content-Type', 'application/json');
 
-  try {
-    upload.single('file')(req, res, (err) => {
-      if (err) {
-        log("Upload error:", err);
-        return res.status(400).json({ 
-          success: false,
-          error: err.message || "Failed to upload file" 
-        });
-      }
-
-      if (!req.file) {
-        log("No file in request");
-        return res.status(400).json({ 
-          success: false,
-          error: "No file uploaded" 
-        });
-      }
-
-      const fileUrl = `/uploads/${req.file.filename}`;
-      const filePath = path.join(uploadDir, req.file.filename);
-
-      // Verify file exists
-      if (!fs.existsSync(filePath)) {
-        log("File not found after upload:", filePath);
-        return res.status(500).json({ 
-          success: false,
-          error: "File not saved properly" 
-        });
-      }
-
-      log("File upload successful:", {
-        url: fileUrl,
-        filename: req.file.filename
+    if (err instanceof multer.MulterError) {
+      // A Multer error occurred when uploading
+      log("Multer error:", err);
+      return res.status(400).json({
+        success: false,
+        error: err.message
       });
-
-      return res.json({
-        success: true,
-        url: fileUrl,
-        filename: req.file.filename
+    } else if (err) {
+      // An unknown error occurred
+      log("Upload error:", err);
+      return res.status(400).json({
+        success: false,
+        error: err.message || "File upload failed"
       });
+    }
+
+    // Check if file exists in request
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: "No file uploaded"
+      });
+    }
+
+    const fileUrl = `/uploads/${req.file.filename}`;
+    const filePath = path.join(uploadDir, req.file.filename);
+
+    // Verify file was saved
+    if (!fs.existsSync(filePath)) {
+      return res.status(500).json({
+        success: false,
+        error: "File was not saved properly"
+      });
+    }
+
+    // Return success response
+    return res.json({
+      success: true,
+      url: fileUrl,
+      filename: req.file.filename
     });
-  } catch (error) {
-    log("Unexpected error during upload:", error);
-    return res.status(500).json({ 
-      success: false,
-      error: "Internal server error during upload" 
-    });
-  }
+  });
 });
 
 // Create a new post
@@ -116,7 +105,7 @@ router.post("/api/social/posts", authenticateToken, async (req, res) => {
 
     const data = schema.parse(req.body);
 
-    const post = await db.insert(socialPosts).values({
+    const [post] = await db.insert(socialPosts).values({
       content: data.content,
       type: data.type,
       mediaUrls: data.mediaUrls || [],
@@ -124,7 +113,7 @@ router.post("/api/social/posts", authenticateToken, async (req, res) => {
       ...(data.linkUrl ? { metadata: { linkUrl: data.linkUrl } } : {})
     }).returning();
 
-    res.json(post[0]);
+    res.json(post);
   } catch (error) {
     log("Failed to create post:", error);
     res.status(400).json({ 

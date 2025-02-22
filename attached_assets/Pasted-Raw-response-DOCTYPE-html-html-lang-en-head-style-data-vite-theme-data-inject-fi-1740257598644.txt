@@ -1,0 +1,179 @@
+Raw response: <!DOCTYPE html>
+<html lang="en">
+  <head>
+    <style data-vite-theme="" data-inject-first="">:root {
+    --background: 16 85% 76%;
+--foreground: 6 100% 9%;
+--muted: 16 79% 62%;
+--muted-foreground: 6 100% 9%;
+--popover: 16 100% 98%;
+--popover-foreground: 6 100% 9%;
+--card: 16 100% 98%;
+--card-foreground: 6 100% 9%;
+--border: 16 79% 62%;
+--input: 16 79% 62%;
+--primary: 18 100% 57%;
+--primary-foreground: 16 100% 99%;
+--secondary: 16 100% 82%;
+--secondary-foreground: 6 100% 9%;
+--accent: 16 100% 82%;
+--accent-foreground: 6 100% 9%;
+--destructive: 0 84.2% 60.2%;
+--destructive-foreground: 60 9.1% 97.8%;
+--ring: 18 100% 57%;
+--radius: 0.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+      --background: 356 100% 0%;
+--foreground: 16 100% 95%;
+--muted: 20 100% 23%;
+--muted-foreground: 16 100% 95%;
+--popover: 8 100% 9%;
+--popover-foreground: 16 100% 95%;
+--card: 8 100% 9%;
+--card-foreground: 16 100% 95%;
+--border: 20 100% 23%;
+--input: 20 100% 23%;
+--primary: 23 100% 40%;
+--primary-foreground: 16 98% 99%;
+--secondary: 20 100% 23%;
+--secondary-foreground: 16 100% 95%;
+--accent: 20 100% 23%;
+--accent-foreground: 16 100% 95%;
+--destructive: 0 62.8% 30.6%;
+--destructive-foreground: 0 0% 98%;
+--ring: 23 100% 40%;
+--radius: 0.5rem;
+  }
+}
+.light {
+    --background: 16 85% 76%;
+--foreground: 6 100% 9%;
+--muted: 16 79% 62%;
+--muted-foreground: 6 100% 9%;
+--popover: 16 100% 98%;
+--popover-foreground: 6 100% 9%;
+--card: 16 100% 98%;
+--card-foreground: 6 100% 9%;
+--border: 16 79% 62%;
+--input: 16 79% 62%;
+--primary: 18 100% 57%;
+--primary-foreground: 16 100% 99%;
+--secondary: 16 100% 82%;
+--secondary-foreground: 6 100% 9%;
+--accent: 16 100% 82%;
+--accent-foreground: 6 100% 9%;
+--destructive: 0 84.2% 60.2%;
+--destructive-foreground: 60 9.1% 97.8%;
+--ring: 18 100% 57%;
+--radius: 0.5rem;
+}
+.dark {
+    --background: 356 100% 0%;
+--foreground: 16 100% 95%;
+--muted: 20 100% 23%;
+--muted-foreground: 16 100% 95%;
+--popover: 8 100% 9%;
+--popover-foreground: 16 100% 95%;
+--card: 8 100% 9%;
+--card-foreground: 16 100% 95%;
+--border: 20 100% 23%;
+--input: 20 100% 23%;
+--primary: 23 100% 40%;
+--primary-foreground: 16 98% 99%;
+--secondary: 20 100% 23%;
+--secondary-foreground: 16 100% 95%;
+--accent: 20 100% 23%;
+--accent-foreground: 16 100% 95%;
+--destructive: 0 62.8% 30.6%;
+--destructive-foreground: 0 0% 98%;
+--ring: 23 100% 40%;
+--radius: 0.5rem;
+}</style>
+
+    <script type="module">
+import { createHotContext } from "/@vite/client";
+const hot = createHotContext("/__dummy__runtime-error-plugin");
+
+function sendError(error) {
+  if (!(error instanceof Error)) {
+    error = new Error("(unknown runtime error)");
+  }
+  const serialized = {
+    message: error.message,
+    stack: error.stack,
+  };
+  hot.send("runtime-error-plugin:error", serialized);
+}
+
+window.addEventListener("error", (evt) => {
+  sendError(evt.error);
+});
+
+window.addEventListener("unhandledrejection", (evt) => {
+  sendError(evt.reason);
+});
+</script>
+
+    <script type="module">
+import RefreshRuntime from "/@react-refresh"
+RefreshRuntime.injectIntoGlobalHook(window)
+window.$RefreshReg$ = () => {}
+window.$RefreshSig$ = () => (type) => type
+window.__vite_plugin_react_preamble_installed__ = true
+</script>
+
+    <script type="module" src="/@vite/client"></script>
+
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx?v=KXrpgDwGGcZGLRfiJNPH6"></script>
+  </body>
+</html>
+Failed to parse response as JSON: 
+SyntaxError {}
+column: 28
+line: 84
+message: "JSON Parse error: Unrecognized token '<'"
+sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx"
+stack: "parse@[native code]↵@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:84:28"
+[[Prototype]]: Object
+
+Upload error: 
+Error {}
+column: 26
+line: 87
+message: "Server returned invalid response format"
+sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx"
+stack: "@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:87:26"
+[[Prototype]]: Object
+
+Upload mutation error: 
+Error {}
+column: 26
+line: 87
+message: "Server returned invalid response format"
+sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx"
+stack: "@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:87:26"
+[[Prototype]]: Object
+
+File upload error: 
+Error {}
+column: 26
+line: 87
+message: "Server returned invalid response format"
+sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx"
+stack: "@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:87:26"
+[[Prototype]]: Object
+
+API Request - POST /api/social/posts
+Request payload: 
+Object {content: "money my way", type: "update", mediaUrls: Array(0)}
+Request options: 
+Object {method: "POST", headers: {…}, bodyLength: 57}
+Response status: 200
