@@ -8,6 +8,7 @@ import { log } from "./vite";
 import { comparePasswords, hashPassword } from './auth';
 import fs from 'fs';
 import express from 'express';
+import path from 'path';
 import { createConnectedAccount, retrieveConnectedAccount } from './stripe';
 import { sendEmail } from './services/email';
 import subscriptionRoutes from './routes/subscriptions';
@@ -25,6 +26,12 @@ import leadsRoutes from './routes/leads';
 import { cleanupExpiredLeads } from './services/cleanup';
 import feedbackRoutes from './routes/feedback';
 import socialRoutes from './routes/social';
+
+// Ensure uploads directory exists
+const uploadDir = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true, mode: 0o755 });
+}
 
 interface User {
   id: number;
@@ -50,6 +57,9 @@ declare global {
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
+
+  // Serve uploaded files
+  app.use('/uploads', express.static(uploadDir));
 
   // Register feedback routes before authentication middleware
   app.use(feedbackRoutes);
@@ -81,7 +91,7 @@ export function registerRoutes(app: Express): Server {
   app.use('/api', reviewRoutes);
   app.use('/api', orderRoutes);
   app.use('/api', socialRoutes);
-  app.use('/api', leadsRoutes); // Add leads routes
+  app.use('/api', leadsRoutes);
 
   const httpServer = createServer(app);
   return httpServer;
