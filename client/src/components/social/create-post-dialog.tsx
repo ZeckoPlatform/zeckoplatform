@@ -66,17 +66,32 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
           },
-          credentials: 'include',
         });
 
+        let errorMessage = "Failed to upload image";
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || errorData.details || "Failed to upload image");
+          try {
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.includes("application/json")) {
+              const errorData = await response.json();
+              errorMessage = errorData.error || errorData.details || errorMessage;
+            } else {
+              errorMessage = await response.text() || errorMessage;
+            }
+          } catch (parseError) {
+            console.error('Error parsing response:', parseError);
+          }
+          throw new Error(errorMessage);
         }
 
-        const data = await response.json();
-        console.log("Upload successful:", data);
-        return data.url;
+        try {
+          const data = await response.json();
+          console.log("Upload successful:", data);
+          return data.url;
+        } catch (parseError) {
+          console.error('Error parsing success response:', parseError);
+          throw new Error("Invalid response format from server");
+        }
       } catch (error) {
         console.error('Upload error:', error);
         throw error;
