@@ -2,7 +2,7 @@ import { Router } from "express";
 import { authenticateToken } from "../auth";
 import { db } from "@db";
 import { socialPosts } from "@db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
@@ -100,11 +100,33 @@ router.post("/api/social/posts", authenticateToken, async (req, res) => {
   }
 });
 
-// Get posts feed
+// Get posts feed with pagination
 router.get("/api/social/posts", async (req, res) => {
   try {
-    const posts = await db.select().from(socialPosts).orderBy(desc(socialPosts.createdAt)).limit(20);
-    res.json(posts);
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    const posts = await db
+      .select()
+      .from(socialPosts)
+      .orderBy(desc(socialPosts.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    const total = await db
+      .select({ count: sql`count(*)` })
+      .from(socialPosts);
+
+    res.json({
+      posts,
+      pagination: {
+        page,
+        limit,
+        total: total[0].count,
+        hasMore: offset + posts.length < total[0].count
+      }
+    });
   } catch (error) {
     log("Failed to fetch posts:", error);
     res.status(500).json({ error: "Failed to fetch posts" });

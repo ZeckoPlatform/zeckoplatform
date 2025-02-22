@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Image, Link, Loader2, X } from "lucide-react";
@@ -40,6 +40,7 @@ interface CreatePostDialogProps {
 export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) {
   const { toast } = useToast();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [showMediaInput, setShowMediaInput] = useState(false);
   const [showLinkInput, setShowLinkInput] = useState(false);
   const [uploadType, setUploadType] = useState<'url' | 'file' | null>(null);
@@ -62,34 +63,40 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
         throw new Error("You must be logged in to upload images");
       }
 
+      if (file.size > MAX_FILE_SIZE) {
+        throw new Error("File size should be less than 5MB");
+      }
+
+      if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+        throw new Error("Only .jpg, .jpeg, .png and .webp files are accepted");
+      }
+
       const formData = new FormData();
       formData.append('file', file);
 
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          throw new Error("Authentication token not found");
-        }
-
-        const response = await fetch('/api/social/upload', {
-          method: 'POST',
-          body: formData,
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-
-        const data = await response.json();
-
-        if (!data.success) {
-          throw new Error(data.error || "Failed to upload image");
-        }
-
-        return data.url;
-      } catch (error) {
-        console.error("Upload error:", error);
-        throw new Error(error instanceof Error ? error.message : "Failed to upload image");
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error("Authentication token not found");
       }
+
+      const response = await fetch('/api/social/upload', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to upload image");
+      }
+
+      const data: UploadResponse = await response.json();
+      if (!data.success || !data.url) {
+        throw new Error(data.error || "Failed to upload image");
+      }
+
+      return data.url;
     },
     onSuccess: (url) => {
       const currentUrls = form.getValues("mediaUrls") || [];
@@ -136,6 +143,8 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       form.reset();
       setSelectedImages([]);
       onOpenChange(false);
+      // Invalidate and refetch posts query
+      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     },
     onError: (error: Error) => {
       toast({
@@ -148,38 +157,15 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
 
   const handleFileUpload = async (files: FileList | null) => {
     if (!files?.length) return;
-
-    const file = files[0];
-
-    if (file.size > MAX_FILE_SIZE) {
-      toast({
-        title: "Error",
-        description: "File size should be less than 5MB",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-      toast({
-        title: "Error",
-        description: "Only .jpg, .jpeg, .png and .webp files are accepted",
-        variant: "destructive",
-      });
-      return;
-    }
-
     try {
-      await uploadImageMutation.mutateAsync(file);
+      await uploadImageMutation.mutateAsync(files[0]);
     } catch (error) {
       console.error('File upload error:', error);
-      setUploadType(null);
     }
   };
 
   const handleMediaAdd = (url: string) => {
     if (!url) return;
-
     try {
       new URL(url);
       const currentUrls = form.getValues("mediaUrls") || [];
@@ -245,6 +231,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
                       size="icon"
                       className="absolute top-1 right-1 h-6 w-6"
                       onClick={() => removeImage(index)}
+                      type="button"
                     >
                       <X className="h-4 w-4" />
                     </Button>
