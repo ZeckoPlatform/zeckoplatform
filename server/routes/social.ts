@@ -18,18 +18,15 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
+  destination: uploadDir,
+  filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const filename = uniqueSuffix + path.extname(file.originalname);
-    cb(null, filename);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
   }
 });
 
 const upload = multer({
-  storage: storage,
+  storage,
   limits: {
     fileSize: 5 * 1024 * 1024 // 5MB limit
   },
@@ -38,7 +35,7 @@ const upload = multer({
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error("Invalid file type. Only JPEG, PNG and WebP are allowed."));
+      cb(null, false);
     }
   }
 }).single('file');
@@ -46,46 +43,26 @@ const upload = multer({
 // File upload endpoint with auth
 router.post("/api/social/upload", authenticateToken, (req, res) => {
   upload(req, res, function(err) {
-    // Set JSON content type for all responses
     res.setHeader('Content-Type', 'application/json');
 
-    if (err instanceof multer.MulterError) {
-      // A Multer error occurred when uploading
-      log("Multer error:", err);
-      return res.status(400).json({
-        success: false,
-        error: err.message
-      });
-    } else if (err) {
-      // An unknown error occurred
-      log("Upload error:", err);
+    if (err) {
+      console.error("Upload error:", err);
       return res.status(400).json({
         success: false,
         error: err.message || "File upload failed"
       });
     }
 
-    // Check if file exists in request
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        error: "No file uploaded"
+        error: "Please upload a valid image file (JPEG, PNG or WebP)"
       });
     }
 
     const fileUrl = `/uploads/${req.file.filename}`;
-    const filePath = path.join(uploadDir, req.file.filename);
 
-    // Verify file was saved
-    if (!fs.existsSync(filePath)) {
-      return res.status(500).json({
-        success: false,
-        error: "File was not saved properly"
-      });
-    }
-
-    // Return success response
-    return res.json({
+    res.json({
       success: true,
       url: fileUrl,
       filename: req.file.filename

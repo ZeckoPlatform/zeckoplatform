@@ -66,29 +66,29 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       formData.append('file', file);
 
       try {
-        console.log("Uploading file:", file.name);
+        const token = localStorage.getItem('token');
+        if (!token) {
+          throw new Error("Authentication token not found");
+        }
+
         const response = await fetch('/api/social/upload', {
           method: 'POST',
           body: formData,
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Authorization': `Bearer ${token}`,
           },
         });
 
-        const data: UploadResponse = await response.json();
-        console.log("Upload response:", data);
+        const data = await response.json();
 
-        if (!data.success || !data.url) {
+        if (!data.success) {
           throw new Error(data.error || "Failed to upload image");
         }
 
         return data.url;
       } catch (error) {
         console.error("Upload error:", error);
-        if (error instanceof Error) {
-          throw error;
-        }
-        throw new Error("Failed to upload image");
+        throw new Error(error instanceof Error ? error.message : "Failed to upload image");
       }
     },
     onSuccess: (url) => {
@@ -103,7 +103,6 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       });
     },
     onError: (error: Error) => {
-      console.error('Upload mutation error:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to upload image. Please try again.",
