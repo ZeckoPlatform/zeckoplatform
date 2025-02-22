@@ -79,40 +79,26 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
         throw new Error("Authentication token not found");
       }
 
-      try {
-        const response = await fetch('/api/social/upload', {
-          method: 'POST',
-          body: formData,
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            // Don't set Content-Type header, let the browser set it with the boundary
-          },
-          credentials: 'same-origin'
-        });
+      const response = await fetch('/api/social/upload', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Upload response:', errorText);
-          throw new Error("Failed to upload image. Please try again.");
-        }
-
-        let data: UploadResponse;
-        try {
-          data = await response.json();
-        } catch (e) {
-          console.error('Failed to parse response:', e);
-          throw new Error("Invalid response from server");
-        }
-
-        if (!data.success || !data.url) {
-          throw new Error(data.error || "Failed to upload image");
-        }
-
-        return data.url;
-      } catch (error) {
-        console.error("Upload error:", error);
-        throw error instanceof Error ? error : new Error("Upload failed");
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error("Server returned invalid response format");
       }
+
+      const data = await response.json();
+
+      if (!data.success || !data.url) {
+        throw new Error(data.error || "Failed to upload image");
+      }
+
+      return data.url;
     },
     onSuccess: (url) => {
       const currentUrls = form.getValues("mediaUrls") || [];
@@ -159,7 +145,6 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       form.reset();
       setSelectedImages([]);
       onOpenChange(false);
-      // Invalidate and refetch posts query
       queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     },
     onError: (error: Error) => {
