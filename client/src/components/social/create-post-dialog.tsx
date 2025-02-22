@@ -79,24 +79,30 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
         throw new Error("Authentication token not found");
       }
 
-      const response = await fetch('/api/social/upload', {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      try {
+        const response = await fetch('/api/social/upload', {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
 
-      if (!response.ok) {
-        throw new Error("Failed to upload image");
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || "Failed to upload image");
+        }
+
+        const data: UploadResponse = await response.json();
+        if (!data.success || !data.url) {
+          throw new Error(data.error || "Failed to upload image");
+        }
+
+        return data.url;
+      } catch (error) {
+        console.error("Upload error:", error);
+        throw new Error(error instanceof Error ? error.message : "Failed to upload image");
       }
-
-      const data: UploadResponse = await response.json();
-      if (!data.success || !data.url) {
-        throw new Error(data.error || "Failed to upload image");
-      }
-
-      return data.url;
     },
     onSuccess: (url) => {
       const currentUrls = form.getValues("mediaUrls") || [];

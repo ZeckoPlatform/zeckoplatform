@@ -1,9 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
-import { MessageCircle, ThumbsUp, Share2, TrendingUp } from "lucide-react";
+import { MessageCircle, ThumbsUp, Share2, TrendingUp, Loader2 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { CreatePostDialog } from "@/components/social/create-post-dialog";
 import { useState } from "react";
@@ -27,12 +27,41 @@ interface Post {
   createdAt: string;
 }
 
+interface PostsResponse {
+  posts: Post[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    hasMore: boolean;
+  };
+}
+
 export default function SocialFeedPage() {
   const { user } = useAuth();
   const [showCreatePost, setShowCreatePost] = useState(false);
 
-  const { data: posts, isLoading } = useQuery<Post[]>({
-    queryKey: ["/api/social/posts"],
+  const {
+    data,
+    isLoading,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage
+  } = useInfiniteQuery<PostsResponse>({
+    queryKey: ['/api/social/posts'],
+    queryFn: async ({ pageParam = 1 }) => {
+      const response = await fetch(`/api/social/posts?page=${pageParam}&limit=10`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch posts');
+      }
+      return response.json();
+    },
+    getNextPageParam: (lastPage) => 
+      lastPage.pagination.hasMore 
+        ? lastPage.pagination.page + 1 
+        : undefined,
+    staleTime: 1000 * 60, // Consider data fresh for 1 minute
+    cacheTime: 1000 * 60 * 5, // Keep in cache for 5 minutes
   });
 
   if (isLoading) {
@@ -49,6 +78,8 @@ export default function SocialFeedPage() {
     );
   }
 
+  const posts = data?.pages.flatMap(page => page.posts) ?? [];
+
   return (
     <div className="container mx-auto py-6">
       <div className="flex justify-between items-center mb-6">
@@ -59,7 +90,7 @@ export default function SocialFeedPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {/* Main Feed */}
         <div className="col-span-3 space-y-4">
-          {posts?.map((post) => (
+          {posts.map((post) => (
             <Card key={post.id} className="p-6">
               <div className="flex items-start space-x-4">
                 <Avatar>
@@ -108,6 +139,24 @@ export default function SocialFeedPage() {
               </div>
             </Card>
           ))}
+
+          {hasNextPage && (
+            <Button
+              onClick={() => fetchNextPage()}
+              disabled={isFetchingNextPage}
+              variant="outline"
+              className="w-full"
+            >
+              {isFetchingNextPage ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Loading more...
+                </>
+              ) : (
+                'Load More'
+              )}
+            </Button>
+          )}
         </div>
 
         {/* Sidebar */}
