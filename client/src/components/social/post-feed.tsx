@@ -90,20 +90,28 @@ export function PostFeed() {
     }
   });
 
+  // Helper function to count total comments including replies
+  const countTotalComments = (comments: Comment[] = []): number => {
+    return comments.reduce((total, comment) => {
+      return total + 1 + (comment.replies ? countTotalComments(comment.replies) : 0);
+    }, 0);
+  };
+
   // Simplified reaction mutation
   const toggleReactionMutation = useMutation({
-    mutationFn: async ({ postId, type }: { postId: number; type: string }) => {
+    mutationFn: async ({ postId, type }: { postId: number; type: 'like' | 'celebrate' | 'support' | 'insightful' }) => {
       const post = postsData?.data.find((p: Post) => p.id === postId);
       const hasReacted = post?.reactions?.some(r => r.type === type && r.userId === user?.id);
 
       const response = await apiRequest(
         hasReacted ? 'DELETE' : 'POST',
         `/api/social/posts/${postId}/reactions${hasReacted ? `/${type}` : ''}`,
-        hasReacted ? undefined : { type }
+        !hasReacted ? { type } : undefined
       );
 
       if (!response.ok) {
-        throw new Error('Failed to toggle reaction');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to toggle reaction');
       }
       return response.json();
     },
@@ -194,7 +202,6 @@ export function PostFeed() {
     return user.id === comment.userId;
   };
 
-  // Comment component with local state management
   const CommentComponent = ({ comment, postId, level = 0 }: { comment: Comment; postId: number; level?: number }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editText, setEditText] = useState(comment.content);
@@ -225,13 +232,13 @@ export function PostFeed() {
         <div className="flex items-start gap-2 p-2 rounded-md bg-secondary/10">
           <Avatar className="h-6 w-6">
             <AvatarFallback className="text-xs">
-              {comment.user.businessName?.[0] || '?'}
+              {comment.user.businessName?.[0] || comment.user.email?.[0]?.toUpperCase() || '?'}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1">
             <div className="flex items-baseline gap-2">
               <span className="text-sm font-medium">
-                {comment.user.businessName}
+                {comment.user.businessName || comment.user.email}
               </span>
               <span className="text-xs text-muted-foreground">
                 {formatDistanceToNow(parseISO(comment.createdAt), { addSuffix: true })}
@@ -363,7 +370,6 @@ export function PostFeed() {
     );
   };
 
-  // New comment input component with local state
   const NewCommentInput = ({ postId }: { postId: number }) => {
     const [commentText, setCommentText] = useState('');
 
@@ -521,7 +527,7 @@ export function PostFeed() {
                 className="mb-2"
               >
                 <MessageCircle className="h-4 w-4 mr-1" />
-                Comments ({post.comments?.length || 0})
+                Comments ({countTotalComments(post.comments)})
               </Button>
 
               {expandedComments.includes(post.id) && (
