@@ -24,7 +24,7 @@ interface PostsResponse {
 
 export function PostFeed() {
   const { data: postsData, isLoading } = useQuery<PostsResponse>({
-    queryKey: ['/api/social/posts'],
+    queryKey: ['/social/posts'],
   });
 
   if (isLoading) {

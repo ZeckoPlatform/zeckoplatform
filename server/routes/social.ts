@@ -9,7 +9,7 @@ import { log } from "../vite";
 const router = Router();
 
 // Create a new post
-router.post("/api/social/posts", authenticateToken, async (req, res) => {
+router.post("/social/posts", authenticateToken, async (req, res) => {
   try {
     log('Received post request with body: ' + JSON.stringify(req.body));
 
@@ -72,7 +72,7 @@ router.post("/api/social/posts", authenticateToken, async (req, res) => {
 });
 
 // Get posts feed - no authentication required for viewing public posts
-router.get("/api/social/posts", async (req, res) => {
+router.get("/social/posts", async (req, res) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
@@ -104,7 +104,10 @@ router.get("/api/social/posts", async (req, res) => {
     return res.json({
       success: true,
       data: posts.map(({ post, user }) => ({
-        ...post,
+        id: post.id,
+        content: post.content,
+        type: post.type,
+        createdAt: post.createdAt,
         user: user ? {
           id: user.id,
           email: user.email,
