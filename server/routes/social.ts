@@ -18,25 +18,11 @@ const upload = multer({
     fileSize: 5 * 1024 * 1024 // 5MB limit
   },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = [
-      "image/jpeg",
-      "image/jpg",
-      "image/png",
-      "image/webp",
-      "image/gif",
-      "image/bmp",
-      "image/tiff"
-    ];
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(null, false);
-      const error = new Error(
-        'Only .jpg, .jpeg, .png, .webp, .gif, .bmp, and .tiff files are allowed'
-      );
-      error.name = 'UNSUPPORTED_FILE_TYPE';
-      req.fileValidationError = error;
+    if (!file.mimetype.startsWith('image/')) {
+      cb(new Error('Only image files are allowed'));
+      return;
     }
+    cb(null, true);
   }
 }).single('file');
 
@@ -46,35 +32,25 @@ const asyncHandler = (fn: any) => (req: any, res: any, next: any) => {
 };
 
 // File upload endpoint with auth
-router.post("/api/social/upload", authenticateToken, asyncHandler((req, res) => {
+router.post("/api/social/upload", authenticateToken, (req, res) => {
+  // Process the upload
   upload(req, res, async (err) => {
-    // Ensure JSON content type for response
+    // Set JSON content type
     res.setHeader('Content-Type', 'application/json');
 
     try {
-      if (err instanceof multer.MulterError) {
-        log('Multer error during upload:', err.message);
+      if (err) {
+        log('Upload error:', err);
         return res.status(400).json({
           success: false,
           error: err.message || "File upload failed"
         });
       }
 
-      if (err) {
-        log('General error during upload:', err instanceof Error ? err.message : 'Unknown error');
-        return res.status(400).json({
-          success: false,
-          error: "File upload failed"
-        });
-      }
-
       if (!req.file) {
-        const errorMessage = req.fileValidationError
-          ? req.fileValidationError.message
-          : "Please upload a valid image file";
         return res.status(400).json({
           success: false,
-          error: errorMessage
+          error: "No file uploaded"
         });
       }
 
@@ -82,20 +58,20 @@ router.post("/api/social/upload", authenticateToken, asyncHandler((req, res) => 
       const result = await uploadToCloudinary(req.file);
       log('Cloudinary upload successful:', result.secure_url);
 
-      return res.status(200).json({
+      return res.json({
         success: true,
         url: result.secure_url,
         public_id: result.public_id
       });
     } catch (error) {
-      log('Unexpected error during file upload:', error instanceof Error ? error.message : 'Unknown error');
+      log('Upload error:', error);
       return res.status(500).json({
         success: false,
-        error: "An unexpected error occurred during file upload"
+        error: error instanceof Error ? error.message : "Upload failed"
       });
     }
   });
-}));
+});
 
 // Create a new post
 router.post("/api/social/posts", authenticateToken, asyncHandler(async (req, res) => {
@@ -103,7 +79,6 @@ router.post("/api/social/posts", authenticateToken, asyncHandler(async (req, res
     content: z.string().min(1),
     type: z.enum(["update", "article", "success_story", "market_insight", "opportunity"]),
     mediaUrls: z.array(z.string()).optional(),
-    linkUrl: z.string().url().optional(),
   });
 
   const data = schema.parse(req.body);
@@ -113,7 +88,6 @@ router.post("/api/social/posts", authenticateToken, asyncHandler(async (req, res
     type: data.type,
     mediaUrls: data.mediaUrls || [],
     userId: req.user!.id,
-    ...(data.linkUrl ? { metadata: { linkUrl: data.linkUrl } } : {}),
     createdAt: new Date(),
     updatedAt: new Date()
   }).returning();
@@ -147,14 +121,5 @@ router.get("/api/social/posts", asyncHandler(async (req, res) => {
     }
   });
 }));
-
-// Error handling middleware
-router.use((err: any, req: any, res: any, next: any) => {
-  log('Error in social routes:', err);
-  res.status(500).json({
-    success: false,
-    error: err.message || 'An unexpected error occurred'
-  });
-});
 
 export default router;

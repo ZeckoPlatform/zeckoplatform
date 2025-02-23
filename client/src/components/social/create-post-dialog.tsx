@@ -14,17 +14,13 @@ import { useState, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-const MAX_IMAGE_DIMENSION = 2048; // Max width or height
 const ACCEPTED_IMAGE_TYPES = [
   "image/jpeg",
   "image/jpg",
   "image/png",
   "image/webp",
-  "image/gif",
-  "image/bmp",
-  "image/tiff"
+  "image/gif"
 ];
-const JPEG_QUALITY = 0.8; // Image compression quality (0-1)
 
 interface UploadResponse {
   success: boolean;
@@ -45,72 +41,6 @@ type CreatePostSchema = z.infer<typeof createPostSchema>;
 interface CreatePostDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}
-
-// Utility function to resize image
-async function resizeImage(file: File): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const img = document.createElement('img');
-    const reader = new FileReader();
-
-    reader.onload = function(e) {
-      if (!e.target?.result) {
-        reject(new Error('Failed to read file'));
-        return;
-      }
-
-      img.src = e.target.result as string;
-      img.onload = () => {
-        let width = img.width;
-        let height = img.height;
-
-        // Calculate new dimensions while maintaining aspect ratio
-        if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
-          if (width > height) {
-            height = Math.round((height * MAX_IMAGE_DIMENSION) / width);
-            width = MAX_IMAGE_DIMENSION;
-          } else {
-            width = Math.round((width * MAX_IMAGE_DIMENSION) / height);
-            height = MAX_IMAGE_DIMENSION;
-          }
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error('Could not get canvas context'));
-          return;
-        }
-
-        // Draw and get resized image
-        ctx.drawImage(img, 0, 0, width, height);
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              reject(new Error('Failed to create image blob'));
-              return;
-            }
-            resolve(blob);
-          },
-          'image/jpeg',
-          JPEG_QUALITY
-        );
-      };
-
-      img.onerror = () => {
-        reject(new Error('Failed to load image'));
-      };
-    };
-
-    reader.onerror = () => {
-      reject(new Error('Failed to read file'));
-    };
-
-    reader.readAsDataURL(file);
-  });
 }
 
 export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) {
@@ -135,60 +65,34 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
 
   const uploadImageMutation = useMutation({
     mutationFn: async (file: File): Promise<string> => {
-      if (!user) {
-        throw new Error("You must be logged in to upload images");
+      if (!file) throw new Error("No file selected");
+
+      if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+        throw new Error("Invalid file type. Please upload an image.");
       }
 
-      try {
-        // Resize image if needed
-        const resizedBlob = await resizeImage(file);
-        const resizedFile = new File([resizedBlob], file.name, {
-          type: 'image/jpeg',
-        });
-
-        const formData = new FormData();
-        formData.append('file', resizedFile);
-
-        const token = localStorage.getItem('token');
-        if (!token) {
-          throw new Error("Authentication token not found");
-        }
-
-        console.log('Uploading file:', resizedFile.name);
-
-        const response = await fetch('/api/social/upload', {
-          method: 'POST',
-          body: formData,
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json',
-          },
-        });
-
-        console.log('Upload response status:', response.status);
-
-        // Get the response text first for debugging
-        const responseText = await response.text();
-        console.log('Upload response text:', responseText);
-
-        // Try to parse as JSON
-        let data: UploadResponse;
-        try {
-          data = JSON.parse(responseText);
-        } catch (parseError) {
-          console.error('Failed to parse response:', parseError);
-          throw new Error('Server returned invalid response format');
-        }
-
-        if (!data.success || !data.url) {
-          throw new Error(data.error || "Failed to upload image");
-        }
-
-        return data.url;
-      } catch (error) {
-        console.error('Upload error:', error);
-        throw error instanceof Error ? error : new Error("Upload failed");
+      if (file.size > MAX_FILE_SIZE) {
+        throw new Error("File size too large. Maximum size is 5MB.");
       }
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/social/upload', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!data.success || !data.url) {
+        throw new Error(data.error || "Failed to upload image");
+      }
+
+      return data.url;
     },
     onSuccess: (url) => {
       const currentUrls = form.getValues("mediaUrls") || [];
@@ -202,10 +106,9 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       });
     },
     onError: (error: Error) => {
-      console.error('Upload mutation error:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to upload image. Please try again.",
+        description: error.message || "Failed to upload image",
         variant: "destructive",
       });
       setUploadType(null);
