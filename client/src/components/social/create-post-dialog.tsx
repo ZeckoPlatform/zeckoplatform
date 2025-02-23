@@ -39,9 +39,11 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
 
       // Always include type: "update" in the request
       const postData = {
-        content: data.content,
-        type: "update" as const
+        ...data,
+        type: "update"
       };
+
+      console.log('Sending post data:', postData);
 
       const response = await fetch('/api/social/posts', {
         method: 'POST',
@@ -53,11 +55,16 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       });
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Server response:', errorText);
         throw new Error("Failed to create post");
       }
 
-      // Parse response carefully to avoid DOMException
       const text = await response.text();
+      if (!text) {
+        throw new Error("Empty response from server");
+      }
+
       try {
         return JSON.parse(text);
       } catch (e) {
