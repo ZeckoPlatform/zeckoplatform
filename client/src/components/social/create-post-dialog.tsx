@@ -87,18 +87,37 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
           body: formData,
           headers: {
             'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
           },
         });
 
         console.log('Upload response status:', response.status);
 
+        // First check if response is ok
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: "Failed to upload image" }));
-          throw new Error(errorData.error || "Failed to upload image");
+          // Try to get error message from response
+          try {
+            const errorData = await response.json();
+            throw new Error(errorData.error || "Failed to upload image");
+          } catch (parseError) {
+            // If we can't parse the error response, throw generic error
+            throw new Error(`Upload failed with status ${response.status}`);
+          }
         }
 
-        const data: UploadResponse = await response.json();
-        console.log('Upload response:', data);
+        // Get the response text first
+        const responseText = await response.text();
+
+        console.log('Upload response text:', responseText);
+
+        // Try to parse as JSON
+        let data: UploadResponse;
+        try {
+          data = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error('Failed to parse response:', parseError);
+          throw new Error('Invalid response format from server');
+        }
 
         if (!data.success || !data.url) {
           throw new Error(data.error || "Failed to upload image");

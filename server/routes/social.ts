@@ -29,6 +29,9 @@ const upload = multer({
 
 // File upload endpoint with auth
 router.post("/api/social/upload", authenticateToken, (req, res) => {
+  // Set proper content type for JSON response
+  res.setHeader('Content-Type', 'application/json');
+
   upload(req, res, async (err) => {
     try {
       if (err instanceof multer.MulterError) {
@@ -56,6 +59,7 @@ router.post("/api/social/upload", authenticateToken, (req, res) => {
 
       // Upload to Cloudinary
       const result = await uploadToCloudinary(req.file);
+      log('Cloudinary upload successful:', result.secure_url);
 
       return res.status(200).json({
         success: true,
