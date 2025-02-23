@@ -38,36 +38,6 @@ export function PostFeed() {
     }
   });
 
-  const editPostMutation = useMutation({
-    mutationFn: async ({ id, content, type }: { id: number; content: string; type: Post['type'] }) => {
-      const response = await apiRequest('PATCH', `/api/social/posts/${id}`, {
-        content,
-        type,
-        images: editingPost?.mediaUrls || editingPost?.images || []
-      });
-      if (!response.ok) {
-        throw new Error('Failed to update post');
-      }
-      const responseData: PostResponse = await response.json();
-      return responseData.data;
-    },
-    onSuccess: (updatedPost) => {
-      queryClient.setQueryData<PostsResponse>(['/api/social/posts'], (old) => {
-        if (!old) return { success: true, data: [updatedPost] };
-        return {
-          ...old,
-          data: old.data.map(post => post.id === updatedPost.id ? updatedPost : post)
-        };
-      });
-
-      toast({
-        title: "Success",
-        description: "Post updated successfully",
-      });
-      setEditingPost(null);
-    }
-  });
-
   const deletePostMutation = useMutation({
     mutationFn: async (postId: number) => {
       const response = await apiRequest('DELETE', `/api/social/posts/${postId}`);
@@ -77,6 +47,7 @@ export function PostFeed() {
       return postId;
     },
     onSuccess: (deletedPostId) => {
+      // Update local cache to remove the deleted post
       queryClient.setQueryData<PostsResponse>(['/api/social/posts'], (old) => {
         if (!old) return { success: true, data: [] };
         return {
@@ -89,15 +60,66 @@ export function PostFeed() {
         title: "Success",
         description: "Post deleted successfully",
       });
+
       setIsDeleteDialogOpen(false);
       setPostToDelete(null);
 
+      // Force a refresh to ensure sync with server
       queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     },
     onError: (error: Error) => {
       toast({
         title: "Error",
         description: error.message || "Failed to delete post",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const editPostMutation = useMutation({
+    mutationFn: async ({ id, content, type }: { id: number; content: string; type: Post['type'] }) => {
+      // Get the current post from cache to preserve image URLs
+      const currentPost = (queryClient.getQueryData<PostsResponse>(['/api/social/posts']))?.data
+        .find(post => post.id === id);
+
+      const updateData = {
+        content,
+        type,
+        // Preserve existing images
+        images: currentPost?.mediaUrls || currentPost?.images || []
+      };
+
+      const response = await apiRequest('PATCH', `/api/social/posts/${id}`, updateData);
+      if (!response.ok) {
+        throw new Error('Failed to update post');
+      }
+      const responseData: PostResponse = await response.json();
+      return responseData.data;
+    },
+    onSuccess: (updatedPost) => {
+      // Update the post in the cache
+      queryClient.setQueryData<PostsResponse>(['/api/social/posts'], (old) => {
+        if (!old) return { success: true, data: [updatedPost] };
+        return {
+          ...old,
+          data: old.data.map(post => post.id === updatedPost.id ? updatedPost : post)
+        };
+      });
+
+      toast({
+        title: "Success",
+        description: "Post updated successfully",
+      });
+
+      setEditingPost(null);
+
+      // Force a refresh to ensure sync with server
+      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update post",
         variant: "destructive",
       });
     }
@@ -152,22 +174,6 @@ export function PostFeed() {
     );
   }
 
-  const formatTime = (dateString: string) => {
-    if (!dateString) {
-      return 'Recently';
-    }
-
-    try {
-      const date = parseISO(dateString);
-      if (isNaN(date.getTime())) {
-        return 'Recently';
-      }
-      return formatDistanceToNow(date, { addSuffix: true });
-    } catch (error) {
-      return 'Recently';
-    }
-  };
-
   return (
     <div className="space-y-4">
       {isAdmin && (
@@ -193,7 +199,7 @@ export function PostFeed() {
                   {post.user?.businessName || post.user?.email || 'Anonymous'}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  {formatTime(post.createdAt)}
+                  {formatDistanceToNow(parseISO(post.createdAt), { addSuffix: true })}
                 </p>
               </div>
             </div>
@@ -227,13 +233,14 @@ export function PostFeed() {
           <CardContent>
             <p className="whitespace-pre-wrap">{post.content}</p>
 
-            {(post.images?.length > 0 || post.mediaUrls?.length > 0) && (
+            {/* Handle both mediaUrls and images */}
+            {((post.mediaUrls && post.mediaUrls.length > 0) || (post.images && post.images.length > 0)) && (
               <div className={`grid gap-2 mt-4 ${
-                (post.images?.length || post.mediaUrls?.length) === 1 ? 'grid-cols-1' :
-                  (post.images?.length || post.mediaUrls?.length) === 2 ? 'grid-cols-2' :
-                    'grid-cols-2'
+                ((post.mediaUrls?.length || post.images?.length) || 0) === 1 ? 'grid-cols-1' :
+                ((post.mediaUrls?.length || post.images?.length) || 0) === 2 ? 'grid-cols-2' :
+                'grid-cols-2'
               }`}>
-                {(post.images || post.mediaUrls || []).map((image, index) => (
+                {(post.mediaUrls || post.images || []).map((image, index) => (
                   <img
                     key={`${post.id}-${index}`}
                     src={image}

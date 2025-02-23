@@ -38,7 +38,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
     defaultValues: {
       content: editPost?.content || "",
       type: editPost?.type || "update",
-      images: editPost?.images || editPost?.mediaUrls || []
+      images: editPost?.mediaUrls || editPost?.images || []
     }
   });
 
@@ -47,7 +47,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
       form.reset({
         content: editPost.content,
         type: editPost.type,
-        images: editPost.images || editPost.mediaUrls || []
+        images: editPost?.mediaUrls || editPost?.images || []
       });
     }
   }, [editPost, form]);
@@ -65,14 +65,14 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
       const response = await fetch('/api/upload', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${token}`
         },
         body: formData
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to upload image');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to upload image');
       }
 
       const data = await response.json();
@@ -82,7 +82,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
 
       return data.url;
     } catch (error) {
-      throw error;
+      throw error instanceof Error ? error : new Error('Failed to upload image');
     }
   };
 
@@ -91,7 +91,6 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
     if (!files?.length) return;
 
     const newImages: { file: File; preview: string }[] = [];
-
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       if (file.type.startsWith('image/')) {
@@ -130,20 +129,20 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
 
         const response = await apiRequest("POST", "/api/social/posts", postData);
         if (!response.ok) {
-          const errorData = await response.json().catch(() => null);
-          throw new Error(errorData?.message || 'Failed to create post');
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to create post');
         }
 
         const newPost: PostResponse = await response.json();
         return newPost.data;
       } catch (error) {
-        console.error('Post creation error:', error);
-        throw error;
+        throw error instanceof Error ? error : new Error('Failed to create post');
       } finally {
         setIsUploading(false);
       }
     },
     onSuccess: (newPost) => {
+      // Update the cache with the new post
       queryClient.setQueryData(['/api/social/posts'], (old: any) => {
         if (!old) return { success: true, data: [newPost] };
         return {
@@ -157,6 +156,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
         description: "Your update has been shared"
       });
 
+      // Clean up form and images
       form.reset();
       images.forEach(img => URL.revokeObjectURL(img.preview));
       setImages([]);
@@ -182,7 +182,6 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
         await createPost.mutateAsync(data);
       }
     } catch (error) {
-      console.error('Form submission error:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "An error occurred",
@@ -223,9 +222,10 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
             />
 
             <div className="space-y-4">
-              {editPost?.images && editPost.images.length > 0 && (
+              {/* Show existing images */}
+              {editPost?.mediaUrls && editPost.mediaUrls.length > 0 && (
                 <div className="grid grid-cols-2 gap-2">
-                  {editPost.images.map((image, index) => (
+                  {editPost.mediaUrls.map((image, index) => (
                     <div key={`existing-${index}`} className="relative">
                       <img
                         src={image}
@@ -237,6 +237,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
                 </div>
               )}
 
+              {/* Show new images being added */}
               {images.length > 0 && (
                 <div className="grid grid-cols-2 gap-2">
                   {images.map((img, index) => (
@@ -270,6 +271,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
                   <ImagePlus className="mr-2 h-4 w-4" />
                   {images.length >= 4 ? 'Max images reached' : 'Add Images'}
                 </Button>
+
                 <input
                   id="image-upload"
                   type="file"
