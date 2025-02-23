@@ -127,10 +127,12 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
       const formData = new FormData();
       formData.append('file', resizedBlob, file.name);
 
-      // Use apiRequest instead of fetch to include auth token
-      const response = await apiRequest('POST', '/api/upload', formData, {
-        // Override default JSON headers for FormData
-        headers: {}
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: formData
       });
 
       if (!response.ok) {
