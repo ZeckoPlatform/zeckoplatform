@@ -50,55 +50,66 @@ interface CreatePostDialogProps {
 // Utility function to resize image
 async function resizeImage(file: File): Promise<Blob> {
   return new Promise((resolve, reject) => {
-    const img = window.Image ? new window.Image() : document.createElement('img');
-    img.src = URL.createObjectURL(file);
+    const img = document.createElement('img');
+    const reader = new FileReader();
 
-    img.onload = () => {
-      URL.revokeObjectURL(img.src);
-
-      let width = img.width;
-      let height = img.height;
-
-      // Calculate new dimensions while maintaining aspect ratio
-      if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
-        if (width > height) {
-          height = Math.round((height * MAX_IMAGE_DIMENSION) / width);
-          width = MAX_IMAGE_DIMENSION;
-        } else {
-          width = Math.round((width * MAX_IMAGE_DIMENSION) / height);
-          height = MAX_IMAGE_DIMENSION;
-        }
-      }
-
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        reject(new Error('Could not get canvas context'));
+    reader.onload = function(e) {
+      if (!e.target?.result) {
+        reject(new Error('Failed to read file'));
         return;
       }
 
-      // Draw and get resized image
-      ctx.drawImage(img, 0, 0, width, height);
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) {
-            reject(new Error('Failed to create image blob'));
-            return;
+      img.src = e.target.result as string;
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        // Calculate new dimensions while maintaining aspect ratio
+        if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
+          if (width > height) {
+            height = Math.round((height * MAX_IMAGE_DIMENSION) / width);
+            width = MAX_IMAGE_DIMENSION;
+          } else {
+            width = Math.round((width * MAX_IMAGE_DIMENSION) / height);
+            height = MAX_IMAGE_DIMENSION;
           }
-          resolve(blob);
-        },
-        'image/jpeg',
-        JPEG_QUALITY
-      );
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Could not get canvas context'));
+          return;
+        }
+
+        // Draw and get resized image
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              reject(new Error('Failed to create image blob'));
+              return;
+            }
+            resolve(blob);
+          },
+          'image/jpeg',
+          JPEG_QUALITY
+        );
+      };
+
+      img.onerror = () => {
+        reject(new Error('Failed to load image'));
+      };
     };
 
-    img.onerror = () => {
-      URL.revokeObjectURL(img.src);
-      reject(new Error('Failed to load image'));
+    reader.onerror = () => {
+      reject(new Error('Failed to read file'));
     };
+
+    reader.readAsDataURL(file);
   });
 }
 

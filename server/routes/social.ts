@@ -46,8 +46,7 @@ const asyncHandler = (fn: any) => (req: any, res: any, next: any) => {
 };
 
 // File upload endpoint with auth
-router.post("/api/social/upload", authenticateToken, (req, res) => {
-  // Handle the file upload
+router.post("/api/social/upload", authenticateToken, asyncHandler((req, res) => {
   upload(req, res, async (err) => {
     // Ensure JSON content type for response
     res.setHeader('Content-Type', 'application/json');
@@ -96,7 +95,7 @@ router.post("/api/social/upload", authenticateToken, (req, res) => {
       });
     }
   });
-});
+}));
 
 // Create a new post
 router.post("/api/social/posts", authenticateToken, asyncHandler(async (req, res) => {
