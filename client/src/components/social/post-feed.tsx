@@ -44,16 +44,18 @@ export function PostFeed() {
         throw error;
       }
     },
-    enabled: !!user
   });
 
   const editPostMutation = useMutation({
     mutationFn: async ({ id, content, type }: { id: number; content: string; type: Post['type'] }) => {
+      console.log('Editing post:', { id, content, type });
       const response = await apiRequest('PATCH', `/api/social/posts/${id}`, { content, type });
       if (!response.ok) {
         throw new Error('Failed to update post');
       }
-      return await response.json();
+      const data = await response.json();
+      console.log('Updated post data:', data);
+      return data;
     },
     onSuccess: (updatedPost) => {
       queryClient.setQueryData<PostsResponse>(['/api/social/posts'], (old) => {
@@ -101,6 +103,7 @@ export function PostFeed() {
       });
       setIsDeleteDialogOpen(false);
       setPostToDelete(null);
+      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     },
     onError: (error: Error) => {
       toast({
@@ -169,6 +172,10 @@ export function PostFeed() {
 
     try {
       const date = parseISO(dateString);
+      if (isNaN(date.getTime())) {
+        console.error('Invalid date object:', dateString);
+        return 'Recently';
+      }
       return formatDistanceToNow(date, { addSuffix: true });
     } catch (error) {
       console.error('Error formatting date:', dateString, error);

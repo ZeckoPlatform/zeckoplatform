@@ -37,7 +37,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
     resolver: zodResolver(createPostSchema),
     defaultValues: {
       content: editPost?.content || "",
-      type: (editPost?.type as CreatePostSchema["type"]) || "update",
+      type: editPost?.type || "update",
       images: editPost?.images || []
     }
   });
@@ -132,12 +132,14 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
         body: formData
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
+        const data = await response.json();
         console.error('Upload error response:', data);
         throw new Error(data.error || 'Failed to upload image');
       }
+
+      const data = await response.json();
+      console.log('Upload response:', data);
 
       if (!data.url) {
         throw new Error('No URL in upload response');
@@ -192,6 +194,8 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
           images: uploadedUrls
         };
 
+        console.log('Sending post data:', postData);
+
         const response = await apiRequest("POST", "/api/social/posts", postData);
         if (!response.ok) {
           const errorData = await response.json().catch(() => null);
@@ -199,6 +203,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
         }
 
         const newPost = await response.json();
+        console.log('Created post:', newPost);
         return newPost;
       } catch (error) {
         console.error('Post creation error:', error);
@@ -225,6 +230,9 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
       images.forEach(img => URL.revokeObjectURL(img.preview));
       setImages([]);
       onOpenChange(false);
+
+      // Refetch posts to ensure we have the latest data
+      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     },
     onError: (error: Error) => {
       toast({
