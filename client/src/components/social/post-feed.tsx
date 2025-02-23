@@ -20,7 +20,6 @@ interface Post {
 }
 
 interface PostsResponse {
-  success: boolean;
   data: Post[];
 }
 
