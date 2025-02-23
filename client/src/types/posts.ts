@@ -30,3 +30,9 @@ export interface PostResponse {
   success: boolean;
   data: Post;
 }
+
+export interface PostMutationResponse {
+  success: boolean;
+  data: Post;
+  message?: string;
+}

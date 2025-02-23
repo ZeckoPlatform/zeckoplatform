@@ -17,7 +17,7 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { CreatePostDialog } from "./create-post-dialog";
-import type { Post, PostsResponse, PostResponse } from "@/types/posts";
+import type { Post, PostsResponse, PostResponse, PostMutationResponse } from "@/types/posts";
 
 export function PostFeed() {
   const { user } = useAuth();
@@ -47,7 +47,7 @@ export function PostFeed() {
       return postId;
     },
     onSuccess: (deletedPostId) => {
-      // Update local cache to remove the deleted post
+      // Update local cache
       queryClient.setQueryData<PostsResponse>(['/api/social/posts'], (old) => {
         if (!old) return { success: true, data: [] };
         return {
@@ -64,7 +64,7 @@ export function PostFeed() {
       setIsDeleteDialogOpen(false);
       setPostToDelete(null);
 
-      // Force a refresh to ensure sync with server
+      // Force a refetch to ensure sync with server
       queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     },
     onError: (error: Error) => {
@@ -78,14 +78,12 @@ export function PostFeed() {
 
   const editPostMutation = useMutation({
     mutationFn: async ({ id, content, type }: { id: number; content: string; type: Post['type'] }) => {
-      // Get the current post from cache to preserve image URLs
-      const currentPost = (queryClient.getQueryData<PostsResponse>(['/api/social/posts']))?.data
+      const currentPost = queryClient.getQueryData<PostsResponse>(['/api/social/posts'])?.data
         .find(post => post.id === id);
 
       const updateData = {
         content,
         type,
-        // Preserve existing images
         images: currentPost?.mediaUrls || currentPost?.images || []
       };
 
@@ -93,11 +91,11 @@ export function PostFeed() {
       if (!response.ok) {
         throw new Error('Failed to update post');
       }
-      const responseData: PostResponse = await response.json();
-      return responseData.data;
+
+      const result: PostMutationResponse = await response.json();
+      return result.data;
     },
     onSuccess: (updatedPost) => {
-      // Update the post in the cache
       queryClient.setQueryData<PostsResponse>(['/api/social/posts'], (old) => {
         if (!old) return { success: true, data: [updatedPost] };
         return {
@@ -113,7 +111,7 @@ export function PostFeed() {
 
       setEditingPost(null);
 
-      // Force a refresh to ensure sync with server
+      // Force a refetch to ensure sync with server
       queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     },
     onError: (error: Error) => {
@@ -186,7 +184,7 @@ export function PostFeed() {
       )}
 
       {postsData.data.map((post) => (
-        <Card key={post.id} className="overflow-hidden">
+        <Card key={post.id}>
           <CardHeader className="flex flex-row items-center justify-between">
             <div className="flex items-center gap-4">
               <Avatar>

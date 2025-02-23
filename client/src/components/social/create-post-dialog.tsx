@@ -10,7 +10,7 @@ import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Post, PostResponse } from "@/types/posts";
+import type { Post, PostResponse, PostMutationResponse } from "@/types/posts";
 
 const createPostSchema = z.object({
   content: z.string().min(1, "Please write something to share"),
@@ -71,18 +71,14 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to upload image');
+        throw new Error('Failed to upload image');
       }
 
       const data = await response.json();
-      if (!data.url) {
-        throw new Error('No URL in upload response');
-      }
-
       return data.url;
     } catch (error) {
-      throw error instanceof Error ? error : new Error('Failed to upload image');
+      console.error('Image upload error:', error);
+      throw new Error('Failed to upload image');
     }
   };
 
@@ -129,12 +125,11 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
 
         const response = await apiRequest("POST", "/api/social/posts", postData);
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to create post');
+          throw new Error('Failed to create post');
         }
 
-        const newPost: PostResponse = await response.json();
-        return newPost.data;
+        const result: PostMutationResponse = await response.json();
+        return result.data;
       } catch (error) {
         throw error instanceof Error ? error : new Error('Failed to create post');
       } finally {
@@ -142,8 +137,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
       }
     },
     onSuccess: (newPost) => {
-      // Update the cache with the new post
-      queryClient.setQueryData(['/api/social/posts'], (old: any) => {
+      queryClient.setQueryData<PostResponse>(['/api/social/posts'], (old: any) => {
         if (!old) return { success: true, data: [newPost] };
         return {
           ...old,
@@ -152,23 +146,21 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
       });
 
       toast({
-        title: "Posted!",
+        title: "Success",
         description: "Your update has been shared"
       });
 
-      // Clean up form and images
       form.reset();
       images.forEach(img => URL.revokeObjectURL(img.preview));
       setImages([]);
       onOpenChange(false);
 
-      // Force refetch to ensure we have the latest data
       queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     },
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to create post",
+        description: error.message,
         variant: "destructive"
       });
     }
@@ -201,10 +193,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
         </DialogHeader>
 
         <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(handleSubmit)}
-            className="space-y-4"
-          >
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
             <FormField
               control={form.control}
               name="content"
@@ -222,13 +211,12 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
             />
 
             <div className="space-y-4">
-              {/* Show existing images */}
               {editPost?.mediaUrls && editPost.mediaUrls.length > 0 && (
                 <div className="grid grid-cols-2 gap-2">
-                  {editPost.mediaUrls.map((image, index) => (
+                  {editPost.mediaUrls.map((url, index) => (
                     <div key={`existing-${index}`} className="relative">
                       <img
-                        src={image}
+                        src={url}
                         alt={`Existing image ${index + 1}`}
                         className="w-full h-32 object-cover rounded-md"
                       />
@@ -237,7 +225,6 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
                 </div>
               )}
 
-              {/* Show new images being added */}
               {images.length > 0 && (
                 <div className="grid grid-cols-2 gap-2">
                   {images.map((img, index) => (
