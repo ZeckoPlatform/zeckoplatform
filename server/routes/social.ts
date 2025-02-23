@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { authenticateToken } from "../auth";
 import { db } from "@db";
-import { socialPosts, users } from "@db/schema";
+import { socialPosts } from "@db/schema";
 import { desc } from "drizzle-orm";
 import { z } from "zod";
 import { log } from "../vite";
@@ -15,17 +15,20 @@ router.post("/api/social/posts", authenticateToken, async (req, res) => {
 
     const schema = z.object({
       content: z.string().min(1, "Please write something to share"),
-      type: z.string()
+      type: z.enum(["update", "article", "success_story", "market_insight", "opportunity"])
     });
 
     const validatedData = schema.parse(req.body);
     log('Validated data:', validatedData);
 
     const [post] = await db.insert(socialPosts).values({
-      userId: req.user!.id,
       content: validatedData.content,
       type: validatedData.type,
+      userId: req.user!.id,
       mediaUrls: [],
+      visibility: "public",
+      status: "published",
+      engagement: { views: 0, likes: 0, comments: 0, shares: 0 },
       createdAt: new Date(),
       updatedAt: new Date()
     }).returning();
@@ -38,7 +41,6 @@ router.post("/api/social/posts", authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error("Failed to create post:", error);
-
     res.setHeader('Content-Type', 'application/json');
 
     if (error instanceof z.ZodError) {

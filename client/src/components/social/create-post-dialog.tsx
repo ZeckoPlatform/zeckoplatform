@@ -9,9 +9,10 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
-// Simplify the schema to match server expectations
+// Match server schema expectations
 const createPostSchema = z.object({
-  content: z.string().min(1, "Please write something to share")
+  content: z.string().min(1, "Please write something to share"),
+  type: z.enum(["update", "article", "success_story", "market_insight", "opportunity"]).default("update")
 });
 
 type CreatePostSchema = z.infer<typeof createPostSchema>;
@@ -28,7 +29,8 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
   const form = useForm<CreatePostSchema>({
     resolver: zodResolver(createPostSchema),
     defaultValues: {
-      content: ""
+      content: "",
+      type: "update"
     }
   });
 
@@ -37,13 +39,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       const token = localStorage.getItem('token');
       if (!token) throw new Error("Not authenticated");
 
-      // Always include type: "update" in the request
-      const postData = {
-        ...data,
-        type: "update"
-      };
-
-      console.log('Sending post data:', postData);
+      console.log('Sending post data:', data);
 
       const response = await fetch('/api/social/posts', {
         method: 'POST',
@@ -51,24 +47,25 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(postData)
+        body: JSON.stringify(data)
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Server response:', errorText);
-        throw new Error("Failed to create post");
-      }
+      const responseText = await response.text();
+      console.log('Raw response:', responseText);
 
-      const text = await response.text();
-      if (!text) {
-        throw new Error("Empty response from server");
+      if (!response.ok) {
+        try {
+          const errorData = JSON.parse(responseText);
+          throw new Error(errorData.message || "Failed to create post");
+        } catch {
+          throw new Error("Failed to create post");
+        }
       }
 
       try {
-        return JSON.parse(text);
+        return JSON.parse(responseText);
       } catch (e) {
-        console.error('Failed to parse response:', text);
+        console.error('Failed to parse response:', e);
         throw new Error("Invalid server response");
       }
     },
@@ -85,7 +82,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       console.error('Post creation error:', error);
       toast({
         title: "Error",
-        description: "Failed to create post. Please try again.",
+        description: error.message || "Failed to create post. Please try again.",
         variant: "destructive"
       });
     }
