@@ -25,6 +25,14 @@ interface PostsResponse {
 export function PostFeed() {
   const { data: postsData, isLoading } = useQuery<PostsResponse>({
     queryKey: ['/social/posts'],
+    queryFn: async () => {
+      const response = await fetch('/social/posts');
+      if (!response.ok) {
+        throw new Error('Failed to fetch posts');
+      }
+      const data = await response.json();
+      return data;
+    }
   });
 
   if (isLoading) {

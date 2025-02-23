@@ -37,13 +37,17 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
 
   const createPost = useMutation({
     mutationFn: async (data: CreatePostSchema) => {
-      const response = await apiRequest("POST", "/social/posts", data);
-      if (!response.ok) {
-        const text = await response.text();
-        console.error('Server response:', text);
-        throw new Error(text || "Failed to create post");
+      try {
+        const response = await apiRequest("POST", "/social/posts", data);
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText || "Failed to create post");
+        }
+        return await response.json();
+      } catch (error) {
+        console.error('Post creation error:', error);
+        throw error;
       }
-      return await response.json();
     },
     onSuccess: () => {
       toast({ 
