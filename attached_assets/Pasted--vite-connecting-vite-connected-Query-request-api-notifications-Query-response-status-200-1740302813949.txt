@@ -1,0 +1,48 @@
+[vite] connecting...
+[vite] connected.
+Query request - /api/notifications
+Query response status: 200
+API Request - POST /api/social/posts
+Request payload: 
+Object {content: "I need this to work in order to make my millions", type: "update", mediaUrls: Array(0)}
+content: "I need this to work in order to make my millions"
+mediaUrls: Array(0)
+type: "update"
+[[Prototype]]: Object
+Request options: 
+Object {method: "POST", headers: {…}, bodyLength: 93}
+Response status: 200
+File upload error: 
+DOMException {line: 83, column: 39, sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/socia…"}
+column: 39
+line: 83
+sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx"
+stack: "json@[native code]↵@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:83:39"
+[[Prototype]]: DOMException
+
+API Request - POST /api/social/posts
+Request payload: 
+Object {content: "I need this to work in order to make my millions", type: "update", mediaUrls: Array(0)}
+Request options: 
+Object {method: "POST", headers: {…}, bodyLength: 93}
+Response status: 200
+API Request - POST /api/social/posts
+Request payload: 
+Object {content: "I need this to work in order to make my millions", type: "update", mediaUrls: Array(0)}
+Request options: 
+Object {method: "POST", headers: {…}, bodyLength: 93}
+Response status: 200
+File upload error: 
+DOMException {line: 83, column: 39, sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/socia…"}
+
+API Request - POST /api/social/posts
+Request payload: 
+Object {content: "I need this to work in order to make my millions", type: "update", mediaUrls: Array(0)}
+Request options: 
+Object {method: "POST", headers: {…}, bodyLength: 93}
+Response status: 200
+API Request - POST /api/social/posts
+Request payload: 
+Object {content: "I need this to work in order to make my millions", type: "update", mediaUrls: Array(0)}
+Request options: 
+Object {method: "POST", headers: {…}, bodyLength: 93}
