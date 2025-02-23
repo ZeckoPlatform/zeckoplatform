@@ -56,6 +56,16 @@ declare global {
 }
 
 export function registerRoutes(app: Express): Server {
+  // JSON and urlencoded middleware should come first
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+
+  // Set default headers for all API routes
+  app.use('/api', (req, res, next) => {
+    res.setHeader('Content-Type', 'application/json');
+    next();
+  });
+
   setupAuth(app);
 
   // Serve uploaded files
@@ -92,6 +102,20 @@ export function registerRoutes(app: Express): Server {
   app.use('/api', orderRoutes);
   app.use('/api', socialRoutes);
   app.use('/api', leadsRoutes);
+
+  // Error handling middleware - should be last
+  app.use((err: any, req: any, res: any, next: any) => {
+    log('Global error handler:', err);
+    // If headers are not sent yet and it's an API route
+    if (!res.headersSent && req.path.startsWith('/api')) {
+      res.status(err.status || 500).json({
+        success: false,
+        error: err.message || 'An unexpected error occurred'
+      });
+    } else {
+      next(err);
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;

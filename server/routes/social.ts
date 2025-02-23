@@ -47,10 +47,11 @@ const asyncHandler = (fn: any) => (req: any, res: any, next: any) => {
 
 // File upload endpoint with auth
 router.post("/api/social/upload", authenticateToken, (req, res) => {
-  // Set proper content type for JSON response
-  res.setHeader('Content-Type', 'application/json');
-
+  // Handle the file upload
   upload(req, res, async (err) => {
+    // Ensure JSON content type for response
+    res.setHeader('Content-Type', 'application/json');
+
     try {
       if (err instanceof multer.MulterError) {
         log('Multer error during upload:', err.message);
