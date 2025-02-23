@@ -40,14 +40,10 @@ export function CreatePostDialog({ open, onOpenChange, editPost }: CreatePostDia
 
   const form = useForm<CreatePostSchema>({
     resolver: zodResolver(createPostSchema),
-    defaultValues: editPost ? {
-      content: editPost.content,
-      type: editPost.type as CreatePostSchema["type"],
-      images: editPost.images || []
-    } : {
-      content: "",
-      type: "update",
-      images: []
+    defaultValues: {
+      content: editPost?.content || "",
+      type: (editPost?.type as CreatePostSchema["type"]) || "update",
+      images: editPost?.images || []
     }
   });
 
@@ -123,9 +119,11 @@ export function CreatePostDialog({ open, onOpenChange, editPost }: CreatePostDia
       const formData = new FormData();
       formData.append('file', resizedBlob, file.name);
 
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
+      const response = await apiRequest('POST', '/api/upload', formData, {
+        headers: {
+          // Remove Content-Type header to let the browser set it with the boundary
+          'Content-Type': undefined
+        }
       });
 
       if (!response.ok) {
@@ -184,7 +182,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost }: CreatePostDia
         // Add uploaded URLs to the post data
         const postData = {
           ...data,
-          images: editPost 
+          images: editPost
             ? [...(editPost.images || []), ...uploadedUrls] // Keep existing images when editing
             : uploadedUrls // Only new images for new posts
         };
@@ -332,7 +330,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost }: CreatePostDia
 
                 <Button
                   type="submit"
-                  disabled={createPost.isPending}
+                  disabled={createPost.isPending || (!form.formState.isDirty && images.length === 0)}
                 >
                   {createPost.isPending ? (
                     <>
