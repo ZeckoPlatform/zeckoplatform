@@ -1,0 +1,57 @@
+[vite] connecting...
+[vite] connected.
+Query request - /api/notifications
+Query response status: 200
+Upload error: 
+TypeError {}
+column: 26
+line: 52
+message: "Object is not a constructor (evaluating 'new Image()')"
+sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx"
+stack: "@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:52:26↵Promise@[native code]↵@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:51:21↵resizeImage@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:50:28↵@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:119:46↵mutationFn@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:114:28↵run@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js:493:51↵start@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js:535:12↵@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js:1228:61"
+[[Prototype]]: Object
+
+Upload mutation error: 
+TypeError {}
+column: 26
+line: 52
+message: "Object is not a constructor (evaluating 'new Image()')"
+sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx"
+stack: "@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:52:26↵Promise@[native code]↵@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:51:21↵resizeImage@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:50:28↵@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:119:46↵mutationFn@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:114:28↵run@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js:493:51↵start@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js:535:12↵@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js:1228:61"
+[[Prototype]]: Object
+
+File upload error: 
+TypeError {}
+column: 26
+line: 52
+message: "Object is not a constructor (evaluating 'new Image()')"
+sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx"
+stack: "@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:52:26↵Promise@[native code]↵@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:51:21↵resizeImage@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:50:28↵@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:119:46↵mutationFn@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:114:28↵run@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js:493:51↵start@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js:535:12↵@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js:1228:61"
+[[Prototype]]: Object
+
+Upload error: 
+TypeError {}
+column: 26
+line: 52
+message: "Object is not a constructor (evaluating 'new Image()')"
+sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx"
+stack: "@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:52:26↵Promise@[native code]↵@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:51:21↵resizeImage@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:50:28↵@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:119:46↵mutationFn@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:114:28↵run@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js:493:51↵start@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js:535:12↵@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js:1228:61"
+[[Prototype]]: Object
+
+Upload mutation error: 
+TypeError {}
+column: 26
+line: 52
+message: "Object is not a constructor (evaluating 'new Image()')"
+sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx"
+stack: "@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:52:26↵Promise@[native code]↵@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:51:21↵resizeImage@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:50:28↵@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:119:46↵mutationFn@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:114:28↵run@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js:493:51↵start@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js:535:12↵@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js:1228:61"
+[[Prototype]]: Object
+
+File upload error: 
+TypeError {}
+column: 26
+line: 52
+message: "Object is not a constructor (evaluating 'new Image()')"
+sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx"
+stack: "@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:52:26↵Promise@[native code]↵@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:51:21↵resizeImage@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:50:28↵@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:119:46↵mutationFn@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:114:28↵run@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js:493:51↵start@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js:535:12↵@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js:1228:61"
+[[Prototype]]: Object
