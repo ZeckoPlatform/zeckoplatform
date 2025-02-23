@@ -11,12 +11,15 @@ const router = Router();
 // Create a new post
 router.post("/api/social/posts", authenticateToken, async (req, res) => {
   try {
+    log('Received post request body:', req.body);
+
     const schema = z.object({
-      content: z.string().min(1, "Post content is required"),
-      type: z.enum(["update"]).default("update")
+      content: z.string().min(1, "Please write something to share"),
+      type: z.literal("update")
     });
 
     const data = schema.parse(req.body);
+    log('Validated data:', data);
 
     const [post] = await db.insert(socialPosts).values({
       userId: req.user!.id,
@@ -27,6 +30,7 @@ router.post("/api/social/posts", authenticateToken, async (req, res) => {
       updatedAt: new Date()
     }).returning();
 
+    log('Created post:', post);
     res.json({ success: true, post });
   } catch (error) {
     log('Error creating post:', error);
@@ -37,35 +41,19 @@ router.post("/api/social/posts", authenticateToken, async (req, res) => {
   }
 });
 
-// Get posts feed with pagination and user info
-router.get("/api/social/posts", async (req, res) => {
+// Get posts feed
+router.get("/api/social/posts", authenticateToken, async (req, res) => {
   try {
-    const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 10;
-    const offset = (page - 1) * limit;
-
     const posts = await db.query.socialPosts.findMany({
-      limit,
-      offset,
       orderBy: [desc(socialPosts.createdAt)],
       with: {
         user: true
       }
     });
 
-    const [{ count }] = await db.select({
-      count: sql<number>`count(*)::int`
-    }).from(socialPosts);
-
     res.json({
       success: true,
-      posts,
-      pagination: {
-        page,
-        limit,
-        total: count,
-        hasMore: offset + posts.length < count
-      }
+      posts
     });
   } catch (error) {
     log('Error fetching posts:', error);

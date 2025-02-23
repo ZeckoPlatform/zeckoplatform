@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
@@ -36,6 +36,8 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       const token = localStorage.getItem('token');
       if (!token) throw new Error("Not authenticated");
 
+      console.log('Sending post data:', data); // Debug log
+
       const response = await fetch('/api/social/posts', {
         method: 'POST',
         headers: {
@@ -62,6 +64,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     },
     onError: (error: Error) => {
+      console.error('Post creation error:', error); // Debug log
       toast({
         title: "Error",
         description: error.message,
@@ -72,9 +75,12 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[525px]" aria-describedby="create-post-description">
         <DialogHeader>
           <DialogTitle>Create a post</DialogTitle>
+          <DialogDescription id="create-post-description">
+            Share updates with your professional network
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
