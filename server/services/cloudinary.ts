@@ -1,5 +1,6 @@
 import { v2 as cloudinary } from 'cloudinary';
 import { log } from "../vite";
+import type { UploadApiResponse, UploadApiErrorResponse } from 'cloudinary';
 
 // Configure Cloudinary
 cloudinary.config({
@@ -13,22 +14,22 @@ cloudinary.config({
  * @param file The file buffer to upload
  * @returns Promise resolving to the Cloudinary upload response
  */
-export async function uploadToCloudinary(file: Express.Multer.File) {
+export async function uploadToCloudinary(file: Express.Multer.File): Promise<UploadApiResponse> {
   try {
     log('Attempting to upload file to Cloudinary');
-    
+
     return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
           folder: 'social-feed',
           resource_type: 'auto',
         },
-        (error, result) => {
-          if (error) {
-            log('Cloudinary upload error:', error);
-            reject(error);
+        (error: UploadApiErrorResponse | null, result: UploadApiResponse | undefined) => {
+          if (error || !result) {
+            log('Cloudinary upload error:', error?.message || 'Unknown error');
+            reject(error || new Error('Upload failed'));
           } else {
-            log('Cloudinary upload successful:', result?.secure_url);
+            log('Cloudinary upload successful:', result.secure_url);
             resolve(result);
           }
         }
@@ -37,7 +38,7 @@ export async function uploadToCloudinary(file: Express.Multer.File) {
       uploadStream.end(file.buffer);
     });
   } catch (error) {
-    log('Error in uploadToCloudinary:', error);
+    log('Error in uploadToCloudinary:', error instanceof Error ? error.message : 'Unknown error');
     throw error;
   }
 }

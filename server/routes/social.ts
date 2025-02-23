@@ -7,10 +7,11 @@ import { z } from "zod";
 import multer from "multer";
 import { log } from "../vite";
 import { uploadToCloudinary } from "../services/cloudinary";
+import type { UploadApiResponse } from 'cloudinary';
 
 const router = Router();
 
-// Configure multer for memory storage instead of disk
+// Configure multer for memory storage
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -31,7 +32,7 @@ router.post("/api/social/upload", authenticateToken, (req, res) => {
   upload(req, res, async (err) => {
     try {
       if (err instanceof multer.MulterError) {
-        log('Multer error during upload:', err);
+        log('Multer error during upload:', err.message);
         return res.status(400).json({
           success: false,
           error: err.message || "File upload failed"
@@ -39,7 +40,7 @@ router.post("/api/social/upload", authenticateToken, (req, res) => {
       }
 
       if (err) {
-        log('General error during upload:', err);
+        log('General error during upload:', err instanceof Error ? err.message : 'Unknown error');
         return res.status(400).json({
           success: false,
           error: "File upload failed"
@@ -62,7 +63,7 @@ router.post("/api/social/upload", authenticateToken, (req, res) => {
         public_id: result.public_id
       });
     } catch (error) {
-      log('Unexpected error during file upload:', error);
+      log('Unexpected error during file upload:', error instanceof Error ? error.message : 'Unknown error');
       return res.status(500).json({
         success: false,
         error: "An unexpected error occurred during file upload"
@@ -88,12 +89,14 @@ router.post("/api/social/posts", authenticateToken, async (req, res) => {
       type: data.type,
       mediaUrls: data.mediaUrls || [],
       userId: req.user!.id,
-      ...(data.linkUrl ? { metadata: { linkUrl: data.linkUrl } } : {})
+      ...(data.linkUrl ? { metadata: { linkUrl: data.linkUrl } } : {}),
+      createdAt: new Date(),
+      updatedAt: new Date()
     }).returning();
 
     res.json(post);
   } catch (error) {
-    log("Failed to create post:", error);
+    log("Failed to create post:", error instanceof Error ? error.message : 'Unknown error');
     res.status(400).json({ 
       error: "Failed to create post",
       details: error instanceof Error ? error.message : "Unknown error"
@@ -108,28 +111,27 @@ router.get("/api/social/posts", async (req, res) => {
     const limit = Number(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
-    const posts = await db
-      .select()
-      .from(socialPosts)
-      .orderBy(desc(socialPosts.createdAt))
-      .limit(limit)
-      .offset(offset);
-
-    const total = await db
-      .select({ count: sql`count(*)` })
-      .from(socialPosts);
+    const [postsResult, totalResult] = await Promise.all([
+      db.select()
+        .from(socialPosts)
+        .orderBy(desc(socialPosts.createdAt))
+        .limit(limit)
+        .offset(offset),
+      db.select({ count: sql<number>`count(*)::int` })
+        .from(socialPosts)
+    ]);
 
     res.json({
-      posts,
+      posts: postsResult,
       pagination: {
         page,
         limit,
-        total: total[0].count,
-        hasMore: offset + posts.length < total[0].count
+        total: totalResult[0].count,
+        hasMore: offset + postsResult.length < totalResult[0].count
       }
     });
   } catch (error) {
-    log("Failed to fetch posts:", error);
+    log("Failed to fetch posts:", error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: "Failed to fetch posts" });
   }
 });

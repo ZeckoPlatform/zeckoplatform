@@ -19,7 +19,7 @@ const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/web
 interface UploadResponse {
   success: boolean;
   url?: string;
-  filename?: string;
+  public_id?: string;
   error?: string;
 }
 
@@ -58,7 +58,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
   });
 
   const uploadImageMutation = useMutation({
-    mutationFn: async (file: File) => {
+    mutationFn: async (file: File): Promise<string> => {
       if (!user) {
         throw new Error("You must be logged in to upload images");
       }
@@ -93,10 +93,11 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
         console.log('Upload response status:', response.status);
 
         if (!response.ok) {
-          throw new Error("Failed to upload image");
+          const errorData = await response.json().catch(() => ({ error: "Failed to upload image" }));
+          throw new Error(errorData.error || "Failed to upload image");
         }
 
-        const data = await response.json();
+        const data: UploadResponse = await response.json();
         console.log('Upload response:', data);
 
         if (!data.success || !data.url) {
