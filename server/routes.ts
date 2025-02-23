@@ -9,10 +9,8 @@ import { comparePasswords, hashPassword } from './auth';
 import fs from 'fs';
 import express from 'express';
 import path from 'path';
-import multer from 'multer';
 import { createConnectedAccount, retrieveConnectedAccount } from './stripe';
 import { sendEmail } from './services/email';
-import { uploadToCloudinary } from './services/cloudinary';
 import subscriptionRoutes from './routes/subscriptions';
 import invoiceRoutes from './routes/invoices';
 import { insertUserSchema } from "@db/schema";
@@ -28,21 +26,7 @@ import leadsRoutes from './routes/leads';
 import { cleanupExpiredLeads } from './services/cleanup';
 import feedbackRoutes from './routes/feedback';
 import socialRoutes from './routes/social';
-
-// Configure multer for handling file uploads
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
-  },
-  fileFilter: (_req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only image files are allowed'));
-    }
-  },
-});
+import uploadRoutes from './routes/upload';
 
 // Ensure uploads directory exists
 const uploadDir = path.join(process.cwd(), 'uploads');
@@ -91,28 +75,6 @@ export function registerRoutes(app: Express): Server {
   // Register feedback routes before authentication middleware
   app.use(feedbackRoutes);
 
-  // File upload endpoint - moved before the general authentication middleware
-  app.post('/api/upload', authenticateToken, upload.single('file'), async (req, res) => {
-    try {
-      log('Processing file upload request');
-      log('Auth check passed, processing file');
-
-      if (!req.file) {
-        return res.status(400).json({ error: 'No file uploaded' });
-      }
-
-      const result = await uploadToCloudinary(req.file);
-      log('File uploaded to Cloudinary:', result.secure_url);
-
-      res.json({ url: result.secure_url });
-    } catch (error) {
-      log('File upload error:', error);
-      res.status(500).json({ 
-        error: error instanceof Error ? error.message : 'Failed to upload file' 
-      });
-    }
-  });
-
   // Authentication middleware for protected routes
   app.use('/api', (req, res, next) => {
     if (req.path.endsWith('/login') ||
@@ -131,6 +93,7 @@ export function registerRoutes(app: Express): Server {
 
   // Register all route modules
   app.use('/api', authRoutes);
+  app.use('/api', uploadRoutes); // Add upload routes
   app.use('/api', subscriptionRoutes);
   app.use('/api', invoiceRoutes);
   app.use('/api', analyticsRoutes);
