@@ -641,6 +641,7 @@ export const socialPosts = pgTable("social_posts", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Existing postComments table needs proper type definitions
 export const postComments = pgTable("post_comments", {
   id: serial("id").primaryKey(),
   postId: integer("post_id").references(() => socialPosts.id).notNull(),
@@ -1029,13 +1030,12 @@ export const productInventoryRelations = relations(productInventory, ({ one }) =
 }));
 
 export const socialPostsRelations = relations(socialPosts, ({ one, many }) => ({
-  author: one(users, {
+  user: one(users, {
     fields: [socialPosts.userId],
     references: [users.id],
   }),
   comments: many(postComments),
   reactions: many(postReactions),
-  hashtags: many(postHashtags),
 }));
 
 export const postCommentsRelations = relations(postComments, ({ one, many }) => ({
@@ -1043,7 +1043,7 @@ export const postCommentsRelations = relations(postComments, ({ one, many }) => 
     fields: [postComments.postId],
     references: [socialPosts.id],
   }),
-  author: one(users, {
+  user: one(users, {
     fields: [postComments.userId],
     references: [users.id],
   }),

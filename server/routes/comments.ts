@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@db";
-import { postComments, postReactions, socialPosts } from "@db/schema";
+import { postComments, postReactions, socialPosts, users } from "@db/schema";
 import { z } from "zod";
 import { eq, and, desc } from "drizzle-orm";
 import { moderateText } from "../services/content-moderation";
@@ -25,19 +25,22 @@ router.get("/posts/:postId/comments", async (req, res) => {
       return res.status(400).json({ error: "Invalid post ID" });
     }
 
-    const comments = await db.query.postComments.findMany({
-      where: eq(postComments.postId, postId),
-      orderBy: desc(postComments.createdAt),
-      with: {
+    // Simplified query without relations for now
+    const comments = await db
+      .select({
+        id: postComments.id,
+        content: postComments.content,
+        createdAt: postComments.createdAt,
         user: {
-          columns: {
-            id: true,
-            profile: true,
-            businessName: true,
-          }
-        }
-      }
-    });
+          id: users.id,
+          businessName: users.businessName,
+          profile: users.profile,
+        },
+      })
+      .from(postComments)
+      .innerJoin(users, eq(users.id, postComments.userId))
+      .where(eq(postComments.postId, postId))
+      .orderBy(desc(postComments.createdAt));
 
     res.json(comments);
   } catch (error) {
@@ -83,7 +86,8 @@ router.post("/posts/:postId/comments", async (req, res) => {
     }
 
     // Create comment
-    const [newComment] = await db.insert(postComments)
+    const [newComment] = await db
+      .insert(postComments)
       .values({
         postId,
         userId: req.user.id,
@@ -91,21 +95,33 @@ router.post("/posts/:postId/comments", async (req, res) => {
         parentCommentId: validatedData.parentCommentId,
         status: "active"
       })
-      .returning();
+      .returning({
+        id: postComments.id,
+        content: postComments.content,
+        createdAt: postComments.createdAt,
+        user: {
+          id: users.id,
+          businessName: users.businessName,
+          profile: users.profile,
+        },
+      });
 
     // Get comment with user info
-    const commentWithUser = await db.query.postComments.findFirst({
-      where: eq(postComments.id, newComment.id),
-      with: {
+    const commentWithUser = await db
+      .select({
+        id: postComments.id,
+        content: postComments.content,
+        createdAt: postComments.createdAt,
         user: {
-          columns: {
-            id: true,
-            profile: true,
-            businessName: true,
-          }
-        }
-      }
-    });
+          id: users.id,
+          businessName: users.businessName,
+          profile: users.profile,
+        },
+      })
+      .from(postComments)
+      .innerJoin(users, eq(users.id, postComments.userId))
+      .where(eq(postComments.id, newComment.id))
+      .then(rows => rows[0]);
 
     res.status(201).json(commentWithUser);
   } catch (error) {
@@ -208,15 +224,14 @@ router.post("/posts/:postId/reactions", async (req, res) => {
     let reaction;
     if (existingReaction) {
       // Update existing reaction
-      const [updatedReaction] = await db
+      [reaction] = await db
         .update(postReactions)
         .set({ type })
         .where(eq(postReactions.id, existingReaction.id))
         .returning();
-      reaction = updatedReaction;
     } else {
       // Create new reaction
-      const [newReaction] = await db
+      [reaction] = await db
         .insert(postReactions)
         .values({
           postId,
@@ -224,7 +239,6 @@ router.post("/posts/:postId/reactions", async (req, res) => {
           type
         })
         .returning();
-      reaction = newReaction;
     }
 
     res.json(reaction);
