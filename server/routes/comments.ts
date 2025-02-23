@@ -25,7 +25,7 @@ router.get("/posts/:postId/comments", async (req, res) => {
       return res.status(400).json({ error: "Invalid post ID" });
     }
 
-    // Simplified query without relations for now
+    // Updated query to use the correct column names
     const comments = await db
       .select({
         id: postComments.id,
@@ -33,6 +33,8 @@ router.get("/posts/:postId/comments", async (req, res) => {
         createdAt: postComments.createdAt,
         user: {
           id: users.id,
+          email: users.email,
+          userType: users.userType,
           businessName: users.businessName,
           profile: users.profile,
         },
@@ -95,18 +97,9 @@ router.post("/posts/:postId/comments", async (req, res) => {
         parentCommentId: validatedData.parentCommentId,
         status: "active"
       })
-      .returning({
-        id: postComments.id,
-        content: postComments.content,
-        createdAt: postComments.createdAt,
-        user: {
-          id: users.id,
-          businessName: users.businessName,
-          profile: users.profile,
-        },
-      });
+      .returning();
 
-    // Get comment with user info
+    // Fetch the created comment with user info
     const commentWithUser = await db
       .select({
         id: postComments.id,
@@ -114,6 +107,8 @@ router.post("/posts/:postId/comments", async (req, res) => {
         createdAt: postComments.createdAt,
         user: {
           id: users.id,
+          email: users.email,
+          userType: users.userType,
           businessName: users.businessName,
           profile: users.profile,
         },
@@ -121,9 +116,9 @@ router.post("/posts/:postId/comments", async (req, res) => {
       .from(postComments)
       .innerJoin(users, eq(users.id, postComments.userId))
       .where(eq(postComments.id, newComment.id))
-      .then(rows => rows[0]);
+      .limit(1);
 
-    res.status(201).json(commentWithUser);
+    res.status(201).json(commentWithUser[0]);
   } catch (error) {
     console.error("Error creating comment:", error);
     if (error instanceof z.ZodError) {
