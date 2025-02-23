@@ -324,7 +324,10 @@ router.get("/social/posts", async (req, res) => {
           })
           .from(postComments)
           .innerJoin(users, eq(postComments.userId, users.id))
-          .where(eq(postComments.postId, post.id))
+          .where(and(
+            eq(postComments.postId, post.id),
+            eq(postComments.status, "active")
+          ))
           .orderBy(desc(postComments.createdAt));
 
         // Organize comments into a tree structure
@@ -353,12 +356,12 @@ router.get("/social/posts", async (req, res) => {
           }));
         }
 
-        // Convert engagement numbers to strings to match the expected format
+        // Update engagement counts
         const engagement = {
-          views: (post.engagement?.views || 0).toString(),
-          likes: reactions.filter(r => r.type === 'like').length.toString(),
-          comments: comments.length.toString(),
-          shares: (post.engagement?.shares || 0).toString(),
+          views: post.engagement?.views || 0,
+          likes: reactions.filter(r => r.type === 'like').length,
+          comments: comments.length,
+          shares: post.engagement?.shares || 0,
         };
 
         // Update post engagement in database
