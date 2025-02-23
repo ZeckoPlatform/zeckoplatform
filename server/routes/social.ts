@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { authenticateToken } from "../auth";
 import { db } from "@db";
-import { socialPosts } from "@db/schema";
-import { desc } from "drizzle-orm";
+import { socialPosts, users } from "@db/schema";
+import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { log } from "../vite";
 
@@ -71,14 +71,44 @@ router.post("/social/posts", authenticateToken, async (req, res) => {
   }
 });
 
-// Get posts feed
-router.get("/social/posts", authenticateToken, async (req, res) => {
+// Get posts feed - no authentication required for viewing public posts
+router.get("/social/posts", async (req, res) => {
   try {
-    const posts = await db.select().from(socialPosts).orderBy(desc(socialPosts.createdAt));
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const offset = (page - 1) * limit;
+
+    // Get posts with user information
+    const posts = await db
+      .select({
+        post: socialPosts,
+        user: {
+          id: users.id,
+          email: users.email,
+          userType: users.userType,
+          businessName: users.businessName,
+          profile: users.profile
+        }
+      })
+      .from(socialPosts)
+      .leftJoin(users, eq(socialPosts.userId, users.id))
+      .where(eq(socialPosts.visibility, 'public'))
+      .orderBy(desc(socialPosts.createdAt))
+      .limit(limit)
+      .offset(offset);
 
     return res.json({
       success: true,
-      data: posts
+      data: posts.map(({ post, user }) => ({
+        ...post,
+        user: {
+          id: user.id,
+          email: user.email,
+          userType: user.userType,
+          businessName: user.businessName,
+          profile: user.profile
+        }
+      }))
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
