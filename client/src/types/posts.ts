@@ -5,6 +5,7 @@ export const postSchema = z.object({
   content: z.string(),
   type: z.enum(["update", "article", "success_story", "market_insight", "opportunity"]),
   createdAt: z.string().datetime(),
+  mediaUrls: z.array(z.string()).optional(),
   images: z.array(z.string()).optional(),
   user: z.object({
     id: z.number(),

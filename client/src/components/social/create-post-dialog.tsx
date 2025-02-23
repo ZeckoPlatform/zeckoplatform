@@ -10,7 +10,7 @@ import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Post, PostResponse, PostsResponse } from "@/types/posts";
+import type { Post, PostResponse } from "@/types/posts";
 
 const createPostSchema = z.object({
   content: z.string().min(1, "Please write something to share"),
@@ -38,7 +38,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
     defaultValues: {
       content: editPost?.content || "",
       type: editPost?.type || "update",
-      images: editPost?.images || []
+      images: editPost?.images || editPost?.mediaUrls || []
     }
   });
 
@@ -47,7 +47,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
       form.reset({
         content: editPost.content,
         type: editPost.type,
-        images: editPost.images || []
+        images: editPost.images || editPost.mediaUrls || []
       });
     }
   }, [editPost, form]);
@@ -71,8 +71,8 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to upload image');
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to upload image');
       }
 
       const data = await response.json();
@@ -82,7 +82,6 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
 
       return data.url;
     } catch (error) {
-      console.error('Image upload error:', error);
       throw error;
     }
   };
@@ -145,7 +144,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
       }
     },
     onSuccess: (newPost) => {
-      queryClient.setQueryData<PostsResponse>(['/api/social/posts'], (old) => {
+      queryClient.setQueryData(['/api/social/posts'], (old: any) => {
         if (!old) return { success: true, data: [newPost] };
         return {
           ...old,
@@ -163,7 +162,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
       setImages([]);
       onOpenChange(false);
 
-      // Refetch to ensure we have the latest data
+      // Force refetch to ensure we have the latest data
       queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     },
     onError: (error: Error) => {

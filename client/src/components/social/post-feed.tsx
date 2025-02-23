@@ -40,10 +40,10 @@ export function PostFeed() {
 
   const editPostMutation = useMutation({
     mutationFn: async ({ id, content, type }: { id: number; content: string; type: Post['type'] }) => {
-      const response = await apiRequest('PATCH', `/api/social/posts/${id}`, { 
-        content, 
+      const response = await apiRequest('PATCH', `/api/social/posts/${id}`, {
+        content,
         type,
-        images: editingPost?.images || [] // Preserve existing images
+        images: editingPost?.mediaUrls || editingPost?.images || []
       });
       if (!response.ok) {
         throw new Error('Failed to update post');
@@ -52,7 +52,6 @@ export function PostFeed() {
       return responseData.data;
     },
     onSuccess: (updatedPost) => {
-      // Update local cache
       queryClient.setQueryData<PostsResponse>(['/api/social/posts'], (old) => {
         if (!old) return { success: true, data: [updatedPost] };
         return {
@@ -66,16 +65,6 @@ export function PostFeed() {
         description: "Post updated successfully",
       });
       setEditingPost(null);
-
-      // Refetch to ensure sync
-      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update post",
-        variant: "destructive",
-      });
     }
   });
 
@@ -88,7 +77,6 @@ export function PostFeed() {
       return postId;
     },
     onSuccess: (deletedPostId) => {
-      // Update local cache immediately
       queryClient.setQueryData<PostsResponse>(['/api/social/posts'], (old) => {
         if (!old) return { success: true, data: [] };
         return {
@@ -104,7 +92,6 @@ export function PostFeed() {
       setIsDeleteDialogOpen(false);
       setPostToDelete(null);
 
-      // Force refetch to ensure sync with server
       queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     },
     onError: (error: Error) => {
@@ -240,13 +227,13 @@ export function PostFeed() {
           <CardContent>
             <p className="whitespace-pre-wrap">{post.content}</p>
 
-            {post.images && post.images.length > 0 && (
+            {(post.images?.length > 0 || post.mediaUrls?.length > 0) && (
               <div className={`grid gap-2 mt-4 ${
-                post.images.length === 1 ? 'grid-cols-1' :
-                  post.images.length === 2 ? 'grid-cols-2' :
+                (post.images?.length || post.mediaUrls?.length) === 1 ? 'grid-cols-1' :
+                  (post.images?.length || post.mediaUrls?.length) === 2 ? 'grid-cols-2' :
                     'grid-cols-2'
               }`}>
-                {post.images.map((image, index) => (
+                {(post.images || post.mediaUrls || []).map((image, index) => (
                   <img
                     key={`${post.id}-${index}`}
                     src={image}
