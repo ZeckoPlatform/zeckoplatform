@@ -5,11 +5,23 @@ import { socialPosts, users } from "@db/schema";
 import { desc, eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { log } from "../vite";
+import { moderateText } from "../services/content-moderation";
+import rateLimit from "express-rate-limit";
 
 const router = Router();
 
-// Create a new post
-router.post("/social/posts", authenticateToken, async (req, res) => {
+// Rate limiting middleware - 5 posts per hour per user
+const postLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5,
+  message: {
+    success: false,
+    message: "Too many posts created. Please try again later."
+  }
+});
+
+// Create a new post with content moderation
+router.post("/social/posts", authenticateToken, postLimiter, async (req, res) => {
   try {
     log('Creating new post with data:', JSON.stringify(req.body));
 
@@ -28,8 +40,35 @@ router.post("/social/posts", authenticateToken, async (req, res) => {
       });
     }
 
+    // Check if user has required permissions
+    const [user] = await db.select().from(users).where(eq(users.id, req.user.id));
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    // Business accounts must be verified to post
+    if (user.userType === 'business' && user.verificationStatus !== 'verified') {
+      return res.status(403).json({
+        success: false,
+        message: "Business accounts must be verified before posting"
+      });
+    }
+
+    // Moderate the content
+    const moderationResult = moderateText(validatedData.content);
+    if (!moderationResult.isAcceptable) {
+      return res.status(400).json({
+        success: false,
+        message: "Your post contains inappropriate content"
+      });
+    }
+
     const [post] = await db.insert(socialPosts).values({
-      content: validatedData.content,
+      content: moderationResult.filteredText || validatedData.content,
       type: validatedData.type,
       userId: req.user.id,
       mediaUrls: validatedData.images || [],
@@ -47,9 +86,6 @@ router.post("/social/posts", authenticateToken, async (req, res) => {
         message: "Failed to create post"
       });
     }
-
-    // Get user info for the response
-    const [user] = await db.select().from(users).where(eq(users.id, req.user.id));
 
     const postWithUser = {
       ...post,
