@@ -79,7 +79,7 @@ export function PostFeed() {
     insightful: { icon: Lightbulb, label: 'Insightful' }
   };
 
-  const { data: postsData, isLoading } = useQuery({
+  const { data: postsData, isLoading, error } = useQuery({
     queryKey: ['/api/social/posts'],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/social/posts');
@@ -118,11 +118,6 @@ export function PostFeed() {
       });
     }
   });
-
-  const handleReaction = (postId: number, type: 'like' | 'celebrate' | 'support' | 'insightful') => {
-    if (!user) return;
-    toggleReactionMutation.mutate({ postId, type });
-  };
 
   const addCommentMutation = useMutation({
     mutationFn: async ({ postId, content, parentCommentId }: { postId: number; content: string; parentCommentId?: number }) => {
@@ -429,7 +424,7 @@ export function PostFeed() {
     return (
       <Card>
         <CardContent className="p-6 text-center text-destructive">
-          Error loading posts. Please try again later.
+          {error instanceof Error ? error.message : 'Error loading posts. Please try again later.'}
         </CardContent>
       </Card>
     );
