@@ -10,7 +10,7 @@ import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Post, PostsResponse } from "@/types/posts";
+import type { Post } from "@/types/posts";
 
 const createPostSchema = z.object({
   content: z.string().min(1, "Please write something to share"),
@@ -52,72 +52,10 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
     }
   }, [editPost, form]);
 
-  const resizeImage = async (file: File): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      const objectUrl = URL.createObjectURL(file);
-
-      img.onload = () => {
-        try {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-
-          if (!ctx) {
-            URL.revokeObjectURL(objectUrl);
-            reject(new Error('Could not get canvas context'));
-            return;
-          }
-
-          const maxDim = 1200;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > maxDim || height > maxDim) {
-            if (width > height) {
-              height = Math.round((height * maxDim) / width);
-              width = maxDim;
-            } else {
-              width = Math.round((width * maxDim) / height);
-              height = maxDim;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          ctx.drawImage(img, 0, 0, width, height);
-
-          canvas.toBlob(
-            (blob) => {
-              URL.revokeObjectURL(objectUrl);
-              if (blob) {
-                resolve(blob);
-              } else {
-                reject(new Error('Failed to create blob from canvas'));
-              }
-            },
-            'image/jpeg',
-            0.8
-          );
-        } catch (error) {
-          URL.revokeObjectURL(objectUrl);
-          reject(error);
-        }
-      };
-
-      img.onerror = () => {
-        URL.revokeObjectURL(objectUrl);
-        reject(new Error('Failed to load image'));
-      };
-
-      img.src = objectUrl;
-    });
-  };
-
   const handleImageUpload = async (file: File) => {
     try {
-      const resizedBlob = await resizeImage(file);
       const formData = new FormData();
-      formData.append('file', resizedBlob, file.name);
+      formData.append('file', file);
 
       const token = localStorage.getItem('token');
       if (!token) {
@@ -182,11 +120,14 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
         setIsUploading(true);
         console.log('Uploading images and creating post...');
 
-        const uploadedUrls = await Promise.all(
-          images.map(img => handleImageUpload(img.file))
-        );
+        let uploadedUrls: string[] = [];
 
-        console.log('Image upload successful, creating post...');
+        if (images.length > 0) {
+          uploadedUrls = await Promise.all(
+            images.map(img => handleImageUpload(img.file))
+          );
+          console.log('Image upload successful, creating post...');
+        }
 
         const postData = {
           content: data.content,
@@ -213,7 +154,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
       }
     },
     onSuccess: (newPost) => {
-      queryClient.setQueryData<PostsResponse>(['/api/social/posts'], (old) => {
+      queryClient.setQueryData(['/api/social/posts'], (old: any) => {
         if (!old) return { success: true, data: [newPost] };
         return {
           ...old,

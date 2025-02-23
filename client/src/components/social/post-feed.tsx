@@ -30,19 +30,14 @@ export function PostFeed() {
   const { data: postsData, isLoading, error } = useQuery<PostsResponse>({
     queryKey: ['/api/social/posts'],
     queryFn: async () => {
-      try {
-        console.log('Fetching posts...');
-        const response = await apiRequest('GET', '/api/social/posts');
-        if (!response.ok) {
-          throw new Error('Failed to fetch posts');
-        }
-        const data = await response.json();
-        console.log('Parsed posts data:', data);
-        return data;
-      } catch (error) {
-        console.error('Error fetching posts:', error);
-        throw error;
+      console.log('Fetching posts...');
+      const response = await apiRequest('GET', '/api/social/posts');
+      if (!response.ok) {
+        throw new Error('Failed to fetch posts');
       }
+      const data = await response.json();
+      console.log('Parsed posts data:', data);
+      return data;
     },
   });
 
@@ -70,6 +65,7 @@ export function PostFeed() {
         description: "Post updated successfully",
       });
       setEditingPost(null);
+      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     },
     onError: (error: Error) => {
       toast({
@@ -77,7 +73,6 @@ export function PostFeed() {
         description: error.message || "Failed to update post",
         variant: "destructive",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     }
   });
 
@@ -90,6 +85,7 @@ export function PostFeed() {
       return postId;
     },
     onSuccess: (deletedPostId) => {
+      // First update the local cache
       queryClient.setQueryData<PostsResponse>(['/api/social/posts'], (old) => {
         if (!old) return { success: true, data: [] };
         return {
@@ -97,12 +93,15 @@ export function PostFeed() {
           data: old.data.filter(post => post.id !== deletedPostId)
         };
       });
+
       toast({
         title: "Success",
         description: "Post deleted successfully",
       });
       setIsDeleteDialogOpen(false);
       setPostToDelete(null);
+
+      // Then refetch to ensure synced with server
       queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     },
     onError: (error: Error) => {
@@ -111,7 +110,6 @@ export function PostFeed() {
         description: error.message || "Failed to delete post",
         variant: "destructive",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     }
   });
 
@@ -250,7 +248,7 @@ export function PostFeed() {
               }`}>
                 {post.images.map((image, index) => (
                   <img
-                    key={index}
+                    key={`${post.id}-${index}`}
                     src={image}
                     alt={`Post image ${index + 1}`}
                     className="rounded-md w-full h-48 object-cover"
