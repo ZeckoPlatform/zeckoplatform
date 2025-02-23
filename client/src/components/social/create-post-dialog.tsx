@@ -14,7 +14,9 @@ import { useState, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_IMAGE_DIMENSION = 2048; // Max width or height
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+const JPEG_QUALITY = 0.8; // Image compression quality (0-1)
 
 interface UploadResponse {
   success: boolean;
@@ -35,6 +37,61 @@ type CreatePostSchema = z.infer<typeof createPostSchema>;
 interface CreatePostDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+}
+
+// Utility function to resize image
+async function resizeImage(file: File): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(img.src);
+
+      let width = img.width;
+      let height = img.height;
+
+      // Calculate new dimensions while maintaining aspect ratio
+      if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
+        if (width > height) {
+          height = Math.round((height * MAX_IMAGE_DIMENSION) / width);
+          width = MAX_IMAGE_DIMENSION;
+        } else {
+          width = Math.round((width * MAX_IMAGE_DIMENSION) / height);
+          height = MAX_IMAGE_DIMENSION;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Could not get canvas context'));
+        return;
+      }
+
+      // Draw and get resized image
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error('Failed to create image blob'));
+            return;
+          }
+          resolve(blob);
+        },
+        'image/jpeg',
+        JPEG_QUALITY
+      );
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(img.src);
+      reject(new Error('Failed to load image'));
+    };
+  });
 }
 
 export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) {
@@ -63,25 +120,23 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
         throw new Error("You must be logged in to upload images");
       }
 
-      if (file.size > MAX_FILE_SIZE) {
-        throw new Error("File size should be less than 5MB");
-      }
-
-      if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-        throw new Error("Only .jpg, .jpeg, .png and .webp files are accepted");
-      }
-
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error("Authentication token not found");
-      }
-
-      console.log('Uploading file:', file.name);
-
       try {
+        // Resize image if needed
+        const resizedBlob = await resizeImage(file);
+        const resizedFile = new File([resizedBlob], file.name, {
+          type: 'image/jpeg',
+        });
+
+        const formData = new FormData();
+        formData.append('file', resizedFile);
+
+        const token = localStorage.getItem('token');
+        if (!token) {
+          throw new Error("Authentication token not found");
+        }
+
+        console.log('Uploading file:', resizedFile.name);
+
         const response = await fetch('/api/social/upload', {
           method: 'POST',
           body: formData,
@@ -93,16 +148,9 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
 
         console.log('Upload response status:', response.status);
 
-        // First check if response is ok
         if (!response.ok) {
-          // Try to get error message from response
-          try {
-            const errorData = await response.json();
-            throw new Error(errorData.error || "Failed to upload image");
-          } catch (parseError) {
-            // If we can't parse the error response, throw generic error
-            throw new Error(`Upload failed with status ${response.status}`);
-          }
+          const errorData = await response.json().catch(() => ({ error: "Upload failed" }));
+          throw new Error(errorData.error || `Upload failed with status ${response.status}`);
         }
 
         const data: UploadResponse = await response.json();
