@@ -11,13 +11,19 @@ interface Post {
   createdAt: string;
   user: {
     id: number;
-    businessName: string;
+    businessName: string | null;
     email: string;
-  };
+    userType: string;
+  } | null;
+}
+
+interface PostsResponse {
+  success: boolean;
+  data: Post[];
 }
 
 export function PostFeed() {
-  const { data: postsData, isLoading } = useQuery<{ posts: Post[] }>({
+  const { data: postsData, isLoading } = useQuery<PostsResponse>({
     queryKey: ['/api/social/posts'],
   });
 
@@ -42,19 +48,29 @@ export function PostFeed() {
     );
   }
 
+  if (!postsData?.success || !postsData.data || postsData.data.length === 0) {
+    return (
+      <Card>
+        <CardContent className="p-6 text-center text-muted-foreground">
+          No posts available yet. Be the first to post!
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      {postsData?.posts.map((post) => (
+      {postsData.data.map((post) => (
         <Card key={post.id}>
           <CardHeader className="flex flex-row items-center gap-4">
             <Avatar>
               <AvatarFallback>
-                {post.user.businessName?.[0] || post.user.email[0].toUpperCase()}
+                {post.user?.businessName?.[0] || post.user?.email[0].toUpperCase() || '?'}
               </AvatarFallback>
             </Avatar>
             <div>
               <h3 className="font-semibold">
-                {post.user.businessName || post.user.email}
+                {post.user?.businessName || post.user?.email || 'Anonymous'}
               </h3>
               <p className="text-sm text-muted-foreground">
                 {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
