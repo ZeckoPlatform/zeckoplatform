@@ -1,10 +1,22 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
+import { Button } from "@/components/ui/button";
+import { MoreVertical, Pencil, Trash2, Shield } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { CreatePostDialog } from "./create-post-dialog";
 
 interface Post {
   id: number;
@@ -26,6 +38,12 @@ interface PostsResponse {
 
 export function PostFeed() {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [editingPost, setEditingPost] = useState<Post | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [postToDelete, setPostToDelete] = useState<Post | null>(null);
+
   const { data: postsData, isLoading, error } = useQuery<PostsResponse>({
     queryKey: ['/api/social/posts'],
     queryFn: async () => {
@@ -48,7 +66,44 @@ export function PostFeed() {
     enabled: !!user // Only fetch when user is authenticated
   });
 
-  console.log('PostFeed render - data:', postsData);
+  const deletePostMutation = useMutation({
+    mutationFn: async (postId: number) => {
+      const response = await apiRequest('DELETE', `/api/social/posts/${postId}`);
+      if (!response.ok) {
+        throw new Error('Failed to delete post');
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
+      toast({
+        title: "Success",
+        description: "Post deleted successfully",
+      });
+      setIsDeleteDialogOpen(false);
+      setPostToDelete(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete post",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Helper function to check if user can edit/delete a post
+  const canModifyPost = (post: Post) => {
+    if (!user) return false;
+
+    // Super admin can modify all posts
+    if (user.userType === 'admin') return true;
+
+    // Post creator can modify their own posts
+    return user.id === post.user?.id;
+  };
+
+  // Check if current user is admin for showing moderation indicators
+  const isAdmin = user?.userType === 'admin';
 
   if (isLoading) {
     return (
@@ -94,22 +149,60 @@ export function PostFeed() {
 
   return (
     <div className="space-y-4">
+      {/* Admin Moderation Banner */}
+      {isAdmin && (
+        <Card className="bg-primary/10">
+          <CardContent className="p-4 flex items-center gap-2">
+            <Shield className="h-5 w-5 text-primary" />
+            <span className="text-sm font-medium">Admin Moderation Mode - You can edit or delete any post</span>
+          </CardContent>
+        </Card>
+      )}
+
       {postsData.data.map((post) => (
         <Card key={post.id}>
-          <CardHeader className="flex flex-row items-center gap-4">
-            <Avatar>
-              <AvatarFallback>
-                {post.user?.businessName?.[0] || post.user?.email[0].toUpperCase() || '?'}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <h3 className="font-semibold">
-                {post.user?.businessName || post.user?.email || 'Anonymous'}
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
-              </p>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Avatar>
+                <AvatarFallback>
+                  {post.user?.businessName?.[0] || post.user?.email[0].toUpperCase() || '?'}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <h3 className="font-semibold">
+                  {post.user?.businessName || post.user?.email || 'Anonymous'}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
+                </p>
+              </div>
             </div>
+
+            {canModifyPost(post) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setEditingPost(post)}>
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    className="text-destructive"
+                    onClick={() => {
+                      setPostToDelete(post);
+                      setIsDeleteDialogOpen(true);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </CardHeader>
           <CardContent>
             <p className="whitespace-pre-wrap">{post.content}</p>
@@ -134,6 +227,49 @@ export function PostFeed() {
           </CardContent>
         </Card>
       ))}
+
+      {/* Edit Post Dialog */}
+      {editingPost && (
+        <CreatePostDialog
+          open={!!editingPost}
+          onOpenChange={(open) => {
+            if (!open) setEditingPost(null);
+          }}
+          editPost={editingPost}
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Post</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this post? This action cannot be undone.
+              {isAdmin && postToDelete && postToDelete.user?.id !== user?.id && (
+                <p className="mt-2 text-destructive">
+                  You are deleting this post as an administrator.
+                </p>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end space-x-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => postToDelete && deletePostMutation.mutate(postToDelete.id)}
+              disabled={deletePostMutation.isPending}
+            >
+              {deletePostMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
