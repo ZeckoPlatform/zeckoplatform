@@ -72,9 +72,22 @@ export function PostFeed() {
       if (!response.ok) {
         throw new Error('Failed to delete post');
       }
+      return response.json();
     },
     onSuccess: () => {
+      // Optimistically remove the post from the cache
+      const currentData = queryClient.getQueryData<PostsResponse>(['/api/social/posts']);
+      if (currentData && postToDelete) {
+        const updatedPosts = {
+          ...currentData,
+          data: currentData.data.filter(post => post.id !== postToDelete.id)
+        };
+        queryClient.setQueryData(['/api/social/posts'], updatedPosts);
+      }
+
+      // Also invalidate the query to refetch fresh data
       queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
+
       toast({
         title: "Success",
         description: "Post deleted successfully",
