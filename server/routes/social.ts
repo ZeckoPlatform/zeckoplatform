@@ -59,7 +59,7 @@ router.post("/social/posts", authenticateToken, postLimiter, async (req, res) =>
     }
 
     // Moderate the content
-    const moderationResult = await moderateText(validatedData.content);
+    const moderationResult = moderateText(validatedData.content);
     if (!moderationResult.isAcceptable) {
       return res.status(400).json({
         success: false,
@@ -69,7 +69,7 @@ router.post("/social/posts", authenticateToken, postLimiter, async (req, res) =>
     }
 
     const [post] = await db.insert(socialPosts).values({
-      content: validatedData.content,
+      content: moderationResult.filteredText || validatedData.content,
       type: validatedData.type,
       userId: req.user.id,
       mediaUrls: validatedData.images || [],

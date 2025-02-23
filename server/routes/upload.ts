@@ -14,6 +14,12 @@ const uploadLimiter = rateLimit({
   message: {
     success: false,
     message: "Too many image uploads. Please try again later."
+  },
+  // Trust the first proxy
+  trustProxy: true,
+  // Use IP and user ID for rate limiting
+  keyGenerator: (req) => {
+    return req.user?.id ? `${req.ip}-${req.user.id}` : req.ip;
   }
 });
 
@@ -61,6 +67,13 @@ router.post("/upload", authenticateToken, uploadLimiter, upload.single('file'), 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     log('Error in upload route:', errorMessage);
+
+    if (errorMessage.includes('Too many requests')) {
+      return res.status(429).json({
+        success: false,
+        message: "Too many upload attempts. Please try again later."
+      });
+    }
 
     return res.status(500).json({
       success: false,

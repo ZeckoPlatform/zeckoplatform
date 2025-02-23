@@ -61,6 +61,9 @@ export function registerRoutes(app: Express): Server {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
+  // Trust first proxy for rate limiting to work properly
+  app.set('trust proxy', 1);
+
   // Set default headers for all API routes
   app.use('/api', (req, res, next) => {
     res.setHeader('Content-Type', 'application/json');
