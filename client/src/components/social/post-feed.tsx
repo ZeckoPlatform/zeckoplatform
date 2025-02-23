@@ -119,6 +119,11 @@ export function PostFeed() {
     }
   });
 
+  const handleReaction = (postId: number, type: 'like' | 'celebrate' | 'support' | 'insightful') => {
+    if (!user) return;
+    toggleReactionMutation.mutate({ postId, type });
+  };
+
   const addCommentMutation = useMutation({
     mutationFn: async ({ postId, content, parentCommentId }: { postId: number; content: string; parentCommentId?: number }) => {
       const response = await apiRequest('POST', `/api/social/posts/${postId}/comments`, { content, parentCommentId });
