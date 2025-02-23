@@ -32,6 +32,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
   const queryClient = useQueryClient();
   const [images, setImages] = useState<{ file: File; preview: string }[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [existingImages, setExistingImages] = useState<string[]>([]);
 
   const form = useForm<CreatePostSchema>({
     resolver: zodResolver(createPostSchema),
@@ -44,11 +45,15 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
 
   useEffect(() => {
     if (editPost) {
+      const currentImages = editPost?.mediaUrls || editPost?.images || [];
+      setExistingImages(currentImages);
       form.reset({
         content: editPost.content,
         type: editPost.type,
-        images: editPost?.mediaUrls || editPost?.images || []
+        images: currentImages
       });
+    } else {
+      setExistingImages([]);
     }
   }, [editPost, form]);
 
@@ -98,11 +103,18 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
     setImages([...images, ...newImages]);
   };
 
-  const removeImage = (index: number) => {
+  const removeNewImage = (index: number) => {
     const newImages = [...images];
     URL.revokeObjectURL(newImages[index].preview);
     newImages.splice(index, 1);
     setImages(newImages);
+  };
+
+  const removeExistingImage = (index: number) => {
+    const newExistingImages = [...existingImages];
+    newExistingImages.splice(index, 1);
+    setExistingImages(newExistingImages);
+    form.setValue('images', newExistingImages);
   };
 
   const createPost = useMutation({
@@ -120,7 +132,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
         const postData = {
           content: data.content,
           type: data.type,
-          images: uploadedUrls
+          images: [...existingImages, ...uploadedUrls]
         };
 
         const response = await apiRequest("POST", "/api/social/posts", postData);
@@ -153,6 +165,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
       form.reset();
       images.forEach(img => URL.revokeObjectURL(img.preview));
       setImages([]);
+      setExistingImages([]);
       onOpenChange(false);
 
       queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
@@ -181,6 +194,8 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
       });
     }
   };
+
+  const totalImages = existingImages.length + images.length;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -211,15 +226,24 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
             />
 
             <div className="space-y-4">
-              {editPost?.mediaUrls && editPost.mediaUrls.length > 0 && (
+              {existingImages.length > 0 && (
                 <div className="grid grid-cols-2 gap-2">
-                  {editPost.mediaUrls.map((url, index) => (
+                  {existingImages.map((url, index) => (
                     <div key={`existing-${index}`} className="relative">
                       <img
                         src={url}
                         alt={`Existing image ${index + 1}`}
                         className="w-full h-32 object-cover rounded-md"
                       />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-1 right-1 h-6 w-6"
+                        onClick={() => removeExistingImage(index)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
                     </div>
                   ))}
                 </div>
@@ -239,7 +263,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
                         variant="destructive"
                         size="icon"
                         className="absolute top-1 right-1 h-6 w-6"
-                        onClick={() => removeImage(index)}
+                        onClick={() => removeNewImage(index)}
                       >
                         <X className="h-4 w-4" />
                       </Button>
@@ -253,10 +277,10 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
                   type="button"
                   variant="outline"
                   onClick={() => document.getElementById('image-upload')?.click()}
-                  disabled={createPost.isPending || images.length >= 4}
+                  disabled={createPost.isPending || totalImages >= 4}
                 >
                   <ImagePlus className="mr-2 h-4 w-4" />
-                  {images.length >= 4 ? 'Max images reached' : 'Add Images'}
+                  {totalImages >= 4 ? 'Max images reached' : 'Add Images'}
                 </Button>
 
                 <input
@@ -266,12 +290,12 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
                   multiple
                   className="hidden"
                   onChange={handleImageChange}
-                  disabled={images.length >= 4}
+                  disabled={totalImages >= 4}
                 />
 
                 <Button
                   type="submit"
-                  disabled={createPost.isPending || (!form.formState.isDirty && images.length === 0)}
+                  disabled={createPost.isPending || (!form.formState.isDirty && images.length === 0 && existingImages.length === existingImages.length)}
                 >
                   {createPost.isPending ? (
                     <>
