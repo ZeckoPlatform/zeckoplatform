@@ -2,7 +2,7 @@ import { Router } from "express";
 import { authenticateToken } from "../auth";
 import { db } from "@db";
 import { socialPosts, users, postComments, postReactions } from "@db/schema";
-import { desc, eq, and } from "drizzle-orm";
+import { desc, eq, and, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { log } from "../vite";
 import { moderateText } from "../services/content-moderation";
@@ -280,6 +280,7 @@ router.get("/social/posts", async (req, res) => {
           engagement: socialPosts.engagement,
           createdAt: socialPosts.createdAt,
           updatedAt: socialPosts.updatedAt,
+          userId: socialPosts.userId,
         },
         user: {
           id: users.id,
@@ -305,12 +306,14 @@ router.get("/social/posts", async (req, res) => {
           .from(postReactions)
           .where(eq(postReactions.postId, post.id));
 
-        // Get comments count for this post
+        // Get comments for this post
         const comments = await db
           .select({
             id: postComments.id,
             content: postComments.content,
             createdAt: postComments.createdAt,
+            parentCommentId: postComments.parentCommentId,
+            userId: postComments.userId,
             user: {
               id: users.id,
               email: users.email,
@@ -320,16 +323,42 @@ router.get("/social/posts", async (req, res) => {
             },
           })
           .from(postComments)
-          .innerJoin(users, eq(users.id, postComments.userId))
+          .innerJoin(users, eq(postComments.userId, users.id))
           .where(eq(postComments.postId, post.id))
           .orderBy(desc(postComments.createdAt));
 
-        // Update engagement counts
+        // Organize comments into a tree structure
+        const commentTree = comments.reduce((acc, comment) => {
+          if (!comment.parentCommentId) {
+            if (!acc.rootComments) acc.rootComments = [];
+            acc.rootComments.push({
+              ...comment,
+              replies: []
+            });
+          } else {
+            if (!acc.replies) acc.replies = {};
+            if (!acc.replies[comment.parentCommentId]) {
+              acc.replies[comment.parentCommentId] = [];
+            }
+            acc.replies[comment.parentCommentId].push(comment);
+          }
+          return acc;
+        }, {} as any);
+
+        // Attach replies to their parent comments
+        if (commentTree.rootComments) {
+          commentTree.rootComments = commentTree.rootComments.map(rootComment => ({
+            ...rootComment,
+            replies: commentTree.replies?.[rootComment.id] || []
+          }));
+        }
+
+        // Convert engagement numbers to strings to match the expected format
         const engagement = {
-          views: post.engagement?.views || 0,
-          likes: reactions.filter(r => r.type === 'like').length,
-          comments: comments.length,
-          shares: post.engagement?.shares || 0,
+          views: (post.engagement?.views || 0).toString(),
+          likes: reactions.filter(r => r.type === 'like').length.toString(),
+          comments: comments.length.toString(),
+          shares: (post.engagement?.shares || 0).toString(),
         };
 
         // Update post engagement in database
@@ -348,7 +377,7 @@ router.get("/social/posts", async (req, res) => {
             profile: user.profile,
           } : null,
           reactions,
-          comments,
+          comments: commentTree.rootComments || [],
           engagement,
         };
       })
