@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { authenticateToken } from "../auth";
 import { db } from "@db";
-import { socialPosts, users } from "@db/schema";
+import { socialPosts, users, postComments, postReactions } from "@db/schema";
 import { desc, eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { log } from "../vite";
@@ -258,7 +258,7 @@ router.delete("/social/posts/:id", authenticateToken, async (req, res) => {
   }
 });
 
-// Get posts feed
+// Get posts feed with reactions and comments
 router.get("/social/posts", async (req, res) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
@@ -267,17 +267,27 @@ router.get("/social/posts", async (req, res) => {
 
     log(`Fetching posts page ${page} with limit ${limit}`);
 
-    // Get posts with user information
+    // Get posts with user information, reactions, and comments
     const posts = await db
       .select({
-        post: socialPosts,
+        post: {
+          id: socialPosts.id,
+          content: socialPosts.content,
+          type: socialPosts.type,
+          mediaUrls: socialPosts.mediaUrls,
+          visibility: socialPosts.visibility,
+          status: socialPosts.status,
+          engagement: socialPosts.engagement,
+          createdAt: socialPosts.createdAt,
+          updatedAt: socialPosts.updatedAt,
+        },
         user: {
           id: users.id,
           email: users.email,
           userType: users.userType,
           businessName: users.businessName,
-          profile: users.profile
-        }
+          profile: users.profile,
+        },
       })
       .from(socialPosts)
       .leftJoin(users, eq(socialPosts.userId, users.id))
@@ -286,20 +296,69 @@ router.get("/social/posts", async (req, res) => {
       .limit(limit)
       .offset(offset);
 
-    log(`Found ${posts.length} posts`);
+    // For each post, fetch its reactions and comments
+    const postsWithDetails = await Promise.all(
+      posts.map(async ({ post, user }) => {
+        // Get reactions for this post
+        const reactions = await db
+          .select()
+          .from(postReactions)
+          .where(eq(postReactions.postId, post.id));
+
+        // Get comments count for this post
+        const comments = await db
+          .select({
+            id: postComments.id,
+            content: postComments.content,
+            createdAt: postComments.createdAt,
+            user: {
+              id: users.id,
+              email: users.email,
+              userType: users.userType,
+              businessName: users.businessName,
+              profile: users.profile,
+            },
+          })
+          .from(postComments)
+          .innerJoin(users, eq(users.id, postComments.userId))
+          .where(eq(postComments.postId, post.id))
+          .orderBy(desc(postComments.createdAt));
+
+        // Update engagement counts
+        const engagement = {
+          views: post.engagement?.views || 0,
+          likes: reactions.filter(r => r.type === 'like').length,
+          comments: comments.length,
+          shares: post.engagement?.shares || 0,
+        };
+
+        // Update post engagement in database
+        await db
+          .update(socialPosts)
+          .set({ engagement })
+          .where(eq(socialPosts.id, post.id));
+
+        return {
+          ...post,
+          user: user ? {
+            id: user.id,
+            email: user.email,
+            userType: user.userType,
+            businessName: user.businessName,
+            profile: user.profile,
+          } : null,
+          reactions,
+          comments,
+          engagement,
+        };
+      })
+    );
+
+    log(`Found ${postsWithDetails.length} posts`);
 
     return res.json({
       success: true,
-      data: posts.map(({ post, user }) => ({
-        ...post,
-        user: user ? {
-          id: user.id,
-          email: user.email,
-          userType: user.userType,
-          businessName: user.businessName,
-          profile: user.profile
-        } : null
-      }))
+      data: postsWithDetails
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

@@ -14,7 +14,7 @@ const commentSchema = z.object({
 });
 
 // Get comments for a post
-router.get("/posts/:postId/comments", async (req, res) => {
+router.get("/social/posts/:postId/comments", async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: "Authentication required" });
@@ -55,7 +55,7 @@ router.get("/posts/:postId/comments", async (req, res) => {
 });
 
 // Create a new comment
-router.post("/posts/:postId/comments", async (req, res) => {
+router.post("/social/posts/:postId/comments", async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: "Authentication required" });
@@ -77,7 +77,7 @@ router.post("/posts/:postId/comments", async (req, res) => {
       });
     }
 
-    // Check if post exists
+    // Check if post exists and get current engagement
     const [post] = await db
       .select()
       .from(socialPosts)
@@ -98,6 +98,18 @@ router.post("/posts/:postId/comments", async (req, res) => {
         status: "active"
       })
       .returning();
+
+    // Update post engagement to increment comment count
+    const currentEngagement = post.engagement || { views: 0, likes: 0, comments: 0, shares: 0 };
+    await db
+      .update(socialPosts)
+      .set({
+        engagement: {
+          ...currentEngagement,
+          comments: (currentEngagement.comments || 0) + 1
+        }
+      })
+      .where(eq(socialPosts.id, postId));
 
     // Fetch the created comment with user info
     const commentWithUser = await db
@@ -135,7 +147,7 @@ router.post("/posts/:postId/comments", async (req, res) => {
 });
 
 // Delete a comment (soft delete by changing status to "hidden")
-router.delete("/comments/:commentId", async (req, res) => {
+router.delete("/social/comments/:commentId", async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: "Authentication required" });
@@ -168,6 +180,12 @@ router.delete("/comments/:commentId", async (req, res) => {
       .where(eq(postComments.id, commentId))
       .returning();
 
+    //Update post engagement to decrement comment count
+    await db
+      .update(socialPosts)
+      .set({ engagement: { ...(comment.post.engagement || { views: 0, likes: 0, comments: 0, shares: 0 }), comments: Math.max(0, (comment.post.engagement?.comments || 0) -1)}})
+      .where(eq(socialPosts.id, comment.postId));
+
     res.json(updatedComment);
   } catch (error) {
     console.error("Error deleting comment:", error);
@@ -179,7 +197,7 @@ router.delete("/comments/:commentId", async (req, res) => {
 });
 
 // Add or update reaction
-router.post("/posts/:postId/reactions", async (req, res) => {
+router.post("/social/posts/:postId/reactions", async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: "Authentication required" });
@@ -195,7 +213,7 @@ router.post("/posts/:postId/reactions", async (req, res) => {
       return res.status(400).json({ error: "Invalid reaction type" });
     }
 
-    // Check if post exists
+    // Check if post exists and get current engagement
     const [post] = await db
       .select()
       .from(socialPosts)
@@ -234,6 +252,18 @@ router.post("/posts/:postId/reactions", async (req, res) => {
           type
         })
         .returning();
+
+      // Update post engagement to increment reaction count
+      const currentEngagement = post.engagement || { views: 0, likes: 0, comments: 0, shares: 0 };
+      await db
+        .update(socialPosts)
+        .set({
+          engagement: {
+            ...currentEngagement,
+            likes: (currentEngagement.likes || 0) + 1
+          }
+        })
+        .where(eq(socialPosts.id, postId));
     }
 
     res.json(reaction);
@@ -247,7 +277,7 @@ router.post("/posts/:postId/reactions", async (req, res) => {
 });
 
 // Remove reaction
-router.delete("/posts/:postId/reactions", async (req, res) => {
+router.delete("/social/posts/:postId/reactions", async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: "Authentication required" });
@@ -256,6 +286,26 @@ router.delete("/posts/:postId/reactions", async (req, res) => {
     const postId = parseInt(req.params.postId);
     if (isNaN(postId)) {
       return res.status(400).json({ error: "Invalid post ID" });
+    }
+
+    // Get current post engagement
+    const [post] = await db
+      .select()
+      .from(socialPosts)
+      .where(eq(socialPosts.id, postId));
+
+    if (post) {
+      // Update post engagement to decrement reaction count
+      const currentEngagement = post.engagement || { views: 0, likes: 0, comments: 0, shares: 0 };
+      await db
+        .update(socialPosts)
+        .set({
+          engagement: {
+            ...currentEngagement,
+            likes: Math.max(0, (currentEngagement.likes || 0) - 1)
+          }
+        })
+        .where(eq(socialPosts.id, postId));
     }
 
     // Delete the reaction
