@@ -59,16 +59,17 @@ router.post("/social/posts", authenticateToken, postLimiter, async (req, res) =>
     }
 
     // Moderate the content
-    const moderationResult = moderateText(validatedData.content);
+    const moderationResult = await moderateText(validatedData.content);
     if (!moderationResult.isAcceptable) {
       return res.status(400).json({
         success: false,
-        message: "Your post contains inappropriate content"
+        message: moderationResult.message || "Your post contains inappropriate content",
+        flags: moderationResult.moderationFlags
       });
     }
 
     const [post] = await db.insert(socialPosts).values({
-      content: moderationResult.filteredText || validatedData.content,
+      content: validatedData.content,
       type: validatedData.type,
       userId: req.user.id,
       mediaUrls: validatedData.images || [],

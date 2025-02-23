@@ -1,53 +1,42 @@
 import { log } from "../vite";
 import { type UploadApiResponse } from 'cloudinary';
 import { uploadToCloudinary } from './cloudinary';
-import { createRequire } from 'module';
+import OpenAI from 'openai';
 
-// Initialize bad-words without top-level await
-let filter: any;
-let BadWords;
-try {
-  const require = createRequire(import.meta.url);
-  BadWords = require('bad-words');
-  filter = new BadWords();
-
-  // Add custom words to the filter
-  filter.addWords(
-    'spam',
-    'scam',
-    'fraud',
-    // Add more custom words as needed
-  );
-} catch (error) {
-  log('Error initializing content filter:', error instanceof Error ? error.message : 'Unknown error');
-  throw new Error('Failed to initialize content moderation');
+if (!process.env.OPENAI_API_KEY) {
+  throw new Error('OPENAI_API_KEY environment variable must be set');
 }
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
 export interface ModeratedContent {
   isAcceptable: boolean;
-  filteredText?: string;
   moderationFlags?: string[];
+  message?: string;
 }
 
 /**
- * Moderate text content for profanity and inappropriate content
+ * Moderate text content using OpenAI's moderation API
  */
-export function moderateText(text: string): ModeratedContent {
+export async function moderateText(text: string): Promise<ModeratedContent> {
   try {
-    const containsProfanity = filter.isProfane(text);
-    if (containsProfanity) {
-      return {
-        isAcceptable: false,
-        moderationFlags: ['profanity']
-      };
-    }
+    log('Moderating text content using OpenAI');
+    const response = await openai.moderations.create({ input: text });
 
-    // Clean the text while preserving word boundaries
-    const filteredText = filter.clean(text);
+    const result = response.results[0];
+    const flagged = result.flagged;
+
+    // Get all categories that were flagged
+    const flaggedCategories = Object.entries(result.categories)
+      .filter(([_, flagged]) => flagged)
+      .map(([category]) => category);
 
     return {
-      isAcceptable: true,
-      filteredText
+      isAcceptable: !flagged,
+      moderationFlags: flaggedCategories,
+      message: flagged ? 'Content contains inappropriate material' : undefined
     };
   } catch (error) {
     log('Error in text moderation:', error instanceof Error ? error.message : 'Unknown error');
@@ -56,21 +45,61 @@ export function moderateText(text: string): ModeratedContent {
 }
 
 /**
- * Enhanced image upload with moderation
+ * Check if an image might contain inappropriate content using OpenAI's vision API
+ */
+async function checkImageContent(imageUrl: string): Promise<ModeratedContent> {
+  try {
+    log('Analyzing image content using OpenAI Vision');
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4-vision-preview",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { 
+              type: "text", 
+              text: "Analyze this image and determine if it contains any inappropriate, offensive, or adult content. Only respond with 'ACCEPTABLE' or 'INAPPROPRIATE: [reason]'." 
+            },
+            {
+              type: "image_url",
+              url: imageUrl,
+            }
+          ],
+        }
+      ],
+      max_tokens: 50
+    });
+
+    const analysis = response.choices[0]?.message?.content || '';
+    const isAcceptable = analysis.startsWith('ACCEPTABLE');
+
+    return {
+      isAcceptable,
+      message: !isAcceptable ? analysis.replace('INAPPROPRIATE: ', '') : undefined,
+      moderationFlags: !isAcceptable ? ['inappropriate_image'] : undefined
+    };
+  } catch (error) {
+    log('Error in image content analysis:', error instanceof Error ? error.message : 'Unknown error');
+    throw error;
+  }
+}
+
+/**
+ * Enhanced image upload with OpenAI-based moderation
  */
 export async function uploadWithModeration(file: Express.Multer.File): Promise<UploadApiResponse> {
   try {
+    // First upload to Cloudinary to get the URL
     const uploadResult = await uploadToCloudinary(file);
 
-    // Check moderation status if available
-    if (uploadResult.moderation && Array.isArray(uploadResult.moderation)) {
-      const hasInappropriateContent = uploadResult.moderation.some(
-        flag => ['violence', 'nudity', 'hate', 'drugs', 'spam'].includes(flag)
-      );
+    // Then check the image content
+    const moderationResult = await checkImageContent(uploadResult.secure_url);
 
-      if (hasInappropriateContent) {
-        throw new Error('Image contains inappropriate content');
-      }
+    if (!moderationResult.isAcceptable) {
+      // If content is inappropriate, delete from Cloudinary
+      // Note: Add Cloudinary deletion here if needed
+      throw new Error(moderationResult.message || 'Image contains inappropriate content');
     }
 
     return uploadResult;
