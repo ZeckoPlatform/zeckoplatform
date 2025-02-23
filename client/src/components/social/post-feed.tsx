@@ -17,7 +17,7 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { CreatePostDialog } from "./create-post-dialog";
-import type { Post, PostsResponse } from "@/types/posts";
+import type { Post, PostsResponse, PostResponse } from "@/types/posts";
 
 export function PostFeed() {
   const { user } = useAuth();
@@ -30,27 +30,22 @@ export function PostFeed() {
   const { data: postsData, isLoading, error } = useQuery<PostsResponse>({
     queryKey: ['/api/social/posts'],
     queryFn: async () => {
-      console.log('Fetching posts...');
       const response = await apiRequest('GET', '/api/social/posts');
       if (!response.ok) {
         throw new Error('Failed to fetch posts');
       }
-      const data = await response.json();
-      console.log('Parsed posts data:', data);
-      return data;
+      return response.json();
     },
   });
 
   const editPostMutation = useMutation({
     mutationFn: async ({ id, content, type }: { id: number; content: string; type: Post['type'] }) => {
-      console.log('Editing post:', { id, content, type });
       const response = await apiRequest('PATCH', `/api/social/posts/${id}`, { content, type });
       if (!response.ok) {
         throw new Error('Failed to update post');
       }
-      const data = await response.json();
-      console.log('Updated post data:', data);
-      return data;
+      const responseData: PostResponse = await response.json();
+      return responseData.data;
     },
     onSuccess: (updatedPost) => {
       queryClient.setQueryData<PostsResponse>(['/api/social/posts'], (old) => {
@@ -65,7 +60,6 @@ export function PostFeed() {
         description: "Post updated successfully",
       });
       setEditingPost(null);
-      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     },
     onError: (error: Error) => {
       toast({
@@ -85,7 +79,6 @@ export function PostFeed() {
       return postId;
     },
     onSuccess: (deletedPostId) => {
-      // First update the local cache
       queryClient.setQueryData<PostsResponse>(['/api/social/posts'], (old) => {
         if (!old) return { success: true, data: [] };
         return {
@@ -101,7 +94,7 @@ export function PostFeed() {
       setIsDeleteDialogOpen(false);
       setPostToDelete(null);
 
-      // Then refetch to ensure synced with server
+      // Refetch to ensure server sync
       queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     },
     onError: (error: Error) => {
@@ -164,19 +157,16 @@ export function PostFeed() {
 
   const formatTime = (dateString: string) => {
     if (!dateString) {
-      console.error('Invalid date string:', dateString);
       return 'Recently';
     }
 
     try {
       const date = parseISO(dateString);
       if (isNaN(date.getTime())) {
-        console.error('Invalid date object:', dateString);
         return 'Recently';
       }
       return formatDistanceToNow(date, { addSuffix: true });
     } catch (error) {
-      console.error('Error formatting date:', dateString, error);
       return 'Recently';
     }
   };
@@ -271,7 +261,7 @@ export function PostFeed() {
             editPostMutation.mutate({
               id: editingPost.id,
               content,
-              type: type as Post['type']
+              type
             });
           }}
         />

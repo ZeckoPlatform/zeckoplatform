@@ -24,3 +24,8 @@ export interface PostsResponse {
   success: boolean;
   data: Post[];
 }
+
+export interface PostResponse {
+  success: boolean;
+  data: Post;
+}

@@ -10,7 +10,7 @@ import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Post } from "@/types/posts";
+import type { Post, PostResponse, PostsResponse } from "@/types/posts";
 
 const createPostSchema = z.object({
   content: z.string().min(1, "Please write something to share"),
@@ -72,13 +72,10 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
 
       if (!response.ok) {
         const data = await response.json();
-        console.error('Upload error response:', data);
         throw new Error(data.error || 'Failed to upload image');
       }
 
       const data = await response.json();
-      console.log('Upload response:', data);
-
       if (!data.url) {
         throw new Error('No URL in upload response');
       }
@@ -118,15 +115,12 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
     mutationFn: async (data: CreatePostSchema) => {
       try {
         setIsUploading(true);
-        console.log('Uploading images and creating post...');
-
         let uploadedUrls: string[] = [];
 
         if (images.length > 0) {
           uploadedUrls = await Promise.all(
             images.map(img => handleImageUpload(img.file))
           );
-          console.log('Image upload successful, creating post...');
         }
 
         const postData = {
@@ -135,17 +129,14 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
           images: uploadedUrls
         };
 
-        console.log('Sending post data:', postData);
-
         const response = await apiRequest("POST", "/api/social/posts", postData);
         if (!response.ok) {
           const errorData = await response.json().catch(() => null);
           throw new Error(errorData?.message || 'Failed to create post');
         }
 
-        const newPost = await response.json();
-        console.log('Created post:', newPost);
-        return newPost;
+        const newPost: PostResponse = await response.json();
+        return newPost.data;
       } catch (error) {
         console.error('Post creation error:', error);
         throw error;
@@ -154,7 +145,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
       }
     },
     onSuccess: (newPost) => {
-      queryClient.setQueryData(['/api/social/posts'], (old: any) => {
+      queryClient.setQueryData<PostsResponse>(['/api/social/posts'], (old) => {
         if (!old) return { success: true, data: [newPost] };
         return {
           ...old,
@@ -171,9 +162,6 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
       images.forEach(img => URL.revokeObjectURL(img.preview));
       setImages([]);
       onOpenChange(false);
-
-      // Refetch posts to ensure we have the latest data
-      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     },
     onError: (error: Error) => {
       toast({
