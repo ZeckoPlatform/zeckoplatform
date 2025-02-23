@@ -11,20 +11,25 @@ const router = Router();
 // Create a new post
 router.post("/api/social/posts", authenticateToken, async (req, res) => {
   try {
+    log('Creating post with data:', req.body);
+
     const schema = z.object({
       content: z.string().min(1, "Post content is required"),
+      type: z.string().default("update")
     });
 
     const data = schema.parse(req.body);
 
     const [post] = await db.insert(socialPosts).values({
-      content: data.content,
-      type: "update", // Default type
-      mediaUrls: [], // Empty array for now
       userId: req.user!.id,
+      content: data.content,
+      type: data.type,
+      mediaUrls: [],
       createdAt: new Date(),
       updatedAt: new Date()
     }).returning();
+
+    log('Post created successfully:', post);
 
     res.json({ success: true, post });
   } catch (error) {

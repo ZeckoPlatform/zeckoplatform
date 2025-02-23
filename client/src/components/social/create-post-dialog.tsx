@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
 const createPostSchema = z.object({
-  content: z.string().min(1, "Post content is required"),
+  content: z.string().min(1, "Post content is required")
 });
 
 type CreatePostSchema = z.infer<typeof createPostSchema>;
@@ -27,19 +27,25 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
   const form = useForm<CreatePostSchema>({
     resolver: zodResolver(createPostSchema),
     defaultValues: {
-      content: "",
+      content: ""
     }
   });
 
   const createPost = useMutation({
     mutationFn: async (data: CreatePostSchema) => {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error("Not authenticated");
+
       const response = await fetch('/api/social/posts', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify({
+          content: data.content,
+          type: "update"
+        })
       });
 
       if (!response.ok) {
@@ -66,10 +72,10 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[525px]" aria-describedby="post-dialog-description">
+      <DialogContent className="sm:max-w-[525px]">
         <DialogHeader>
           <DialogTitle>Share with Your Network</DialogTitle>
-          <DialogDescription id="post-dialog-description">
+          <DialogDescription>
             Share your thoughts with your business network
           </DialogDescription>
         </DialogHeader>
