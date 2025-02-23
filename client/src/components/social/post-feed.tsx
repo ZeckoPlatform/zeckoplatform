@@ -48,13 +48,12 @@ export function PostFeed() {
   });
 
   const editPostMutation = useMutation({
-    mutationFn: async ({ id, content, type }: { id: number; content: string; type: string }) => {
+    mutationFn: async ({ id, content, type }: { id: number; content: string; type: Post['type'] }) => {
       const response = await apiRequest('PATCH', `/api/social/posts/${id}`, { content, type });
       if (!response.ok) {
         throw new Error('Failed to update post');
       }
-      const updatedPost = await response.json();
-      return updatedPost;
+      return await response.json();
     },
     onSuccess: (updatedPost) => {
       queryClient.setQueryData<PostsResponse>(['/api/social/posts'], (old) => {
@@ -162,6 +161,15 @@ export function PostFeed() {
     );
   }
 
+  const formatTime = (dateString: string) => {
+    try {
+      return formatDistanceToNow(parseISO(dateString), { addSuffix: true });
+    } catch (error) {
+      console.error('Error formatting date:', dateString, error);
+      return 'Recently';
+    }
+  };
+
   return (
     <div className="space-y-4">
       {isAdmin && (
@@ -187,7 +195,7 @@ export function PostFeed() {
                   {post.user?.businessName || post.user?.email || 'Anonymous'}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  {formatDistanceToNow(parseISO(post.createdAt), { addSuffix: true })}
+                  {formatTime(post.createdAt)}
                 </p>
               </div>
             </div>

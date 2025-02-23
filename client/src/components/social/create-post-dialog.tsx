@@ -119,21 +119,26 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
       const formData = new FormData();
       formData.append('file', resizedBlob, file.name);
 
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+
       const response = await fetch('/api/upload', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: formData
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Upload error response:', errorText);
-        throw new Error('Failed to upload image');
+        console.error('Upload error response:', data);
+        throw new Error(data.error || 'Failed to upload image');
       }
 
-      const data = await response.json();
       if (!data.url) {
         throw new Error('No URL in upload response');
       }
@@ -182,7 +187,8 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
         console.log('Image upload successful, creating post...');
 
         const postData = {
-          ...data,
+          content: data.content,
+          type: data.type,
           images: uploadedUrls
         };
 

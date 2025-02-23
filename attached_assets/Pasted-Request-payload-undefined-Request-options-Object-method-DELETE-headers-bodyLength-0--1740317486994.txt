@@ -1,0 +1,47 @@
+Request payload: undefined
+Request options: 
+Object {method: "DELETE", headers: {…}, bodyLength: 0}
+Response status: 200
+API Request - DELETE /api/social/posts/8
+Request payload: undefined
+Request options: 
+Object {method: "DELETE", headers: {…}, bodyLength: 0}
+Response status: 200
+API Request - DELETE /api/social/posts/7
+Request payload: undefined
+Request options: 
+Object {method: "DELETE", headers: {…}, bodyLength: 0}
+Response status: 200
+Uploading images and creating post...
+Image upload successful, creating post...
+API Request - POST /api/social/posts
+Request payload: 
+Object {content: "dfehhr", type: "update", images: Array(1)}
+Request options: 
+Object {method: "POST", headers: {…}, bodyLength: 148}
+Response status: 201
+undefined is not an object (evaluating 'dateString.split')
+undefined is not an object (evaluating 'dateString.split')
+The above error occurred in the <PostFeed> component:
+
+PostFeed@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/post-feed.tsx:39:27
+div
+div
+div
+SocialFeedPage@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/pages/social-feed.tsx:27:27
+ProtectedRoute@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/lib/protected-route.tsx:23:5
+component
+Route@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js:323:14
+Switch@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js:380:27
+div
+Router
+AuthProvider@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/hooks/use-auth.tsx:177:6
+QueryClientProvider@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js:2837:9
+App
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+t@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:12639
+value@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:32772
+@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:34410
+undefined is not an object (evaluating 'dateString.split')
