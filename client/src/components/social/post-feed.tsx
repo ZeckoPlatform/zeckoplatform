@@ -71,7 +71,7 @@ export function PostFeed() {
   const [expandedComments, setExpandedComments] = useState<number[]>([]);
   const [expandedReplies, setExpandedReplies] = useState<number[]>([]);
 
-  // Define reaction types with literal strings
+  // Define reaction types with exact string literals matching the backend
   const reactionTypes = {
     'like': { icon: ThumbsUp, label: 'Like' },
     'celebrate': { icon: Star, label: 'Celebrate' },
@@ -80,6 +80,11 @@ export function PostFeed() {
   } as const;
 
   type ReactionType = keyof typeof reactionTypes;
+
+  // Helper function to count reactions by type
+  const getReactionCount = (reactions: Reaction[] = [], type: ReactionType) => {
+    return reactions.filter(r => r.type === type).length;
+  };
 
   const { data: postsData, isLoading, error } = useQuery({
     queryKey: ['/api/social/posts'],
@@ -506,6 +511,7 @@ export function PostFeed() {
             <div className="flex gap-2 w-full">
               {(Object.entries(reactionTypes) as [ReactionType, typeof reactionTypes[ReactionType]][]).map(([type, { icon: Icon, label }]) => {
                 const hasReacted = post.reactions?.some(r => r.type === type && r.userId === user?.id);
+                const reactionCount = getReactionCount(post.reactions, type);
                 return (
                   <Button
                     key={type}
@@ -513,9 +519,15 @@ export function PostFeed() {
                     size="sm"
                     onClick={() => handleReaction(post.id, type)}
                     disabled={toggleReactionMutation.isPending}
+                    className="flex items-center gap-1"
                   >
-                    <Icon className="h-4 w-4 mr-1" />
-                    {label}
+                    <Icon className="h-4 w-4" />
+                    <span>{label}</span>
+                    {reactionCount > 0 && (
+                      <span className="ml-1 text-xs bg-secondary/20 px-1.5 py-0.5 rounded-full">
+                        {reactionCount}
+                      </span>
+                    )}
                   </Button>
                 );
               })}
