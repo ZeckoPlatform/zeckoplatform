@@ -31,18 +31,26 @@ router.post("/api/social/posts", authenticateToken, async (req, res) => {
     }).returning();
 
     log('Created post:', post);
-    res.status(201).json({ success: true, post });
+    res.setHeader('Content-Type', 'application/json');
+    return res.status(201).json({ 
+      success: true, 
+      data: post 
+    });
   } catch (error) {
-    log('Error creating post:', error);
+    console.error("Failed to create post:", error);
+
+    res.setHeader('Content-Type', 'application/json');
+
     if (error instanceof z.ZodError) {
       return res.status(400).json({ 
         success: false, 
-        error: error.errors[0].message 
+        message: error.errors[0].message 
       });
     }
-    res.status(500).json({ 
+
+    return res.status(500).json({ 
       success: false, 
-      error: 'Failed to create post' 
+      message: "Failed to create post. Please try again." 
     });
   }
 });
@@ -57,15 +65,17 @@ router.get("/api/social/posts", authenticateToken, async (req, res) => {
       }
     });
 
-    res.json({
+    res.setHeader('Content-Type', 'application/json');
+    return res.json({
       success: true,
-      posts
+      data: posts
     });
   } catch (error) {
-    log('Error fetching posts:', error);
-    res.status(500).json({ 
+    console.error("Failed to fetch posts:", error);
+    res.setHeader('Content-Type', 'application/json');
+    return res.status(500).json({ 
       success: false, 
-      error: 'Failed to fetch posts' 
+      message: "Failed to fetch posts" 
     });
   }
 });
