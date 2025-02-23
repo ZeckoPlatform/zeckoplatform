@@ -5,28 +5,14 @@ import { socialPosts } from "@db/schema";
 import { eq, desc, sql } from "drizzle-orm";
 import { z } from "zod";
 import multer from "multer";
-import path from "path";
-import fs from "fs";
 import { log } from "../vite";
+import { uploadToCloudinary } from "../services/cloudinary";
 
 const router = Router();
 
-// Configure multer for handling file uploads
-const uploadDir = path.join(process.cwd(), 'uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true, mode: 0o755 });
-}
-
-const storage = multer.diskStorage({
-  destination: uploadDir,
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
+// Configure multer for memory storage instead of disk
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 5 * 1024 * 1024 // 5MB limit
   },
@@ -38,14 +24,11 @@ const upload = multer({
       cb(null, false);
     }
   }
-}).single('file'); // Specify 'file' field for upload
+}).single('file');
 
 // File upload endpoint with auth
 router.post("/api/social/upload", authenticateToken, (req, res) => {
-  // Ensure JSON response type
-  res.setHeader('Content-Type', 'application/json');
-
-  upload(req, res, (err) => {
+  upload(req, res, async (err) => {
     try {
       if (err instanceof multer.MulterError) {
         log('Multer error during upload:', err);
@@ -70,13 +53,13 @@ router.post("/api/social/upload", authenticateToken, (req, res) => {
         });
       }
 
-      const fileUrl = `/uploads/${req.file.filename}`;
-      log('File uploaded successfully:', fileUrl);
+      // Upload to Cloudinary
+      const result = await uploadToCloudinary(req.file);
 
       return res.status(200).json({
         success: true,
-        url: fileUrl,
-        filename: req.file.filename
+        url: result.secure_url,
+        public_id: result.public_id
       });
     } catch (error) {
       log('Unexpected error during file upload:', error);
