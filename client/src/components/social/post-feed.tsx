@@ -7,17 +7,17 @@ import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { 
-  MoreVertical, 
-  Pencil, 
-  Trash2, 
+import {
+  MoreVertical,
+  Pencil,
+  Trash2,
   MessageCircle,
   ThumbsUp,
   Star,
   Heart,
   Lightbulb,
   Send,
-  CornerDownRight, 
+  CornerDownRight,
   ChevronDown,
   ChevronUp
 } from "lucide-react";
@@ -83,7 +83,7 @@ export function PostFeed() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [postToDelete, setPostToDelete] = useState<Post | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [commentText, setCommentText] = useState<string>('');
+  const [commentInputs, setCommentInputs] = useState<{ [key: string]: string }>({});
   const [editingComment, setEditingComment] = useState<Comment | null>(null);
   const [replyingTo, setReplyingTo] = useState<{ postId: number; commentId?: number } | null>(null);
   const [expandedComments, setExpandedComments] = useState<number[]>([]);
@@ -119,7 +119,7 @@ export function PostFeed() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
-      setCommentText('');
+      setCommentText(0,'',0); //Added to clear input after successful comment
       setReplyingTo(null);
       toast({
         title: "Success",
@@ -198,16 +198,52 @@ export function PostFeed() {
   });
 
   const handleReaction = (postId: number, type: 'like' | 'celebrate' | 'support' | 'insightful') => {
-    reactionMutation.mutate({ postId, type });
+    const post = postsData?.data.find(p => p.id === postId);
+    const hasReacted = post?.reactions?.some(r => r.type === type && r.userId === user?.id);
+
+    if (hasReacted) {
+      removeReactionMutation.mutate(postId);
+    } else {
+      reactionMutation.mutate({ postId, type });
+    }
+  };
+
+  const getCommentText = (postId: number, commentId?: number) => {
+    const key = commentId ? `${postId}-${commentId}` : `${postId}`;
+    return commentInputs[key] || '';
+  };
+
+  const setCommentText = (postId: number, text: string, commentId?: number) => {
+    const key = commentId ? `${postId}-${commentId}` : `${postId}`;
+    setCommentInputs(prev => ({ ...prev, [key]: text }));
   };
 
   const handleAddComment = (postId: number, parentCommentId?: number) => {
-    if (!commentText.trim()) return;
-    addCommentMutation.mutate({ postId, content: commentText.trim(), parentCommentId });
+    const text = getCommentText(postId, parentCommentId);
+    if (!text.trim()) return;
+
+    addCommentMutation.mutate(
+      { postId, content: text.trim(), parentCommentId },
+      {
+        onSuccess: () => {
+          setCommentText(postId, '', parentCommentId);
+          setReplyingTo(null);
+          queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
+        }
+      }
+    );
   };
 
   const handleEditComment = (commentId: number, content: string) => {
-    editCommentMutation.mutate({ commentId, content });
+    editCommentMutation.mutate(
+      { commentId, content },
+      {
+        onSuccess: () => {
+          setEditingComment(null);
+          queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
+        }
+      }
+    );
   };
 
   const handleDeleteComment = (commentId: number) => {
@@ -215,13 +251,13 @@ export function PostFeed() {
   };
 
   const toggleReplies = (commentId: number) => {
-    setExpandedReplies(prev => 
+    setExpandedReplies(prev =>
       prev.includes(commentId) ? prev.filter(id => id !== commentId) : [...prev, commentId]
     );
   };
 
   const toggleComments = (postId: number) => {
-    setExpandedComments(prev => 
+    setExpandedComments(prev =>
       prev.includes(postId) ? prev.filter(id => id !== postId) : [...prev, postId]
     );
   };
@@ -238,6 +274,7 @@ export function PostFeed() {
     const [editText, setEditText] = useState(comment.content);
     const showReplies = expandedReplies.includes(comment.id);
     const isReplying = replyingTo?.commentId === comment.id;
+    const replyText = getCommentText(postId, comment.id);
 
     return (
       <div className={`ml-${level * 4} mb-2`}>
@@ -343,14 +380,14 @@ export function PostFeed() {
               <div className="flex gap-2 mt-2">
                 <Input
                   placeholder="Write a reply..."
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
+                  value={replyText}
+                  onChange={(e) => setCommentText(postId, e.target.value, comment.id)}
                   className="flex-1"
                 />
                 <Button
                   size="sm"
                   onClick={() => handleAddComment(postId, comment.id)}
-                  disabled={!commentText.trim()}
+                  disabled={!replyText.trim()}
                 >
                   Reply
                 </Button>
@@ -451,11 +488,11 @@ export function PostFeed() {
             {post.mediaUrls && post.mediaUrls.length > 0 && (
               <div className={`grid gap-2 mt-4 ${
                 post.mediaUrls.length === 1 ? 'grid-cols-1' :
-                post.mediaUrls.length === 2 ? 'grid-cols-2' :
-                'grid-cols-2'
+                  post.mediaUrls.length === 2 ? 'grid-cols-2' :
+                    'grid-cols-2'
               }`}>
                 {post.mediaUrls.map((image, index) => (
-                  <div 
+                  <div
                     key={`${post.id}-${index}`}
                     className="relative cursor-pointer overflow-hidden rounded-md group"
                     onClick={() => setSelectedImage(image)}
@@ -481,13 +518,7 @@ export function PostFeed() {
                     key={type}
                     variant={hasReacted ? "secondary" : "ghost"}
                     size="sm"
-                    onClick={() => {
-                      if (hasReacted) {
-                        removeReactionMutation.mutate(post.id);
-                      } else {
-                        handleReaction(post.id, type as 'like' | 'celebrate' | 'support' | 'insightful');
-                      }
-                    }}
+                    onClick={() => handleReaction(post.id, type as 'like' | 'celebrate' | 'support' | 'insightful')}
                   >
                     <Icon className="h-4 w-4 mr-1" />
                     {label}
@@ -512,8 +543,8 @@ export function PostFeed() {
                   <div className="flex gap-2">
                     <Input
                       placeholder="Write a comment..."
-                      value={replyingTo?.postId === post.id && !replyingTo.commentId ? commentText : ''}
-                      onChange={(e) => setCommentText(e.target.value)}
+                      value={getCommentText(post.id)}
+                      onChange={(e) => setCommentText(post.id, e.target.value)}
                       onKeyPress={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
@@ -524,7 +555,7 @@ export function PostFeed() {
                     <Button
                       size="icon"
                       onClick={() => handleAddComment(post.id)}
-                      disabled={!commentText.trim()}
+                      disabled={!getCommentText(post.id).trim()}
                     >
                       <Send className="h-4 w-4" />
                     </Button>
