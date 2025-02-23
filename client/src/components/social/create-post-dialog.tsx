@@ -44,6 +44,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       const response = await fetch('/api/social/posts', {
         method: 'POST',
         headers: {
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
@@ -53,21 +54,19 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       const responseText = await response.text();
       console.log('Raw response:', responseText);
 
-      if (!response.ok) {
-        try {
-          const errorData = JSON.parse(responseText);
-          throw new Error(errorData.message || "Failed to create post");
-        } catch {
-          throw new Error("Failed to create post");
-        }
+      let jsonResponse;
+      try {
+        jsonResponse = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse response:', responseText);
+        throw new Error("Server returned an invalid response");
       }
 
-      try {
-        return JSON.parse(responseText);
-      } catch (e) {
-        console.error('Failed to parse response:', e);
-        throw new Error("Invalid server response");
+      if (!response.ok) {
+        throw new Error(jsonResponse.message || "Failed to create post");
       }
+
+      return jsonResponse;
     },
     onSuccess: () => {
       toast({ 

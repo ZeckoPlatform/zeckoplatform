@@ -10,6 +10,8 @@ const router = Router();
 
 // Create a new post
 router.post("/api/social/posts", authenticateToken, async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+
   try {
     log('Received post request:', req.body);
 
@@ -21,10 +23,18 @@ router.post("/api/social/posts", authenticateToken, async (req, res) => {
     const validatedData = schema.parse(req.body);
     log('Validated data:', validatedData);
 
+    // Ensure req.user exists
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated"
+      });
+    }
+
     const [post] = await db.insert(socialPosts).values({
       content: validatedData.content,
       type: validatedData.type,
-      userId: req.user!.id,
+      userId: req.user.id,
       mediaUrls: [],
       visibility: "public",
       status: "published",
@@ -33,15 +43,20 @@ router.post("/api/social/posts", authenticateToken, async (req, res) => {
       updatedAt: new Date()
     }).returning();
 
+    if (!post) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to create post"
+      });
+    }
+
     log('Created post:', post);
-    res.setHeader('Content-Type', 'application/json');
     return res.status(201).json({ 
       success: true, 
       data: post 
     });
   } catch (error) {
-    console.error("Failed to create post:", error);
-    res.setHeader('Content-Type', 'application/json');
+    log('Error creating post:', error);
 
     if (error instanceof z.ZodError) {
       return res.status(400).json({ 
@@ -59,6 +74,8 @@ router.post("/api/social/posts", authenticateToken, async (req, res) => {
 
 // Get posts feed
 router.get("/api/social/posts", authenticateToken, async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+
   try {
     const posts = await db.query.socialPosts.findMany({
       orderBy: [desc(socialPosts.createdAt)],
@@ -67,14 +84,12 @@ router.get("/api/social/posts", authenticateToken, async (req, res) => {
       }
     });
 
-    res.setHeader('Content-Type', 'application/json');
     return res.json({
       success: true,
       data: posts
     });
   } catch (error) {
-    console.error("Failed to fetch posts:", error);
-    res.setHeader('Content-Type', 'application/json');
+    log('Error fetching posts:', error);
     return res.status(500).json({ 
       success: false, 
       message: "Failed to fetch posts" 
