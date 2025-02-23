@@ -71,12 +71,12 @@ export function PostFeed() {
   const [expandedComments, setExpandedComments] = useState<number[]>([]);
   const [expandedReplies, setExpandedReplies] = useState<number[]>([]);
 
-  // Reactions configuration
+  // Define reaction types with literal strings
   const reactionTypes = {
-    like: { icon: ThumbsUp, label: 'Like' },
-    celebrate: { icon: Star, label: 'Celebrate' },
-    support: { icon: Heart, label: 'Support' },
-    insightful: { icon: Lightbulb, label: 'Insightful' }
+    'like': { icon: ThumbsUp, label: 'Like' },
+    'celebrate': { icon: Star, label: 'Celebrate' },
+    'support': { icon: Heart, label: 'Support' },
+    'insightful': { icon: Lightbulb, label: 'Insightful' }
   } as const;
 
   type ReactionType = keyof typeof reactionTypes;
@@ -99,7 +99,7 @@ export function PostFeed() {
     }, 0);
   };
 
-  // Simplified reaction mutation
+  // Simplified reaction mutation with exact type matching
   const toggleReactionMutation = useMutation({
     mutationFn: async ({ postId, type }: { postId: number; type: ReactionType }) => {
       const post = postsData?.data.find((p: Post) => p.id === postId);
@@ -504,14 +504,14 @@ export function PostFeed() {
 
           <CardFooter className="flex flex-col gap-4">
             <div className="flex gap-2 w-full">
-              {Object.entries(reactionTypes).map(([type, { icon: Icon, label }]) => {
+              {(Object.entries(reactionTypes) as [ReactionType, typeof reactionTypes[ReactionType]][]).map(([type, { icon: Icon, label }]) => {
                 const hasReacted = post.reactions?.some(r => r.type === type && r.userId === user?.id);
                 return (
                   <Button
                     key={type}
                     variant={hasReacted ? "secondary" : "ghost"}
                     size="sm"
-                    onClick={() => handleReaction(post.id, type as ReactionType)}
+                    onClick={() => handleReaction(post.id, type)}
                     disabled={toggleReactionMutation.isPending}
                   >
                     <Icon className="h-4 w-4 mr-1" />
