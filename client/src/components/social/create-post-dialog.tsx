@@ -127,11 +127,10 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
       const formData = new FormData();
       formData.append('file', resizedBlob, file.name);
 
-      // Use fetch directly for FormData upload
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        credentials: 'include', // Include cookies
-        body: formData
+      // Use apiRequest instead of fetch to include auth token
+      const response = await apiRequest('POST', '/api/upload', formData, {
+        // Override default JSON headers for FormData
+        headers: {}
       });
 
       if (!response.ok) {
@@ -231,8 +230,8 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
       }
     },
     onSuccess: () => {
-      toast({ 
-        title: editPost ? "Updated!" : "Posted!", 
+      toast({
+        title: editPost ? "Updated!" : "Posted!",
         description: editPost ? "Your post has been updated" : "Your update has been shared"
       });
       form.reset();
@@ -282,8 +281,8 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
         </DialogHeader>
 
         <Form {...form}>
-          <form 
-            onSubmit={form.handleSubmit(handleSubmit)} 
+          <form
+            onSubmit={form.handleSubmit(handleSubmit)}
             className="space-y-4"
           >
             <FormField

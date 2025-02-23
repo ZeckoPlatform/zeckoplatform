@@ -1,0 +1,51 @@
+[vite] connecting...
+[vite] connected.
+Query request - /api/notifications
+Query response status: 200
+Fetching posts...
+API Request - GET /api/social/posts
+Request payload: undefined
+Request options: 
+Object {method: "GET", headers: {…}, bodyLength: 0}
+Response status: 200
+Parsed posts data: 
+Object {success: true, data: Array(7)}
+API Request - DELETE /api/social/posts/7
+Request payload: undefined
+Request options: 
+Object {method: "DELETE", headers: {…}, bodyLength: 0}
+Response status: 200
+API Request - PATCH /api/social/posts/6
+Request payload: 
+Object {content: "lets make that money now all my millions I will take them all and make more", type: "update"}
+Request options: 
+Object {method: "PATCH", headers: {…}, bodyLength: 105}
+Response status: 200
+Uploading images and creating post...
+Upload error response: {"success":false,"message":"Authentication required"}
+Image upload error: 
+Error {}
+column: 24
+line: 124
+message: "Failed to upload image"
+sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx"
+stack: "@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:124:24"
+[[Prototype]]: Object
+
+Post creation error: 
+Error {}
+column: 24
+line: 124
+message: "Failed to upload image"
+sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx"
+stack: "@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:124:24"
+[[Prototype]]: Object
+
+Post creation error: 
+Error {}
+column: 24
+line: 124
+message: "Failed to upload image"
+sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx"
+stack: "@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/social/create-post-dialog.tsx:124:24"
+[[Prototype]]: Object
