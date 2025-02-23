@@ -91,10 +91,11 @@ export function registerRoutes(app: Express): Server {
   // Register feedback routes before authentication middleware
   app.use(feedbackRoutes);
 
-  // File upload endpoint
+  // File upload endpoint - moved before the general authentication middleware
   app.post('/api/upload', authenticateToken, upload.single('file'), async (req, res) => {
     try {
       log('Processing file upload request');
+      log('Auth check passed, processing file');
 
       if (!req.file) {
         return res.status(400).json({ error: 'No file uploaded' });
@@ -122,7 +123,6 @@ export function registerRoutes(app: Express): Server {
         req.path.endsWith('/vendor/stripe/account') ||
         req.path.endsWith('/vendor/stripe/account/status') ||
         req.path.endsWith('/feedback') ||
-        req.path.endsWith('/upload') || // Added to exclude /upload from authentication
         req.method === 'OPTIONS') {
       return next();
     }
