@@ -9,9 +9,9 @@ import { log } from "../vite";
 const router = Router();
 
 // Create a new post
-router.post("/api/social/posts", authenticateToken, async (req, res) => {
+router.post("/social/posts", authenticateToken, async (req, res) => {
   try {
-    log('Received post request:', req.body);
+    log('Received post request with body: ' + JSON.stringify(req.body));
 
     const schema = z.object({
       content: z.string().min(1, "Please write something to share"),
@@ -19,7 +19,6 @@ router.post("/api/social/posts", authenticateToken, async (req, res) => {
     });
 
     const validatedData = schema.parse(req.body);
-    log('Validated data:', validatedData);
 
     // Ensure req.user exists
     if (!req.user || !req.user.id) {
@@ -49,13 +48,14 @@ router.post("/api/social/posts", authenticateToken, async (req, res) => {
       });
     }
 
-    log('Created post successfully:', post);
+    log('Created post successfully: ' + JSON.stringify(post));
     return res.status(201).json({ 
       success: true, 
       data: post 
     });
   } catch (error) {
-    log('Error creating post:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    log('Error creating post: ' + errorMessage);
 
     if (error instanceof z.ZodError) {
       return res.status(400).json({ 
@@ -72,21 +72,17 @@ router.post("/api/social/posts", authenticateToken, async (req, res) => {
 });
 
 // Get posts feed
-router.get("/api/social/posts", authenticateToken, async (req, res) => {
+router.get("/social/posts", authenticateToken, async (req, res) => {
   try {
-    const posts = await db.query.socialPosts.findMany({
-      orderBy: [desc(socialPosts.createdAt)],
-      with: {
-        user: true
-      }
-    });
+    const posts = await db.select().from(socialPosts).orderBy(desc(socialPosts.createdAt));
 
     return res.json({
       success: true,
       data: posts
     });
   } catch (error) {
-    log('Error fetching posts:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    log('Error fetching posts: ' + errorMessage);
     return res.status(500).json({ 
       success: false, 
       message: "Failed to fetch posts" 
