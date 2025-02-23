@@ -27,6 +27,7 @@ import { cleanupExpiredLeads } from './services/cleanup';
 import feedbackRoutes from './routes/feedback';
 import socialRoutes from './routes/social';
 import uploadRoutes from './routes/upload';
+import commentsRoutes from './routes/comments';
 
 // Ensure uploads directory exists
 const uploadDir = path.join(process.cwd(), 'uploads');
@@ -96,7 +97,7 @@ export function registerRoutes(app: Express): Server {
 
   // Register all route modules
   app.use('/api', authRoutes);
-  app.use('/api', uploadRoutes); // Add upload routes
+  app.use('/api', uploadRoutes);
   app.use('/api', subscriptionRoutes);
   app.use('/api', invoiceRoutes);
   app.use('/api', analyticsRoutes);
@@ -107,6 +108,7 @@ export function registerRoutes(app: Express): Server {
   app.use('/api', orderRoutes);
   app.use('/api', socialRoutes);
   app.use('/api', leadsRoutes);
+  app.use('/api', commentsRoutes);
 
   // Error handling middleware - should be last
   app.use((err: any, req: any, res: any, next: any) => {
