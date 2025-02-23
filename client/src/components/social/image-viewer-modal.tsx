@@ -16,7 +16,7 @@ export function ImageViewerModal({ open, onOpenChange, imageUrl }: ImageViewerMo
         style={{ backdropFilter: 'none' }}
       >
         <DialogTitle className="sr-only">Image Viewer</DialogTitle>
-        <div className="relative flex items-center justify-center bg-black/90 rounded-lg overflow-hidden">
+        <div className="relative flex items-center justify-center bg-black/90 rounded-lg overflow-hidden border border-primary">
           <Button
             variant="ghost"
             size="icon"
