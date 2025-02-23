@@ -17,6 +17,7 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { CreatePostDialog } from "./create-post-dialog";
+import { ImageViewerModal } from "./image-viewer-modal";
 import type { Post, PostsResponse, PostResponse, PostMutationResponse } from "@/types/posts";
 
 export function PostFeed() {
@@ -26,6 +27,7 @@ export function PostFeed() {
   const [editingPost, setEditingPost] = useState<Post | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [postToDelete, setPostToDelete] = useState<Post | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   const { data: postsData, isLoading, error } = useQuery<PostsResponse>({
     queryKey: ['/api/social/posts'],
@@ -47,7 +49,6 @@ export function PostFeed() {
       return postId;
     },
     onSuccess: (deletedPostId) => {
-      // Update local cache
       queryClient.setQueryData<PostsResponse>(['/api/social/posts'], (old) => {
         if (!old) return { success: true, data: [] };
         return {
@@ -64,60 +65,12 @@ export function PostFeed() {
       setIsDeleteDialogOpen(false);
       setPostToDelete(null);
 
-      // Force a refetch to ensure sync with server
       queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     },
     onError: (error: Error) => {
       toast({
         title: "Error",
         description: error.message || "Failed to delete post",
-        variant: "destructive",
-      });
-    }
-  });
-
-  const editPostMutation = useMutation({
-    mutationFn: async ({ id, content, type }: { id: number; content: string; type: Post['type'] }) => {
-      const currentPost = queryClient.getQueryData<PostsResponse>(['/api/social/posts'])?.data
-        .find(post => post.id === id);
-
-      const updateData = {
-        content,
-        type,
-        images: currentPost?.mediaUrls || currentPost?.images || []
-      };
-
-      const response = await apiRequest('PATCH', `/api/social/posts/${id}`, updateData);
-      if (!response.ok) {
-        throw new Error('Failed to update post');
-      }
-
-      const result: PostMutationResponse = await response.json();
-      return result.data;
-    },
-    onSuccess: (updatedPost) => {
-      queryClient.setQueryData<PostsResponse>(['/api/social/posts'], (old) => {
-        if (!old) return { success: true, data: [updatedPost] };
-        return {
-          ...old,
-          data: old.data.map(post => post.id === updatedPost.id ? updatedPost : post)
-        };
-      });
-
-      toast({
-        title: "Success",
-        description: "Post updated successfully",
-      });
-
-      setEditingPost(null);
-
-      // Force a refetch to ensure sync with server
-      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update post",
         variant: "destructive",
       });
     }
@@ -239,12 +192,18 @@ export function PostFeed() {
                 'grid-cols-2'
               }`}>
                 {(post.mediaUrls || post.images || []).map((image, index) => (
-                  <img
+                  <div 
                     key={`${post.id}-${index}`}
-                    src={image}
-                    alt={`Post image ${index + 1}`}
-                    className="rounded-md w-full h-48 object-cover"
-                  />
+                    className="relative cursor-pointer overflow-hidden rounded-md group"
+                    onClick={() => setSelectedImage(image)}
+                  >
+                    <img
+                      src={image}
+                      alt={`Post image ${index + 1}`}
+                      className="w-full h-48 object-cover transition-transform duration-200 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                  </div>
                 ))}
               </div>
             )}
@@ -259,13 +218,6 @@ export function PostFeed() {
             if (!open) setEditingPost(null);
           }}
           editPost={editingPost}
-          onEdit={(content, type) => {
-            editPostMutation.mutate({
-              id: editingPost.id,
-              content,
-              type
-            });
-          }}
         />
       )}
 
@@ -299,6 +251,12 @@ export function PostFeed() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ImageViewerModal
+        open={!!selectedImage}
+        onOpenChange={(open) => !open && setSelectedImage(null)}
+        imageUrl={selectedImage || ''}
+      />
     </div>
   );
 }
