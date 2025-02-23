@@ -1,0 +1,59 @@
+[vite] connecting...
+[vite] connected.
+Query request - /api/notifications
+Query response status: 200
+Fetching posts...
+API Request - GET /api/social/posts
+Request payload: undefined
+Request options: 
+Object {method: "GET", headers: {…}, bodyLength: 0}
+Response status: 200
+Parsed posts data: 
+Object {success: true, data: Array(6)}
+Uploading images and creating post...
+Sending post data: 
+Object {content: "hello gecko", type: "update", images: Array(0)}
+API Request - POST /api/social/posts
+Request payload: 
+Object {content: "hello gecko", type: "update", images: Array(0)}
+Request options: 
+Object {method: "POST", headers: {…}, bodyLength: 53}
+Response status: 201
+Fetching posts...
+API Request - GET /api/social/posts
+Request payload: undefined
+Request options: 
+Object {method: "GET", headers: {…}, bodyLength: 0}
+Response status: 200
+Parsed posts data: 
+Object {success: true, data: Array(7)}
+Uploading images and creating post...
+Sending post data: 
+Object {content: "hello gecko.", type: "update", images: Array(0)}
+API Request - PATCH /api/social/posts/7
+Request payload: 
+Object {content: "hello gecko.", type: "update", images: Array(0)}
+Request options: 
+Object {method: "PATCH", headers: {…}, bodyLength: 54}
+Response status: 200
+Post creation error: 
+DOMException {line: 113, column: 38, sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/socia…"}
+
+Post creation error: 
+DOMException {line: 113, column: 38, sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/socia…"}
+
+Uploading images and creating post...
+API Request - POST /api/upload
+Request payload: 
+FormData {append: ƒ, delete: ƒ, get: ƒ, getAll: ƒ, has: ƒ, …}
+Request options: 
+Object {method: "POST", headers: {…}, bodyLength: 2}
+Response status: 200
+Image upload error: 
+DOMException {line: 66, column: 39, sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/socia…"}
+
+Post creation error: 
+DOMException {line: 66, column: 39, sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/socia…"}
+
+Post creation error: 
+DOMException {line: 66, column: 39, sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/components/socia…"}

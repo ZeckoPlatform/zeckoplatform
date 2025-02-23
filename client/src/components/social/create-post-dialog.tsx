@@ -51,23 +51,94 @@ export function CreatePostDialog({ open, onOpenChange, editPost }: CreatePostDia
     }
   });
 
-  const handleImageUpload = async (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
+  const resizeImage = async (file: File): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      try {
+        const img = new Image();
+        const objectUrl = URL.createObjectURL(file);
 
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            if (!ctx) {
+              URL.revokeObjectURL(objectUrl);
+              reject(new Error('Could not get canvas context'));
+              return;
+            }
+
+            // Target dimensions (max width/height of 1200px while maintaining aspect ratio)
+            const maxDim = 1200;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > maxDim || height > maxDim) {
+              if (width > height) {
+                height = Math.round((height * maxDim) / width);
+                width = maxDim;
+              } else {
+                width = Math.round((width * maxDim) / height);
+                height = maxDim;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            ctx.drawImage(img, 0, 0, width, height);
+
+            canvas.toBlob(
+              (blob) => {
+                URL.revokeObjectURL(objectUrl);
+                if (blob) {
+                  resolve(blob);
+                } else {
+                  reject(new Error('Failed to create blob from canvas'));
+                }
+              },
+              'image/jpeg',
+              0.8
+            );
+          } catch (error) {
+            URL.revokeObjectURL(objectUrl);
+            reject(error);
+          }
+        };
+
+        img.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          reject(new Error('Failed to load image'));
+        };
+
+        img.src = objectUrl;
+      } catch (error) {
+        reject(error);
+      }
+    });
+  };
+
+  const handleImageUpload = async (file: File) => {
     try {
-      const response = await apiRequest('POST', '/api/upload', formData, {
-        headers: {
-          // Don't set Content-Type, let the browser set it with the boundary
-          'Accept': 'application/json',
-        },
+      const resizedBlob = await resizeImage(file);
+      const formData = new FormData();
+      formData.append('file', resizedBlob, file.name);
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
       });
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Upload error response:', errorText);
         throw new Error('Failed to upload image');
       }
 
       const data = await response.json();
+      if (!data.url) {
+        throw new Error('No URL in upload response');
+      }
+
       return data.url;
     } catch (error) {
       console.error('Image upload error:', error);
@@ -80,13 +151,12 @@ export function CreatePostDialog({ open, onOpenChange, editPost }: CreatePostDia
     if (!files?.length) return;
 
     const newImages: { file: File; preview: string }[] = [];
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       if (file.type.startsWith('image/')) {
-        newImages.push({
-          file,
-          preview: URL.createObjectURL(file)
-        });
+        const preview = URL.createObjectURL(file);
+        newImages.push({ file, preview });
       }
     }
 
@@ -114,7 +184,9 @@ export function CreatePostDialog({ open, onOpenChange, editPost }: CreatePostDia
         // Add uploaded URLs to the post data
         const postData = {
           ...data,
-          images: [...(data.images || []), ...uploadedUrls]
+          images: editPost 
+            ? [...(editPost.images || []), ...uploadedUrls] // Keep existing images when editing
+            : uploadedUrls // Only new images for new posts
         };
 
         console.log('Sending post data:', postData);
@@ -260,7 +332,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost }: CreatePostDia
 
                 <Button
                   type="submit"
-                  disabled={createPost.isPending || !form.formState.isDirty}
+                  disabled={createPost.isPending}
                 >
                   {createPost.isPending ? (
                     <>
