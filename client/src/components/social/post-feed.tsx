@@ -72,15 +72,16 @@ export function PostFeed() {
       if (!response.ok) {
         throw new Error('Failed to delete post');
       }
-      return response.json();
+      // Don't try to parse response as JSON
+      return postId;
     },
-    onSuccess: () => {
+    onSuccess: (deletedPostId) => {
       // Optimistically remove the post from the cache
       const currentData = queryClient.getQueryData<PostsResponse>(['/api/social/posts']);
-      if (currentData && postToDelete) {
+      if (currentData) {
         const updatedPosts = {
           ...currentData,
-          data: currentData.data.filter(post => post.id !== postToDelete.id)
+          data: currentData.data.filter(post => post.id !== deletedPostId)
         };
         queryClient.setQueryData(['/api/social/posts'], updatedPosts);
       }
@@ -203,7 +204,7 @@ export function PostFeed() {
                     <Pencil className="h-4 w-4 mr-2" />
                     Edit
                   </DropdownMenuItem>
-                  <DropdownMenuItem 
+                  <DropdownMenuItem
                     className="text-destructive"
                     onClick={() => {
                       setPostToDelete(post);
@@ -223,9 +224,9 @@ export function PostFeed() {
             {/* Image Gallery */}
             {post.images && post.images.length > 0 && (
               <div className={`grid gap-2 mt-4 ${
-                post.images.length === 1 ? 'grid-cols-1' : 
-                post.images.length === 2 ? 'grid-cols-2' :
-                'grid-cols-2'
+                post.images.length === 1 ? 'grid-cols-1' :
+                  post.images.length === 2 ? 'grid-cols-2' :
+                    'grid-cols-2'
               }`}>
                 {post.images.map((image, index) => (
                   <img
