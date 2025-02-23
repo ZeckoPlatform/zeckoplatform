@@ -23,6 +23,7 @@ export function ImageViewerModal({ open, onOpenChange, imageUrl }: ImageViewerMo
             className="absolute top-2 right-2 z-50 bg-black hover:bg-black/70 text-white"
             onClick={() => onOpenChange(false)}
             aria-label="Close image viewer"
+            style={{ backdropFilter: 'none', transition: 'background-color 0.2s ease' }}
           >
             <X className="h-4 w-4" />
           </Button>
