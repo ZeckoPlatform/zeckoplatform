@@ -162,8 +162,14 @@ export function PostFeed() {
   }
 
   const formatTime = (dateString: string) => {
+    if (!dateString) {
+      console.error('Invalid date string:', dateString);
+      return 'Recently';
+    }
+
     try {
-      return formatDistanceToNow(parseISO(dateString), { addSuffix: true });
+      const date = parseISO(dateString);
+      return formatDistanceToNow(date, { addSuffix: true });
     } catch (error) {
       console.error('Error formatting date:', dateString, error);
       return 'Recently';
@@ -187,7 +193,7 @@ export function PostFeed() {
             <div className="flex items-center gap-4">
               <Avatar>
                 <AvatarFallback>
-                  {post.user?.businessName?.[0] || post.user?.email[0].toUpperCase() || '?'}
+                  {post.user?.businessName?.[0] || post.user?.email?.[0]?.toUpperCase() || '?'}
                 </AvatarFallback>
               </Avatar>
               <div>
@@ -260,7 +266,7 @@ export function PostFeed() {
             editPostMutation.mutate({
               id: editingPost.id,
               content,
-              type
+              type: type as Post['type']
             });
           }}
         />

@@ -24,7 +24,7 @@ interface CreatePostDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editPost?: Post;
-  onEdit?: (content: string, type: string) => void;
+  onEdit?: (content: string, type: Post['type']) => void;
 }
 
 export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: CreatePostDialogProps) {
@@ -46,7 +46,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
     if (editPost) {
       form.reset({
         content: editPost.content,
-        type: editPost.type as CreatePostSchema["type"],
+        type: editPost.type,
         images: editPost.images || []
       });
     }
@@ -198,7 +198,8 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
           throw new Error(errorData?.message || 'Failed to create post');
         }
 
-        return await response.json();
+        const newPost = await response.json();
+        return newPost;
       } catch (error) {
         console.error('Post creation error:', error);
         throw error;
