@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/use-auth";
 
 interface Post {
   id: number;
@@ -24,6 +25,7 @@ interface PostsResponse {
 }
 
 export function PostFeed() {
+  const { user } = useAuth();
   const { data: postsData, isLoading, error } = useQuery<PostsResponse>({
     queryKey: ['/api/social/posts'],
     queryFn: async () => {
@@ -42,7 +44,8 @@ export function PostFeed() {
         console.error('Error fetching posts:', error);
         throw error;
       }
-    }
+    },
+    enabled: !!user // Only fetch when user is authenticated
   });
 
   console.log('PostFeed render - data:', postsData);
@@ -79,7 +82,7 @@ export function PostFeed() {
     );
   }
 
-  if (!postsData?.success || !postsData.data || postsData.data.length === 0) {
+  if (!postsData?.data || postsData.data.length === 0) {
     return (
       <Card>
         <CardContent className="p-6 text-center text-muted-foreground">
