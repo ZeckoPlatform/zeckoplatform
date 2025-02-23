@@ -36,9 +36,11 @@ interface Comment {
   replies?: Comment[];
 }
 
+type ReactionType = "like" | "celebrate" | "support" | "insightful";
+
 interface Reaction {
   id: number;
-  type: 'like' | 'celebrate' | 'support' | 'insightful';
+  type: ReactionType;
   userId: number;
 }
 
@@ -71,31 +73,17 @@ export function PostFeed() {
   const [expandedComments, setExpandedComments] = useState<number[]>([]);
   const [expandedReplies, setExpandedReplies] = useState<number[]>([]);
 
-  // Define reaction types with exact string literals matching the backend
   const reactionTypes = {
-    'like': { icon: ThumbsUp, label: 'Like' },
-    'celebrate': { icon: Star, label: 'Celebrate' },
-    'support': { icon: Heart, label: 'Support' },
-    'insightful': { icon: Lightbulb, label: 'Insightful' }
-  } as const;
-
-  type ReactionType = keyof typeof reactionTypes;
+    "like": { icon: ThumbsUp, label: 'Like' },
+    "celebrate": { icon: Star, label: 'Celebrate' },
+    "support": { icon: Heart, label: 'Support' },
+    "insightful": { icon: Lightbulb, label: 'Insightful' }
+  } satisfies Record<ReactionType, { icon: any; label: string }>;
 
   // Helper function to count reactions by type
   const getReactionCount = (reactions: Reaction[] = [], type: ReactionType) => {
     return reactions.filter(r => r.type === type).length;
   };
-
-  const { data: postsData, isLoading, error } = useQuery({
-    queryKey: ['/api/social/posts'],
-    queryFn: async () => {
-      const response = await apiRequest('GET', '/api/social/posts');
-      if (!response.ok) {
-        throw new Error('Failed to fetch posts');
-      }
-      return response.json();
-    }
-  });
 
   // Helper function to count total comments including replies
   const countTotalComments = (comments: Comment[] = []): number => {
@@ -104,7 +92,6 @@ export function PostFeed() {
     }, 0);
   };
 
-  // Simplified reaction mutation with exact type matching
   const toggleReactionMutation = useMutation({
     mutationFn: async ({ postId, type }: { postId: number; type: ReactionType }) => {
       const post = postsData?.data.find((p: Post) => p.id === postId);
@@ -416,6 +403,17 @@ export function PostFeed() {
       </div>
     );
   };
+
+  const { data: postsData, isLoading, error } = useQuery({
+    queryKey: ['/api/social/posts'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/social/posts');
+      if (!response.ok) {
+        throw new Error('Failed to fetch posts');
+      }
+      return response.json();
+    }
+  });
 
   if (isLoading) {
     return (
