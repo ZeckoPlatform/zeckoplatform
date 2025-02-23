@@ -8,29 +8,17 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  MoreVertical,
-  Pencil,
-  Trash2,
   MessageCircle,
   ThumbsUp,
   Star,
   Heart,
   Lightbulb,
   Send,
-  CornerDownRight,
   ChevronDown,
   ChevronUp
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { CreatePostDialog } from "./create-post-dialog";
 import { ImageViewerModal } from "./image-viewer-modal";
 
 interface Comment {
@@ -79,13 +67,7 @@ export function PostFeed() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [editingPost, setEditingPost] = useState<Post | null>(null);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [postToDelete, setPostToDelete] = useState<Post | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [commentInputs, setCommentInputs] = useState<{ [key: string]: string }>({});
-  const [editingComment, setEditingComment] = useState<Comment | null>(null);
-  const [replyingTo, setReplyingTo] = useState<{ postId: number; commentId?: number } | null>(null);
   const [expandedComments, setExpandedComments] = useState<number[]>([]);
   const [expandedReplies, setExpandedReplies] = useState<number[]>([]);
 
@@ -119,18 +101,9 @@ export function PostFeed() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
-      setCommentText(0,'',0); 
-      setReplyingTo(null);
       toast({
         title: "Success",
         description: "Comment added successfully",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to add comment",
-        variant: "destructive",
       });
     }
   });
@@ -145,7 +118,6 @@ export function PostFeed() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
-      setEditingComment(null);
       toast({
         title: "Success",
         description: "Comment updated successfully",
@@ -185,8 +157,8 @@ export function PostFeed() {
   });
 
   const removeReactionMutation = useMutation({
-    mutationFn: async (postId: number) => {
-      const response = await apiRequest('DELETE', `/api/social/posts/${postId}/reactions`);
+    mutationFn: async ({ postId, type }: { postId: number; type: string }) => {
+      const response = await apiRequest('DELETE', `/api/social/posts/${postId}/reactions/${type}`);
       if (!response.ok) {
         throw new Error('Failed to remove reaction');
       }
@@ -197,58 +169,17 @@ export function PostFeed() {
     }
   });
 
-  // Modified to handle reaction toggling properly
   const handleReaction = (postId: number, type: 'like' | 'celebrate' | 'support' | 'insightful') => {
+    if (!user) return;
+
     const post = postsData?.data.find((p: any) => p.id === postId);
-    const hasReacted = post?.reactions?.some((r: any) => r.type === type && r.userId === user?.id);
+    const hasReacted = post?.reactions?.some((r: any) => r.type === type && r.userId === user.id);
 
     if (hasReacted) {
-      removeReactionMutation.mutate(postId);
+      removeReactionMutation.mutate({ postId, type });
     } else {
       reactionMutation.mutate({ postId, type });
     }
-  };
-
-  const getCommentText = (postId: number, commentId?: number) => {
-    const key = commentId ? `${postId}-${commentId}` : `${postId}`;
-    return commentInputs[key] || '';
-  };
-
-  const setCommentText = (postId: number, text: string, commentId?: number) => {
-    const key = commentId ? `${postId}-${commentId}` : `${postId}`;
-    setCommentInputs(prev => ({ ...prev, [key]: text }));
-  };
-
-  const handleAddComment = (postId: number, parentCommentId?: number) => {
-    const text = getCommentText(postId, parentCommentId);
-    if (!text.trim()) return;
-
-    addCommentMutation.mutate(
-      { postId, content: text.trim(), parentCommentId },
-      {
-        onSuccess: () => {
-          setCommentText(postId, '', parentCommentId);
-          setReplyingTo(null);
-          queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
-        }
-      }
-    );
-  };
-
-  const handleEditComment = (commentId: number, content: string) => {
-    editCommentMutation.mutate(
-      { commentId, content },
-      {
-        onSuccess: () => {
-          setEditingComment(null);
-          queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
-        }
-      }
-    );
-  };
-
-  const handleDeleteComment = (commentId: number) => {
-    deleteCommentMutation.mutate(commentId);
   };
 
   const toggleReplies = (commentId: number) => {
@@ -269,13 +200,27 @@ export function PostFeed() {
     return user.id === comment.userId;
   };
 
-  // Comment component with fixed reply input handling
+  // Comment component with local state management
   const CommentComponent = ({ comment, postId, level = 0 }: { comment: Comment; postId: number; level?: number }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editText, setEditText] = useState(comment.content);
+    const [replyText, setReplyText] = useState('');
     const showReplies = expandedReplies.includes(comment.id);
-    const isReplying = replyingTo?.commentId === comment.id;
-    const replyText = getCommentText(postId, comment.id);
+    const [isReplying, setIsReplying] = useState(false);
+
+    const handleAddReply = () => {
+      if (!replyText.trim()) return;
+
+      addCommentMutation.mutate(
+        { postId, content: replyText.trim(), parentCommentId: comment.id },
+        {
+          onSuccess: () => {
+            setReplyText('');
+            setIsReplying(false);
+          }
+        }
+      );
+    };
 
     return (
       <div className={`ml-${level * 4} mb-2`}>
@@ -328,7 +273,7 @@ export function PostFeed() {
                 variant="ghost"
                 size="sm"
                 className="h-6 px-2 text-xs"
-                onClick={() => setReplyingTo({ postId, commentId: comment.id })}
+                onClick={() => setIsReplying(!isReplying)}
               >
                 Reply
               </Button>
@@ -349,7 +294,7 @@ export function PostFeed() {
                     variant="ghost"
                     size="sm"
                     className="h-6 px-2 text-xs text-destructive"
-                    onClick={() => handleDeleteComment(comment.id)}
+                    onClick={() => deleteCommentMutation.mutate(comment.id)}
                   >
                     Delete
                   </Button>
@@ -382,12 +327,12 @@ export function PostFeed() {
                 <Input
                   placeholder="Write a reply..."
                   value={replyText}
-                  onChange={(e) => setCommentText(postId, e.target.value, comment.id)}
+                  onChange={(e) => setReplyText(e.target.value)}
                   className="flex-1"
                 />
                 <Button
                   size="sm"
-                  onClick={() => handleAddComment(postId, comment.id)}
+                  onClick={handleAddReply}
                   disabled={!replyText.trim()}
                 >
                   Reply
@@ -395,7 +340,7 @@ export function PostFeed() {
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => setReplyingTo(null)}
+                  onClick={() => setIsReplying(false)}
                 >
                   Cancel
                 </Button>
@@ -416,6 +361,47 @@ export function PostFeed() {
             )}
           </div>
         </div>
+      </div>
+    );
+  };
+
+  // New comment input component with local state
+  const NewCommentInput = ({ postId }: { postId: number }) => {
+    const [commentText, setCommentText] = useState('');
+
+    const handleAddComment = () => {
+      if (!commentText.trim()) return;
+
+      addCommentMutation.mutate(
+        { postId, content: commentText.trim() },
+        {
+          onSuccess: () => {
+            setCommentText('');
+          }
+        }
+      );
+    };
+
+    return (
+      <div className="flex gap-2">
+        <Input
+          placeholder="Write a comment..."
+          value={commentText}
+          onChange={(e) => setCommentText(e.target.value)}
+          onKeyPress={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              handleAddComment();
+            }
+          }}
+        />
+        <Button
+          size="icon"
+          onClick={handleAddComment}
+          disabled={!commentText.trim()}
+        >
+          <Send className="h-4 w-4" />
+        </Button>
       </div>
     );
   };
@@ -541,26 +527,7 @@ export function PostFeed() {
 
               {expandedComments.includes(post.id) && (
                 <div className="space-y-4">
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Write a comment..."
-                      value={getCommentText(post.id)}
-                      onChange={(e) => setCommentText(post.id, e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          handleAddComment(post.id);
-                        }
-                      }}
-                    />
-                    <Button
-                      size="icon"
-                      onClick={() => handleAddComment(post.id)}
-                      disabled={!getCommentText(post.id).trim()}
-                    >
-                      <Send className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  <NewCommentInput postId={post.id} />
 
                   <div className="space-y-2">
                     {post.comments?.map((comment) => (
