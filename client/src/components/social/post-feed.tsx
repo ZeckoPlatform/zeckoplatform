@@ -11,6 +11,7 @@ interface Post {
   content: string;
   type: string;
   createdAt: string;
+  images?: string[];
   user: {
     id: number;
     businessName: string | null;
@@ -112,6 +113,24 @@ export function PostFeed() {
           </CardHeader>
           <CardContent>
             <p className="whitespace-pre-wrap">{post.content}</p>
+
+            {/* Image Gallery */}
+            {post.images && post.images.length > 0 && (
+              <div className={`grid gap-2 mt-4 ${
+                post.images.length === 1 ? 'grid-cols-1' : 
+                post.images.length === 2 ? 'grid-cols-2' :
+                'grid-cols-2'
+              }`}>
+                {post.images.map((image, index) => (
+                  <img
+                    key={index}
+                    src={image}
+                    alt={`Post image ${index + 1}`}
+                    className="rounded-md w-full h-48 object-cover"
+                  />
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       ))}
