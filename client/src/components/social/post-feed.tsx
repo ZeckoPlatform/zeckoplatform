@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, parseISO } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -17,25 +17,7 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { CreatePostDialog } from "./create-post-dialog";
-
-interface Post {
-  id: number;
-  content: string;
-  type: string;
-  createdAt: string;
-  images?: string[];
-  user: {
-    id: number;
-    businessName: string | null;
-    email: string;
-    userType: string;
-  } | null;
-}
-
-interface PostsResponse {
-  success: boolean;
-  data: Post[];
-}
+import type { Post, PostsResponse } from "@/types/posts";
 
 export function PostFeed() {
   const { user } = useAuth();
@@ -94,7 +76,6 @@ export function PostFeed() {
         description: error.message || "Failed to update post",
         variant: "destructive",
       });
-      // Refetch to ensure data consistency
       queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     }
   });
@@ -128,19 +109,16 @@ export function PostFeed() {
         description: error.message || "Failed to delete post",
         variant: "destructive",
       });
-      // Refetch to ensure data consistency
       queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     }
   });
 
-  // Helper function to check if user can edit/delete a post
   const canModifyPost = (post: Post) => {
     if (!user) return false;
     if (user.userType === 'admin') return true;
     return user.id === post.user?.id;
   };
 
-  // Check if current user is admin
   const isAdmin = user?.userType === 'admin';
 
   if (isLoading) {
@@ -186,7 +164,6 @@ export function PostFeed() {
 
   return (
     <div className="space-y-4">
-      {/* Admin Moderation Banner */}
       {isAdmin && (
         <Card className="bg-primary/10">
           <CardContent className="p-4 flex items-center gap-2">
@@ -210,7 +187,7 @@ export function PostFeed() {
                   {post.user?.businessName || post.user?.email || 'Anonymous'}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
+                  {formatDistanceToNow(parseISO(post.createdAt), { addSuffix: true })}
                 </p>
               </div>
             </div>
@@ -244,7 +221,6 @@ export function PostFeed() {
           <CardContent>
             <p className="whitespace-pre-wrap">{post.content}</p>
 
-            {/* Image Gallery */}
             {post.images && post.images.length > 0 && (
               <div className={`grid gap-2 mt-4 ${
                 post.images.length === 1 ? 'grid-cols-1' :
@@ -265,7 +241,6 @@ export function PostFeed() {
         </Card>
       ))}
 
-      {/* Edit Post Dialog */}
       {editingPost && (
         <CreatePostDialog
           open={!!editingPost}
@@ -283,7 +258,6 @@ export function PostFeed() {
         />
       )}
 
-      {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>

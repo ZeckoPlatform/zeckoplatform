@@ -1,18 +1,16 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { MessageSquarePlus, Bug, Loader2, ImagePlus, X } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { ImagePlus, Loader2, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/use-auth";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { PostsResponse } from "@/types/posts";
-
+import type { Post, PostsResponse } from "@/types/posts";
 
 const createPostSchema = z.object({
   content: z.string().min(1, "Please write something to share"),
@@ -25,12 +23,7 @@ type CreatePostSchema = z.infer<typeof createPostSchema>;
 interface CreatePostDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  editPost?: {
-    id: number;
-    content: string;
-    type: string;
-    images?: string[];
-  };
+  editPost?: Post;
   onEdit?: (content: string, type: string) => void;
 }
 
@@ -40,7 +33,6 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
   const [images, setImages] = useState<{ file: File; preview: string }[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
-  // Initialize form with edit values if they exist
   const form = useForm<CreatePostSchema>({
     resolver: zodResolver(createPostSchema),
     defaultValues: {
@@ -50,7 +42,6 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
     }
   });
 
-  // Effect to reset form when editPost changes
   useEffect(() => {
     if (editPost) {
       form.reset({
@@ -77,7 +68,6 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
             return;
           }
 
-          // Target dimensions (max width/height of 1200px while maintaining aspect ratio)
           const maxDim = 1200;
           let width = img.width;
           let height = img.height;
@@ -129,7 +119,6 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
       const formData = new FormData();
       formData.append('file', resizedBlob, file.name);
 
-      // Use fetch with auth token for FormData upload
       const response = await fetch('/api/upload', {
         method: 'POST',
         headers: {
@@ -186,19 +175,16 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
         setIsUploading(true);
         console.log('Uploading images and creating post...');
 
-        // Upload all images first
         const uploadedUrls = await Promise.all(
           images.map(img => handleImageUpload(img.file))
         );
 
-        // Add uploaded URLs to the post data
+        console.log('Image upload successful, creating post...');
+
         const postData = {
           ...data,
           images: uploadedUrls
         };
-
-        console.log('Sending post data:', postData);
-
 
         const response = await apiRequest("POST", "/api/social/posts", postData);
         if (!response.ok) {
@@ -206,18 +192,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
           throw new Error(errorData?.message || 'Failed to create post');
         }
 
-        const newPost = await response.json();
-
-        // Update cache with new post
-        queryClient.setQueryData<PostsResponse>(['/api/social/posts'], (old) => {
-          if (!old) return { success: true, data: [newPost] };
-          return {
-            ...old,
-            data: [newPost, ...old.data]
-          };
-        });
-
-        return newPost;
+        return await response.json();
       } catch (error) {
         console.error('Post creation error:', error);
         throw error;
@@ -225,23 +200,29 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
         setIsUploading(false);
       }
     },
-    onSuccess: () => {
+    onSuccess: (newPost) => {
+      queryClient.setQueryData<PostsResponse>(['/api/social/posts'], (old) => {
+        if (!old) return { success: true, data: [newPost] };
+        return {
+          ...old,
+          data: [newPost, ...old.data]
+        };
+      });
+
       toast({
         title: "Posted!",
         description: "Your update has been shared"
       });
+
       form.reset();
-      // Clean up image previews
       images.forEach(img => URL.revokeObjectURL(img.preview));
       setImages([]);
       onOpenChange(false);
-      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     },
     onError: (error: Error) => {
-      console.error('Post creation error:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to create post. Please try again.",
+        description: error.message || "Failed to create post",
         variant: "destructive"
       });
     }
@@ -250,11 +231,9 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
   const handleSubmit = async (data: CreatePostSchema) => {
     try {
       if (editPost && onEdit) {
-        // If editing, call onEdit callback
         onEdit(data.content, data.type);
       } else {
-        // Otherwise create new post
-        createPost.mutate(data);
+        await createPost.mutateAsync(data);
       }
     } catch (error) {
       console.error('Form submission error:', error);
@@ -297,9 +276,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
               )}
             />
 
-            {/* Image upload section */}
             <div className="space-y-4">
-              {/* Show existing images from editPost */}
               {editPost?.images && editPost.images.length > 0 && (
                 <div className="grid grid-cols-2 gap-2">
                   {editPost.images.map((image, index) => (
@@ -314,7 +291,6 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
                 </div>
               )}
 
-              {/* Show new images being uploaded */}
               {images.length > 0 && (
                 <div className="grid grid-cols-2 gap-2">
                   {images.map((img, index) => (
