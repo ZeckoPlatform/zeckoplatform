@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
@@ -12,7 +12,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
-// Match server schema expectations
 const createPostSchema = z.object({
   content: z.string().min(1, "Please write something to share"),
   type: z.enum(["update", "article", "success_story", "market_insight", "opportunity"]).default("update"),
@@ -38,6 +37,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost }: CreatePostDia
   const [images, setImages] = useState<{ file: File; preview: string }[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
+  // Initialize form with edit values if they exist
   const form = useForm<CreatePostSchema>({
     resolver: zodResolver(createPostSchema),
     defaultValues: {
@@ -47,69 +47,76 @@ export function CreatePostDialog({ open, onOpenChange, editPost }: CreatePostDia
     }
   });
 
+  // Effect to reset form when editPost changes
+  useEffect(() => {
+    if (editPost) {
+      form.reset({
+        content: editPost.content,
+        type: editPost.type as CreatePostSchema["type"],
+        images: editPost.images || []
+      });
+    }
+  }, [editPost, form]);
+
   const resizeImage = async (file: File): Promise<Blob> => {
     return new Promise((resolve, reject) => {
-      try {
-        const img = new Image();
-        const objectUrl = URL.createObjectURL(file);
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
 
-        img.onload = () => {
-          try {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
 
-            if (!ctx) {
-              URL.revokeObjectURL(objectUrl);
-              reject(new Error('Could not get canvas context'));
-              return;
-            }
-
-            // Target dimensions (max width/height of 1200px while maintaining aspect ratio)
-            const maxDim = 1200;
-            let width = img.width;
-            let height = img.height;
-
-            if (width > maxDim || height > maxDim) {
-              if (width > height) {
-                height = Math.round((height * maxDim) / width);
-                width = maxDim;
-              } else {
-                width = Math.round((width * maxDim) / height);
-                height = maxDim;
-              }
-            }
-
-            canvas.width = width;
-            canvas.height = height;
-            ctx.drawImage(img, 0, 0, width, height);
-
-            canvas.toBlob(
-              (blob) => {
-                URL.revokeObjectURL(objectUrl);
-                if (blob) {
-                  resolve(blob);
-                } else {
-                  reject(new Error('Failed to create blob from canvas'));
-                }
-              },
-              'image/jpeg',
-              0.8
-            );
-          } catch (error) {
+          if (!ctx) {
             URL.revokeObjectURL(objectUrl);
-            reject(error);
+            reject(new Error('Could not get canvas context'));
+            return;
           }
-        };
 
-        img.onerror = () => {
+          // Target dimensions (max width/height of 1200px while maintaining aspect ratio)
+          const maxDim = 1200;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          ctx.drawImage(img, 0, 0, width, height);
+
+          canvas.toBlob(
+            (blob) => {
+              URL.revokeObjectURL(objectUrl);
+              if (blob) {
+                resolve(blob);
+              } else {
+                reject(new Error('Failed to create blob from canvas'));
+              }
+            },
+            'image/jpeg',
+            0.8
+          );
+        } catch (error) {
           URL.revokeObjectURL(objectUrl);
-          reject(new Error('Failed to load image'));
-        };
+          reject(error);
+        }
+      };
 
-        img.src = objectUrl;
-      } catch (error) {
-        reject(error);
-      }
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error('Failed to load image'));
+      };
+
+      img.src = objectUrl;
     });
   };
 
@@ -119,11 +126,11 @@ export function CreatePostDialog({ open, onOpenChange, editPost }: CreatePostDia
       const formData = new FormData();
       formData.append('file', resizedBlob, file.name);
 
-      const response = await apiRequest('POST', '/api/upload', formData, {
-        headers: {
-          // Remove Content-Type header to let the browser set it with the boundary
-          'Content-Type': undefined
-        }
+      // Use fetch directly for FormData upload
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        credentials: 'include', // Include cookies
+        body: formData
       });
 
       if (!response.ok) {
@@ -159,6 +166,10 @@ export function CreatePostDialog({ open, onOpenChange, editPost }: CreatePostDia
     }
 
     setImages([...images, ...newImages]);
+    // Mark form as dirty when new images are added
+    form.setValue("images", [...(form.getValues("images") || []), ...Array(newImages.length).fill("")], {
+      shouldDirty: true
+    });
   };
 
   const removeImage = (index: number) => {
@@ -166,6 +177,10 @@ export function CreatePostDialog({ open, onOpenChange, editPost }: CreatePostDia
     URL.revokeObjectURL(newImages[index].preview);
     newImages.splice(index, 1);
     setImages(newImages);
+    // Mark form as dirty when images are removed
+    form.setValue("images", form.getValues("images")?.filter((_, i) => i !== index) || [], {
+      shouldDirty: true
+    });
   };
 
   const createPost = useMutation({

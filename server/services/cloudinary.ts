@@ -1,8 +1,9 @@
 import { v2 as cloudinary } from 'cloudinary';
 import { log } from "../vite";
-import type { UploadApiResponse, UploadApiErrorResponse } from 'cloudinary';
+import type { UploadApiResponse } from 'cloudinary';
+import type { File } from 'multer';
 
-// Configure Cloudinary
+// Configure Cloudinary with required environment variables
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -10,21 +11,26 @@ cloudinary.config({
 });
 
 /**
- * Uploads a file to Cloudinary
- * @param file The file buffer to upload
+ * Uploads a file to Cloudinary with proper error handling and logging
+ * @param file The file from multer to upload
  * @returns Promise resolving to the Cloudinary upload response
  */
 export async function uploadToCloudinary(file: Express.Multer.File): Promise<UploadApiResponse> {
   try {
-    log('Attempting to upload file to Cloudinary');
+    log('Initiating file upload to Cloudinary');
+    log(`File details: ${file.originalname}, ${file.mimetype}, ${file.size} bytes`);
 
-    return new Promise((resolve, reject) => {
+    const uploadPromise = new Promise<UploadApiResponse>((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
           folder: 'social-feed',
           resource_type: 'auto',
+          transformation: [
+            { width: 1200, height: 1200, crop: 'limit' },
+            { quality: 'auto:good' }
+          ]
         },
-        (error: UploadApiErrorResponse | null, result: UploadApiResponse | undefined) => {
+        (error, result) => {
           if (error || !result) {
             log('Cloudinary upload error:', error?.message || 'Unknown error');
             reject(error || new Error('Upload failed'));
@@ -35,8 +41,17 @@ export async function uploadToCloudinary(file: Express.Multer.File): Promise<Upl
         }
       );
 
+      // Handle potential stream errors
+      uploadStream.on('error', (error) => {
+        log('Upload stream error:', error);
+        reject(error);
+      });
+
+      // Write file buffer to stream
       uploadStream.end(file.buffer);
     });
+
+    return await uploadPromise;
   } catch (error) {
     log('Error in uploadToCloudinary:', error instanceof Error ? error.message : 'Unknown error');
     throw error;

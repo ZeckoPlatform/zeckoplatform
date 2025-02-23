@@ -6,9 +6,14 @@ import { Server } from "http";
 const app = express();
 const isProd = app.get('env') === 'production';
 
+// Startup logging
+log('=== Server Initialization Started ===');
+log(`Environment: ${process.env.NODE_ENV}`);
+log(`Process ID: ${process.pid}`);
+
 // Body parsing middleware
 app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: true }));
 
 // API-specific middleware - only apply to /api routes
 app.use('/api', (req, res, next) => {
@@ -41,11 +46,13 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-// Create HTTP server and register routes
+log('Registering routes...');
 const httpServer = registerRoutes(app);
+log('Routes registered successfully');
 
 // Setup static/Vite serving for frontend routes
 if (isProd) {
+  log('Setting up production static file serving');
   app.use((req, res, next) => {
     if (!req.path.startsWith('/api')) {
       serveStatic(app);
@@ -54,11 +61,13 @@ if (isProd) {
   });
 } else {
   // Handle development mode with Vite
+  log('Setting up Vite development server');
   (async () => {
     try {
       await setupVite(app, httpServer);
+      log('Vite setup completed successfully');
     } catch (error) {
-      log('Vite setup error:', error);
+      log('Fatal error during Vite setup:', error);
       process.exit(1);
     }
   })();
@@ -147,7 +156,6 @@ const startServer = async (port: number): Promise<boolean> => {
     log('=== Environment Information ===');
     log(`NODE_ENV: ${process.env.NODE_ENV}`);
     log(`PORT: ${process.env.PORT}`);
-    log(`REPLIT_PORT: ${process.env.REPLIT_PORT}`);
     log(`Process ID: ${process.pid}`);
     log(`Platform: ${process.platform}`);
     log(`Node Version: ${process.version}`);

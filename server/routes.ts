@@ -9,8 +9,10 @@ import { comparePasswords, hashPassword } from './auth';
 import fs from 'fs';
 import express from 'express';
 import path from 'path';
+import multer from 'multer';
 import { createConnectedAccount, retrieveConnectedAccount } from './stripe';
 import { sendEmail } from './services/email';
+import { uploadToCloudinary } from './services/cloudinary';
 import subscriptionRoutes from './routes/subscriptions';
 import invoiceRoutes from './routes/invoices';
 import { insertUserSchema } from "@db/schema";
@@ -26,6 +28,21 @@ import leadsRoutes from './routes/leads';
 import { cleanupExpiredLeads } from './services/cleanup';
 import feedbackRoutes from './routes/feedback';
 import socialRoutes from './routes/social';
+
+// Configure multer for handling file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  },
+});
 
 // Ensure uploads directory exists
 const uploadDir = path.join(process.cwd(), 'uploads');
@@ -74,6 +91,27 @@ export function registerRoutes(app: Express): Server {
   // Register feedback routes before authentication middleware
   app.use(feedbackRoutes);
 
+  // File upload endpoint
+  app.post('/api/upload', authenticateToken, upload.single('file'), async (req, res) => {
+    try {
+      log('Processing file upload request');
+
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
+
+      const result = await uploadToCloudinary(req.file);
+      log('File uploaded to Cloudinary:', result.secure_url);
+
+      res.json({ url: result.secure_url });
+    } catch (error) {
+      log('File upload error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : 'Failed to upload file' 
+      });
+    }
+  });
+
   // Authentication middleware for protected routes
   app.use('/api', (req, res, next) => {
     if (req.path.endsWith('/login') ||
@@ -84,6 +122,7 @@ export function registerRoutes(app: Express): Server {
         req.path.endsWith('/vendor/stripe/account') ||
         req.path.endsWith('/vendor/stripe/account/status') ||
         req.path.endsWith('/feedback') ||
+        req.path.endsWith('/upload') || // Added to exclude /upload from authentication
         req.method === 'OPTIONS') {
       return next();
     }
