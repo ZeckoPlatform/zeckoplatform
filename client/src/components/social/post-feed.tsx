@@ -77,7 +77,9 @@ export function PostFeed() {
     celebrate: { icon: Star, label: 'Celebrate' },
     support: { icon: Heart, label: 'Support' },
     insightful: { icon: Lightbulb, label: 'Insightful' }
-  };
+  } as const;
+
+  type ReactionType = keyof typeof reactionTypes;
 
   const { data: postsData, isLoading, error } = useQuery({
     queryKey: ['/api/social/posts'],
@@ -99,7 +101,7 @@ export function PostFeed() {
 
   // Simplified reaction mutation
   const toggleReactionMutation = useMutation({
-    mutationFn: async ({ postId, type }: { postId: number; type: 'like' | 'celebrate' | 'support' | 'insightful' }) => {
+    mutationFn: async ({ postId, type }: { postId: number; type: ReactionType }) => {
       const post = postsData?.data.find((p: Post) => p.id === postId);
       const hasReacted = post?.reactions?.some(r => r.type === type && r.userId === user?.id);
 
@@ -127,7 +129,7 @@ export function PostFeed() {
     }
   });
 
-  const handleReaction = (postId: number, type: 'like' | 'celebrate' | 'support' | 'insightful') => {
+  const handleReaction = (postId: number, type: ReactionType) => {
     if (!user) return;
     toggleReactionMutation.mutate({ postId, type });
   };
@@ -509,7 +511,7 @@ export function PostFeed() {
                     key={type}
                     variant={hasReacted ? "secondary" : "ghost"}
                     size="sm"
-                    onClick={() => handleReaction(post.id, type as 'like' | 'celebrate' | 'support' | 'insightful')}
+                    onClick={() => handleReaction(post.id, type as ReactionType)}
                     disabled={toggleReactionMutation.isPending}
                   >
                     <Icon className="h-4 w-4 mr-1" />
