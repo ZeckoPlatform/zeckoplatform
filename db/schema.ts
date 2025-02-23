@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, decimal } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, numeric } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -115,6 +115,7 @@ export const insertUserSchema = createInsertSchema(users, {
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type SelectUser = typeof users.$inferSelect;
 
+// First fix the budget field using numeric instead of decimal
 export const leads = pgTable("leads", {
   id: serial("id").primaryKey(),
   user_id: integer("user_id").references(() => users.id).notNull(),
@@ -122,7 +123,7 @@ export const leads = pgTable("leads", {
   description: text("description").notNull(),
   category: text("category").notNull(),
   subcategory: text("subcategory"),
-  budget: decimal("budget", { precision: 10, scale: 2 }),
+  budget: numeric("budget", { precision: 10, scale: 2 }),
   location: text("location"),
   phone_number: text("phone_number"),
   status: text("status", { enum: ["open", "closed", "in_progress"] }).default("open"),
@@ -194,20 +195,21 @@ export const productAttributeValues = pgTable("product_attribute_values", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Fix products table
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
   vendorId: integer("vendor_id").references(() => users.id).notNull(),
   title: text("title").notNull(),
   description: text("description").notNull(),
-  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-  compareAtPrice: decimal("compare_at_price", { precision: 10, scale: 2 }),
+  price: numeric("price", { precision: 10, scale: 2 }).notNull(),
+  compareAtPrice: numeric("compare_at_price", { precision: 10, scale: 2 }),
   category: text("category").notNull(),
   categoryId: integer("category_id").references(() => productCategories.id),
   imageUrl: text("image_url"),
   galleryImages: text("gallery_images").array(),
   sku: text("sku"),
   barcode: text("barcode"),
-  weight: decimal("weight", { precision: 10, scale: 2 }),
+  weight: numeric("weight", { precision: 10, scale: 2 }),
   dimensions: jsonb("dimensions").$type<{
     length: number;
     width: number;
@@ -215,7 +217,7 @@ export const products = pgTable("products", {
     unit: "cm" | "in";
   }>(),
   shippingRequired: boolean("shipping_required").default(true),
-  shippingWeight: decimal("shipping_weight", { precision: 10, scale: 2 }),
+  shippingWeight: numeric("shipping_weight", { precision: 10, scale: 2 }),
   tags: text("tags").array(),
   status: text("status", {
     enum: ["draft", "active", "archived"]
@@ -225,14 +227,15 @@ export const products = pgTable("products", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Fix product variations
 export const productVariations = pgTable("product_variations", {
   id: serial("id").primaryKey(),
   productId: integer("product_id").references(() => products.id).notNull(),
   sku: text("sku"),
   barcode: text("barcode"),
-  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-  compareAtPrice: decimal("compare_at_price", { precision: 10, scale: 2 }),
-  weight: decimal("weight", { precision: 10, scale: 2 }),
+  price: numeric("price", { precision: 10, scale: 2 }).notNull(),
+  compareAtPrice: numeric("compare_at_price", { precision: 10, scale: 2 }),
+  weight: numeric("weight", { precision: 10, scale: 2 }),
   position: integer("position").default(0),
   imageUrl: text("image_url"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -610,6 +613,7 @@ export const feedbackResponses = pgTable("feedback_responses", {
   created_at: timestamp("created_at").defaultNow(),
 });
 
+// Fix social posts table and ensure engagement is numeric
 export const socialPosts = pgTable("social_posts", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").references(() => users.id).notNull(),
@@ -621,8 +625,6 @@ export const socialPosts = pgTable("social_posts", {
   visibility: text("visibility", {
     enum: ["public", "connections", "private"]
   }).default("public"),
-  tags: text("tags").array(),
-  mentionedUsers: integer("mentioned_users").array(),
   status: text("status", {
     enum: ["draft", "published", "archived", "flagged"]
   }).default("published"),
@@ -632,16 +634,13 @@ export const socialPosts = pgTable("social_posts", {
     comments: number;
     shares: number;
   }>().default({ views: 0, likes: 0, comments: 0, shares: 0 }),
-  metadata: jsonb("metadata").$type<{
-    location?: string;
-    businessContext?: string;
-    industry?: string[];
-  }>(),
+  tags: text("tags").array(),
+  mentionedUsers: integer("mentioned_users").array(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Existing postComments table needs proper type definitions
+// Fix post comments table and add proper relations
 export const postComments = pgTable("post_comments", {
   id: serial("id").primaryKey(),
   postId: integer("post_id").references(() => socialPosts.id).notNull(),
@@ -739,8 +738,7 @@ export const usersRelations = relations(users, ({ many }) => ({
 
 export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
   user: one(users, {
-    fields: [subscriptions.user_id],
-    references: [users.id],
+    fields: [subscriptions.user_id],    references: [users.id],
   }),
 }));
 
@@ -1029,15 +1027,7 @@ export const productInventoryRelations = relations(productInventory, ({ one }) =
   }),
 }));
 
-export const socialPostsRelations = relations(socialPosts, ({ one, many }) => ({
-  user: one(users, {
-    fields: [socialPosts.userId],
-    references: [users.id],
-  }),
-  comments: many(postComments),
-  reactions: many(postReactions),
-}));
-
+// Add proper relations for nested comments
 export const postCommentsRelations = relations(postComments, ({ one, many }) => ({
   post: one(socialPosts, {
     fields: [postComments.postId],
@@ -1047,11 +1037,14 @@ export const postCommentsRelations = relations(postComments, ({ one, many }) => 
     fields: [postComments.userId],
     references: [users.id],
   }),
-  parentComment: one(postComments, {
+  parent: one(postComments, {
     fields: [postComments.parentCommentId],
     references: [postComments.id],
   }),
-  reactions: many(postReactions),
+  replies: many(postComments, {
+    fields: [postComments.id],
+    references: [postComments.parentCommentId],
+  }),
 }));
 
 export const postReactionsRelations = relations(postReactions, ({ one }) => ({

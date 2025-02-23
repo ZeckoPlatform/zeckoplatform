@@ -11,13 +11,15 @@ import {
   MoreVertical, 
   Pencil, 
   Trash2, 
-  Shield, 
   MessageCircle,
   ThumbsUp,
-  Star, // Replace Party with Star
+  Star,
   Heart,
   Lightbulb,
-  Send
+  Send,
+  CornerDownRight, 
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -30,17 +32,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { useToast } from "@/hooks/use-toast";
 import { CreatePostDialog } from "./create-post-dialog";
 import { ImageViewerModal } from "./image-viewer-modal";
-import type { Post, PostsResponse, PostResponse, PostMutationResponse } from "@/types/posts";
 
 interface Comment {
   id: number;
   content: string;
   createdAt: string;
+  parentCommentId?: number;
+  userId: number;
   user: {
     id: number;
     profile: any;
     businessName: string;
+    email: string;
   };
+  replies?: Comment[];
 }
 
 interface Reaction {
@@ -49,7 +54,23 @@ interface Reaction {
   userId: number;
 }
 
-interface ExtendedPost extends Post {
+interface Post {
+  id: number;
+  content: string;
+  mediaUrls?: string[];
+  type: string;
+  engagement: {
+    views: number;
+    likes: number;
+    comments: number;
+    shares: number;
+  };
+  user: {
+    id: number;
+    businessName: string;
+    email: string;
+  };
+  createdAt: string;
   reactions?: Reaction[];
   comments?: Comment[];
 }
@@ -63,17 +84,20 @@ export function PostFeed() {
   const [postToDelete, setPostToDelete] = useState<Post | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [commentText, setCommentText] = useState<string>('');
+  const [editingComment, setEditingComment] = useState<Comment | null>(null);
+  const [replyingTo, setReplyingTo] = useState<{ postId: number; commentId?: number } | null>(null);
   const [expandedComments, setExpandedComments] = useState<number[]>([]);
+  const [expandedReplies, setExpandedReplies] = useState<number[]>([]);
 
   // Reactions configuration
   const reactionTypes = {
     like: { icon: ThumbsUp, label: 'Like' },
-    celebrate: { icon: Star, label: 'Celebrate' }, // Using Star instead of Party
+    celebrate: { icon: Star, label: 'Celebrate' },
     support: { icon: Heart, label: 'Support' },
     insightful: { icon: Lightbulb, label: 'Insightful' }
   };
 
-  const { data: postsData, isLoading, error } = useQuery<PostsResponse>({
+  const { data: postsData, isLoading, error } = useQuery({
     queryKey: ['/api/social/posts'],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/social/posts');
@@ -84,60 +108,19 @@ export function PostFeed() {
     }
   });
 
-  // Delete post mutation
-  const deletePostMutation = useMutation({
-    mutationFn: async (postId: number) => {
-      const response = await apiRequest('DELETE', `/api/social/posts/${postId}`);
-      if (!response.ok) {
-        throw new Error('Failed to delete post');
-      }
-      return postId;
-    },
-    onSuccess: (deletedPostId) => {
-      queryClient.setQueryData<PostsResponse>(['/api/social/posts'], (old) => {
-        if (!old) return { success: true, data: [] };
-        return {
-          ...old,
-          data: old.data.filter(post => post.id !== deletedPostId)
-        };
-      });
-      setIsDeleteDialogOpen(false);
-      setPostToDelete(null);
-      toast({
-        title: "Success",
-        description: "Post deleted successfully",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete post",
-        variant: "destructive",
-      });
-    }
-  });
-
-  // Fetch comments for a post
-  const fetchComments = async (postId: number) => {
-    const response = await apiRequest('GET', `/api/posts/${postId}/comments`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch comments');
-    }
-    return response.json();
-  };
-
-  // Add comment mutation
+  // Comment mutations
   const addCommentMutation = useMutation({
-    mutationFn: async ({ postId, content }: { postId: number; content: string }) => {
-      const response = await apiRequest('POST', `/api/posts/${postId}/comments`, { content });
+    mutationFn: async ({ postId, content, parentCommentId }: { postId: number; content: string; parentCommentId?: number }) => {
+      const response = await apiRequest('POST', `/api/social/posts/${postId}/comments`, { content, parentCommentId });
       if (!response.ok) {
         throw new Error('Failed to add comment');
       }
       return response.json();
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/posts', variables.postId, 'comments'] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
       setCommentText('');
+      setReplyingTo(null);
       toast({
         title: "Success",
         description: "Comment added successfully",
@@ -152,10 +135,45 @@ export function PostFeed() {
     }
   });
 
-  // Add/update reaction mutation
+  const editCommentMutation = useMutation({
+    mutationFn: async ({ commentId, content }: { commentId: number; content: string }) => {
+      const response = await apiRequest('PATCH', `/api/social/comments/${commentId}`, { content });
+      if (!response.ok) {
+        throw new Error('Failed to edit comment');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
+      setEditingComment(null);
+      toast({
+        title: "Success",
+        description: "Comment updated successfully",
+      });
+    }
+  });
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: async (commentId: number) => {
+      const response = await apiRequest('DELETE', `/api/social/comments/${commentId}`);
+      if (!response.ok) {
+        throw new Error('Failed to delete comment');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
+      toast({
+        title: "Success",
+        description: "Comment deleted successfully",
+      });
+    }
+  });
+
+  // Reaction mutations
   const reactionMutation = useMutation({
     mutationFn: async ({ postId, type }: { postId: number; type: string }) => {
-      const response = await apiRequest('POST', `/api/posts/${postId}/reactions`, { type });
+      const response = await apiRequest('POST', `/api/social/posts/${postId}/reactions`, { type });
       if (!response.ok) {
         throw new Error('Failed to update reaction');
       }
@@ -163,20 +181,12 @@ export function PostFeed() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update reaction",
-        variant: "destructive",
-      });
     }
   });
 
-  // Remove reaction mutation
   const removeReactionMutation = useMutation({
     mutationFn: async (postId: number) => {
-      const response = await apiRequest('DELETE', `/api/posts/${postId}/reactions`);
+      const response = await apiRequest('DELETE', `/api/social/posts/${postId}/reactions`);
       if (!response.ok) {
         throw new Error('Failed to remove reaction');
       }
@@ -187,30 +197,189 @@ export function PostFeed() {
     }
   });
 
-  const toggleComments = async (postId: number) => {
-    if (expandedComments.includes(postId)) {
-      setExpandedComments(expandedComments.filter(id => id !== postId));
-    } else {
-      setExpandedComments([...expandedComments, postId]);
-      // Fetch comments when expanding
-      try {
-        await queryClient.prefetchQuery({
-          queryKey: ['/api/posts', postId, 'comments'],
-          queryFn: () => fetchComments(postId)
-        });
-      } catch (error) {
-        console.error('Error fetching comments:', error);
-      }
-    }
-  };
-
   const handleReaction = (postId: number, type: 'like' | 'celebrate' | 'support' | 'insightful') => {
     reactionMutation.mutate({ postId, type });
   };
 
-  const handleAddComment = (postId: number) => {
+  const handleAddComment = (postId: number, parentCommentId?: number) => {
     if (!commentText.trim()) return;
-    addCommentMutation.mutate({ postId, content: commentText.trim() });
+    addCommentMutation.mutate({ postId, content: commentText.trim(), parentCommentId });
+  };
+
+  const handleEditComment = (commentId: number, content: string) => {
+    editCommentMutation.mutate({ commentId, content });
+  };
+
+  const handleDeleteComment = (commentId: number) => {
+    deleteCommentMutation.mutate(commentId);
+  };
+
+  const toggleReplies = (commentId: number) => {
+    setExpandedReplies(prev => 
+      prev.includes(commentId) ? prev.filter(id => id !== commentId) : [...prev, commentId]
+    );
+  };
+
+  const toggleComments = (postId: number) => {
+    setExpandedComments(prev => 
+      prev.includes(postId) ? prev.filter(id => id !== postId) : [...prev, postId]
+    );
+  };
+
+  const canModifyComment = (comment: Comment) => {
+    if (!user) return false;
+    if (user.userType === 'admin') return true;
+    return user.id === comment.userId;
+  };
+
+  // Comment component
+  const CommentComponent = ({ comment, postId, level = 0 }: { comment: Comment; postId: number; level?: number }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [editText, setEditText] = useState(comment.content);
+    const showReplies = expandedReplies.includes(comment.id);
+    const isReplying = replyingTo?.commentId === comment.id;
+
+    return (
+      <div className={`ml-${level * 4} mb-2`}>
+        <div className="flex items-start gap-2 p-2 rounded-md bg-secondary/10">
+          <Avatar className="h-6 w-6">
+            <AvatarFallback className="text-xs">
+              {comment.user.businessName?.[0] || '?'}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1">
+            <div className="flex items-baseline gap-2">
+              <span className="text-sm font-medium">
+                {comment.user.businessName}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {formatDistanceToNow(parseISO(comment.createdAt), { addSuffix: true })}
+              </span>
+            </div>
+
+            {isEditing ? (
+              <div className="flex gap-2 mt-1">
+                <Input
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    handleEditComment(comment.id, editText);
+                    setIsEditing(false);
+                  }}
+                >
+                  Save
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setIsEditing(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <p className="text-sm">{comment.content}</p>
+            )}
+
+            <div className="flex gap-2 mt-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs"
+                onClick={() => setReplyingTo({ postId, commentId: comment.id })}
+              >
+                Reply
+              </Button>
+              {canModifyComment(comment) && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs"
+                    onClick={() => {
+                      setIsEditing(true);
+                      setEditText(comment.content);
+                    }}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs text-destructive"
+                    onClick={() => handleDeleteComment(comment.id)}
+                  >
+                    Delete
+                  </Button>
+                </>
+              )}
+              {comment.replies && comment.replies.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  onClick={() => toggleReplies(comment.id)}
+                >
+                  {showReplies ? (
+                    <>
+                      <ChevronUp className="h-3 w-3 mr-1" />
+                      Hide Replies
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="h-3 w-3 mr-1" />
+                      Show Replies ({comment.replies.length})
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+
+            {isReplying && (
+              <div className="flex gap-2 mt-2">
+                <Input
+                  placeholder="Write a reply..."
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  size="sm"
+                  onClick={() => handleAddComment(postId, comment.id)}
+                  disabled={!commentText.trim()}
+                >
+                  Reply
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setReplyingTo(null)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            )}
+
+            {showReplies && comment.replies && (
+              <div className="ml-4 mt-2">
+                {comment.replies.map((reply) => (
+                  <CommentComponent
+                    key={reply.id}
+                    comment={reply}
+                    postId={postId}
+                    level={level + 1}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   if (isLoading) {
@@ -254,26 +423,9 @@ export function PostFeed() {
     );
   }
 
-  const canModifyPost = (post: Post) => {
-    if (!user) return false;
-    if (user.userType === 'admin') return true;
-    return user.id === post.user?.id;
-  };
-
-  const isAdmin = user?.userType === 'admin';
-
   return (
     <div className="space-y-4">
-      {isAdmin && (
-        <Card className="bg-primary/10">
-          <CardContent className="p-4 flex items-center gap-2">
-            <Shield className="h-5 w-5 text-primary" />
-            <span className="text-sm font-medium">Admin Moderation Mode - You can edit or delete any post</span>
-          </CardContent>
-        </Card>
-      )}
-
-      {postsData.data.map((post: ExtendedPost) => (
+      {postsData.data.map((post: Post) => (
         <Card key={post.id}>
           <CardHeader className="flex flex-row items-center justify-between">
             <div className="flex items-center gap-4">
@@ -291,44 +443,18 @@ export function PostFeed() {
                 </p>
               </div>
             </div>
-
-            {canModifyPost(post) && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setEditingPost(post)}>
-                    <Pencil className="h-4 w-4 mr-2" />
-                    Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="text-destructive"
-                    onClick={() => {
-                      setPostToDelete(post);
-                      setIsDeleteDialogOpen(true);
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
           </CardHeader>
+
           <CardContent>
             <p className="whitespace-pre-wrap">{post.content}</p>
 
-            {/* Media Gallery */}
-            {((post.mediaUrls && post.mediaUrls.length > 0) || (post.images && post.images.length > 0)) && (
+            {post.mediaUrls && post.mediaUrls.length > 0 && (
               <div className={`grid gap-2 mt-4 ${
-                ((post.mediaUrls?.length || post.images?.length) || 0) === 1 ? 'grid-cols-1' :
-                ((post.mediaUrls?.length || post.images?.length) || 0) === 2 ? 'grid-cols-2' :
+                post.mediaUrls.length === 1 ? 'grid-cols-1' :
+                post.mediaUrls.length === 2 ? 'grid-cols-2' :
                 'grid-cols-2'
               }`}>
-                {(post.mediaUrls || post.images || []).map((image, index) => (
+                {post.mediaUrls.map((image, index) => (
                   <div 
                     key={`${post.id}-${index}`}
                     className="relative cursor-pointer overflow-hidden rounded-md group"
@@ -346,25 +472,30 @@ export function PostFeed() {
             )}
           </CardContent>
 
-          {/* Reactions and Comments Section */}
           <CardFooter className="flex flex-col gap-4">
-            {/* Reaction Buttons */}
             <div className="flex gap-2 w-full">
-              {Object.entries(reactionTypes).map(([type, { icon: Icon, label }]) => (
-                <Button
-                  key={type}
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleReaction(post.id, type as 'like' | 'celebrate' | 'support' | 'insightful')}
-                  className={post.reactions?.some(r => r.type === type && r.userId === user?.id) ? 'bg-primary/10' : ''}
-                >
-                  <Icon className="h-4 w-4 mr-1" />
-                  {label}
-                </Button>
-              ))}
+              {Object.entries(reactionTypes).map(([type, { icon: Icon, label }]) => {
+                const hasReacted = post.reactions?.some(r => r.type === type && r.userId === user?.id);
+                return (
+                  <Button
+                    key={type}
+                    variant={hasReacted ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => {
+                      if (hasReacted) {
+                        removeReactionMutation.mutate(post.id);
+                      } else {
+                        handleReaction(post.id, type as 'like' | 'celebrate' | 'support' | 'insightful');
+                      }
+                    }}
+                  >
+                    <Icon className="h-4 w-4 mr-1" />
+                    {label}
+                  </Button>
+                );
+              })}
             </div>
 
-            {/* Comments Section */}
             <div className="w-full">
               <Button
                 variant="ghost"
@@ -378,11 +509,10 @@ export function PostFeed() {
 
               {expandedComments.includes(post.id) && (
                 <div className="space-y-4">
-                  {/* Comment Input */}
                   <div className="flex gap-2">
                     <Input
                       placeholder="Write a comment..."
-                      value={commentText}
+                      value={replyingTo?.postId === post.id && !replyingTo.commentId ? commentText : ''}
                       onChange={(e) => setCommentText(e.target.value)}
                       onKeyPress={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
@@ -400,27 +530,13 @@ export function PostFeed() {
                     </Button>
                   </div>
 
-                  {/* Comments List */}
                   <div className="space-y-2">
-                    {post.comments?.map((comment: Comment) => (
-                      <div key={comment.id} className="flex items-start gap-2 p-2 rounded-md bg-secondary/10">
-                        <Avatar className="h-6 w-6">
-                          <AvatarFallback className="text-xs">
-                            {comment.user.businessName?.[0] || '?'}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-sm font-medium">
-                              {comment.user.businessName}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {formatDistanceToNow(parseISO(comment.createdAt), { addSuffix: true })}
-                            </span>
-                          </div>
-                          <p className="text-sm">{comment.content}</p>
-                        </div>
-                      </div>
+                    {post.comments?.map((comment) => (
+                      <CommentComponent
+                        key={comment.id}
+                        comment={comment}
+                        postId={post.id}
+                      />
                     ))}
                   </div>
                 </div>
@@ -429,47 +545,6 @@ export function PostFeed() {
           </CardFooter>
         </Card>
       ))}
-
-      {editingPost && (
-        <CreatePostDialog
-          open={!!editingPost}
-          onOpenChange={(open) => {
-            if (!open) setEditingPost(null);
-          }}
-          editPost={editingPost}
-        />
-      )}
-
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Post</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this post? This action cannot be undone.
-              {isAdmin && postToDelete && postToDelete.user?.id !== user?.id && (
-                <p className="mt-2 text-destructive">
-                  You are deleting this post as an administrator.
-                </p>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end space-x-2">
-            <Button
-              variant="outline"
-              onClick={() => setIsDeleteDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => postToDelete && deletePostMutation.mutate(postToDelete.id)}
-              disabled={deletePostMutation.isPending}
-            >
-              {deletePostMutation.isPending ? "Deleting..." : "Delete"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <ImageViewerModal
         open={!!selectedImage}
