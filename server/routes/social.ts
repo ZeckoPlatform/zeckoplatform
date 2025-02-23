@@ -18,11 +18,24 @@ const upload = multer({
     fileSize: 5 * 1024 * 1024 // 5MB limit
   },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    const allowedTypes = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/webp",
+      "image/gif",
+      "image/bmp",
+      "image/tiff"
+    ];
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
       cb(null, false);
+      const error = new Error(
+        'Only .jpg, .jpeg, .png, .webp, .gif, .bmp, and .tiff files are allowed'
+      );
+      error.name = 'UNSUPPORTED_FILE_TYPE';
+      req.fileValidationError = error;
     }
   }
 }).single('file');
@@ -56,9 +69,12 @@ router.post("/api/social/upload", authenticateToken, (req, res) => {
       }
 
       if (!req.file) {
+        const errorMessage = req.fileValidationError
+          ? req.fileValidationError.message
+          : "Please upload a valid image file";
         return res.status(400).json({
           success: false,
-          error: "Please upload a valid image file (JPEG, PNG or WebP)"
+          error: errorMessage
         });
       }
 

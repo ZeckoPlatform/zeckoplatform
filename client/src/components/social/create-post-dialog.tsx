@@ -15,7 +15,15 @@ import { useAuth } from "@/hooks/use-auth";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_IMAGE_DIMENSION = 2048; // Max width or height
-const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+const ACCEPTED_IMAGE_TYPES = [
+  "image/jpeg", 
+  "image/jpg", 
+  "image/png", 
+  "image/webp",
+  "image/gif",
+  "image/bmp",
+  "image/tiff"
+];
 const JPEG_QUALITY = 0.8; // Image compression quality (0-1)
 
 interface UploadResponse {
