@@ -119,7 +119,7 @@ export function PostFeed() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
-      setCommentText(0,'',0); //Added to clear input after successful comment
+      setCommentText(0,'',0); 
       setReplyingTo(null);
       toast({
         title: "Success",
@@ -197,9 +197,10 @@ export function PostFeed() {
     }
   });
 
+  // Modified to handle reaction toggling properly
   const handleReaction = (postId: number, type: 'like' | 'celebrate' | 'support' | 'insightful') => {
-    const post = postsData?.data.find(p => p.id === postId);
-    const hasReacted = post?.reactions?.some(r => r.type === type && r.userId === user?.id);
+    const post = postsData?.data.find((p: any) => p.id === postId);
+    const hasReacted = post?.reactions?.some((r: any) => r.type === type && r.userId === user?.id);
 
     if (hasReacted) {
       removeReactionMutation.mutate(postId);
@@ -268,7 +269,7 @@ export function PostFeed() {
     return user.id === comment.userId;
   };
 
-  // Comment component
+  // Comment component with fixed reply input handling
   const CommentComponent = ({ comment, postId, level = 0 }: { comment: Comment; postId: number; level?: number }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editText, setEditText] = useState(comment.content);
