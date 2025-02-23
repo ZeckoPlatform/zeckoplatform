@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
+import { apiRequest } from "@/lib/queryClient";
 
 interface Post {
   id: number;
@@ -24,29 +25,17 @@ interface PostsResponse {
 
 export function PostFeed() {
   const { data: postsData, isLoading, error } = useQuery<PostsResponse>({
-    queryKey: ['/social/posts'],
+    queryKey: ['/api/social/posts'],
     queryFn: async () => {
       try {
         console.log('Fetching posts...');
-        const response = await fetch('/social/posts');
-
-        // Get response as text first for debugging
-        const responseText = await response.text();
-        console.log('Raw posts response:', responseText);
-
-        // Try to parse as JSON
-        let data;
-        try {
-          data = JSON.parse(responseText);
-        } catch (e) {
-          console.error('Failed to parse posts response:', responseText);
-          throw new Error('Invalid response format from server');
-        }
+        const response = await apiRequest('GET', '/api/social/posts');
 
         if (!response.ok) {
-          throw new Error(data.message || 'Failed to fetch posts');
+          throw new Error('Failed to fetch posts');
         }
 
+        const data = await response.json();
         console.log('Parsed posts data:', data);
         return data;
       } catch (error) {
