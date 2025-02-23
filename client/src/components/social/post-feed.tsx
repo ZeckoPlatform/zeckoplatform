@@ -460,7 +460,7 @@ export function PostFeed() {
 
   return (
     <div className="space-y-4">
-      {postsData.data.map((post: Post) => (
+      {postsData?.data.map((post: Post) => (
         <Card key={post.id}>
           <CardHeader className="flex flex-row items-center justify-between">
             <div className="flex items-center gap-4">
@@ -533,6 +533,7 @@ export function PostFeed() {
               })}
             </div>
 
+            {/* Comment section */}
             <div className="w-full">
               <Button
                 variant="ghost"
