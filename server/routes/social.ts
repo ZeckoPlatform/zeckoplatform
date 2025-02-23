@@ -2,7 +2,7 @@ import { Router } from "express";
 import { authenticateToken } from "../auth";
 import { db } from "@db";
 import { socialPosts, users } from "@db/schema";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { log } from "../vite";
 
@@ -11,16 +11,16 @@ const router = Router();
 // Create a new post
 router.post("/social/posts", authenticateToken, async (req, res) => {
   try {
-    log('Received post request with body: ' + JSON.stringify(req.body));
+    log('Creating new post with data:', JSON.stringify(req.body));
 
     const schema = z.object({
       content: z.string().min(1, "Please write something to share"),
-      type: z.enum(["update", "article", "success_story", "market_insight", "opportunity"])
+      type: z.enum(["update", "article", "success_story", "market_insight", "opportunity"]),
+      images: z.array(z.string()).optional()
     });
 
     const validatedData = schema.parse(req.body);
 
-    // Ensure req.user exists
     if (!req.user || !req.user.id) {
       return res.status(401).json({
         success: false,
@@ -32,7 +32,7 @@ router.post("/social/posts", authenticateToken, async (req, res) => {
       content: validatedData.content,
       type: validatedData.type,
       userId: req.user.id,
-      mediaUrls: [],
+      mediaUrls: validatedData.images || [],
       visibility: "public",
       status: "published",
       engagement: { views: 0, likes: 0, comments: 0, shares: 0 },
@@ -48,30 +48,180 @@ router.post("/social/posts", authenticateToken, async (req, res) => {
       });
     }
 
-    log('Created post successfully: ' + JSON.stringify(post));
-    return res.status(201).json({ 
-      success: true, 
-      data: post 
+    // Get user info for the response
+    const [user] = await db.select().from(users).where(eq(users.id, req.user.id));
+
+    const postWithUser = {
+      ...post,
+      user: user ? {
+        id: user.id,
+        email: user.email,
+        userType: user.userType,
+        businessName: user.businessName,
+        profile: user.profile
+      } : null
+    };
+
+    log('Created post successfully:', JSON.stringify(postWithUser));
+    return res.status(201).json({
+      success: true,
+      data: postWithUser
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    log('Error creating post: ' + errorMessage);
+    log('Error creating post:', errorMessage);
 
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ 
-        success: false, 
-        message: error.errors[0].message 
+      return res.status(400).json({
+        success: false,
+        message: error.errors[0].message
       });
     }
 
-    return res.status(500).json({ 
-      success: false, 
-      message: "Failed to create post. Please try again." 
+    return res.status(500).json({
+      success: false,
+      message: "Failed to create post. Please try again."
     });
   }
 });
 
-// Get posts feed - no authentication required for viewing public posts
+// Update a post
+router.patch("/social/posts/:id", authenticateToken, async (req, res) => {
+  try {
+    const postId = parseInt(req.params.id);
+    if (isNaN(postId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid post ID"
+      });
+    }
+
+    const schema = z.object({
+      content: z.string().min(1, "Please write something to share"),
+      type: z.enum(["update", "article", "success_story", "market_insight", "opportunity"]),
+      images: z.array(z.string()).optional()
+    });
+
+    const validatedData = schema.parse(req.body);
+
+    // Check post ownership
+    const [existingPost] = await db
+      .select()
+      .from(socialPosts)
+      .where(eq(socialPosts.id, postId));
+
+    if (!existingPost) {
+      return res.status(404).json({
+        success: false,
+        message: "Post not found"
+      });
+    }
+
+    if (existingPost.userId !== req.user?.id && req.user?.userType !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to update this post"
+      });
+    }
+
+    // Update the post
+    const [updatedPost] = await db
+      .update(socialPosts)
+      .set({
+        content: validatedData.content,
+        type: validatedData.type,
+        mediaUrls: validatedData.images || existingPost.mediaUrls,
+        updatedAt: new Date()
+      })
+      .where(eq(socialPosts.id, postId))
+      .returning();
+
+    // Get user info for the response
+    const [user] = await db.select().from(users).where(eq(users.id, updatedPost.userId));
+
+    const postWithUser = {
+      ...updatedPost,
+      user: user ? {
+        id: user.id,
+        email: user.email,
+        userType: user.userType,
+        businessName: user.businessName,
+        profile: user.profile
+      } : null
+    };
+
+    return res.json({
+      success: true,
+      data: postWithUser
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    log('Error updating post:', errorMessage);
+
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        message: error.errors[0].message
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update post"
+    });
+  }
+});
+
+// Delete a post
+router.delete("/social/posts/:id", authenticateToken, async (req, res) => {
+  try {
+    const postId = parseInt(req.params.id);
+    if (isNaN(postId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid post ID"
+      });
+    }
+
+    // Check post ownership
+    const [existingPost] = await db
+      .select()
+      .from(socialPosts)
+      .where(eq(socialPosts.id, postId));
+
+    if (!existingPost) {
+      return res.status(404).json({
+        success: false,
+        message: "Post not found"
+      });
+    }
+
+    if (existingPost.userId !== req.user?.id && req.user?.userType !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to delete this post"
+      });
+    }
+
+    // Delete the post
+    await db.delete(socialPosts).where(eq(socialPosts.id, postId));
+
+    return res.json({
+      success: true,
+      message: "Post deleted successfully"
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    log('Error deleting post:', errorMessage);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete post"
+    });
+  }
+});
+
+// Get posts feed
 router.get("/social/posts", async (req, res) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
@@ -104,10 +254,7 @@ router.get("/social/posts", async (req, res) => {
     return res.json({
       success: true,
       data: posts.map(({ post, user }) => ({
-        id: post.id,
-        content: post.content,
-        type: post.type,
-        createdAt: post.createdAt,
+        ...post,
         user: user ? {
           id: user.id,
           email: user.email,
@@ -119,10 +266,10 @@ router.get("/social/posts", async (req, res) => {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    log('Error fetching posts: ' + errorMessage);
-    return res.status(500).json({ 
-      success: false, 
-      message: "Failed to fetch posts" 
+    log('Error fetching posts:', errorMessage);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch posts"
     });
   }
 });
