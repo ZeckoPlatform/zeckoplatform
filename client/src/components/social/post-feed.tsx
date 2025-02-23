@@ -72,7 +72,6 @@ export function PostFeed() {
       if (!response.ok) {
         throw new Error('Failed to delete post');
       }
-      // Don't try to parse response as JSON
       return postId;
     },
     onSuccess: (deletedPostId) => {
@@ -86,9 +85,6 @@ export function PostFeed() {
         queryClient.setQueryData(['/api/social/posts'], updatedPosts);
       }
 
-      // Also invalidate the query to refetch fresh data
-      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
-
       toast({
         title: "Success",
         description: "Post deleted successfully",
@@ -97,6 +93,9 @@ export function PostFeed() {
       setPostToDelete(null);
     },
     onError: (error: Error) => {
+      // Revert optimistic update on error
+      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
+
       toast({
         title: "Error",
         description: error.message || "Failed to delete post",
