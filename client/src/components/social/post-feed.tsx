@@ -79,7 +79,7 @@ export function PostFeed() {
     insightful: { icon: Lightbulb, label: 'Insightful' }
   };
 
-  const { data: postsData, isLoading, error } = useQuery({
+  const { data: postsData, isLoading } = useQuery({
     queryKey: ['/api/social/posts'],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/social/posts');
@@ -90,7 +90,40 @@ export function PostFeed() {
     }
   });
 
-  // Comment mutations
+  // Simplified reaction mutation
+  const toggleReactionMutation = useMutation({
+    mutationFn: async ({ postId, type }: { postId: number; type: string }) => {
+      const post = postsData?.data.find((p: Post) => p.id === postId);
+      const hasReacted = post?.reactions?.some(r => r.type === type && r.userId === user?.id);
+
+      const response = await apiRequest(
+        hasReacted ? 'DELETE' : 'POST',
+        `/api/social/posts/${postId}/reactions${hasReacted ? `/${type}` : ''}`,
+        hasReacted ? undefined : { type }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to toggle reaction');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update reaction",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const handleReaction = (postId: number, type: 'like' | 'celebrate' | 'support' | 'insightful') => {
+    if (!user) return;
+    toggleReactionMutation.mutate({ postId, type });
+  };
+
   const addCommentMutation = useMutation({
     mutationFn: async ({ postId, content, parentCommentId }: { postId: number; content: string; parentCommentId?: number }) => {
       const response = await apiRequest('POST', `/api/social/posts/${postId}/comments`, { content, parentCommentId });
@@ -142,45 +175,6 @@ export function PostFeed() {
     }
   });
 
-  // Reaction mutations
-  const reactionMutation = useMutation({
-    mutationFn: async ({ postId, type }: { postId: number; type: string }) => {
-      const response = await apiRequest('POST', `/api/social/posts/${postId}/reactions`, { type });
-      if (!response.ok) {
-        throw new Error('Failed to update reaction');
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
-    }
-  });
-
-  const removeReactionMutation = useMutation({
-    mutationFn: async ({ postId, type }: { postId: number; type: string }) => {
-      const response = await apiRequest('DELETE', `/api/social/posts/${postId}/reactions/${type}`);
-      if (!response.ok) {
-        throw new Error('Failed to remove reaction');
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
-    }
-  });
-
-  const handleReaction = (postId: number, type: 'like' | 'celebrate' | 'support' | 'insightful') => {
-    if (!user) return;
-
-    const post = postsData?.data.find((p: any) => p.id === postId);
-    const hasReacted = post?.reactions?.some((r: any) => r.type === type && r.userId === user.id);
-
-    if (hasReacted) {
-      removeReactionMutation.mutate({ postId, type });
-    } else {
-      reactionMutation.mutate({ postId, type });
-    }
-  };
 
   const toggleReplies = (commentId: number) => {
     setExpandedReplies(prev =>
@@ -220,6 +214,10 @@ export function PostFeed() {
           }
         }
       );
+    };
+
+    const handleEditComment = (commentId: number, content: string) => {
+      editCommentMutation.mutate({ commentId, content });
     };
 
     return (
@@ -506,6 +504,7 @@ export function PostFeed() {
                     variant={hasReacted ? "secondary" : "ghost"}
                     size="sm"
                     onClick={() => handleReaction(post.id, type as 'like' | 'celebrate' | 'support' | 'insightful')}
+                    disabled={toggleReactionMutation.isPending}
                   >
                     <Icon className="h-4 w-4 mr-1" />
                     {label}
