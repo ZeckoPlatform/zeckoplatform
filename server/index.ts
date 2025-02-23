@@ -41,24 +41,27 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-// Create HTTP server
+// Create HTTP server and register routes
 const httpServer = registerRoutes(app);
 
 // Setup static/Vite serving for frontend routes
 if (isProd) {
   app.use((req, res, next) => {
     if (!req.path.startsWith('/api')) {
-      return serveStatic(app)(req, res, next);
+      serveStatic(app);
     }
     next();
   });
 } else {
-  app.use(async (req, res, next) => {
-    if (!req.path.startsWith('/api')) {
-      return setupVite(app, httpServer)(req, res, next);
+  // Handle development mode with Vite
+  (async () => {
+    try {
+      await setupVite(app, httpServer);
+    } catch (error) {
+      log('Vite setup error:', error);
+      process.exit(1);
     }
-    next();
-  });
+  })();
 }
 
 // Error handling middleware
@@ -81,16 +84,17 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   res.status(500).send('Internal Server Error');
 });
 
-const startServer = async (server: Server, port: number): Promise<boolean> => {
+// Start server function
+const startServer = async (port: number): Promise<boolean> => {
   return new Promise((resolve) => {
     let isResolved = false;
 
     const cleanup = () => {
       if (!isResolved) {
         log(`Cleaning up server on port ${port}`);
-        server.removeAllListeners();
-        if (server.listening) {
-          server.close();
+        httpServer.removeAllListeners();
+        if (httpServer.listening) {
+          httpServer.close();
         }
       }
     };
@@ -113,20 +117,19 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
     const onListening = () => {
       if (isResolved) return;
 
-      const addr = server.address();
+      const addr = httpServer.address();
       const actualPort = typeof addr === 'string' ? addr : addr?.port;
       log(`Server successfully started and listening on port ${actualPort}`);
       resolve(true);
       isResolved = true;
     };
 
-    server.once('error', onError);
-    server.once('listening', onListening);
+    httpServer.once('error', onError);
+    httpServer.once('listening', onListening);
 
     try {
-      const PORT = 5000;
-      log(`Attempting to bind to port ${PORT} on address 0.0.0.0...`);
-      server.listen(PORT, '0.0.0.0');
+      log(`Attempting to bind to port ${port} on address 0.0.0.0...`);
+      httpServer.listen(port, '0.0.0.0');
     } catch (error) {
       if (!isResolved) {
         log(`Failed to start server: ${error}`);
@@ -138,6 +141,7 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
   });
 };
 
+// Main startup function
 (async () => {
   try {
     log('=== Environment Information ===');
@@ -149,10 +153,10 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
     log(`Node Version: ${process.version}`);
     log('=== End Environment Information ===');
 
-    const PORT = 5000;
-    log(`Testing server startup with fixed port ${PORT}`);
+    const PORT = Number(process.env.PORT) || 5000;
+    log(`Starting server on port ${PORT}`);
 
-    const serverStarted = await startServer(httpServer, PORT);
+    const serverStarted = await startServer(PORT);
     if (!serverStarted) {
       throw new Error(`Could not start server on port ${PORT}`);
     }
