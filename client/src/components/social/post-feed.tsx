@@ -23,17 +23,40 @@ interface PostsResponse {
 }
 
 export function PostFeed() {
-  const { data: postsData, isLoading } = useQuery<PostsResponse>({
+  const { data: postsData, isLoading, error } = useQuery<PostsResponse>({
     queryKey: ['/social/posts'],
     queryFn: async () => {
-      const response = await fetch('/social/posts');
-      if (!response.ok) {
-        throw new Error('Failed to fetch posts');
+      try {
+        console.log('Fetching posts...');
+        const response = await fetch('/social/posts');
+
+        // Get response as text first for debugging
+        const responseText = await response.text();
+        console.log('Raw posts response:', responseText);
+
+        // Try to parse as JSON
+        let data;
+        try {
+          data = JSON.parse(responseText);
+        } catch (e) {
+          console.error('Failed to parse posts response:', responseText);
+          throw new Error('Invalid response format from server');
+        }
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Failed to fetch posts');
+        }
+
+        console.log('Parsed posts data:', data);
+        return data;
+      } catch (error) {
+        console.error('Error fetching posts:', error);
+        throw error;
       }
-      const data = await response.json();
-      return data;
     }
   });
+
+  console.log('PostFeed render - data:', postsData);
 
   if (isLoading) {
     return (
@@ -53,6 +76,17 @@ export function PostFeed() {
           </Card>
         ))}
       </div>
+    );
+  }
+
+  if (error) {
+    console.error('PostFeed error:', error);
+    return (
+      <Card>
+        <CardContent className="p-6 text-center text-destructive">
+          Error loading posts. Please try again later.
+        </CardContent>
+      </Card>
     );
   }
 

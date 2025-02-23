@@ -38,12 +38,28 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
   const createPost = useMutation({
     mutationFn: async (data: CreatePostSchema) => {
       try {
+        console.log('Sending post data:', data);
         const response = await apiRequest("POST", "/social/posts", data);
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(errorText || "Failed to create post");
+
+        // First get the response as text
+        const responseText = await response.text();
+        console.log('Raw server response:', responseText);
+
+        // Try to parse as JSON
+        let jsonResponse;
+        try {
+          jsonResponse = JSON.parse(responseText);
+        } catch (e) {
+          console.error('Failed to parse response as JSON:', responseText);
+          throw new Error('Invalid server response format');
         }
-        return await response.json();
+
+        // Check if the response was successful
+        if (!response.ok || !jsonResponse.success) {
+          throw new Error(jsonResponse.message || 'Failed to create post');
+        }
+
+        return jsonResponse.data;
       } catch (error) {
         console.error('Post creation error:', error);
         throw error;
@@ -56,6 +72,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       });
       form.reset();
       onOpenChange(false);
+      // Invalidate both possible query keys to ensure refresh
       queryClient.invalidateQueries({ queryKey: ['/social/posts'] });
     },
     onError: (error: Error) => {
