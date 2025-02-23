@@ -8,10 +8,14 @@ import { log } from "../vite";
 
 const router = Router();
 
+// Global error handler middleware for this router
+router.use((req, res, next) => {
+  res.setHeader('Content-Type', 'application/json');
+  next();
+});
+
 // Create a new post
 router.post("/api/social/posts", authenticateToken, async (req, res) => {
-  res.setHeader('Content-Type', 'application/json');
-
   try {
     log('Received post request:', req.body);
 
@@ -44,13 +48,14 @@ router.post("/api/social/posts", authenticateToken, async (req, res) => {
     }).returning();
 
     if (!post) {
+      log('Failed to create post - no post returned');
       return res.status(500).json({
         success: false,
         message: "Failed to create post"
       });
     }
 
-    log('Created post:', post);
+    log('Created post successfully:', post);
     return res.status(201).json({ 
       success: true, 
       data: post 
@@ -74,8 +79,6 @@ router.post("/api/social/posts", authenticateToken, async (req, res) => {
 
 // Get posts feed
 router.get("/api/social/posts", authenticateToken, async (req, res) => {
-  res.setHeader('Content-Type', 'application/json');
-
   try {
     const posts = await db.query.socialPosts.findMany({
       orderBy: [desc(socialPosts.createdAt)],

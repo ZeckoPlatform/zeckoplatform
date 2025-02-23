@@ -70,11 +70,11 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
           throw new Error("Server returned an invalid response");
         }
 
-        if (!response.ok) {
+        if (!response.ok || !jsonResponse.success) {
           throw new Error(jsonResponse.message || "Failed to create post");
         }
 
-        return jsonResponse;
+        return jsonResponse.data;
       } catch (error: any) {
         // If it's an authentication error, clear the token
         if (error.message.toLowerCase().includes('auth')) {
