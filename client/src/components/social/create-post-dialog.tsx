@@ -24,9 +24,15 @@ type CreatePostSchema = z.infer<typeof createPostSchema>;
 interface CreatePostDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  editPost?: {
+    id: number;
+    content: string;
+    type: string;
+    images?: string[];
+  };
 }
 
-export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) {
+export function CreatePostDialog({ open, onOpenChange, editPost }: CreatePostDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [images, setImages] = useState<{ file: File; preview: string }[]>([]);
@@ -34,7 +40,11 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
 
   const form = useForm<CreatePostSchema>({
     resolver: zodResolver(createPostSchema),
-    defaultValues: {
+    defaultValues: editPost ? {
+      content: editPost.content,
+      type: editPost.type as CreatePostSchema["type"],
+      images: editPost.images || []
+    } : {
       content: "",
       type: "update",
       images: []
@@ -104,12 +114,23 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
         // Add uploaded URLs to the post data
         const postData = {
           ...data,
-          images: uploadedUrls
+          images: [...(data.images || []), ...uploadedUrls]
         };
 
         console.log('Sending post data:', postData);
-        const response = await apiRequest("POST", "/api/social/posts", postData);
 
+        // If editing, use PATCH request
+        if (editPost) {
+          const response = await apiRequest("PATCH", `/api/social/posts/${editPost.id}`, postData);
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => null);
+            throw new Error(errorData?.message || 'Failed to update post');
+          }
+          return await response.json();
+        }
+
+        // Otherwise create new post
+        const response = await apiRequest("POST", "/api/social/posts", postData);
         if (!response.ok) {
           const errorData = await response.json().catch(() => null);
           throw new Error(errorData?.message || 'Failed to create post');
@@ -125,8 +146,8 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
     },
     onSuccess: () => {
       toast({ 
-        title: "Posted!", 
-        description: "Your update has been shared" 
+        title: editPost ? "Updated!" : "Posted!", 
+        description: editPost ? "Your post has been updated" : "Your update has been shared"
       });
       form.reset();
       // Clean up image previews
@@ -149,9 +170,9 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[525px]">
         <DialogHeader>
-          <DialogTitle>Create a post</DialogTitle>
+          <DialogTitle>{editPost ? "Edit post" : "Create a post"}</DialogTitle>
           <DialogDescription>
-            Share updates with your professional network
+            {editPost ? "Update your post" : "Share updates with your professional network"}
           </DialogDescription>
         </DialogHeader>
 
@@ -178,6 +199,22 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
 
             {/* Image upload section */}
             <div className="space-y-4">
+              {/* Show existing images from editPost */}
+              {editPost?.images && editPost.images.length > 0 && (
+                <div className="grid grid-cols-2 gap-2">
+                  {editPost.images.map((image, index) => (
+                    <div key={`existing-${index}`} className="relative">
+                      <img
+                        src={image}
+                        alt={`Existing image ${index + 1}`}
+                        className="w-full h-32 object-cover rounded-md"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Show new images being uploaded */}
               {images.length > 0 && (
                 <div className="grid grid-cols-2 gap-2">
                   {images.map((img, index) => (
@@ -228,10 +265,10 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
                   {createPost.isPending ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {isUploading ? 'Uploading...' : 'Posting...'}
+                      {isUploading ? 'Uploading...' : editPost ? 'Updating...' : 'Posting...'}
                     </>
                   ) : (
-                    'Post'
+                    editPost ? 'Update' : 'Post'
                   )}
                 </Button>
               </div>
