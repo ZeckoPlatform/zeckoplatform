@@ -11,22 +11,25 @@ interface ImageViewerModalProps {
 export function ImageViewerModal({ open, onOpenChange, imageUrl }: ImageViewerModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[90vw] max-h-[90vh] p-0 border-0 bg-transparent shadow-none">
-        <DialogTitle className="sr-only">View Image</DialogTitle>
-        <div className="relative bg-black rounded-lg overflow-hidden">
+      <DialogContent 
+        className="max-w-[90vw] max-h-[90vh] p-0 overflow-hidden border-0 bg-transparent"
+        style={{ backdropFilter: 'none' }}
+      >
+        <DialogTitle className="sr-only">Image Viewer</DialogTitle>
+        <div className="relative flex items-center justify-center bg-black/90 rounded-lg overflow-hidden">
           <Button
             variant="ghost"
             size="icon"
-            className="absolute top-2 right-2 z-50 bg-black/50 hover:bg-black/70 text-white"
+            className="absolute top-2 right-2 z-50 bg-black hover:bg-black/70 text-white"
             onClick={() => onOpenChange(false)}
+            aria-label="Close image viewer"
           >
             <X className="h-4 w-4" />
           </Button>
           <img
             src={imageUrl}
             alt="Full size view"
-            className="w-full h-full object-contain max-h-[90vh]"
-            style={{ maxWidth: '90vw' }}
+            className="max-w-[90vw] max-h-[90vh] object-contain"
           />
         </div>
       </DialogContent>
