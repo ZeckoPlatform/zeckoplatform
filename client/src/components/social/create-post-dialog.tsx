@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
 const createPostSchema = z.object({
-  content: z.string().min(1, "Post content is required")
+  content: z.string().min(1, "Please write something to share")
 });
 
 type CreatePostSchema = z.infer<typeof createPostSchema>;
@@ -56,7 +56,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       return response.json();
     },
     onSuccess: () => {
-      toast({ title: "Success", description: "Post shared!" });
+      toast({ title: "Posted!", description: "Your update has been shared" });
       form.reset();
       onOpenChange(false);
       queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
@@ -72,12 +72,9 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[525px]">
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle>Share with Your Network</DialogTitle>
-          <DialogDescription>
-            Share your thoughts with your business network
-          </DialogDescription>
+          <DialogTitle>Create a post</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
@@ -89,8 +86,8 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
                 <FormItem>
                   <FormControl>
                     <Textarea
-                      placeholder="What's on your mind?"
-                      className="min-h-[120px]"
+                      placeholder="What do you want to share?"
+                      className="min-h-[120px] resize-none"
                       {...field}
                     />
                   </FormControl>
