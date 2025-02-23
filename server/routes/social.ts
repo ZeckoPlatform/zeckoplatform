@@ -35,9 +35,6 @@ const asyncHandler = (fn: any) => (req: any, res: any, next: any) => {
 router.post("/api/social/upload", authenticateToken, (req, res) => {
   // Process the upload
   upload(req, res, async (err) => {
-    // Set JSON content type
-    res.setHeader('Content-Type', 'application/json');
-
     try {
       if (err) {
         log('Upload error:', err);

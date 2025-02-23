@@ -14,29 +14,7 @@ import { useState, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-const ACCEPTED_IMAGE_TYPES = [
-  "image/jpeg",
-  "image/jpg",
-  "image/png",
-  "image/webp",
-  "image/gif"
-];
-
-interface UploadResponse {
-  success: boolean;
-  url?: string;
-  public_id?: string;
-  error?: string;
-}
-
-const createPostSchema = z.object({
-  content: z.string().min(1, "Post content is required"),
-  type: z.enum(["update", "article", "success_story", "market_insight", "opportunity"]),
-  mediaUrls: z.array(z.string()).optional(),
-  linkUrl: z.string().url("Please enter a valid URL").optional().or(z.literal("")),
-});
-
-type CreatePostSchema = z.infer<typeof createPostSchema>;
+const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
 
 interface CreatePostDialogProps {
   open: boolean;
@@ -53,8 +31,13 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
 
-  const form = useForm<CreatePostSchema>({
-    resolver: zodResolver(createPostSchema),
+  const form = useForm({
+    resolver: zodResolver(z.object({
+      content: z.string().min(1, "Post content is required"),
+      type: z.enum(["update", "article", "success_story", "market_insight", "opportunity"]),
+      mediaUrls: z.array(z.string()).optional(),
+      linkUrl: z.string().url("Please enter a valid URL").optional().or(z.literal("")),
+    })),
     defaultValues: {
       content: "",
       type: "update",
@@ -78,16 +61,25 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       const formData = new FormData();
       formData.append('file', file);
 
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error("Authentication token not found");
+      }
+
       const response = await fetch('/api/social/upload', {
         method: 'POST',
         body: formData,
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
         },
       });
 
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.statusText}`);
+      }
 
+      const data = await response.json();
       if (!data.success || !data.url) {
         throw new Error(data.error || "Failed to upload image");
       }
@@ -116,12 +108,11 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
   });
 
   const createPost = useMutation({
-    mutationFn: async (data: CreatePostSchema) => {
+    mutationFn: async (data: any) => {
       const response = await apiRequest("POST", "/api/social/posts", {
         content: data.content,
         type: data.type,
         mediaUrls: data.mediaUrls || [],
-        ...(data.linkUrl ? { linkUrl: data.linkUrl } : {})
       });
 
       if (!response.ok) {
@@ -156,24 +147,6 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       await uploadImageMutation.mutateAsync(files[0]);
     } catch (error) {
       console.error('File upload error:', error);
-    }
-  };
-
-  const handleMediaAdd = (url: string) => {
-    if (!url) return;
-    try {
-      new URL(url);
-      const currentUrls = form.getValues("mediaUrls") || [];
-      form.setValue("mediaUrls", [...currentUrls, url]);
-      setSelectedImages([...selectedImages, url]);
-      setShowMediaInput(false);
-      setUploadType(null);
-    } catch (e) {
-      toast({
-        title: "Error",
-        description: "Please enter a valid URL",
-        variant: "destructive",
-      });
     }
   };
 
@@ -242,14 +215,6 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => setUploadType('url')}
-                      className="flex-1"
-                    >
-                      Add Image URL
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
                       onClick={() => {
                         setUploadType('file');
                         fileInputRef.current?.click();
@@ -259,35 +224,6 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
                       Upload Image
                     </Button>
                   </div>
-                ) : uploadType === 'url' ? (
-                  <FormField
-                    control={form.control}
-                    name="mediaUrls"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormControl>
-                          <div className="flex gap-2">
-                            <Input
-                              type="url"
-                              placeholder="Enter image URL"
-                              onChange={(e) => handleMediaAdd(e.target.value)}
-                            />
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => {
-                                setShowMediaInput(false);
-                                setUploadType(null);
-                              }}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                 ) : null}
                 <input
                   type="file"
@@ -297,34 +233,6 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
                   onChange={(e) => handleFileUpload(e.target.files)}
                 />
               </div>
-            )}
-
-            {showLinkInput && (
-              <FormField
-                control={form.control}
-                name="linkUrl"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormControl>
-                      <div className="flex gap-2">
-                        <Input
-                          type="url"
-                          placeholder="Enter link URL"
-                          {...field}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setShowLinkInput(false)}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             )}
 
             <div className="flex items-center space-x-2">
@@ -339,18 +247,6 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
               >
                 <Image className="h-4 w-4 mr-2" />
                 Add Image
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setShowLinkInput(true);
-                  setShowMediaInput(false);
-                }}
-              >
-                <Link className="h-4 w-4 mr-2" />
-                Add Link
               </Button>
             </div>
 
