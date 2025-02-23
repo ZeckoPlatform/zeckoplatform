@@ -52,7 +52,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
     }
   }, [editPost, form]);
 
-  const handleImageUpload = async (file: File) => {
+  const handleImageUpload = async (file: File): Promise<string> => {
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -162,6 +162,9 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
       images.forEach(img => URL.revokeObjectURL(img.preview));
       setImages([]);
       onOpenChange(false);
+
+      // Refetch to ensure we have the latest data
+      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     },
     onError: (error: Error) => {
       toast({

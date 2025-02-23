@@ -35,12 +35,16 @@ export function PostFeed() {
         throw new Error('Failed to fetch posts');
       }
       return response.json();
-    },
+    }
   });
 
   const editPostMutation = useMutation({
     mutationFn: async ({ id, content, type }: { id: number; content: string; type: Post['type'] }) => {
-      const response = await apiRequest('PATCH', `/api/social/posts/${id}`, { content, type });
+      const response = await apiRequest('PATCH', `/api/social/posts/${id}`, { 
+        content, 
+        type,
+        images: editingPost?.images || [] // Preserve existing images
+      });
       if (!response.ok) {
         throw new Error('Failed to update post');
       }
@@ -48,6 +52,7 @@ export function PostFeed() {
       return responseData.data;
     },
     onSuccess: (updatedPost) => {
+      // Update local cache
       queryClient.setQueryData<PostsResponse>(['/api/social/posts'], (old) => {
         if (!old) return { success: true, data: [updatedPost] };
         return {
@@ -55,11 +60,15 @@ export function PostFeed() {
           data: old.data.map(post => post.id === updatedPost.id ? updatedPost : post)
         };
       });
+
       toast({
         title: "Success",
         description: "Post updated successfully",
       });
       setEditingPost(null);
+
+      // Refetch to ensure sync
+      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     },
     onError: (error: Error) => {
       toast({
@@ -79,6 +88,7 @@ export function PostFeed() {
       return postId;
     },
     onSuccess: (deletedPostId) => {
+      // Update local cache immediately
       queryClient.setQueryData<PostsResponse>(['/api/social/posts'], (old) => {
         if (!old) return { success: true, data: [] };
         return {
@@ -94,7 +104,7 @@ export function PostFeed() {
       setIsDeleteDialogOpen(false);
       setPostToDelete(null);
 
-      // Refetch to ensure server sync
+      // Force refetch to ensure sync with server
       queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     },
     onError: (error: Error) => {
@@ -183,7 +193,7 @@ export function PostFeed() {
       )}
 
       {postsData.data.map((post) => (
-        <Card key={post.id}>
+        <Card key={post.id} className="overflow-hidden">
           <CardHeader className="flex flex-row items-center justify-between">
             <div className="flex items-center gap-4">
               <Avatar>
