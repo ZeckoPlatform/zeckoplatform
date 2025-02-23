@@ -27,6 +27,11 @@ const upload = multer({
   }
 }).single('file');
 
+// Wrapper to handle async errors
+const asyncHandler = (fn: any) => (req: any, res: any, next: any) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
+
 // File upload endpoint with auth
 router.post("/api/social/upload", authenticateToken, (req, res) => {
   // Set proper content type for JSON response
@@ -77,67 +82,63 @@ router.post("/api/social/upload", authenticateToken, (req, res) => {
 });
 
 // Create a new post
-router.post("/api/social/posts", authenticateToken, async (req, res) => {
-  try {
-    const schema = z.object({
-      content: z.string().min(1),
-      type: z.enum(["update", "article", "success_story", "market_insight", "opportunity"]),
-      mediaUrls: z.array(z.string()).optional(),
-      linkUrl: z.string().url().optional(),
-    });
+router.post("/api/social/posts", authenticateToken, asyncHandler(async (req, res) => {
+  const schema = z.object({
+    content: z.string().min(1),
+    type: z.enum(["update", "article", "success_story", "market_insight", "opportunity"]),
+    mediaUrls: z.array(z.string()).optional(),
+    linkUrl: z.string().url().optional(),
+  });
 
-    const data = schema.parse(req.body);
+  const data = schema.parse(req.body);
 
-    const [post] = await db.insert(socialPosts).values({
-      content: data.content,
-      type: data.type,
-      mediaUrls: data.mediaUrls || [],
-      userId: req.user!.id,
-      ...(data.linkUrl ? { metadata: { linkUrl: data.linkUrl } } : {}),
-      createdAt: new Date(),
-      updatedAt: new Date()
-    }).returning();
+  const [post] = await db.insert(socialPosts).values({
+    content: data.content,
+    type: data.type,
+    mediaUrls: data.mediaUrls || [],
+    userId: req.user!.id,
+    ...(data.linkUrl ? { metadata: { linkUrl: data.linkUrl } } : {}),
+    createdAt: new Date(),
+    updatedAt: new Date()
+  }).returning();
 
-    res.json(post);
-  } catch (error) {
-    log("Failed to create post:", error instanceof Error ? error.message : 'Unknown error');
-    res.status(400).json({ 
-      error: "Failed to create post",
-      details: error instanceof Error ? error.message : "Unknown error"
-    });
-  }
-});
+  res.json(post);
+}));
 
 // Get posts feed with pagination
-router.get("/api/social/posts", async (req, res) => {
-  try {
-    const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 10;
-    const offset = (page - 1) * limit;
+router.get("/api/social/posts", asyncHandler(async (req, res) => {
+  const page = Number(req.query.page) || 1;
+  const limit = Number(req.query.limit) || 10;
+  const offset = (page - 1) * limit;
 
-    const [postsResult, totalResult] = await Promise.all([
-      db.select()
-        .from(socialPosts)
-        .orderBy(desc(socialPosts.createdAt))
-        .limit(limit)
-        .offset(offset),
-      db.select({ count: sql<number>`count(*)::int` })
-        .from(socialPosts)
-    ]);
+  const [postsResult, totalResult] = await Promise.all([
+    db.select()
+      .from(socialPosts)
+      .orderBy(desc(socialPosts.createdAt))
+      .limit(limit)
+      .offset(offset),
+    db.select({ count: sql<number>`count(*)::int` })
+      .from(socialPosts)
+  ]);
 
-    res.json({
-      posts: postsResult,
-      pagination: {
-        page,
-        limit,
-        total: totalResult[0].count,
-        hasMore: offset + postsResult.length < totalResult[0].count
-      }
-    });
-  } catch (error) {
-    log("Failed to fetch posts:", error instanceof Error ? error.message : 'Unknown error');
-    res.status(500).json({ error: "Failed to fetch posts" });
-  }
+  res.json({
+    posts: postsResult,
+    pagination: {
+      page,
+      limit,
+      total: totalResult[0].count,
+      hasMore: offset + postsResult.length < totalResult[0].count
+    }
+  });
+}));
+
+// Error handling middleware
+router.use((err: any, req: any, res: any, next: any) => {
+  log('Error in social routes:', err);
+  res.status(500).json({
+    success: false,
+    error: err.message || 'An unexpected error occurred'
+  });
 });
 
 export default router;

@@ -105,19 +105,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
           }
         }
 
-        // Get the response text first
-        const responseText = await response.text();
-
-        console.log('Upload response text:', responseText);
-
-        // Try to parse as JSON
-        let data: UploadResponse;
-        try {
-          data = JSON.parse(responseText);
-        } catch (parseError) {
-          console.error('Failed to parse response:', parseError);
-          throw new Error('Invalid response format from server');
-        }
+        const data: UploadResponse = await response.json();
 
         if (!data.success || !data.url) {
           throw new Error(data.error || "Failed to upload image");
