@@ -24,7 +24,7 @@ interface CreatePostDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editPost?: Post;
-  onEdit?: (content: string, type: Post['type']) => void;
+  onEdit?: (post: CreatePostSchema) => void;
 }
 
 export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: CreatePostDialogProps) {
@@ -54,6 +54,11 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
       });
     } else {
       setExistingImages([]);
+      form.reset({
+        content: "",
+        type: "update",
+        images: []
+      });
     }
   }, [editPost, form]);
 
@@ -179,10 +184,76 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
     }
   });
 
+  const editPostMutation = useMutation({
+    mutationFn: async (data: CreatePostSchema) => {
+      try {
+        setIsUploading(true);
+        let uploadedUrls: string[] = [];
+
+        if (images.length > 0) {
+          uploadedUrls = await Promise.all(
+            images.map(img => handleImageUpload(img.file))
+          );
+        }
+
+        if (!editPost?.id) throw new Error('Post ID is required for editing');
+
+        const postData = {
+          content: data.content,
+          type: data.type,
+          images: [...existingImages, ...uploadedUrls]
+        };
+
+        const response = await apiRequest("PATCH", `/api/social/posts/${editPost?.id}`, postData);
+        if (!response.ok) {
+          throw new Error('Failed to update post');
+        }
+
+        const result: PostMutationResponse = await response.json();
+        return result.data;
+      } catch (error) {
+        throw error instanceof Error ? error : new Error('Failed to update post');
+      } finally {
+        setIsUploading(false);
+      }
+    },
+    onSuccess: (updatedPost) => {
+      queryClient.setQueryData<PostResponse>(['/api/social/posts'], (old: any) => {
+        if (!old) return { success: true, data: [updatedPost] };
+        return {
+          ...old,
+          data: old.data.map((post: Post) =>
+            post.id === updatedPost.id ? updatedPost : post
+          )
+        };
+      });
+
+      toast({
+        title: "Success",
+        description: "Your post has been updated"
+      });
+
+      form.reset();
+      images.forEach(img => URL.revokeObjectURL(img.preview));
+      setImages([]);
+      setExistingImages([]);
+      onOpenChange(false);
+
+      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
   const handleSubmit = async (data: CreatePostSchema) => {
     try {
-      if (editPost && onEdit) {
-        onEdit(data.content, data.type);
+      if (editPost) {
+        await editPostMutation.mutateAsync(data);
       } else {
         await createPost.mutateAsync(data);
       }
@@ -196,6 +267,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
   };
 
   const totalImages = existingImages.length + images.length;
+  const isSubmitting = createPost.isPending || editPostMutation.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -277,7 +349,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
                   type="button"
                   variant="outline"
                   onClick={() => document.getElementById('image-upload')?.click()}
-                  disabled={createPost.isPending || totalImages >= 4}
+                  disabled={isSubmitting || totalImages >= 4}
                 >
                   <ImagePlus className="mr-2 h-4 w-4" />
                   {totalImages >= 4 ? 'Max images reached' : 'Add Images'}
@@ -295,9 +367,9 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
 
                 <Button
                   type="submit"
-                  disabled={createPost.isPending || (!form.formState.isDirty && images.length === 0 && existingImages.length === existingImages.length)}
+                  disabled={isSubmitting || (!form.formState.isDirty && images.length === 0 && existingImages.length === existingImages.length)}
                 >
-                  {createPost.isPending ? (
+                  {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       {isUploading ? 'Uploading...' : editPost ? 'Updating...' : 'Posting...'}
