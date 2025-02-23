@@ -66,6 +66,58 @@ export function PostFeed() {
     enabled: !!user // Only fetch when user is authenticated
   });
 
+  const editPostMutation = useMutation({
+    mutationFn: async ({ id, content, type }: { id: number; content: string; type: string }) => {
+      const response = await apiRequest('PATCH', `/api/social/posts/${id}`, { content, type });
+      if (!response.ok) {
+        throw new Error('Failed to update post');
+      }
+      return { id, content, type };
+    },
+    onMutate: async ({ id, content, type }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['/api/social/posts'] });
+
+      // Snapshot the previous value
+      const previousPosts = queryClient.getQueryData<PostsResponse>(['/api/social/posts']);
+
+      // Optimistically update to the new value
+      if (previousPosts) {
+        const updatedPosts = {
+          ...previousPosts,
+          data: previousPosts.data.map(post =>
+            post.id === id ? { ...post, content, type } : post
+          )
+        };
+        queryClient.setQueryData(['/api/social/posts'], updatedPosts);
+      }
+
+      return { previousPosts };
+    },
+    onError: (err, newPost, context) => {
+      // Revert back to the previous state if there's an error
+      if (context?.previousPosts) {
+        queryClient.setQueryData(['/api/social/posts'], context.previousPosts);
+      }
+      toast({
+        title: "Error",
+        description: err.message || "Failed to update post",
+        variant: "destructive",
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Post updated successfully",
+      });
+      setEditingPost(null);
+    },
+    onSettled: () => {
+      // Invalidate and refetch
+      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
+    },
+  });
+
   const deletePostMutation = useMutation({
     mutationFn: async (postId: number) => {
       const response = await apiRequest('DELETE', `/api/social/posts/${postId}`);
@@ -249,6 +301,13 @@ export function PostFeed() {
             if (!open) setEditingPost(null);
           }}
           editPost={editingPost}
+          onEdit={(content, type) => {
+            editPostMutation.mutate({
+              id: editingPost.id,
+              content,
+              type
+            });
+          }}
         />
       )}
 

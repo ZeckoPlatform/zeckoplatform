@@ -29,9 +29,10 @@ interface CreatePostDialogProps {
     type: string;
     images?: string[];
   };
+  onEdit?: (content: string, type: string) => void;
 }
 
-export function CreatePostDialog({ open, onOpenChange, editPost }: CreatePostDialogProps) {
+export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: CreatePostDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [images, setImages] = useState<{ file: File; preview: string }[]>([]);
@@ -251,6 +252,25 @@ export function CreatePostDialog({ open, onOpenChange, editPost }: CreatePostDia
     }
   });
 
+  const handleSubmit = async (data: CreatePostSchema) => {
+    try {
+      if (editPost && onEdit) {
+        // If editing, call onEdit callback
+        onEdit(data.content, data.type);
+      } else {
+        // Otherwise create new post
+        createPost.mutate(data);
+      }
+    } catch (error) {
+      console.error('Form submission error:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[525px]">
@@ -263,7 +283,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost }: CreatePostDia
 
         <Form {...form}>
           <form 
-            onSubmit={form.handleSubmit((data) => createPost.mutate(data))} 
+            onSubmit={form.handleSubmit(handleSubmit)} 
             className="space-y-4"
           >
             <FormField
