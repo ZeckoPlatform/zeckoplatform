@@ -72,6 +72,7 @@ export function PostFeed() {
       if (!response.ok) {
         throw new Error('Failed to update post');
       }
+      // Return the updated post data
       return { id, content, type };
     },
     onMutate: async ({ id, content, type }) => {
@@ -86,7 +87,9 @@ export function PostFeed() {
         const updatedPosts = {
           ...previousPosts,
           data: previousPosts.data.map(post =>
-            post.id === id ? { ...post, content, type } : post
+            post.id === id 
+              ? { ...post, content, type }
+              : post
           )
         };
         queryClient.setQueryData(['/api/social/posts'], updatedPosts);
@@ -111,11 +114,7 @@ export function PostFeed() {
         description: "Post updated successfully",
       });
       setEditingPost(null);
-    },
-    onSettled: () => {
-      // Invalidate and refetch
-      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
-    },
+    }
   });
 
   const deletePostMutation = useMutation({
@@ -126,33 +125,42 @@ export function PostFeed() {
       }
       return postId;
     },
-    onSuccess: (deletedPostId) => {
-      // Optimistically remove the post from the cache
-      const currentData = queryClient.getQueryData<PostsResponse>(['/api/social/posts']);
-      if (currentData) {
+    onMutate: async (postId) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['/api/social/posts'] });
+
+      // Snapshot the previous value
+      const previousPosts = queryClient.getQueryData<PostsResponse>(['/api/social/posts']);
+
+      // Optimistically update to the new value
+      if (previousPosts) {
         const updatedPosts = {
-          ...currentData,
-          data: currentData.data.filter(post => post.id !== deletedPostId)
+          ...previousPosts,
+          data: previousPosts.data.filter(post => post.id !== postId)
         };
         queryClient.setQueryData(['/api/social/posts'], updatedPosts);
       }
 
+      return { previousPosts };
+    },
+    onError: (err, postId, context) => {
+      // Revert back to the previous state if there's an error
+      if (context?.previousPosts) {
+        queryClient.setQueryData(['/api/social/posts'], context.previousPosts);
+      }
+      toast({
+        title: "Error",
+        description: err.message || "Failed to delete post",
+        variant: "destructive",
+      });
+    },
+    onSuccess: () => {
       toast({
         title: "Success",
         description: "Post deleted successfully",
       });
       setIsDeleteDialogOpen(false);
       setPostToDelete(null);
-    },
-    onError: (error: Error) => {
-      // Revert optimistic update on error
-      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
-
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete post",
-        variant: "destructive",
-      });
     }
   });
 
