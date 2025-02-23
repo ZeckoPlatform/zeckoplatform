@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
@@ -66,9 +66,12 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[525px]">
+      <DialogContent className="sm:max-w-[525px]" aria-describedby="post-dialog-description">
         <DialogHeader>
           <DialogTitle>Share with Your Network</DialogTitle>
+          <DialogDescription id="post-dialog-description">
+            Share your thoughts with your business network
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -80,7 +83,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
                 <FormItem>
                   <FormControl>
                     <Textarea
-                      placeholder="Share your thoughts..."
+                      placeholder="What's on your mind?"
                       className="min-h-[120px]"
                       {...field}
                     />
