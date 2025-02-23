@@ -11,6 +11,8 @@ import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import type { PostsResponse } from "@/types/posts";
+
 
 const createPostSchema = z.object({
   content: z.string().min(1, "Please write something to share"),
@@ -127,6 +129,7 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
       const formData = new FormData();
       formData.append('file', resizedBlob, file.name);
 
+      // Use fetch with auth token for FormData upload
       const response = await fetch('/api/upload', {
         method: 'POST',
         headers: {
@@ -168,10 +171,6 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
     }
 
     setImages([...images, ...newImages]);
-    // Mark form as dirty when new images are added
-    form.setValue("images", [...(form.getValues("images") || []), ...Array(newImages.length).fill("")], {
-      shouldDirty: true
-    });
   };
 
   const removeImage = (index: number) => {
@@ -179,10 +178,6 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
     URL.revokeObjectURL(newImages[index].preview);
     newImages.splice(index, 1);
     setImages(newImages);
-    // Mark form as dirty when images are removed
-    form.setValue("images", form.getValues("images")?.filter((_, i) => i !== index) || [], {
-      shouldDirty: true
-    });
   };
 
   const createPost = useMutation({
@@ -199,31 +194,30 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
         // Add uploaded URLs to the post data
         const postData = {
           ...data,
-          images: editPost
-            ? [...(editPost.images || []), ...uploadedUrls] // Keep existing images when editing
-            : uploadedUrls // Only new images for new posts
+          images: uploadedUrls
         };
 
         console.log('Sending post data:', postData);
 
-        // If editing, use PATCH request
-        if (editPost) {
-          const response = await apiRequest("PATCH", `/api/social/posts/${editPost.id}`, postData);
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => null);
-            throw new Error(errorData?.message || 'Failed to update post');
-          }
-          return await response.json();
-        }
 
-        // Otherwise create new post
         const response = await apiRequest("POST", "/api/social/posts", postData);
         if (!response.ok) {
           const errorData = await response.json().catch(() => null);
           throw new Error(errorData?.message || 'Failed to create post');
         }
 
-        return await response.json();
+        const newPost = await response.json();
+
+        // Update cache with new post
+        queryClient.setQueryData<PostsResponse>(['/api/social/posts'], (old) => {
+          if (!old) return { success: true, data: [newPost] };
+          return {
+            ...old,
+            data: [newPost, ...old.data]
+          };
+        });
+
+        return newPost;
       } catch (error) {
         console.error('Post creation error:', error);
         throw error;
@@ -233,8 +227,8 @@ export function CreatePostDialog({ open, onOpenChange, editPost, onEdit }: Creat
     },
     onSuccess: () => {
       toast({
-        title: editPost ? "Updated!" : "Posted!",
-        description: editPost ? "Your post has been updated" : "Your update has been shared"
+        title: "Posted!",
+        description: "Your update has been shared"
       });
       form.reset();
       // Clean up image previews

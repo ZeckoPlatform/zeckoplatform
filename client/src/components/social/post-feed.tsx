@@ -33,6 +33,7 @@ interface Post {
 }
 
 interface PostsResponse {
+  success: boolean;
   data: Post[];
 }
 
@@ -50,11 +51,9 @@ export function PostFeed() {
       try {
         console.log('Fetching posts...');
         const response = await apiRequest('GET', '/api/social/posts');
-
         if (!response.ok) {
           throw new Error('Failed to fetch posts');
         }
-
         const data = await response.json();
         console.log('Parsed posts data:', data);
         return data;
@@ -63,7 +62,7 @@ export function PostFeed() {
         throw error;
       }
     },
-    enabled: !!user // Only fetch when user is authenticated
+    enabled: !!user
   });
 
   const editPostMutation = useMutation({
@@ -72,48 +71,31 @@ export function PostFeed() {
       if (!response.ok) {
         throw new Error('Failed to update post');
       }
-      // Return the updated post data
-      return { id, content, type };
+      const updatedPost = await response.json();
+      return updatedPost;
     },
-    onMutate: async ({ id, content, type }) => {
-      // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ['/api/social/posts'] });
-
-      // Snapshot the previous value
-      const previousPosts = queryClient.getQueryData<PostsResponse>(['/api/social/posts']);
-
-      // Optimistically update to the new value
-      if (previousPosts) {
-        const updatedPosts = {
-          ...previousPosts,
-          data: previousPosts.data.map(post =>
-            post.id === id 
-              ? { ...post, content, type }
-              : post
-          )
+    onSuccess: (updatedPost) => {
+      queryClient.setQueryData<PostsResponse>(['/api/social/posts'], (old) => {
+        if (!old) return { success: true, data: [updatedPost] };
+        return {
+          ...old,
+          data: old.data.map(post => post.id === updatedPost.id ? updatedPost : post)
         };
-        queryClient.setQueryData(['/api/social/posts'], updatedPosts);
-      }
-
-      return { previousPosts };
-    },
-    onError: (err, newPost, context) => {
-      // Revert back to the previous state if there's an error
-      if (context?.previousPosts) {
-        queryClient.setQueryData(['/api/social/posts'], context.previousPosts);
-      }
-      toast({
-        title: "Error",
-        description: err.message || "Failed to update post",
-        variant: "destructive",
       });
-    },
-    onSuccess: () => {
       toast({
         title: "Success",
         description: "Post updated successfully",
       });
       setEditingPost(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update post",
+        variant: "destructive",
+      });
+      // Refetch to ensure data consistency
+      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     }
   });
 
@@ -125,57 +107,40 @@ export function PostFeed() {
       }
       return postId;
     },
-    onMutate: async (postId) => {
-      // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ['/api/social/posts'] });
-
-      // Snapshot the previous value
-      const previousPosts = queryClient.getQueryData<PostsResponse>(['/api/social/posts']);
-
-      // Optimistically update to the new value
-      if (previousPosts) {
-        const updatedPosts = {
-          ...previousPosts,
-          data: previousPosts.data.filter(post => post.id !== postId)
+    onSuccess: (deletedPostId) => {
+      queryClient.setQueryData<PostsResponse>(['/api/social/posts'], (old) => {
+        if (!old) return { success: true, data: [] };
+        return {
+          ...old,
+          data: old.data.filter(post => post.id !== deletedPostId)
         };
-        queryClient.setQueryData(['/api/social/posts'], updatedPosts);
-      }
-
-      return { previousPosts };
-    },
-    onError: (err, postId, context) => {
-      // Revert back to the previous state if there's an error
-      if (context?.previousPosts) {
-        queryClient.setQueryData(['/api/social/posts'], context.previousPosts);
-      }
-      toast({
-        title: "Error",
-        description: err.message || "Failed to delete post",
-        variant: "destructive",
       });
-    },
-    onSuccess: () => {
       toast({
         title: "Success",
         description: "Post deleted successfully",
       });
       setIsDeleteDialogOpen(false);
       setPostToDelete(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete post",
+        variant: "destructive",
+      });
+      // Refetch to ensure data consistency
+      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     }
   });
 
   // Helper function to check if user can edit/delete a post
   const canModifyPost = (post: Post) => {
     if (!user) return false;
-
-    // Super admin can modify all posts
     if (user.userType === 'admin') return true;
-
-    // Post creator can modify their own posts
     return user.id === post.user?.id;
   };
 
-  // Check if current user is admin for showing moderation indicators
+  // Check if current user is admin
   const isAdmin = user?.userType === 'admin';
 
   if (isLoading) {
@@ -200,7 +165,6 @@ export function PostFeed() {
   }
 
   if (error) {
-    console.error('PostFeed error:', error);
     return (
       <Card>
         <CardContent className="p-6 text-center text-destructive">
