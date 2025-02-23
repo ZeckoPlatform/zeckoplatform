@@ -10,30 +10,30 @@ const isProd = app.get('env') === 'production';
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Debug middleware
-app.use((req, res, next) => {
-  if (req.path.startsWith('/api')) {
-    log('=== Request Debug Info ===');
-    log(`Path: ${req.method} ${req.path}`);
-    log(`Authorization: ${req.headers.authorization ? 'Present' : 'Missing'}`);
-    log(`Query params: ${JSON.stringify(req.query)}`);
-    log(`Body length: ${req.body ? JSON.stringify(req.body).length : 0}`);
-    log('=== End Debug Info ===');
-  }
+// API-specific middleware - only apply to /api routes
+app.use('/api', (req, res, next) => {
+  res.setHeader('Content-Type', 'application/json');
+
+  // Debug logging for API requests
+  log('=== API Request Debug Info ===');
+  log(`Path: ${req.method} ${req.path}`);
+  log(`Authorization: ${req.headers.authorization ? 'Present' : 'Missing'}`);
+  log(`Query params: ${JSON.stringify(req.query)}`);
+  log(`Body length: ${req.body ? JSON.stringify(req.body).length : 0}`);
+  log('=== End Debug Info ===');
+
   next();
 });
 
-// CORS middleware
-app.use((req, res, next) => {
+// CORS middleware - only apply to /api routes
+app.use('/api', (req, res, next) => {
   const origin = req.headers.origin;
-  if (!origin) {
-    return next();
+  if (origin) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.header('Access-Control-Allow-Credentials', 'true');
   }
-
-  res.header('Access-Control-Allow-Origin', origin);
-  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.header('Access-Control-Allow-Credentials', 'true');
 
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
@@ -41,19 +41,45 @@ app.use((req, res, next) => {
   next();
 });
 
-// Error handling
-app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  log(`Server error: ${err.message}`);
-  log(`Stack trace: ${err.stack}`);
-  res.status(500).json({ message: "Internal server error" });
-});
+// Create HTTP server
+const httpServer = registerRoutes(app);
 
-const createServer = (): Server => {
-  log('Creating HTTP server...');
-  const server = registerRoutes(app);
-  log('Routes registered successfully');
-  return server;
-};
+// Setup static/Vite serving for frontend routes
+if (isProd) {
+  app.use((req, res, next) => {
+    if (!req.path.startsWith('/api')) {
+      return serveStatic(app)(req, res, next);
+    }
+    next();
+  });
+} else {
+  app.use(async (req, res, next) => {
+    if (!req.path.startsWith('/api')) {
+      return setupVite(app, httpServer)(req, res, next);
+    }
+    next();
+  });
+}
+
+// Error handling middleware
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  log('Error handler:', err);
+
+  if (res.headersSent) {
+    return next(err);
+  }
+
+  // Send JSON responses for API routes
+  if (req.path.startsWith('/api')) {
+    return res.status(err.status || 500).json({
+      success: false,
+      error: err.message || 'An unexpected error occurred'
+    });
+  }
+
+  // Send HTML error for frontend routes
+  res.status(500).send('Internal Server Error');
+});
 
 const startServer = async (server: Server, port: number): Promise<boolean> => {
   return new Promise((resolve) => {
@@ -98,7 +124,6 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
     server.once('listening', onListening);
 
     try {
-      // Hardcode port 5000 for testing
       const PORT = 5000;
       log(`Attempting to bind to port ${PORT} on address 0.0.0.0...`);
       server.listen(PORT, '0.0.0.0');
@@ -115,7 +140,6 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
 
 (async () => {
   try {
-    // Log environment information
     log('=== Environment Information ===');
     log(`NODE_ENV: ${process.env.NODE_ENV}`);
     log(`PORT: ${process.env.PORT}`);
@@ -125,34 +149,15 @@ const startServer = async (server: Server, port: number): Promise<boolean> => {
     log(`Node Version: ${process.version}`);
     log('=== End Environment Information ===');
 
-    log('Initializing server...');
-    const server = createServer();
-
-    // Use hardcoded port 5000 for testing
     const PORT = 5000;
     log(`Testing server startup with fixed port ${PORT}`);
 
-    const serverStarted = await startServer(server, PORT);
-    if (serverStarted) {
-      log('Server started successfully, setting up services...');
-      try {
-        if (app.get("env") === "development") {
-          log('Setting up Vite development server...');
-          await setupVite(app, server);
-          log('Vite setup completed successfully');
-        } else {
-          log('Production mode: Setting up static file serving...');
-          serveStatic(app);
-          log('Static file serving setup completed');
-        }
-        log('Server setup completed successfully');
-      } catch (error) {
-        log(`Error during Vite/static setup: ${error}`);
-        throw error;
-      }
-    } else {
+    const serverStarted = await startServer(httpServer, PORT);
+    if (!serverStarted) {
       throw new Error(`Could not start server on port ${PORT}`);
     }
+
+    log('Server started successfully');
   } catch (error) {
     log(`Fatal server startup error: ${error}`);
     process.exit(1);

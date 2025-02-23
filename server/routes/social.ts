@@ -8,12 +8,6 @@ import { log } from "../vite";
 
 const router = Router();
 
-// Global error handler middleware for this router
-router.use((req, res, next) => {
-  res.setHeader('Content-Type', 'application/json');
-  next();
-});
-
 // Create a new post
 router.post("/api/social/posts", authenticateToken, async (req, res) => {
   try {
