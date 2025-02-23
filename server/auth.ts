@@ -42,6 +42,8 @@ export function generateToken(user: SelectUser) {
 
 // Middleware to authenticate requests using either JWT token or session
 export function authenticateToken(req: Request, res: Response, next: NextFunction) {
+  res.setHeader('Content-Type', 'application/json');
+
   // First check if user is authenticated via session
   if (req.isAuthenticated && req.isAuthenticated()) {
     log('User authenticated via session');
@@ -54,13 +56,19 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
 
   if (!token) {
     log('No authentication token found');
-    return res.status(401).json({ message: "Authentication required" });
+    return res.status(401).json({ 
+      success: false,
+      message: "Authentication required" 
+    });
   }
 
   jwt.verify(token, JWT_SECRET, async (err: any, decoded: any) => {
     if (err) {
       log('Invalid token:', err.message);
-      return res.status(401).json({ message: "Invalid or expired token" });
+      return res.status(401).json({ 
+        success: false,
+        message: "Invalid or expired token" 
+      });
     }
 
     try {
@@ -72,7 +80,10 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
 
       if (!user) {
         log('User not found for token');
-        return res.status(401).json({ message: "User not found" });
+        return res.status(401).json({ 
+          success: false,
+          message: "User not found" 
+        });
       }
 
       req.user = user;
@@ -80,7 +91,10 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
       next();
     } catch (error) {
       log('Database error in auth middleware:', error);
-      return res.status(500).json({ message: "Internal server error" });
+      return res.status(500).json({ 
+        success: false,
+        message: "Internal server error" 
+      });
     }
   });
 }

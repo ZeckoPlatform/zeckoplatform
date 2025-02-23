@@ -37,36 +37,51 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
   const createPost = useMutation({
     mutationFn: async (data: CreatePostSchema) => {
       const token = localStorage.getItem('token');
-      if (!token) throw new Error("Not authenticated");
+      if (!token) {
+        toast({
+          title: "Authentication Error",
+          description: "Please log in to create posts",
+          variant: "destructive"
+        });
+        throw new Error("Not authenticated");
+      }
 
       console.log('Sending post data:', data);
 
-      const response = await fetch('/api/social/posts', {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(data)
-      });
-
-      const responseText = await response.text();
-      console.log('Raw response:', responseText);
-
-      let jsonResponse;
       try {
-        jsonResponse = JSON.parse(responseText);
-      } catch (e) {
-        console.error('Failed to parse response:', responseText);
-        throw new Error("Server returned an invalid response");
-      }
+        const response = await fetch('/api/social/posts', {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(data)
+        });
 
-      if (!response.ok) {
-        throw new Error(jsonResponse.message || "Failed to create post");
-      }
+        const responseText = await response.text();
+        console.log('Raw response:', responseText);
 
-      return jsonResponse;
+        let jsonResponse;
+        try {
+          jsonResponse = JSON.parse(responseText);
+        } catch (e) {
+          console.error('Failed to parse response:', responseText);
+          throw new Error("Server returned an invalid response");
+        }
+
+        if (!response.ok) {
+          throw new Error(jsonResponse.message || "Failed to create post");
+        }
+
+        return jsonResponse;
+      } catch (error: any) {
+        // If it's an authentication error, clear the token
+        if (error.message.toLowerCase().includes('auth')) {
+          localStorage.removeItem('token');
+        }
+        throw error;
+      }
     },
     onSuccess: () => {
       toast({ 
