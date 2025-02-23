@@ -11,32 +11,38 @@ const router = Router();
 // Create a new post
 router.post("/api/social/posts", authenticateToken, async (req, res) => {
   try {
-    log('Received post request body:', req.body);
+    log('Received post request:', req.body);
 
     const schema = z.object({
       content: z.string().min(1, "Please write something to share"),
-      type: z.literal("update")
+      type: z.string()
     });
 
-    const data = schema.parse(req.body);
-    log('Validated data:', data);
+    const validatedData = schema.parse(req.body);
+    log('Validated data:', validatedData);
 
     const [post] = await db.insert(socialPosts).values({
       userId: req.user!.id,
-      content: data.content,
-      type: data.type,
+      content: validatedData.content,
+      type: validatedData.type,
       mediaUrls: [],
       createdAt: new Date(),
       updatedAt: new Date()
     }).returning();
 
     log('Created post:', post);
-    res.json({ success: true, post });
+    res.status(201).json({ success: true, post });
   } catch (error) {
     log('Error creating post:', error);
-    res.status(400).json({ 
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ 
+        success: false, 
+        error: error.errors[0].message 
+      });
+    }
+    res.status(500).json({ 
       success: false, 
-      error: error instanceof Error ? error.message : 'Failed to create post' 
+      error: 'Failed to create post' 
     });
   }
 });
@@ -59,7 +65,7 @@ router.get("/api/social/posts", authenticateToken, async (req, res) => {
     log('Error fetching posts:', error);
     res.status(500).json({ 
       success: false, 
-      error: error instanceof Error ? error.message : 'Failed to fetch posts' 
+      error: 'Failed to fetch posts' 
     });
   }
 });

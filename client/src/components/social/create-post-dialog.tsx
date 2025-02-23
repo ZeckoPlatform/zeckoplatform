@@ -36,7 +36,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       const token = localStorage.getItem('token');
       if (!token) throw new Error("Not authenticated");
 
-      console.log('Sending post data:', data); // Debug log
+      console.log('Sending post data:', { ...data, type: "update" }); // Debug log
 
       const response = await fetch('/api/social/posts', {
         method: 'POST',
@@ -51,11 +51,12 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to create post");
+        throw new Error("Failed to create post");
       }
 
-      return response.json();
+      const responseData = await response.json();
+      console.log('Response data:', responseData); // Debug log
+      return responseData;
     },
     onSuccess: () => {
       toast({ title: "Posted!", description: "Your update has been shared" });
@@ -67,7 +68,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       console.error('Post creation error:', error); // Debug log
       toast({
         title: "Error",
-        description: error.message,
+        description: "Failed to create post. Please try again.",
         variant: "destructive"
       });
     }
@@ -75,16 +76,19 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[525px]" aria-describedby="create-post-description">
+      <DialogContent className="sm:max-w-[525px]">
         <DialogHeader>
           <DialogTitle>Create a post</DialogTitle>
-          <DialogDescription id="create-post-description">
+          <DialogDescription>
             Share updates with your professional network
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit((data) => createPost.mutate(data))} className="space-y-4">
+          <form 
+            onSubmit={form.handleSubmit((data) => createPost.mutate(data))} 
+            className="space-y-4"
+          >
             <FormField
               control={form.control}
               name="content"
