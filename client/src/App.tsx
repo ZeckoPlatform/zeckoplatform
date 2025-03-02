@@ -18,7 +18,6 @@ import AdminManagementPage from "@/pages/admin-management";
 import SettingsLayout from "@/pages/settings/layout";
 import SecuritySettingsPage from "@/pages/settings/security-settings";
 import NotificationSettingsPage from "@/pages/settings/notification-settings";
-import AnalyticsSettingsPage from "@/pages/settings/analytics-settings";
 import BusinessProfilePage from "@/pages/settings/business-profile";
 import ProfilePage from "@/pages/settings/profile";
 import UserEditPage from "@/pages/admin/user-edit";
@@ -49,6 +48,7 @@ function Router() {
         <Route path="/vendor/dashboard" component={() => <ProtectedRoute component={VendorDashboard} />} />
         <Route path="/analytics" component={() => <ProtectedRoute component={AnalyticsDashboard} />} />
         <Route path="/admin/analytics" component={() => <ProtectedRoute component={AdminAnalyticsDashboard} />} />
+        <Route path="/admin/analytics/settings" component={() => <ProtectedRoute component={AdminAnalyticsDashboard} />} />
         <Route path="/admin-management" component={() => <ProtectedRoute component={AdminManagementPage} />} />
         <Route path="/reviews" component={() => <ProtectedRoute component={ReviewsDashboard} />} />
         <Route path="/notifications" component={() => <ProtectedRoute component={NotificationsPage} />} />

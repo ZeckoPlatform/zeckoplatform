@@ -44,13 +44,25 @@ const loginSchema = z.object({
   password: z.string().min(1, "Password is required")
 });
 
+export function generateToken(user: SelectUser) {
+  return jwt.sign(
+    { 
+      id: user.id,
+      email: user.email,
+      userType: user.userType,
+      superAdmin: user.userType === 'admin' 
+    },
+    JWT_SECRET,
+    { expiresIn: '24h' }
+  );
+}
+
 export function setupAuth(app: Express) {
   app.post("/api/login", async (req, res) => {
     try {
       const { email, password } = req.body;
       log(`Login attempt for email: ${email}`);
 
-      // Validate request body
       try {
         loginSchema.parse(req.body);
         log('Request validation passed');
@@ -65,7 +77,6 @@ export function setupAuth(app: Express) {
         throw validationError;
       }
 
-      // Find user by email
       let user: SelectUser | undefined;
       try {
         log('Querying database for user...');
@@ -88,7 +99,6 @@ export function setupAuth(app: Express) {
         });
       }
 
-      // Verify password
       const isValidPassword = await comparePasswords(password, user.password);
       log(`Password validation result: ${isValidPassword ? 'Valid' : 'Invalid'}`);
 
@@ -99,16 +109,7 @@ export function setupAuth(app: Express) {
         });
       }
 
-      // Generate JWT token
-      const token = jwt.sign(
-        { 
-          id: user.id,
-          email: user.email,
-          userType: user.userType
-        },
-        JWT_SECRET,
-        { expiresIn: '24h' }
-      );
+      const token = generateToken(user);
       log(`Login successful for user: ${user.id}`);
 
       res.json({
@@ -136,7 +137,6 @@ export function setupAuth(app: Express) {
         });
       }
 
-      // Check for existing email
       const [existingUser] = await db
         .select()
         .from(users)
@@ -150,7 +150,6 @@ export function setupAuth(app: Express) {
         });
       }
 
-      // Hash password and create user
       const hashedPassword = await hashPassword(result.data.password);
       const [user] = await db
         .insert(users)
@@ -223,7 +222,10 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
         });
       }
 
-      (req as any).user = user;
+      (req as any).user = {
+        ...user,
+        superAdmin: user.userType === 'admin'
+      };
       next();
     } catch (error) {
       log('Database error in auth middleware:', error instanceof Error ? error.message : String(error));
@@ -233,16 +235,4 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
       });
     }
   });
-}
-
-export function generateToken(user: SelectUser) {
-  return jwt.sign(
-    { 
-      id: user.id,
-      email: user.email,
-      userType: user.userType
-    },
-    JWT_SECRET,
-    { expiresIn: '24h' }
-  );
 }
