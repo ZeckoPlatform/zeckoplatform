@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { users, insertUserSchema, type SelectUser } from "@db/schema";
-import { db, checkDatabaseConnection } from "@db";
+import { db } from "@db";
 import { eq } from "drizzle-orm";
 import { fromZodError } from "zod-validation-error";
 import { log } from "./vite";
@@ -13,6 +13,7 @@ import { sendPasswordResetEmail } from "./services/email";
 const scryptAsync = promisify(scrypt);
 const JWT_SECRET = process.env.REPL_ID!;
 
+// Make these functions exported so they can be used by other modules
 export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;
@@ -41,23 +42,16 @@ export function generateToken(user: SelectUser) {
 }
 
 export function setupAuth(app: Express) {
-  // Database health check middleware with detailed logging
-  app.use(async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      if (!(await checkDatabaseConnection())) {
-        log('Database health check failed in auth middleware');
-        return res.status(503).json({
-          message: "Database connection error. Please try again later."
+  // Async database check middleware
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    db.execute('SELECT 1')
+      .then(() => next())
+      .catch(error => {
+        log('Database error in middleware:', error instanceof Error ? error.message : String(error));
+        res.status(503).json({
+          message: "Service temporarily unavailable"
         });
-      }
-      next();
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      log('Error in database health check middleware:', errorMessage);
-      return res.status(503).json({
-        message: "Service temporarily unavailable. Please try again later."
       });
-    }
   });
 
   app.post("/api/login", async (req, res) => {

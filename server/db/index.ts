@@ -2,93 +2,56 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { log } from '../vite';
 
-const RETRY_ATTEMPTS = 3;
-const RETRY_DELAY = 2000; // 2 seconds
-const POOL_CONFIG = {
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-};
-
-// Initialize connection pool with retries
-async function initializePool() {
-  for (let attempt = 1; attempt <= RETRY_ATTEMPTS; attempt++) {
-    try {
-      log(`Attempting database connection (attempt ${attempt}/${RETRY_ATTEMPTS})`);
-      log(`Using database host: ${process.env.PGHOST}`);
-
-      const pool = new Pool({
-        connectionString: process.env.DATABASE_URL,
-        ...POOL_CONFIG
-      });
-
-      // Test the connection
-      const client = await pool.connect();
-      await client.query('SELECT 1'); // Verify we can execute queries
-      client.release();
-
-      log('Database connection established successfully');
-      return pool;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      log(`Database connection attempt ${attempt} failed: ${errorMessage}`);
-
-      if (attempt === RETRY_ATTEMPTS) {
-        throw new Error(`Failed to establish database connection after ${RETRY_ATTEMPTS} attempts`);
-      }
-
-      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
-    }
-  }
-  throw new Error('Failed to initialize database pool');
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL environment variable is required');
 }
 
-let pool: Pool;
-let isInitialized = false;
-
-// Initialize pool lazily
-async function getPool() {
-  if (!isInitialized) {
-    try {
-      pool = await initializePool();
-      isInitialized = true;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      log(`Fatal database initialization error: ${errorMessage}`);
-      throw error;
-    }
-  }
-  return pool;
-}
-
-// Export database instance with lazy initialization
-export const db = drizzle(new Pool({
+// Basic pool configuration using DATABASE_URL
+const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ...POOL_CONFIG
-}));
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  max: 10, // Reduced from 20 to prevent connection exhaustion
+  idleTimeoutMillis: 10000, // Reduced from 30000 to release connections faster
+  connectionTimeoutMillis: 3000, // Reduced from 5000 to fail fast
+  allowExitOnIdle: true // Allow the pool to cleanup on app shutdown
+});
 
-// Health check function
+// Add basic error handling
+pool.on('error', (err) => {
+  log('Unexpected database error:', err.message);
+});
+
+// Export the drizzle instance
+export const db = drizzle(pool);
+
+// Simple health check function with timeout
 export async function checkDatabaseConnection(): Promise<boolean> {
-  try {
-    const pool = await getPool();
-    const client = await pool.connect();
-    try {
-      await client.query('SELECT 1');
-      log('Database health check successful');
-      return true;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      log(`Database query failed during health check: ${errorMessage}`);
-      return false;
-    } finally {
-      client.release();
-    }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    log(`Database connection failed during health check: ${errorMessage}`);
-    return false;
-  }
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      log('Database health check timed out');
+      resolve(false);
+    }, 2000); // 2 second timeout
+
+    pool.connect()
+      .then(client => {
+        clearTimeout(timeout);
+        client.query('SELECT 1')
+          .then(() => {
+            client.release();
+            resolve(true);
+          })
+          .catch(err => {
+            client.release();
+            log('Database query error:', err.message);
+            resolve(false);
+          });
+      })
+      .catch(err => {
+        clearTimeout(timeout);
+        log('Database connection error:', err.message);
+        resolve(false);
+      });
+  });
 }
 
 export { pool };
