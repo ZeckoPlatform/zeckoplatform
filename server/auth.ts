@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { users, insertUserSchema, type SelectUser } from "@db/schema";
-import { db } from "@db";
+import { db, checkDatabaseConnection } from "@db";
 import { eq } from "drizzle-orm";
 import { fromZodError } from "zod-validation-error";
 import { log } from "./vite";
@@ -28,8 +28,8 @@ export async function comparePasswords(supplied: string, stored: string) {
 
 export function generateToken(user: SelectUser) {
   return jwt.sign(
-    { 
-      id: user.id, 
+    {
+      id: user.id,
       email: user.email,
       userType: user.userType,
       subscriptionActive: user.subscriptionActive,
@@ -40,28 +40,96 @@ export function generateToken(user: SelectUser) {
   );
 }
 
-async function getUserByEmail(email: string): Promise<SelectUser[]> {
-  if (!email) {
-    throw new Error('Email is required');
-  }
-
-  try {
-    log(`Attempting to find user with email: ${email}`);
-    const result = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, email))
-      .limit(1);
-
-    log(`Found ${result.length} users with email ${email}`);
-    return result;
-  } catch (error) {
-    log(`Database error in getUserByEmail: ${error}`);
-    throw error;
-  }
-}
-
 export function setupAuth(app: Express) {
+  // Database health check middleware with detailed logging
+  app.use(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!(await checkDatabaseConnection())) {
+        log('Database health check failed in auth middleware');
+        return res.status(503).json({
+          message: "Database connection error. Please try again later."
+        });
+      }
+      next();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log('Error in database health check middleware:', errorMessage);
+      return res.status(503).json({
+        message: "Service temporarily unavailable. Please try again later."
+      });
+    }
+  });
+
+  app.post("/api/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({
+          message: "Email and password are required"
+        });
+      }
+
+      const ip = req.ip || 'unknown';
+      log(`Login attempt for email: ${email} from IP: ${ip}`);
+
+      // Check login attempts
+      const loginCheck = await checkLoginAttempts(ip, email);
+      if (!loginCheck.allowed) {
+        return res.status(429).json({
+          message: `Too many login attempts. Please try again in ${loginCheck.lockoutMinutes} minutes.`,
+          lockoutEndTime: loginCheck.lockoutEndTime,
+          lockoutMinutes: loginCheck.lockoutMinutes
+        });
+      }
+
+      // Find user
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1);
+
+      if (!user) {
+        await recordLoginAttempt({ ip, email, timestamp: new Date(), successful: false });
+        return res.status(401).json({
+          message: "Invalid credentials",
+          remainingAttempts: loginCheck.remainingAttempts
+        });
+      }
+
+      // Verify password
+      const isValidPassword = await comparePasswords(password, user.password);
+      if (!isValidPassword) {
+        await recordLoginAttempt({ ip, email, timestamp: new Date(), successful: false });
+        return res.status(401).json({
+          message: "Invalid credentials",
+          remainingAttempts: loginCheck.remainingAttempts
+        });
+      }
+
+      // Successful login
+      await recordLoginAttempt({ ip, email, timestamp: new Date(), successful: true, userId: user.id });
+      const token = generateToken(user);
+
+      log(`Login successful for user: ${user.id} (${user.userType})`);
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          userType: user.userType,
+          subscriptionActive: user.subscriptionActive,
+          subscriptionTier: user.subscriptionTier
+        },
+        token
+      });
+    } catch (error: any) {
+      log(`Login error:`, error);
+      res.status(500).json({
+        message: "An error occurred during login. Please try again later."
+      });
+    }
+  });
+
   app.post("/api/register", async (req, res) => {
     try {
       log(`Registration attempt - Data received:`, req.body);
@@ -119,61 +187,6 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/login", async (req, res) => {
-    try {
-      const { email, password } = req.body;
-      const ip = req.ip;
-
-      if (!email || !password) {
-        return res.status(400).json({ message: "Email and password are required" });
-      }
-
-      log(`Login attempt for email: ${email} from IP: ${ip}`);
-
-      try {
-        const loginCheck = await checkLoginAttempts(ip, email);
-        if (!loginCheck.allowed) {
-          return res.status(429).json({
-            message: `Too many login attempts. Please try again in ${loginCheck.lockoutMinutes} minutes.`,
-            lockoutEndTime: loginCheck.lockoutEndTime,
-            lockoutMinutes: loginCheck.lockoutMinutes
-          });
-        }
-
-        const [user] = await getUserByEmail(email);
-
-        if (!user) {
-          await recordLoginAttempt({ ip, email, timestamp: new Date(), successful: false });
-          return res.status(401).json({
-            message: "Invalid credentials",
-            remainingAttempts: loginCheck.remainingAttempts
-          });
-        }
-
-        const isValidPassword = await comparePasswords(password, user.password);
-        if (!isValidPassword) {
-          await recordLoginAttempt({ ip, email, timestamp: new Date(), successful: false });
-          return res.status(401).json({
-            message: "Invalid credentials",
-            remainingAttempts: loginCheck.remainingAttempts
-          });
-        }
-
-        await recordLoginAttempt({ ip, email, timestamp: new Date(), successful: true });
-        const token = generateToken(user);
-
-        log(`Login successful for user: ${user.id} (${user.userType})`);
-        res.json({ user, token });
-      } catch (error) {
-        log(`Database or authentication error: ${error}`);
-        throw error;
-      }
-    } catch (error) {
-      log(`Login error: ${error}`);
-      res.status(500).json({ message: "Internal server error during login" });
-    }
-  });
-
 
   app.post("/api/auth/forgot-password", async (req, res) => {
     try {
@@ -224,7 +237,7 @@ export function setupAuth(app: Express) {
             });
           }
 
-          return res.status(500).json({ 
+          return res.status(500).json({
             message: "Unable to send password reset email. Please try again later or contact support."
           });
         }
@@ -232,7 +245,7 @@ export function setupAuth(app: Express) {
       } catch (error) {
         log(`Error in password reset process: ${error}`);
         // Don't leak error details to the client
-        return res.status(500).json({ 
+        return res.status(500).json({
           message: "Unable to process password reset request. Please try again later or contact support."
         });
       }
@@ -287,6 +300,27 @@ export function setupAuth(app: Express) {
   });
 }
 
+async function getUserByEmail(email: string): Promise<SelectUser[]> {
+  if (!email) {
+    throw new Error('Email is required');
+  }
+
+  try {
+    log(`Attempting to find user with email: ${email}`);
+    const result = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+
+    log(`Found ${result.length} users with email ${email}`);
+    return result;
+  } catch (error) {
+    log(`Database error in getUserByEmail: ${error}`);
+    throw error;
+  }
+}
+
 export async function updateUserResetToken(userId: number, token: string | null, expiry: Date | null) {
   try {
     log(`Updating reset token for user ${userId}`);
@@ -312,34 +346,21 @@ export async function updateUserResetToken(userId: number, token: string | null,
   }
 }
 
-// Middleware to authenticate requests using either JWT token or session
+// Middleware to authenticate requests using JWT token
 export function authenticateToken(req: Request, res: Response, next: NextFunction) {
-  res.setHeader('Content-Type', 'application/json');
-
-  // First check if user is authenticated via session
-  if (req.isAuthenticated && req.isAuthenticated()) {
-    log('User authenticated via session');
-    return next();
-  }
-
-  // If not authenticated via session, check for JWT token
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    log('No authentication token found');
-    return res.status(401).json({ 
-      success: false,
-      message: "Authentication required" 
+    return res.status(401).json({
+      message: "Authentication required"
     });
   }
 
   jwt.verify(token, JWT_SECRET, async (err: any, decoded: any) => {
     if (err) {
-      log('Invalid token:', err.message);
-      return res.status(401).json({ 
-        success: false,
-        message: "Invalid or expired token" 
+      return res.status(401).json({
+        message: "Invalid or expired token"
       });
     }
 
@@ -351,21 +372,17 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
         .limit(1);
 
       if (!user) {
-        log('User not found for token');
-        return res.status(401).json({ 
-          success: false,
-          message: "User not found" 
+        return res.status(401).json({
+          message: "User not found"
         });
       }
 
       req.user = user;
-      log('User authenticated via JWT token');
       next();
     } catch (error) {
       log('Database error in auth middleware:', error);
-      return res.status(500).json({ 
-        success: false,
-        message: "Internal server error" 
+      return res.status(500).json({
+        message: "Internal server error"
       });
     }
   });
