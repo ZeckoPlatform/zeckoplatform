@@ -5,7 +5,9 @@ import { log } from "./vite";
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 import { metricsMiddleware, getMetrics, initializeMonitoring } from './services/monitoring';
+import { startGrafanaServer, GRAFANA_INTERNAL_URL } from './services/grafana';
 import subscriptionRoutes from './routes/subscriptions';
 import invoiceRoutes from './routes/invoices';
 import authRoutes from './routes/auth';
@@ -30,6 +32,9 @@ if (!fs.existsSync(uploadDir)) {
 export function registerRoutes(app: Express): Server {
   // Initialize monitoring
   initializeMonitoring();
+
+  // Start Grafana server
+  startGrafanaServer();
 
   // JSON and urlencoded middleware should come first
   app.use(express.json());
@@ -65,6 +70,30 @@ export function registerRoutes(app: Express): Server {
 
   // Serve uploaded files
   app.use('/uploads', express.static(uploadDir));
+
+  // Grafana proxy middleware (protected for admin access only)
+  app.use(
+    '/admin/analytics/grafana',
+    (req: any, res, next) => {
+      if (!req.user?.superAdmin) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      // Add auth headers for Grafana
+      req.headers['X-WEBAUTH-USER'] = req.user.email;
+      next();
+    },
+    createProxyMiddleware({
+      target: GRAFANA_INTERNAL_URL,
+      changeOrigin: true,
+      pathRewrite: {
+        '^/admin/analytics/grafana': '',
+      },
+      onError: (err, req, res) => {
+        log('Grafana proxy error:', err);
+        res.status(500).send('Grafana service unavailable');
+      },
+    })
+  );
 
   // Register routes
   app.use('/api', authRoutes);

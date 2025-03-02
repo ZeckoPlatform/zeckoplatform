@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
 
 // Helper function to parse Prometheus metrics
 function parseMetrics(metricsText: string) {
@@ -82,7 +83,15 @@ export default function AdminAnalyticsDashboard() {
 
   return (
     <div className="container mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6">System Analytics Dashboard</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">System Analytics Dashboard</h1>
+        <Button
+          variant="outline"
+          onClick={() => window.open('/admin/analytics/grafana', '_blank')}
+        >
+          Open Grafana Dashboard
+        </Button>
+      </div>
 
       <Tabs defaultValue="metrics" className="w-full">
         <TabsList className="mb-4">
@@ -148,9 +157,9 @@ export default function AdminAnalyticsDashboard() {
                   <option value="info">Info Logs</option>
                   <option value="debug">Debug Logs</option>
                 </select>
-                <input 
-                  type="text" 
-                  placeholder="Search logs..." 
+                <input
+                  type="text"
+                  placeholder="Search logs..."
                   className="border rounded p-2 flex-1"
                 />
               </div>
@@ -178,7 +187,7 @@ export default function AdminAnalyticsDashboard() {
               <Card className="p-4 border-l-4 border-yellow-500">
                 <h3 className="font-medium">Response Time Alert</h3>
                 <p className="text-sm text-muted-foreground">
-                  {metricsData?.responseTimes.length ? 
+                  {metricsData?.responseTimes.length ?
                     `Current average response time: ${formatMetricValue(metricsData.responseTimes[0])} ms` :
                     'No response time data available'
                   }
@@ -187,7 +196,7 @@ export default function AdminAnalyticsDashboard() {
               <Card className="p-4 border-l-4 border-red-500">
                 <h3 className="font-medium">Error Rate Alert</h3>
                 <p className="text-sm text-muted-foreground">
-                  {metricsData?.errors.length ? 
+                  {metricsData?.errors.length ?
                     `Total errors: ${metricsData.errors.length}` :
                     'No errors detected'
                   }
@@ -196,7 +205,7 @@ export default function AdminAnalyticsDashboard() {
               <Card className="p-4 border-l-4 border-blue-500">
                 <h3 className="font-medium">Resource Usage Alert</h3>
                 <p className="text-sm text-muted-foreground">
-                  {metricsData?.memory.length ? 
+                  {metricsData?.memory.length ?
                     `Memory usage: ${formatMetricValue(metricsData.memory[0])} MB` :
                     'No memory usage data available'
                   }
@@ -223,7 +232,7 @@ export default function AdminAnalyticsDashboard() {
               <Card className="p-4">
                 <h3 className="text-sm font-medium mb-2">Active Connections</h3>
                 <div className="bg-muted p-2 rounded-lg text-xs">
-                  {metricsData?.database.length ? 
+                  {metricsData?.database.length ?
                     `${metricsData.database.length} active queries` :
                     'No active database connections'
                   }
