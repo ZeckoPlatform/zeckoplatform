@@ -2,56 +2,59 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { log } from '../vite';
 
+// Validate required environment variables
 if (!process.env.DATABASE_URL) {
   throw new Error('DATABASE_URL environment variable is required');
 }
 
-// Basic pool configuration using DATABASE_URL
-const pool = new Pool({
+// Pool configuration with reasonable defaults
+const poolConfig = {
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  max: 10, // Reduced from 20 to prevent connection exhaustion
-  idleTimeoutMillis: 10000, // Reduced from 30000 to release connections faster
-  connectionTimeoutMillis: 3000, // Reduced from 5000 to fail fast
-  allowExitOnIdle: true // Allow the pool to cleanup on app shutdown
+  max: 20, // Maximum number of clients in the pool
+  idleTimeoutMillis: 30000, // How long a client is allowed to remain idle before being closed
+  connectionTimeoutMillis: 5000, // How long to wait for a connection
+  application_name: 'zecko_marketplace' // Identify the application in database logs
+};
+
+// Create the connection pool
+const pool = new Pool(poolConfig);
+
+// Add error handling for unexpected pool errors
+pool.on('error', (err) => {
+  log('Unexpected database pool error:', err.message);
 });
 
-// Add basic error handling
-pool.on('error', (err) => {
-  log('Unexpected database error:', err.message);
+// Add connection handling
+pool.on('connect', () => {
+  log('New database connection established');
+});
+
+pool.on('acquire', () => {
+  log('Client acquired from pool');
+});
+
+pool.on('remove', () => {
+  log('Client removed from pool');
 });
 
 // Export the drizzle instance
 export const db = drizzle(pool);
 
-// Simple health check function with timeout
-export async function checkDatabaseConnection(): Promise<boolean> {
-  return new Promise((resolve) => {
-    const timeout = setTimeout(() => {
-      log('Database health check timed out');
-      resolve(false);
-    }, 2000); // 2 second timeout
-
-    pool.connect()
-      .then(client => {
-        clearTimeout(timeout);
-        client.query('SELECT 1')
-          .then(() => {
-            client.release();
-            resolve(true);
-          })
-          .catch(err => {
-            client.release();
-            log('Database query error:', err.message);
-            resolve(false);
-          });
-      })
-      .catch(err => {
-        clearTimeout(timeout);
-        log('Database connection error:', err.message);
-        resolve(false);
-      });
-  });
+// Health check function that doesn't block
+export async function checkDatabaseHealth(): Promise<boolean> {
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query('SELECT 1');
+      return true;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    log('Database health check failed:', error instanceof Error ? error.message : String(error));
+    return false;
+  }
 }
 
 export { pool };

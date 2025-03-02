@@ -9,6 +9,9 @@ import { log } from "./vite";
 import jwt from 'jsonwebtoken';
 import { checkLoginAttempts, recordLoginAttempt } from "./services/rate-limiter";
 import { sendPasswordResetEmail } from "./services/email";
+import { Router } from "express";
+import { authenticateToken } from "./auth"; // Corrected path
+
 
 const scryptAsync = promisify(scrypt);
 const JWT_SECRET = process.env.REPL_ID!;
@@ -54,25 +57,14 @@ export function setupAuth(app: Express) {
       });
   });
 
-  app.post("/api/login", async (req, res) => {
+  const authRouter = Router(); // Create a router for auth routes
+
+  authRouter.post("/api/login", async (req, res) => {
     try {
       const { email, password } = req.body;
       if (!email || !password) {
         return res.status(400).json({
           message: "Email and password are required"
-        });
-      }
-
-      const ip = req.ip || 'unknown';
-      log(`Login attempt for email: ${email} from IP: ${ip}`);
-
-      // Check login attempts
-      const loginCheck = await checkLoginAttempts(ip, email);
-      if (!loginCheck.allowed) {
-        return res.status(429).json({
-          message: `Too many login attempts. Please try again in ${loginCheck.lockoutMinutes} minutes.`,
-          lockoutEndTime: loginCheck.lockoutEndTime,
-          lockoutMinutes: loginCheck.lockoutMinutes
         });
       }
 
@@ -84,28 +76,23 @@ export function setupAuth(app: Express) {
         .limit(1);
 
       if (!user) {
-        await recordLoginAttempt({ ip, email, timestamp: new Date(), successful: false });
         return res.status(401).json({
-          message: "Invalid credentials",
-          remainingAttempts: loginCheck.remainingAttempts
+          message: "Invalid credentials"
         });
       }
 
       // Verify password
       const isValidPassword = await comparePasswords(password, user.password);
       if (!isValidPassword) {
-        await recordLoginAttempt({ ip, email, timestamp: new Date(), successful: false });
         return res.status(401).json({
-          message: "Invalid credentials",
-          remainingAttempts: loginCheck.remainingAttempts
+          message: "Invalid credentials"
         });
       }
 
       // Successful login
-      await recordLoginAttempt({ ip, email, timestamp: new Date(), successful: true, userId: user.id });
       const token = generateToken(user);
+      log(`Login successful for user: ${user.id}`);
 
-      log(`Login successful for user: ${user.id} (${user.userType})`);
       res.json({
         user: {
           id: user.id,
@@ -116,15 +103,16 @@ export function setupAuth(app: Express) {
         },
         token
       });
-    } catch (error: any) {
+    } catch (error) {
       log(`Login error:`, error);
       res.status(500).json({
-        message: "An error occurred during login. Please try again later."
+        message: "An error occurred during login"
       });
     }
   });
 
-  app.post("/api/register", async (req, res) => {
+
+  authRouter.post("/api/register", async (req, res) => {
     try {
       log(`Registration attempt - Data received:`, req.body);
       const result = insertUserSchema.safeParse(req.body);
@@ -182,7 +170,7 @@ export function setupAuth(app: Express) {
   });
 
 
-  app.post("/api/auth/forgot-password", async (req, res) => {
+  authRouter.post("/api/auth/forgot-password", async (req, res) => {
     try {
       const { email } = req.body;
       log(`Processing forgot password request for email: ${email}`);
@@ -249,7 +237,7 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/auth/reset-password", async (req, res) => {
+  authRouter.post("/api/auth/reset-password", async (req, res) => {
     try {
       const { token, password } = req.body;
 
@@ -285,13 +273,15 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/logout", (req, res) => {
+  authRouter.post("/api/logout", (req, res) => {
     res.json({ message: "Logged out successfully" });
   });
 
-  app.get("/api/user", authenticateToken, (req, res) => {
+  authRouter.get("/api/user", authenticateToken, (req, res) => {
     res.json(req.user);
   });
+
+  app.use(authRouter); // Use the router for auth routes
 }
 
 async function getUserByEmail(email: string): Promise<SelectUser[]> {
