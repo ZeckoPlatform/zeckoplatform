@@ -40,90 +40,6 @@ export function generateToken(user: SelectUser) {
   );
 }
 
-// Middleware to authenticate requests using either JWT token or session
-export function authenticateToken(req: Request, res: Response, next: NextFunction) {
-  res.setHeader('Content-Type', 'application/json');
-
-  // First check if user is authenticated via session
-  if (req.isAuthenticated && req.isAuthenticated()) {
-    log('User authenticated via session');
-    return next();
-  }
-
-  // If not authenticated via session, check for JWT token
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    log('No authentication token found');
-    return res.status(401).json({ 
-      success: false,
-      message: "Authentication required" 
-    });
-  }
-
-  jwt.verify(token, JWT_SECRET, async (err: any, decoded: any) => {
-    if (err) {
-      log('Invalid token:', err.message);
-      return res.status(401).json({ 
-        success: false,
-        message: "Invalid or expired token" 
-      });
-    }
-
-    try {
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, decoded.id))
-        .limit(1);
-
-      if (!user) {
-        log('User not found for token');
-        return res.status(401).json({ 
-          success: false,
-          message: "User not found" 
-        });
-      }
-
-      req.user = user;
-      log('User authenticated via JWT token');
-      next();
-    } catch (error) {
-      log('Database error in auth middleware:', error);
-      return res.status(500).json({ 
-        success: false,
-        message: "Internal server error" 
-      });
-    }
-  });
-}
-
-export async function updateUserResetToken(userId: number, token: string | null, expiry: Date | null) {
-  try {
-    log(`Updating reset token for user ${userId}`);
-
-    const [updated] = await db
-      .update(users)
-      .set({
-        resetPasswordToken: token,
-        resetPasswordExpiry: expiry
-      })
-      .where(eq(users.id, userId))
-      .returning();
-
-    if (!updated) {
-      throw new Error('Failed to update user reset token');
-    }
-
-    log(`Successfully updated reset token for user ${userId}`);
-    return true;
-  } catch (error) {
-    log(`Error updating reset token: ${error}`);
-    throw error;
-  }
-}
-
 async function getUserByEmail(email: string): Promise<SelectUser[]> {
   if (!email) {
     throw new Error('Email is required');
@@ -156,17 +72,13 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ message: fromZodError(result.error).toString() });
       }
 
-      // Check for existing email
-      const [existingEmail] = await db.select()
-        .from(users)
-        .where(eq(users.email, result.data.email));
+      const [existingEmail] = await getUserByEmail(result.data.email);
 
       if (existingEmail) {
         log(`Registration failed: Email ${result.data.email} already exists`);
         return res.status(400).json({ message: "Email already registered" });
       }
 
-      // Create base user data
       const userData = {
         email: result.data.email,
         password: await hashPassword(result.data.password),
@@ -174,9 +86,10 @@ export function setupAuth(app: Express) {
         countryCode: result.data.countryCode,
         phoneNumber: result.data.phoneNumber,
         active: true,
+        subscriptionActive: result.data.userType === "free",
+        subscriptionTier: result.data.userType === "free" ? "none" : result.data.userType,
       };
 
-      // Only add business-specific fields if not a free user
       if (result.data.userType !== "free") {
         Object.assign(userData, {
           businessName: result.data.businessName,
@@ -186,15 +99,7 @@ export function setupAuth(app: Express) {
           einNumber: result.data.einNumber,
           registeredState: result.data.registeredState,
           stateRegistrationNumber: result.data.stateRegistrationNumber,
-          subscriptionActive: false, // Will be activated after payment
-          subscriptionTier: result.data.userType,
           paymentFrequency: result.data.paymentFrequency,
-        });
-      } else {
-        // For free users, set subscription fields accordingly
-        Object.assign(userData, {
-          subscriptionActive: true,
-          subscriptionTier: "none",
         });
       }
 
@@ -206,18 +111,7 @@ export function setupAuth(app: Express) {
 
       log(`User created successfully: ID ${user.id}, Type: ${user.userType}`);
 
-      const token = jwt.sign(
-        { 
-          id: user.id, 
-          email: user.email,
-          userType: user.userType,
-          subscriptionActive: user.subscriptionActive,
-          subscriptionTier: user.subscriptionTier
-        },
-        JWT_SECRET,
-        { expiresIn: '24h' }
-      );
-
+      const token = generateToken(user);
       res.status(201).json({ user, token });
     } catch (error: any) {
       log(`Registration error: ${error.message}`);
@@ -236,39 +130,44 @@ export function setupAuth(app: Express) {
 
       log(`Login attempt for email: ${email} from IP: ${ip}`);
 
-      const loginCheck = await checkLoginAttempts(ip, email);
-      if (!loginCheck.allowed) {
-        return res.status(429).json({
-          message: `Too many login attempts. Please try again in ${loginCheck.lockoutMinutes} minutes.`,
-          lockoutEndTime: loginCheck.lockoutEndTime,
-          lockoutMinutes: loginCheck.lockoutMinutes
-        });
+      try {
+        const loginCheck = await checkLoginAttempts(ip, email);
+        if (!loginCheck.allowed) {
+          return res.status(429).json({
+            message: `Too many login attempts. Please try again in ${loginCheck.lockoutMinutes} minutes.`,
+            lockoutEndTime: loginCheck.lockoutEndTime,
+            lockoutMinutes: loginCheck.lockoutMinutes
+          });
+        }
+
+        const [user] = await getUserByEmail(email);
+
+        if (!user) {
+          await recordLoginAttempt({ ip, email, timestamp: new Date(), successful: false });
+          return res.status(401).json({
+            message: "Invalid credentials",
+            remainingAttempts: loginCheck.remainingAttempts
+          });
+        }
+
+        const isValidPassword = await comparePasswords(password, user.password);
+        if (!isValidPassword) {
+          await recordLoginAttempt({ ip, email, timestamp: new Date(), successful: false });
+          return res.status(401).json({
+            message: "Invalid credentials",
+            remainingAttempts: loginCheck.remainingAttempts
+          });
+        }
+
+        await recordLoginAttempt({ ip, email, timestamp: new Date(), successful: true });
+        const token = generateToken(user);
+
+        log(`Login successful for user: ${user.id} (${user.userType})`);
+        res.json({ user, token });
+      } catch (error) {
+        log(`Database or authentication error: ${error}`);
+        throw error;
       }
-
-      const [user] = await getUserByEmail(email);
-
-      if (!user) {
-        await recordLoginAttempt({ ip, email, timestamp: new Date(), successful: false });
-        return res.status(401).json({
-          message: "Invalid credentials",
-          remainingAttempts: loginCheck.remainingAttempts
-        });
-      }
-
-      const isValidPassword = await comparePasswords(password, user.password);
-      if (!isValidPassword) {
-        await recordLoginAttempt({ ip, email, timestamp: new Date(), successful: false });
-        return res.status(401).json({
-          message: "Invalid credentials",
-          remainingAttempts: loginCheck.remainingAttempts
-        });
-      }
-
-      await recordLoginAttempt({ ip, email, timestamp: new Date(), successful: true });
-
-      const token = generateToken(user);
-      log(`Login successful for user: ${user.id} (${user.userType})`);
-      res.json({ user, token });
     } catch (error) {
       log(`Login error: ${error}`);
       res.status(500).json({ message: "Internal server error during login" });
@@ -385,5 +284,89 @@ export function setupAuth(app: Express) {
 
   app.get("/api/user", authenticateToken, (req, res) => {
     res.json(req.user);
+  });
+}
+
+export async function updateUserResetToken(userId: number, token: string | null, expiry: Date | null) {
+  try {
+    log(`Updating reset token for user ${userId}`);
+
+    const [updated] = await db
+      .update(users)
+      .set({
+        resetPasswordToken: token,
+        resetPasswordExpiry: expiry
+      })
+      .where(eq(users.id, userId))
+      .returning();
+
+    if (!updated) {
+      throw new Error('Failed to update user reset token');
+    }
+
+    log(`Successfully updated reset token for user ${userId}`);
+    return true;
+  } catch (error) {
+    log(`Error updating reset token: ${error}`);
+    throw error;
+  }
+}
+
+// Middleware to authenticate requests using either JWT token or session
+export function authenticateToken(req: Request, res: Response, next: NextFunction) {
+  res.setHeader('Content-Type', 'application/json');
+
+  // First check if user is authenticated via session
+  if (req.isAuthenticated && req.isAuthenticated()) {
+    log('User authenticated via session');
+    return next();
+  }
+
+  // If not authenticated via session, check for JWT token
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    log('No authentication token found');
+    return res.status(401).json({ 
+      success: false,
+      message: "Authentication required" 
+    });
+  }
+
+  jwt.verify(token, JWT_SECRET, async (err: any, decoded: any) => {
+    if (err) {
+      log('Invalid token:', err.message);
+      return res.status(401).json({ 
+        success: false,
+        message: "Invalid or expired token" 
+      });
+    }
+
+    try {
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, decoded.id))
+        .limit(1);
+
+      if (!user) {
+        log('User not found for token');
+        return res.status(401).json({ 
+          success: false,
+          message: "User not found" 
+        });
+      }
+
+      req.user = user;
+      log('User authenticated via JWT token');
+      next();
+    } catch (error) {
+      log('Database error in auth middleware:', error);
+      return res.status(500).json({ 
+        success: false,
+        message: "Internal server error" 
+      });
+    }
   });
 }
