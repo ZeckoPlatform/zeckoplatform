@@ -1,10 +1,25 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
-import { database as db } from "@db";
+import { db } from "@db";
 import { sql } from "drizzle-orm";
 import { log } from "./vite";
 import express from 'express';
+
+// Import all routes
+import authRoutes from './routes/auth.js';
+import uploadRoutes from './routes/upload.js';
+import subscriptionRoutes from './routes/subscriptions.js';
+import invoiceRoutes from './routes/invoices.js';
+import analyticsRoutes from './routes/analytics.js';
+import notificationRoutes from './routes/notifications.js';
+import adminRoutes from './routes/admin.js';
+import documentRoutes from './routes/documents.js';
+import reviewRoutes from './routes/reviews.js';
+import orderRoutes from './routes/orders.js';
+import socialRoutes from './routes/social.js';
+import leadsRoutes from './routes/leads.js';
+import commentsRoutes from './routes/comments.js';
 
 export function registerRoutes(app: Express): Server {
   // JSON and urlencoded middleware should come first
@@ -43,19 +58,19 @@ export function registerRoutes(app: Express): Server {
   setupAuth(app);
 
   // Register all route modules
-  app.use('/api', require('./routes/auth'));
-  app.use('/api', require('./routes/upload'));
-  app.use('/api', require('./routes/subscriptions'));
-  app.use('/api', require('./routes/invoices'));
-  app.use('/api', require('./routes/analytics'));
-  app.use('/api', require('./routes/notifications'));
-  app.use('/api', require('./routes/admin'));
-  app.use('/api', require('./routes/documents'));
-  app.use('/api', require('./routes/reviews'));
-  app.use('/api', require('./routes/orders'));
-  app.use('/api', require('./routes/social'));
-  app.use('/api', require('./routes/leads'));
-  app.use('/api', require('./routes/comments'));
+  app.use('/api', authRoutes);
+  app.use('/api', uploadRoutes);
+  app.use('/api', subscriptionRoutes);
+  app.use('/api', invoiceRoutes);
+  app.use('/api', analyticsRoutes);
+  app.use('/api', notificationRoutes);
+  app.use('/api', adminRoutes);
+  app.use('/api', documentRoutes);
+  app.use('/api', reviewRoutes);
+  app.use('/api', orderRoutes);
+  app.use('/api', socialRoutes);
+  app.use('/api', leadsRoutes);
+  app.use('/api', commentsRoutes);
 
   // Error handling middleware - should be last
   app.use((err: any, req: any, res: any, next: any) => {

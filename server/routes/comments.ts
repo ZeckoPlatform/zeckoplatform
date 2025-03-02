@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { authenticateToken } from "../auth";
-import { database as db } from "@db";
+import { db } from "@db";
 import { postComments, postReactions, socialPosts, users } from "@db/schema";
 import { z } from "zod";
 import { eq, and, desc, isNull } from "drizzle-orm";

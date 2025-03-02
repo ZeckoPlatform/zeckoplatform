@@ -2,7 +2,6 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { Server } from "http";
-import { initializeDatabase } from "@db";
 
 const app = express();
 const isProd = app.get('env') === 'production';
@@ -19,15 +18,6 @@ app.use(express.urlencoded({ extended: true }));
 // API-specific middleware - only apply to /api routes
 app.use('/api', (req, res, next) => {
   res.setHeader('Content-Type', 'application/json');
-
-  // Debug logging for API requests
-  log('=== API Request Debug Info ===');
-  log(`Path: ${req.method} ${req.path}`);
-  log(`Authorization: ${req.headers.authorization ? 'Present' : 'Missing'}`);
-  log(`Query params: ${JSON.stringify(req.query)}`);
-  log(`Body length: ${req.body ? JSON.stringify(req.body).length : 0}`);
-  log('=== End Debug Info ===');
-
   next();
 });
 
@@ -46,6 +36,34 @@ app.use('/api', (req, res, next) => {
   }
   next();
 });
+
+// Create HTTP server and register routes
+log('Registering routes...');
+const httpServer = registerRoutes(app);
+log('Routes registered successfully');
+
+// Setup static/Vite serving for frontend routes
+if (isProd) {
+  log('Setting up production static file serving');
+  app.use((req, res, next) => {
+    if (!req.path.startsWith('/api')) {
+      serveStatic(app);
+    }
+    next();
+  });
+} else {
+  // Handle development mode with Vite
+  log('Setting up Vite development server');
+  (async () => {
+    try {
+      await setupVite(app, httpServer);
+      log('Vite setup completed successfully');
+    } catch (error) {
+      log('Fatal error during Vite setup:', error);
+      process.exit(1);
+    }
+  })();
+}
 
 // Error handling middleware
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
@@ -67,115 +85,34 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   res.status(500).send('Internal Server Error');
 });
 
-// Start server function
-const startServer = async (port: number): Promise<boolean> => {
-  return new Promise((resolve) => {
-    let isResolved = false;
+// Start server
+const PORT = Number(process.env.PORT) || 5000;
+log(`Starting server on port ${PORT}`);
 
-    const cleanup = () => {
-      if (!isResolved) {
-        log(`Cleaning up server on port ${port}`);
-        httpServer.removeAllListeners();
-        if (httpServer.listening) {
-          httpServer.close();
-        }
-      }
-    };
+httpServer.listen(PORT, '0.0.0.0', () => {
+  log(`Server is running on port ${PORT}`);
+});
 
-    const onError = (error: NodeJS.ErrnoException) => {
-      if (isResolved) return;
-
-      log(`Server error on port ${port}:`);
-      log(`Error name: ${error.name}`);
-      log(`Error message: ${error.message}`);
-      log(`Error code: ${error.code}`);
-      if (error.code === 'EADDRINUSE') {
-        log(`Port ${port} is already in use`);
-      }
-      cleanup();
-      resolve(false);
-      isResolved = true;
-    };
-
-    const onListening = () => {
-      if (isResolved) return;
-
-      const addr = httpServer.address();
-      const actualPort = typeof addr === 'string' ? addr : addr?.port;
-      log(`Server successfully started and listening on port ${actualPort}`);
-      resolve(true);
-      isResolved = true;
-    };
-
-    log('Registering routes...');
-    const httpServer = registerRoutes(app);
-    log('Routes registered successfully');
-
-    httpServer.once('error', onError);
-    httpServer.once('listening', onListening);
-
-    try {
-      log(`Attempting to bind to port ${port} on address 0.0.0.0...`);
-      httpServer.listen(port, '0.0.0.0');
-    } catch (error) {
-      if (!isResolved) {
-        log(`Failed to start server: ${error}`);
-        cleanup();
-        resolve(false);
-        isResolved = true;
-      }
-    }
-  });
-};
-
-// Main startup function
-(async () => {
-  try {
-    log('=== Environment Information ===');
-    log(`NODE_ENV: ${process.env.NODE_ENV}`);
-    log(`PORT: ${process.env.PORT}`);
-    log(`Process ID: ${process.pid}`);
-    log(`Platform: ${process.platform}`);
-    log(`Node Version: ${process.version}`);
-    log('=== End Environment Information ===');
-
-    // Initialize database first
-    log('Initializing database...');
-    await initializeDatabase();
-    log('Database initialization completed');
-
-    // Setup static/Vite serving for frontend routes
-    if (isProd) {
-      log('Setting up production static file serving');
-      app.use((req, res, next) => {
-        if (!req.path.startsWith('/api')) {
-          serveStatic(app);
-        }
-        next();
-      });
-    } else {
-      // Handle development mode with Vite
-      log('Setting up Vite development server');
-      try {
-        await setupVite(app, httpServer);
-        log('Vite setup completed successfully');
-      } catch (error) {
-        log('Fatal error during Vite setup:', error);
-        process.exit(1);
-      }
-    }
-
-    const PORT = Number(process.env.PORT) || 5000;
-    log(`Starting server on port ${PORT}`);
-
-    const serverStarted = await startServer(PORT);
-    if (!serverStarted) {
-      throw new Error(`Could not start server on port ${PORT}`);
-    }
-
-    log('Server started successfully');
-  } catch (error) {
-    log(`Fatal server startup error: ${error}`);
-    process.exit(1);
+// Handle server errors
+httpServer.on('error', (error: NodeJS.ErrnoException) => {
+  if (error.syscall !== 'listen') {
+    throw error;
   }
-})();
+
+  const bind = typeof PORT === 'string'
+    ? 'Pipe ' + PORT
+    : 'Port ' + PORT;
+
+  switch (error.code) {
+    case 'EACCES':
+      log(`${bind} requires elevated privileges`);
+      process.exit(1);
+      break;
+    case 'EADDRINUSE':
+      log(`${bind} is already in use`);
+      process.exit(1);
+      break;
+    default:
+      throw error;
+  }
+});
