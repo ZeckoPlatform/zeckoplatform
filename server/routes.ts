@@ -76,7 +76,7 @@ export function registerRoutes(app: Express): Server {
     '/admin/analytics/grafana',
     (req: any, res, next) => {
       // Check if user is authenticated and is a super admin
-      if (!req.user || !req.user.userType === 'admin') {
+      if (!req.user || !req.user.superAdmin) {
         return res.status(403).json({ error: 'Access denied' });
       }
 
