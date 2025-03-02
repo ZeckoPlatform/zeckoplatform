@@ -92,20 +92,15 @@ export function PostFeed() {
     }, 0);
   };
 
-  const toggleReactionMutation = useMutation({
+  const addReactionMutation = useMutation({
     mutationFn: async ({ postId, type }: { postId: number; type: ReactionType }) => {
-      const post = postsData?.data.find((p: Post) => p.id === postId);
-      const hasReacted = post?.reactions?.some(r => r.type === type && r.userId === user?.id);
-
-      const response = await apiRequest(
-        hasReacted ? 'DELETE' : 'POST',
-        `/api/social/posts/${postId}/reactions${hasReacted ? `/${type}` : ''}`,
-        !hasReacted ? { type } : undefined
-      );
+      const response = await apiRequest('POST', `/api/social/posts/${postId}/reactions`, {
+        type: type
+      });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to toggle reaction');
+        throw new Error(errorData.message || 'Failed to add reaction');
       }
       return response.json();
     },
@@ -115,7 +110,29 @@ export function PostFeed() {
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to update reaction",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  const removeReactionMutation = useMutation({
+    mutationFn: async ({ postId, type }: { postId: number; type: ReactionType }) => {
+      const response = await apiRequest('DELETE', `/api/social/posts/${postId}/reactions/${type}`);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to remove reaction');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
         variant: "destructive",
       });
     }
@@ -123,7 +140,15 @@ export function PostFeed() {
 
   const handleReaction = (postId: number, type: ReactionType) => {
     if (!user) return;
-    toggleReactionMutation.mutate({ postId, type });
+
+    const post = postsData?.data.find((p: Post) => p.id === postId);
+    const hasReacted = post?.reactions?.some(r => r.type === type && r.userId === user.id);
+
+    if (hasReacted) {
+      removeReactionMutation.mutate({ postId, type });
+    } else {
+      addReactionMutation.mutate({ postId, type });
+    }
   };
 
   const addCommentMutation = useMutation({
@@ -516,7 +541,7 @@ export function PostFeed() {
                     variant={hasReacted ? "secondary" : "ghost"}
                     size="sm"
                     onClick={() => handleReaction(post.id, type)}
-                    disabled={toggleReactionMutation.isPending}
+                    disabled={addReactionMutation.isPending || removeReactionMutation.isPending}
                     className="flex items-center gap-1"
                   >
                     <Icon className="h-4 w-4" />
