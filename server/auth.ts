@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { fromZodError } from "zod-validation-error";
 import { log } from "./vite";
 import jwt from 'jsonwebtoken';
+import { z } from "zod";
 
 const scryptAsync = promisify(scrypt);
 const JWT_SECRET = process.env.REPL_ID!;
@@ -93,60 +94,33 @@ export function generateToken(user: SelectUser) {
 async function getUserByEmail(email: string): Promise<SelectUser[]> {
   try {
     log(`Looking up user with email: ${email}`);
-    const result = await db
+    const [user] = await db
       .select()
       .from(users)
       .where(eq(users.email, email))
       .limit(1);
-    log(`Found ${result.length} users`);
-    return result;
+    log(`User lookup result: ${user ? 'Found' : 'Not found'}`);
+    return [user];
   } catch (error) {
     log(`Database error in getUserByEmail: ${error}`);
-    throw error;
+    throw new Error(`Failed to lookup user: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
+const loginSchema = z.object({
+  email: z.string().email("Invalid email format"),
+  password: z.string().min(1, "Password is required")
+});
+
 export function setupAuth(app: Express) {
-  app.post("/api/register", async (req, res) => {
-    try {
-      log(`Registration attempt - Data received:`, req.body);
-      const result = insertUserSchema.safeParse(req.body);
-
-      if (!result.success) {
-        log(`Validation failed: ${fromZodError(result.error).toString()}`);
-        return res.status(400).json({ message: fromZodError(result.error).toString() });
-      }
-
-      // Check for existing email
-      const [existingUser] = await getUserByEmail(result.data.email);
-
-      if (existingUser) {
-        log(`Registration failed: Email ${result.data.email} already exists`);
-        return res.status(400).json({ message: "Email already registered" });
-      }
-
-      const [user] = await db
-        .insert(users)
-        .values({
-          ...result.data,
-          password: await hashPassword(result.data.password),
-        })
-        .returning();
-
-      const token = generateToken(user);
-      log(`User created successfully: ID ${user.id}`);
-
-      res.status(201).json({ user, token });
-    } catch (error: any) {
-      log(`Registration error: ${error.message}`);
-      res.status(500).json({ message: "Registration failed" });
-    }
-  });
-
   app.post("/api/login", async (req, res) => {
     try {
       const { email, password } = req.body;
       log(`Login attempt for email: ${email}`);
+
+      // Validate request body
+      const validatedData = loginSchema.parse(req.body);
+      log('Request validation passed');
 
       if (!email || !password) {
         return res.status(400).json({
@@ -156,6 +130,7 @@ export function setupAuth(app: Express) {
       }
 
       const [user] = await getUserByEmail(email);
+      log(`User lookup result: ${user ? 'Found' : 'Not found'}`);
 
       if (!user) {
         log(`No user found with email: ${email}`);
@@ -165,13 +140,20 @@ export function setupAuth(app: Express) {
         });
       }
 
-      const isValidPassword = await comparePasswords(password, user.password);
-      if (!isValidPassword) {
-        log(`Invalid password for user: ${email}`);
-        return res.status(401).json({
-          success: false,
-          message: "Invalid credentials"
-        });
+      try {
+        const isValidPassword = await comparePasswords(password, user.password);
+        log(`Password validation result: ${isValidPassword ? 'Valid' : 'Invalid'}`);
+
+        if (!isValidPassword) {
+          log(`Invalid password for user: ${email}`);
+          return res.status(401).json({
+            success: false,
+            message: "Invalid credentials"
+          });
+        }
+      } catch (passwordError) {
+        log(`Password comparison error:`, passwordError);
+        throw passwordError;
       }
 
       // Generate JWT token
@@ -185,157 +167,94 @@ export function setupAuth(app: Express) {
         token
       });
     } catch (error) {
-      log(`Login error: ${error}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log(`Login error: ${errorMessage}`);
+      log(`Stack trace:`, error instanceof Error ? error.stack : 'No stack trace');
+
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          success: false,
+          message: "Validation error",
+          errors: error.errors
+        });
+      }
+
       res.status(500).json({
         success: false,
         message: "Internal server error during login",
-        error: error instanceof Error ? error.message : String(error)
+        error: errorMessage
       });
     }
   });
 
-  app.post("/api/logout", (req, res, next) => {
-    req.logout((err) => {
-      if (err) return next(err);
-      res.sendStatus(200);
-    });
-  });
-
-  app.post("/api/auth/forgot-password", async (req, res) => {
+  app.post("/api/register", async (req, res) => {
     try {
-      const { email } = req.body;
-      log(`Processing forgot password request for email: ${email}`);
+      const result = insertUserSchema.safeParse(req.body);
 
-      if (!email) {
-        return res.status(400).json({ message: "Email is required" });
-      }
-
-      const [user] = await getUserByEmail(email);
-
-      // Don't reveal if user exists
-      if (!user) {
-        log(`No user found with email: ${email}`);
-        return res.status(200).json({
-          message: "If an account exists with this email, a password reset link will be sent."
+      if (!result.success) {
+        log(`Registration validation failed: ${fromZodError(result.error).toString()}`);
+        return res.status(400).json({
+          success: false,
+          message: fromZodError(result.error).toString()
         });
       }
 
-      try {
-        const resetToken = randomBytes(32).toString('hex');
-        const resetExpires = new Date(Date.now() + 3600000); // 1 hour
+      // Check for existing email
+      const [existingUser] = await getUserByEmail(result.data.email);
 
-        // Update user with reset token
-        await updateUserResetToken(user.id, resetToken, resetExpires);
-
-        // Generate reset URL
-        const protocol = req.protocol;
-        const host = req.get('host');
-        const resetUrl = `${protocol}://${host}/reset-password/${resetToken}`;
-
-        try {
-          // Send email
-          await sendPasswordResetEmail(email, resetToken, resetUrl);
-
-          return res.status(200).json({
-            message: "If an account exists with this email, a password reset link will be sent."
-          });
-
-        } catch (error: any) {
-          log(`Failed to send password reset email: ${error.message}`);
-
-          // Check if it's a verification error
-          if (error.message?.includes('needs to be verified')) {
-            return res.status(400).json({
-              message: error.message
-            });
-          }
-
-          return res.status(500).json({ 
-            message: "Unable to send password reset email. Please try again later or contact support."
-          });
-        }
-
-      } catch (error) {
-        log(`Error in password reset process: ${error}`);
-        // Don't leak error details to the client
-        return res.status(500).json({ 
-          message: "Unable to process password reset request. Please try again later or contact support."
+      if (existingUser) {
+        log(`Registration failed: Email ${result.data.email} already exists`);
+        return res.status(400).json({
+          success: false,
+          message: "Email already registered"
         });
-      }
-    } catch (error) {
-      log(`Password reset request error: ${error}`);
-      return res.status(500).json({ message: "Failed to process password reset request" });
-    }
-  });
-
-  app.post("/api/auth/reset-password", async (req, res) => {
-    try {
-      const { token, password } = req.body;
-
-      if (!token || !password) {
-        return res.status(400).json({ message: "Token and password are required" });
       }
 
       const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.resetPasswordToken, token))
-        .limit(1);
-
-      if (!user || !user.resetPasswordExpiry || new Date(user.resetPasswordExpiry) < new Date()) {
-        return res.status(400).json({ message: "Invalid or expired reset token" });
-      }
-
-      await db
-        .update(users)
-        .set({
-          password: await hashPassword(password),
-          resetPasswordToken: null,
-          resetPasswordExpiry: null
+        .insert(users)
+        .values({
+          ...result.data,
+          password: await hashPassword(result.data.password),
         })
-        .where(eq(users.id, user.id))
-        .execute();
+        .returning();
 
-      log(`Successfully reset password for user: ${user.id}`);
-      return res.json({ message: "Password has been reset successfully" });
+      const token = generateToken(user);
+      log(`User created successfully: ID ${user.id}`);
+
+      res.status(201).json({
+        success: true,
+        user,
+        token
+      });
     } catch (error) {
-      log(`Password reset error: ${error}`);
-      return res.status(500).json({ message: "Failed to reset password" });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log(`Registration error: ${errorMessage}`);
+      log(`Stack trace:`, error instanceof Error ? error.stack : 'No stack trace');
+
+      res.status(500).json({
+        success: false,
+        message: "Registration failed",
+        error: errorMessage
+      });
+    }
+  });
+
+  app.post("/api/logout", (req, res) => {
+    try {
+      res.json({
+        success: true,
+        message: "Logged out successfully"
+      });
+    } catch (error) {
+      log('Logout error:', error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to logout"
+      });
     }
   });
 
   app.get("/api/user", authenticateToken, (req, res) => {
     res.json(req.user);
   });
-}
-
-export async function updateUserResetToken(userId: number, token: string | null, expiry: Date | null) {
-  try {
-    log(`Updating reset token for user ${userId}`);
-
-    const [updated] = await db
-      .update(users)
-      .set({
-        resetPasswordToken: token,
-        resetPasswordExpiry: expiry
-      })
-      .where(eq(users.id, userId))
-      .returning();
-
-    if (!updated) {
-      throw new Error('Failed to update user reset token');
-    }
-
-    log(`Successfully updated reset token for user ${userId}`);
-    return true;
-  } catch (error) {
-    log(`Error updating reset token: ${error}`);
-    throw error;
-  }
-}
-
-// Added this function because it's referenced but not defined
-async function sendPasswordResetEmail(email: string, token: string, url: string): Promise<void> {
-  //Implementation to send email using a service like nodemailer would go here.  This is a placeholder.
-  console.log(`Email sent to ${email} with reset token ${token} and url ${url}`);
 }

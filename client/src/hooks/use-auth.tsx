@@ -57,8 +57,10 @@ function useAuthState() {
 
       const data = await res.json();
 
-      if (!res.ok) {
-        throw new Error(data.message || "Login failed");
+      if (!res.ok || !data.success) {
+        const errorMessage = data.message || data.error || "Login failed";
+        console.error('Login response error:', data);
+        throw new Error(errorMessage);
       }
 
       localStorage.setItem("token", data.token);
