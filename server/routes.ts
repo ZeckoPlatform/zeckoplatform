@@ -5,6 +5,7 @@ import { log } from "./vite";
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import { metricsMiddleware, getMetrics, initializeMonitoring } from './services/monitoring';
 import subscriptionRoutes from './routes/subscriptions';
 import invoiceRoutes from './routes/invoices';
 import authRoutes from './routes/auth';
@@ -27,14 +28,36 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 export function registerRoutes(app: Express): Server {
+  // Initialize monitoring
+  initializeMonitoring();
+
   // JSON and urlencoded middleware should come first
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
+
+  // Add metrics middleware
+  app.use(metricsMiddleware);
 
   // Set default headers for all API routes
   app.use('/api', (req, res, next) => {
     res.setHeader('Content-Type', 'application/json');
     next();
+  });
+
+  // Metrics endpoint (protected for admin access only)
+  app.get('/metrics', async (req, res) => {
+    try {
+      // Only allow access from admin users
+      if (!req.user?.superAdmin) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      const metrics = await getMetrics();
+      res.set('Content-Type', 'text/plain');
+      res.send(metrics);
+    } catch (error) {
+      log('Error serving metrics:', error);
+      res.status(500).send('Error collecting metrics');
+    }
   });
 
   // Setup authentication

@@ -1,6 +1,7 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { log } from "./vite";
+import { trackDatabaseQuery } from "./services/monitoring";
 
 // Initialize database connection with retries
 const MAX_RETRIES = 5;
@@ -24,6 +25,31 @@ async function initializeDatabase() {
         // Disable SSL for local development
         ssl: false
       });
+
+      // Add query monitoring
+      const originalQuery = pool.query.bind(pool);
+      pool.query = async function monitoredQuery(...args: any[]) {
+        const start = Date.now();
+        try {
+          const result = await originalQuery(...args);
+          const duration = Date.now() - start;
+
+          // Extract query type and table from the SQL
+          const sql = args[0]?.text || args[0];
+          const queryType = sql.trim().split(' ')[0].toUpperCase();
+          const tableMatch = sql.match(/FROM\s+([^\s,;]+)/i);
+          const table = tableMatch ? tableMatch[1] : 'unknown';
+
+          // Track query performance
+          trackDatabaseQuery(queryType, table, duration);
+
+          return result;
+        } catch (error) {
+          const duration = Date.now() - start;
+          trackDatabaseQuery('ERROR', 'unknown', duration);
+          throw error;
+        }
+      };
 
       // Test connection
       const client = await pool.connect();

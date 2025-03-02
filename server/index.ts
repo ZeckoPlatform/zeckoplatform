@@ -2,14 +2,18 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { Server } from "http";
+import { logInfo, logError } from "./services/logging";
+import { initializeMonitoring } from "./services/monitoring";
+import { checkPerformanceMetrics } from "./services/admin-notifications";
 
 const app = express();
 const isProd = process.env.NODE_ENV === 'production';
 
 // Startup logging
-log('=== Server Initialization Started ===');
-log(`Environment: ${process.env.NODE_ENV}`);
-log(`Process ID: ${process.pid}`);
+logInfo('=== Server Initialization Started ===', {
+  environment: process.env.NODE_ENV,
+  processId: process.pid
+});
 
 // Setup CORS for API routes
 app.use('/api', (req, res, next) => {
@@ -27,32 +31,44 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-// Register API routes first
-log('Registering routes...');
+// Initialize monitoring first before registering routes
+try {
+  initializeMonitoring();
+} catch (error) {
+  logError('Failed to initialize monitoring:', {
+    error: error instanceof Error ? error.message : String(error)
+  });
+  // Continue server startup even if monitoring fails
+}
+
+// Register API routes
+logInfo('Registering routes...');
 const httpServer = registerRoutes(app);
-log('Routes registered successfully');
+logInfo('Routes registered successfully');
 
 // Setup frontend serving
 if (isProd) {
-  log('Setting up production static file serving');
+  logInfo('Setting up production static file serving');
   app.use(serveStatic);
 
   // Fallback route for SPA
   app.get('*', (req, res) => {
     if (!req.path.startsWith('/api')) {
-      log(`Serving index.html for path: ${req.path}`);
+      logInfo(`Serving index.html for path: ${req.path}`);
       res.sendFile('index.html', { root: './client/dist' });
     }
   });
 } else {
   // Handle development mode with Vite
-  log('Setting up Vite development server');
+  logInfo('Setting up Vite development server');
   (async () => {
     try {
       await setupVite(app, httpServer);
-      log('Vite setup completed successfully');
+      logInfo('Vite setup completed successfully');
     } catch (error) {
-      log('Fatal error during Vite setup:', error);
+      logError('Fatal error during Vite setup:', {
+        error: error instanceof Error ? error.message : String(error)
+      });
       process.exit(1);
     }
   })();
@@ -60,11 +76,17 @@ if (isProd) {
 
 // Error handling middleware
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-  log('Error handler:', err);
+  logError('Error handler:', {
+    error: err instanceof Error ? err.message : String(err),
+    stack: err.stack
+  });
 
   if (res.headersSent) {
     return next(err);
   }
+
+  // Store error for metrics middleware
+  res.locals.error = err;
 
   // Send JSON responses for API routes
   if (req.path.startsWith('/api')) {
@@ -85,7 +107,7 @@ const startServer = async (port: number): Promise<boolean> => {
 
     const cleanup = () => {
       if (!isResolved) {
-        log(`Cleaning up server on port ${port}`);
+        logInfo(`Cleaning up server on port ${port}`);
         httpServer.removeAllListeners();
         if (httpServer.listening) {
           httpServer.close();
@@ -96,10 +118,11 @@ const startServer = async (port: number): Promise<boolean> => {
     const onError = (error: NodeJS.ErrnoException) => {
       if (isResolved) return;
 
-      log(`Server error on port ${port}:`);
-      log(`Error name: ${error.name}`);
-      log(`Error message: ${error.message}`);
-      log(`Error code: ${error.code}`);
+      logError(`Server error on port ${port}:`, {
+        name: error.name,
+        message: error.message,
+        code: error.code
+      });
       cleanup();
       resolve(false);
       isResolved = true;
@@ -110,7 +133,7 @@ const startServer = async (port: number): Promise<boolean> => {
 
       const addr = httpServer.address();
       const actualPort = typeof addr === 'string' ? addr : addr?.port;
-      log(`Server successfully started and listening on port ${actualPort}`);
+      logInfo(`Server successfully started and listening on port ${actualPort}`);
       resolve(true);
       isResolved = true;
     };
@@ -119,11 +142,13 @@ const startServer = async (port: number): Promise<boolean> => {
     httpServer.once('listening', onListening);
 
     try {
-      log(`Attempting to bind to port ${port} on address 0.0.0.0...`);
+      logInfo(`Attempting to bind to port ${port} on address 0.0.0.0...`);
       httpServer.listen(port, '0.0.0.0');
     } catch (error) {
       if (!isResolved) {
-        log(`Failed to start server: ${error}`);
+        logError(`Failed to start server:`, {
+          error: error instanceof Error ? error.message : String(error)
+        });
         cleanup();
         resolve(false);
         isResolved = true;
@@ -132,28 +157,40 @@ const startServer = async (port: number): Promise<boolean> => {
   });
 };
 
+// Schedule periodic performance checks
+const PERFORMANCE_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
+setInterval(() => {
+  checkPerformanceMetrics().catch(error => {
+    logError('Failed to run performance check:', {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  });
+}, PERFORMANCE_CHECK_INTERVAL);
+
 // Main startup function
 (async () => {
   try {
-    log('=== Environment Information ===');
-    log(`NODE_ENV: ${process.env.NODE_ENV}`);
-    log(`PORT: ${process.env.PORT}`);
-    log(`Process ID: ${process.pid}`);
-    log(`Platform: ${process.platform}`);
-    log(`Node Version: ${process.version}`);
-    log('=== End Environment Information ===');
+    logInfo('=== Environment Information ===', {
+      NODE_ENV: process.env.NODE_ENV,
+      PORT: process.env.PORT,
+      processId: process.pid,
+      platform: process.platform,
+      nodeVersion: process.version
+    });
 
     const PORT = Number(process.env.PORT) || 5000;
-    log(`Starting server on port ${PORT}`);
+    logInfo(`Starting server on port ${PORT}`);
 
     const serverStarted = await startServer(PORT);
     if (!serverStarted) {
       throw new Error(`Could not start server on port ${PORT}`);
     }
 
-    log('Server started successfully');
+    logInfo('Server started successfully');
   } catch (error) {
-    log(`Fatal server startup error: ${error}`);
+    logError(`Fatal server startup error:`, {
+      error: error instanceof Error ? error.message : String(error)
+    });
     process.exit(1);
   }
 })();
