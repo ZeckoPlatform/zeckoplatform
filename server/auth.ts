@@ -18,10 +18,15 @@ export async function hashPassword(password: string) {
 }
 
 export async function comparePasswords(supplied: string, stored: string) {
-  const [hashed, salt] = stored.split(".");
-  const hashedBuf = Buffer.from(hashed, "hex");
-  const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-  return timingSafeEqual(hashedBuf, suppliedBuf);
+  try {
+    const [hashed, salt] = stored.split(".");
+    const hashedBuf = Buffer.from(hashed, "hex");
+    const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+    return timingSafeEqual(hashedBuf, suppliedBuf);
+  } catch (error) {
+    log(`Error comparing passwords: ${error instanceof Error ? error.message : String(error)}`);
+    throw error;
+  }
 }
 
 export function generateToken(user: any) {
@@ -44,6 +49,12 @@ export function generateToken(user: any) {
 }
 
 export function setupAuth(app: Express) {
+  // Debug middleware to log all requests
+  app.use((req, res, next) => {
+    log(`${req.method} ${req.path}`);
+    next();
+  });
+
   app.post("/api/login", async (req, res) => {
     try {
       const { email, password } = req.body;
@@ -66,6 +77,15 @@ export function setupAuth(app: Express) {
         log(`Login failed: No user found with email ${email}`);
         return res.status(401).json({
           message: "Invalid credentials"
+        });
+      }
+
+      // Log password details for debugging
+      log(`Found user ${user.id}, checking password...`);
+      if (!user.password) {
+        log(`Error: User ${user.id} has no password stored`);
+        return res.status(500).json({
+          message: "User account configuration error"
         });
       }
 
@@ -110,69 +130,9 @@ export function setupAuth(app: Express) {
         });
       }
     } catch (error) {
-      log(`Login error:`, error);
+      log(`Login error: ${error instanceof Error ? error.message : String(error)}`);
       return res.status(500).json({
         message: "An error occurred during login"
-      });
-    }
-  });
-
-  app.post("/api/register", async (req, res) => {
-    try {
-      const { email, password, userType, countryCode } = req.body;
-      log(`Registration attempt received for email: ${email}`);
-
-      if (!email || !password || !userType || !countryCode) {
-        return res.status(400).json({
-          message: "All fields are required"
-        });
-      }
-
-      const [existingUser] = await db
-        .select()
-        .from(users)
-        .where(eq(users.email, email))
-        .limit(1);
-
-      if (existingUser) {
-        log(`Registration failed: Email ${email} already exists`);
-        return res.status(400).json({
-          message: "Email already registered"
-        });
-      }
-
-      const hashedPassword = await hashPassword(password);
-
-      const [user] = await db
-        .insert(users)
-        .values({
-          email,
-          password: hashedPassword,
-          userType,
-          countryCode,
-          active: true,
-          subscriptionActive: userType === "free",
-          subscriptionTier: userType === "free" ? "none" : userType
-        })
-        .returning();
-
-      const token = generateToken(user);
-      log(`Registration successful for user: ${user.id}, token generated`);
-
-      res.status(201).json({
-        token,
-        user: {
-          id: user.id,
-          email: user.email,
-          userType: user.userType,
-          subscriptionActive: user.subscriptionActive,
-          subscriptionTier: user.subscriptionTier
-        }
-      });
-    } catch (error) {
-      log(`Registration error:`, error);
-      res.status(500).json({
-        message: "Registration failed"
       });
     }
   });

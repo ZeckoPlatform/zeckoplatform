@@ -7,9 +7,7 @@ import { log } from "../server/vite";
 neonConfig.webSocketConstructor = ws;
 
 if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
-  );
+  throw new Error("DATABASE_URL environment variable is required");
 }
 
 let pool: Pool;
@@ -32,7 +30,7 @@ try {
     log("Successfully connected to database");
   });
 
-  db = drizzle({ client: pool, schema });
+  db = drizzle(pool, { schema });
   log("Database initialization completed");
 } catch (error) {
   log(`Database initialization error: ${error instanceof Error ? error.message : String(error)}`);
