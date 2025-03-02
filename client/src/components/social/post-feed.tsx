@@ -21,6 +21,15 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ImageViewerModal } from "./image-viewer-modal";
 
+// Match the exact reaction types from the schema
+type ReactionType = "like" | "celebrate" | "support" | "insightful";
+
+interface Reaction {
+  id: number;
+  type: ReactionType;
+  userId: number;
+}
+
 interface Comment {
   id: number;
   content: string;
@@ -34,15 +43,6 @@ interface Comment {
     email: string;
   };
   replies?: Comment[];
-}
-
-// Match the exact reaction types from the schema
-type ReactionType = "like" | "celebrate" | "support" | "insightful";
-
-interface Reaction {
-  id: number;
-  type: ReactionType;
-  userId: number;
 }
 
 interface Post {
@@ -66,6 +66,11 @@ interface Post {
   comments?: Comment[];
 }
 
+// Helper function to count reactions by type
+const getReactionCount = (reactions: Reaction[] = [], type: ReactionType) => {
+  return reactions.filter(r => r.type === type).length;
+};
+
 export function PostFeed() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -80,11 +85,6 @@ export function PostFeed() {
     "support": { icon: Heart, label: 'Support' },
     "insightful": { icon: Lightbulb, label: 'Insightful' }
   } satisfies Record<ReactionType, { icon: any; label: string }>;
-
-  // Helper function to count reactions by type
-  const getReactionCount = (reactions: Reaction[] = [], type: ReactionType) => {
-    return reactions.filter(r => r.type === type).length;
-  };
 
   const addReactionMutation = useMutation({
     mutationFn: async ({ postId, type }: { postId: number; type: ReactionType }) => {
@@ -142,7 +142,12 @@ export function PostFeed() {
     const post = postsData?.data.find((p: Post) => p.id === postId);
     const hasReacted = post?.reactions?.some(r => r.type === type && r.userId === user.id);
 
-    console.log('Handling reaction:', { postId, type, hasReacted });
+    console.log('Handling reaction:', { 
+      postId, 
+      type,
+      hasReacted,
+      currentUserReactions: post?.reactions?.filter(r => r.userId === user.id)
+    });
 
     if (hasReacted) {
       removeReactionMutation.mutate({ postId, type });
@@ -439,6 +444,17 @@ export function PostFeed() {
       return response.json();
     }
   });
+
+  const countTotalComments = (comments: Comment[] | undefined) => {
+    if(!comments) return 0;
+    let count = comments.length;
+    comments.forEach(comment => {
+      if(comment.replies){
+        count += comment.replies.length;
+      }
+    });
+    return count;
+  }
 
   if (isLoading) {
     return (

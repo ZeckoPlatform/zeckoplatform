@@ -13,6 +13,58 @@ import { sendPasswordResetEmail } from "./services/email";
 const scryptAsync = promisify(scrypt);
 const JWT_SECRET = process.env.REPL_ID!;
 
+// Middleware to authenticate requests using JWT token
+export function authenticateToken(req: Request, res: Response, next: NextFunction) {
+  res.setHeader('Content-Type', 'application/json');
+
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    log('No authentication token found');
+    return res.status(401).json({ 
+      success: false,
+      message: "Authentication required" 
+    });
+  }
+
+  jwt.verify(token, JWT_SECRET, async (err: any, decoded: any) => {
+    if (err) {
+      log('Invalid token:', err.message);
+      return res.status(401).json({ 
+        success: false,
+        message: "Invalid or expired token" 
+      });
+    }
+
+    try {
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, decoded.id))
+        .limit(1);
+
+      if (!user) {
+        log('User not found for token');
+        return res.status(401).json({ 
+          success: false,
+          message: "User not found" 
+        });
+      }
+
+      req.user = user;
+      log('User authenticated via JWT token');
+      next();
+    } catch (error) {
+      log('Database error in auth middleware:', error);
+      return res.status(500).json({ 
+        success: false,
+        message: "Internal server error" 
+      });
+    }
+  });
+}
+
 export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;

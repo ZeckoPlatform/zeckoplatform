@@ -416,13 +416,23 @@ router.post("/social/posts/:id/reactions", authenticateToken, async (req, res) =
     log('Adding reaction - Raw payload:', JSON.stringify(req.body));
 
     const schema = z.object({
-      type: z.string()
-        .trim()
-        .toLowerCase()
-        .pipe(z.enum(["like", "celebrate", "support", "insightful"]))
+      type: z.preprocess(
+        (val) => typeof val === "string" ? val.trim().toLowerCase() : val,
+        z.enum(["like", "celebrate", "support", "insightful"])
+      )
     });
 
-    const validatedData = schema.parse(req.body);
+    let preprocessedData;
+    try {
+      preprocessedData = typeof req.body.type === "string" ? 
+        { type: req.body.type.trim().toLowerCase() } : req.body;
+      log('Preprocessed data:', preprocessedData);
+    } catch (e) {
+      log('Preprocessing error:', e);
+      throw e;
+    }
+
+    const validatedData = schema.parse(preprocessedData);
     log('Validated reaction data:', validatedData);
 
     // Check if user has already reacted with this type
