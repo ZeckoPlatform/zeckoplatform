@@ -34,7 +34,8 @@ function useAuthState() {
           localStorage.removeItem("token");
           return null;
         }
-        throw new Error("Failed to fetch user data");
+        const error = await res.json();
+        throw new Error(error.message || "Failed to fetch user data");
       }
 
       return res.json();
@@ -60,6 +61,9 @@ function useAuthState() {
       }
 
       const data = await res.json();
+      if (!data.token) {
+        throw new Error("No token received from server");
+      }
       localStorage.setItem("token", data.token);
       return data.user;
     },
@@ -84,9 +88,10 @@ function useAuthState() {
       }
     },
     onError: (error: Error) => {
+      console.error('Login error:', error);
       toast({
         title: "Login failed",
-        description: error.message,
+        description: error.message || "Invalid credentials",
         variant: "destructive",
       });
     },
@@ -94,7 +99,6 @@ function useAuthState() {
 
   const registerMutation = useMutation({
     mutationFn: async (data: any) => {
-      console.log('Registration data being sent:', data);
       const res = await fetch("/api/register", {
         method: "POST",
         headers: {
@@ -109,6 +113,9 @@ function useAuthState() {
       }
 
       const responseData = await res.json();
+      if (!responseData.token) {
+        throw new Error("No token received from server");
+      }
       localStorage.setItem("token", responseData.token);
       return responseData.user;
     },
@@ -140,7 +147,6 @@ function useAuthState() {
       await fetch("/api/logout", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       });

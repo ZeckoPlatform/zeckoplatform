@@ -1,14 +1,11 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { users, insertUserSchema, type SelectUser } from "@db/schema";
+import { users } from "@db/schema";
 import { db } from "@db";
 import { eq } from "drizzle-orm";
-import { fromZodError } from "zod-validation-error";
 import { log } from "./vite";
 import jwt from 'jsonwebtoken';
-import { checkLoginAttempts, recordLoginAttempt } from "./services/rate-limiter";
-import { sendPasswordResetEmail } from "./services/email";
 
 const scryptAsync = promisify(scrypt);
 const JWT_SECRET = process.env.REPL_ID!;
@@ -26,7 +23,7 @@ export async function comparePasswords(supplied: string, stored: string) {
   return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
-export function generateToken(user: SelectUser) {
+export function generateToken(user: any) {
   return jwt.sign(
     {
       id: user.id,
@@ -44,11 +41,14 @@ export function setupAuth(app: Express) {
   app.post("/api/login", async (req, res) => {
     try {
       const { email, password } = req.body;
+
       if (!email || !password) {
         return res.status(400).json({
           message: "Email and password are required"
         });
       }
+
+      log(`Login attempt for email: ${email}`);
 
       // Find user
       const [user] = await db
@@ -71,19 +71,20 @@ export function setupAuth(app: Express) {
         });
       }
 
-      // Successful login
+      // Generate token
       const token = generateToken(user);
       log(`Login successful for user: ${user.id}`);
 
+      // Return user data and token
       res.json({
+        token,
         user: {
           id: user.id,
           email: user.email,
           userType: user.userType,
           subscriptionActive: user.subscriptionActive,
           subscriptionTier: user.subscriptionTier
-        },
-        token
+        }
       });
     } catch (error) {
       log(`Login error:`, error);
@@ -95,42 +96,48 @@ export function setupAuth(app: Express) {
 
   app.post("/api/register", async (req, res) => {
     try {
-      log(`Registration attempt - Data received:`, req.body);
-      const result = insertUserSchema.safeParse(req.body);
+      const { email, password, userType, countryCode } = req.body;
 
-      if (!result.success) {
-        log(`Validation failed: ${fromZodError(result.error).toString()}`);
-        return res.status(400).json({ message: fromZodError(result.error).toString() });
+      if (!email || !password || !userType || !countryCode) {
+        return res.status(400).json({
+          message: "All fields are required"
+        });
       }
 
-      const [existingEmail] = await getUserByEmail(result.data.email);
+      const [existingUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1);
 
-      if (existingEmail) {
-        log(`Registration failed: Email ${result.data.email} already exists`);
-        return res.status(400).json({ message: "Email already registered" });
+      if (existingUser) {
+        return res.status(400).json({
+          message: "Email already registered"
+        });
       }
 
-      const userData = {
-        email: result.data.email,
-        password: await hashPassword(result.data.password),
-        userType: result.data.userType,
-        countryCode: result.data.countryCode,
-        active: true,
-        subscriptionActive: result.data.userType === "free",
-        subscriptionTier: result.data.userType === "free" ? "none" : result.data.userType,
-      };
+      const hashedPassword = await hashPassword(password);
 
-      const [user] = await db.insert(users)
-        .values(userData)
+      const [user] = await db
+        .insert(users)
+        .values({
+          email,
+          password: hashedPassword,
+          userType,
+          countryCode,
+          active: true,
+          subscriptionActive: userType === "free",
+          subscriptionTier: userType === "free" ? "none" : userType
+        })
         .returning();
-
-      log(`User created successfully: ID ${user.id}, Type: ${user.userType}`);
 
       const token = generateToken(user);
       res.status(201).json({ user, token });
-    } catch (error: any) {
-      log(`Registration error: ${error.message}`);
-      res.status(500).json({ message: "Registration failed" });
+    } catch (error) {
+      log(`Registration error:`, error);
+      res.status(500).json({
+        message: "Registration failed"
+      });
     }
   });
 
@@ -141,27 +148,6 @@ export function setupAuth(app: Express) {
   app.get("/api/user", authenticateToken, (req, res) => {
     res.json(req.user);
   });
-}
-
-async function getUserByEmail(email: string): Promise<SelectUser[]> {
-  if (!email) {
-    throw new Error('Email is required');
-  }
-
-  try {
-    log(`Attempting to find user with email: ${email}`);
-    const result = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, email))
-      .limit(1);
-
-    log(`Found ${result.length} users with email ${email}`);
-    return result;
-  } catch (error) {
-    log(`Database error in getUserByEmail: ${error}`);
-    throw error;
-  }
 }
 
 export function authenticateToken(req: Request, res: Response, next: NextFunction) {
