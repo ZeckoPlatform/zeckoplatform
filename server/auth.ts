@@ -8,7 +8,8 @@ import { log } from "./vite";
 import jwt from 'jsonwebtoken';
 
 const scryptAsync = promisify(scrypt);
-const JWT_SECRET = process.env.REPL_ID!;
+// Use a secure secret or fallback for JWT
+const JWT_SECRET = process.env.JWT_SECRET || randomBytes(32).toString('hex');
 
 export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
@@ -24,31 +25,35 @@ export async function comparePasswords(supplied: string, stored: string) {
 }
 
 export function generateToken(user: any) {
-  return jwt.sign(
-    {
-      id: user.id,
-      email: user.email,
-      userType: user.userType,
-      subscriptionActive: user.subscriptionActive,
-      subscriptionTier: user.subscriptionTier
-    },
-    JWT_SECRET,
-    { expiresIn: '24h' }
-  );
+  try {
+    const token = jwt.sign(
+      {
+        id: user.id,
+        email: user.email,
+        userType: user.userType
+      },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+    log(`Token generated successfully for user ${user.id}`);
+    return token;
+  } catch (error) {
+    log(`Error generating token: ${error}`);
+    throw new Error('Failed to generate authentication token');
+  }
 }
 
 export function setupAuth(app: Express) {
   app.post("/api/login", async (req, res) => {
     try {
       const { email, password } = req.body;
+      log(`Login attempt received for email: ${email}`);
 
       if (!email || !password) {
         return res.status(400).json({
           message: "Email and password are required"
         });
       }
-
-      log(`Login attempt for email: ${email}`);
 
       // Find user
       const [user] = await db
@@ -58,6 +63,7 @@ export function setupAuth(app: Express) {
         .limit(1);
 
       if (!user) {
+        log(`Login failed: No user found with email ${email}`);
         return res.status(401).json({
           message: "Invalid credentials"
         });
@@ -66,14 +72,15 @@ export function setupAuth(app: Express) {
       // Verify password
       const isValidPassword = await comparePasswords(password, user.password);
       if (!isValidPassword) {
+        log(`Login failed: Invalid password for user ${email}`);
         return res.status(401).json({
           message: "Invalid credentials"
         });
       }
 
-      // Generate token
+      // Generate token on successful login
       const token = generateToken(user);
-      log(`Login successful for user: ${user.id}`);
+      log(`Login successful for user: ${user.id}, token generated`);
 
       // Return user data and token
       res.json({
@@ -90,53 +97,6 @@ export function setupAuth(app: Express) {
       log(`Login error:`, error);
       res.status(500).json({
         message: "An error occurred during login"
-      });
-    }
-  });
-
-  app.post("/api/register", async (req, res) => {
-    try {
-      const { email, password, userType, countryCode } = req.body;
-
-      if (!email || !password || !userType || !countryCode) {
-        return res.status(400).json({
-          message: "All fields are required"
-        });
-      }
-
-      const [existingUser] = await db
-        .select()
-        .from(users)
-        .where(eq(users.email, email))
-        .limit(1);
-
-      if (existingUser) {
-        return res.status(400).json({
-          message: "Email already registered"
-        });
-      }
-
-      const hashedPassword = await hashPassword(password);
-
-      const [user] = await db
-        .insert(users)
-        .values({
-          email,
-          password: hashedPassword,
-          userType,
-          countryCode,
-          active: true,
-          subscriptionActive: userType === "free",
-          subscriptionTier: userType === "free" ? "none" : userType
-        })
-        .returning();
-
-      const token = generateToken(user);
-      res.status(201).json({ user, token });
-    } catch (error) {
-      log(`Registration error:`, error);
-      res.status(500).json({
-        message: "Registration failed"
       });
     }
   });
@@ -162,6 +122,7 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
 
   jwt.verify(token, JWT_SECRET, async (err: any, decoded: any) => {
     if (err) {
+      log(`Token verification failed:`, err);
       return res.status(401).json({
         message: "Invalid or expired token"
       });
