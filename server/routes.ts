@@ -8,6 +8,8 @@ import fs from 'fs';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { metricsMiddleware, getMetrics, initializeMonitoring } from './services/monitoring';
 import { startGrafanaServer, GRAFANA_INTERNAL_URL } from './services/grafana';
+
+// Import route handlers
 import subscriptionRoutes from './routes/subscriptions';
 import invoiceRoutes from './routes/invoices';
 import authRoutes from './routes/auth';
@@ -57,6 +59,7 @@ export function registerRoutes(app: Express): Server {
     try {
       // Only allow access from admin users
       if (!req.user?.superAdmin) {
+        log('Metrics access denied:', { user: req.user });
         return res.status(403).json({ error: 'Access denied' });
       }
       const metrics = await getMetrics();
@@ -75,20 +78,22 @@ export function registerRoutes(app: Express): Server {
   app.use(
     '/admin/analytics/grafana',
     (req: any, res, next) => {
-      // Debug log
-      log('Grafana auth middleware:', {
+      // Debug log for authentication
+      log('Grafana auth check:', {
+        isAuthenticated: req.isAuthenticated(),
         user: req.user,
         isSuperAdmin: req.user?.superAdmin,
-        path: req.path
+        headers: req.headers
       });
 
-      // Check if user is authenticated and is a super admin
-      if (!req.user || !req.user.superAdmin) {
-        log('Grafana access denied:', {
-          user: req.user,
-          reason: !req.user ? 'No user' : 'Not super admin'
-        });
-        return res.status(403).json({ error: 'Access denied' });
+      if (!req.isAuthenticated()) {
+        log('Grafana access denied: Not authenticated');
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      if (!req.user?.superAdmin) {
+        log('Grafana access denied: Not super admin');
+        return res.status(403).json({ error: 'Super admin access required' });
       }
 
       // Add auth headers for Grafana
@@ -104,23 +109,21 @@ export function registerRoutes(app: Express): Server {
       pathRewrite: {
         '^/admin/analytics/grafana': '',
       },
-      ws: true, // Enable WebSocket proxy
-      logLevel: 'debug', // Enable debug logging
-      onProxyReq: (proxyReq, req, res) => {
-        // Debug log proxy request
+      ws: true,
+      onProxyReq: (proxyReq, req: any, res) => {
         log('Grafana proxy request:', {
-          path: req.path,
+          originalUrl: req.originalUrl,
           headers: proxyReq.getHeaders()
         });
       },
-      onError: (err: Error, req: any, res: any) => {
+      onError: (err: Error, req: any, res) => {
         log('Grafana proxy error:', err instanceof Error ? err.message : String(err));
-        res.status(500).send('Grafana service unavailable');
-      },
+        res.status(503).json({ error: 'Grafana service unavailable' });
+      }
     })
   );
 
-  // Register routes
+  // Register API routes
   app.use('/api', authRoutes);
   app.use('/api', uploadRoutes);
   app.use('/api', subscriptionRoutes);
@@ -141,7 +144,6 @@ export function registerRoutes(app: Express): Server {
   // Error handling middleware - should be last
   app.use((err: any, req: any, res: any, next: any) => {
     log('Global error handler:', err instanceof Error ? err.message : String(err));
-    // If headers are not sent yet and it's an API route
     if (!res.headersSent && req.path.startsWith('/api')) {
       res.status(err.status || 500).json({
         success: false,
