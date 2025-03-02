@@ -402,4 +402,146 @@ router.get("/social/posts", async (req, res) => {
   }
 });
 
+// Add routes for post reactions with proper validation
+router.post("/social/posts/:id/reactions", authenticateToken, async (req, res) => {
+  try {
+    const postId = parseInt(req.params.id);
+    if (isNaN(postId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid post ID"
+      });
+    }
+
+    log('Adding reaction - Raw payload:', JSON.stringify(req.body));
+
+    const schema = z.object({
+      type: z.string()
+        .trim()
+        .toLowerCase()
+        .pipe(z.enum(["like", "celebrate", "support", "insightful"]))
+    });
+
+    const validatedData = schema.parse(req.body);
+    log('Validated reaction data:', validatedData);
+
+    // Check if user has already reacted with this type
+    const [existingReaction] = await db
+      .select()
+      .from(postReactions)
+      .where(
+        and(
+          eq(postReactions.postId, postId),
+          eq(postReactions.userId, req.user!.id),
+          eq(postReactions.type, validatedData.type)
+        )
+      );
+
+    if (existingReaction) {
+      log('User already reacted with this type');
+      return res.status(400).json({
+        success: false,
+        message: "You have already reacted with this type"
+      });
+    }
+
+    // Add the reaction
+    const [reaction] = await db
+      .insert(postReactions)
+      .values({
+        postId,
+        userId: req.user!.id,
+        type: validatedData.type,
+        createdAt: new Date()
+      })
+      .returning();
+
+    log('Successfully added reaction:', reaction);
+
+    return res.json({
+      success: true,
+      data: reaction
+    });
+  } catch (error) {
+    log('Error adding reaction:', error);
+
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid reaction type. Must be one of: like, celebrate, support, insightful`
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to add reaction"
+    });
+  }
+});
+
+// Remove a reaction with improved validation
+router.delete("/social/posts/:id/reactions/:type", authenticateToken, async (req, res) => {
+  try {
+    const postId = parseInt(req.params.id);
+    const rawType = req.params.type;
+
+    if (isNaN(postId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid post ID"
+      });
+    }
+
+    log('Removing reaction - Raw type:', rawType);
+
+    const schema = z.string()
+      .trim()
+      .toLowerCase()
+      .pipe(z.enum(["like", "celebrate", "support", "insightful"]));
+
+    const type = schema.parse(rawType);
+    log('Validated reaction type:', type);
+
+    // Remove the reaction
+    const [deletedReaction] = await db
+      .delete(postReactions)
+      .where(
+        and(
+          eq(postReactions.postId, postId),
+          eq(postReactions.userId, req.user!.id),
+          eq(postReactions.type, type)
+        )
+      )
+      .returning();
+
+    if (!deletedReaction) {
+      return res.status(404).json({
+        success: false,
+        message: "Reaction not found"
+      });
+    }
+
+    log('Successfully removed reaction');
+
+    return res.json({
+      success: true,
+      data: deletedReaction
+    });
+  } catch (error) {
+    log('Error removing reaction:', error);
+
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid reaction type. Must be one of: like, celebrate, support, insightful`
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to remove reaction"
+    });
+  }
+});
+
 export default router;

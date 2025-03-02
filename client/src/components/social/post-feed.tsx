@@ -36,6 +36,7 @@ interface Comment {
   replies?: Comment[];
 }
 
+// Match the exact reaction types from the schema
 type ReactionType = "like" | "celebrate" | "support" | "insightful";
 
 interface Reaction {
@@ -85,17 +86,11 @@ export function PostFeed() {
     return reactions.filter(r => r.type === type).length;
   };
 
-  // Helper function to count total comments including replies
-  const countTotalComments = (comments: Comment[] = []): number => {
-    return comments.reduce((total, comment) => {
-      return total + 1 + (comment.replies ? countTotalComments(comment.replies) : 0);
-    }, 0);
-  };
-
   const addReactionMutation = useMutation({
     mutationFn: async ({ postId, type }: { postId: number; type: ReactionType }) => {
+      console.log('Adding reaction:', { postId, type });
       const response = await apiRequest('POST', `/api/social/posts/${postId}/reactions`, {
-        type: type
+        type: type.toLowerCase().trim()
       });
 
       if (!response.ok) {
@@ -108,6 +103,7 @@ export function PostFeed() {
       queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     },
     onError: (error: Error) => {
+      console.error('Add reaction error:', error);
       toast({
         title: "Error",
         description: error.message,
@@ -118,7 +114,8 @@ export function PostFeed() {
 
   const removeReactionMutation = useMutation({
     mutationFn: async ({ postId, type }: { postId: number; type: ReactionType }) => {
-      const response = await apiRequest('DELETE', `/api/social/posts/${postId}/reactions/${type}`);
+      console.log('Removing reaction:', { postId, type });
+      const response = await apiRequest('DELETE', `/api/social/posts/${postId}/reactions/${type.toLowerCase().trim()}`);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -130,6 +127,7 @@ export function PostFeed() {
       queryClient.invalidateQueries({ queryKey: ['/api/social/posts'] });
     },
     onError: (error: Error) => {
+      console.error('Remove reaction error:', error);
       toast({
         title: "Error",
         description: error.message,
@@ -143,6 +141,8 @@ export function PostFeed() {
 
     const post = postsData?.data.find((p: Post) => p.id === postId);
     const hasReacted = post?.reactions?.some(r => r.type === type && r.userId === user.id);
+
+    console.log('Handling reaction:', { postId, type, hasReacted });
 
     if (hasReacted) {
       removeReactionMutation.mutate({ postId, type });

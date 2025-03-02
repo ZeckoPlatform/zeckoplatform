@@ -45,7 +45,8 @@ function useAuthState() {
   });
 
   const loginMutation = useMutation({
-    mutationFn: async (credentials: LoginData) => {
+    mutationFn: async (credentials: LoginData): Promise<SelectUser> => {
+      console.log('Attempting login with:', { email: credentials.email });
       const res = await fetch("/api/login", {
         method: "POST",
         headers: {
@@ -54,12 +55,12 @@ function useAuthState() {
         body: JSON.stringify(credentials),
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Login failed");
+        throw new Error(data.message || "Login failed");
       }
 
-      const data = await res.json();
       localStorage.setItem("token", data.token);
       return data.user;
     },
@@ -84,6 +85,7 @@ function useAuthState() {
       }
     },
     onError: (error: Error) => {
+      console.error('Login error:', error);
       toast({
         title: "Login failed",
         description: error.message,
@@ -93,7 +95,7 @@ function useAuthState() {
   });
 
   const registerMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: InsertUser): Promise<SelectUser> => {
       console.log('Registration data being sent:', data);
       const res = await fetch("/api/register", {
         method: "POST",
@@ -103,12 +105,12 @@ function useAuthState() {
         body: JSON.stringify(data),
       });
 
+      const responseData = await res.json();
+
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Registration failed");
+        throw new Error(responseData.message || "Registration failed");
       }
 
-      const responseData = await res.json();
       localStorage.setItem("token", responseData.token);
       return responseData.user;
     },
@@ -137,13 +139,16 @@ function useAuthState() {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      await fetch("/api/logout", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
+      const token = localStorage.getItem("token");
+      if (token) {
+        await fetch("/api/logout", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      }
       localStorage.removeItem("token");
       queryClient.setQueryData(["/api/user"], null);
     },

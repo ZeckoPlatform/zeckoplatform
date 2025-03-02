@@ -40,105 +40,12 @@ export function generateToken(user: SelectUser) {
   );
 }
 
-// Middleware to authenticate requests using either JWT token or session
-export function authenticateToken(req: Request, res: Response, next: NextFunction) {
-  res.setHeader('Content-Type', 'application/json');
-
-  // First check if user is authenticated via session
-  if (req.isAuthenticated && req.isAuthenticated()) {
-    log('User authenticated via session');
-    return next();
-  }
-
-  // If not authenticated via session, check for JWT token
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    log('No authentication token found');
-    return res.status(401).json({ 
-      success: false,
-      message: "Authentication required" 
-    });
-  }
-
-  jwt.verify(token, JWT_SECRET, async (err: any, decoded: any) => {
-    if (err) {
-      log('Invalid token:', err.message);
-      return res.status(401).json({ 
-        success: false,
-        message: "Invalid or expired token" 
-      });
-    }
-
-    try {
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, decoded.id))
-        .limit(1);
-
-      if (!user) {
-        log('User not found for token');
-        return res.status(401).json({ 
-          success: false,
-          message: "User not found" 
-        });
-      }
-
-      req.user = user;
-      log('User authenticated via JWT token');
-      next();
-    } catch (error) {
-      log('Database error in auth middleware:', error);
-      return res.status(500).json({ 
-        success: false,
-        message: "Internal server error" 
-      });
-    }
-  });
-}
-
-export async function updateUserResetToken(userId: number, token: string | null, expiry: Date | null) {
-  try {
-    log(`Updating reset token for user ${userId}`);
-
-    const [updated] = await db
-      .update(users)
-      .set({
-        resetPasswordToken: token,
-        resetPasswordExpiry: expiry
-      })
-      .where(eq(users.id, userId))
-      .returning();
-
-    if (!updated) {
-      throw new Error('Failed to update user reset token');
-    }
-
-    log(`Successfully updated reset token for user ${userId}`);
-    return true;
-  } catch (error) {
-    log(`Error updating reset token: ${error}`);
-    throw error;
-  }
-}
-
 async function getUserByEmail(email: string): Promise<SelectUser[]> {
-  if (!email) {
-    throw new Error('Email is required');
-  }
-
   try {
-    log(`Attempting to find user with email: ${email}`);
-    const result = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, email))
-      .limit(1);
-
-    log(`Found ${result.length} users with email ${email}`);
-    return result;
+    log(`Looking up user with email: ${email}`);
+    const users = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    log(`Found ${users.length} users`);
+    return users;
   } catch (error) {
     log(`Database error in getUserByEmail: ${error}`);
     throw error;
@@ -228,46 +135,30 @@ export function setupAuth(app: Express) {
   app.post("/api/login", async (req, res) => {
     try {
       const { email, password } = req.body;
-      const ip = req.ip;
+      log(`Login attempt for email: ${email}`);
 
       if (!email || !password) {
         return res.status(400).json({ message: "Email and password are required" });
       }
 
-      log(`Login attempt for email: ${email} from IP: ${ip}`);
-
-      const loginCheck = await checkLoginAttempts(ip, email);
-      if (!loginCheck.allowed) {
-        return res.status(429).json({
-          message: `Too many login attempts. Please try again in ${loginCheck.lockoutMinutes} minutes.`,
-          lockoutEndTime: loginCheck.lockoutEndTime,
-          lockoutMinutes: loginCheck.lockoutMinutes
-        });
-      }
-
       const [user] = await getUserByEmail(email);
 
       if (!user) {
-        await recordLoginAttempt({ ip, email, timestamp: new Date(), successful: false });
-        return res.status(401).json({
-          message: "Invalid credentials",
-          remainingAttempts: loginCheck.remainingAttempts
-        });
+        log(`No user found with email: ${email}`);
+        return res.status(401).json({ message: "Invalid credentials" });
       }
 
       const isValidPassword = await comparePasswords(password, user.password);
       if (!isValidPassword) {
-        await recordLoginAttempt({ ip, email, timestamp: new Date(), successful: false });
-        return res.status(401).json({
-          message: "Invalid credentials",
-          remainingAttempts: loginCheck.remainingAttempts
-        });
+        log(`Invalid password for user: ${email}`);
+        return res.status(401).json({ message: "Invalid credentials" });
       }
 
-      await recordLoginAttempt({ ip, email, timestamp: new Date(), successful: true });
-
+      // Generate JWT token
       const token = generateToken(user);
-      log(`Login successful for user: ${user.id} (${user.userType})`);
+      log(`Login successful for user: ${user.id}`);
+
+      // Send response with user data and token
       res.json({ user, token });
     } catch (error) {
       log(`Login error: ${error}`);
@@ -386,4 +277,29 @@ export function setupAuth(app: Express) {
   app.get("/api/user", authenticateToken, (req, res) => {
     res.json(req.user);
   });
+}
+
+export async function updateUserResetToken(userId: number, token: string | null, expiry: Date | null) {
+  try {
+    log(`Updating reset token for user ${userId}`);
+
+    const [updated] = await db
+      .update(users)
+      .set({
+        resetPasswordToken: token,
+        resetPasswordExpiry: expiry
+      })
+      .where(eq(users.id, userId))
+      .returning();
+
+    if (!updated) {
+      throw new Error('Failed to update user reset token');
+    }
+
+    log(`Successfully updated reset token for user ${userId}`);
+    return true;
+  } catch (error) {
+    log(`Error updating reset token: ${error}`);
+    throw error;
+  }
 }
