@@ -12,69 +12,83 @@ import { z } from "zod";
 const scryptAsync = promisify(scrypt);
 const JWT_SECRET = process.env.REPL_ID!;
 
-// Middleware to authenticate requests using JWT token
-export function authenticateToken(req: Request, res: Response, next: NextFunction) {
-  res.setHeader('Content-Type', 'application/json');
-
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    log('No authentication token found');
-    return res.status(401).json({ 
-      success: false,
-      message: "Authentication required" 
-    });
-  }
-
-  jwt.verify(token, JWT_SECRET, async (err: any, decoded: any) => {
-    if (err) {
-      log('Invalid token:', err.message);
-      return res.status(401).json({ 
-        success: false,
-        message: "Invalid or expired token" 
-      });
-    }
-
-    try {
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, decoded.id))
-        .limit(1);
-
-      if (!user) {
-        log('User not found for token');
-        return res.status(401).json({ 
-          success: false,
-          message: "User not found" 
-        });
-      }
-
-      (req as any).user = user;
-      log('User authenticated via JWT token');
-      next();
-    } catch (error) {
-      log('Database error in auth middleware:', error);
-      return res.status(500).json({ 
-        success: false,
-        message: "Internal server error" 
-      });
-    }
-  });
-}
-
 export async function hashPassword(password: string) {
-  const salt = randomBytes(16).toString("hex");
-  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-  return `${buf.toString("hex")}.${salt}`;
+  try {
+    const salt = randomBytes(16).toString("hex");
+    const buf = (await scryptAsync(password, salt, 64)) as Buffer;
+    return `${buf.toString("hex")}.${salt}`;
+  } catch (error) {
+    log('Error hashing password:', error);
+    throw new Error('Failed to hash password');
+  }
 }
 
 export async function comparePasswords(supplied: string, stored: string) {
-  const [hashed, salt] = stored.split(".");
-  const hashedBuf = Buffer.from(hashed, "hex");
-  const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-  return timingSafeEqual(hashedBuf, suppliedBuf);
+  try {
+    const [hashed, salt] = stored.split(".");
+    const hashedBuf = Buffer.from(hashed, "hex");
+    const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+    return timingSafeEqual(hashedBuf, suppliedBuf);
+  } catch (error) {
+    log('Error comparing passwords:', error);
+    throw new Error('Failed to compare passwords');
+  }
+}
+
+export function authenticateToken(req: Request, res: Response, next: NextFunction) {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+      log('No authentication token found');
+      return res.status(401).json({ 
+        success: false,
+        message: "Authentication required" 
+      });
+    }
+
+    jwt.verify(token, JWT_SECRET, async (err: any, decoded: any) => {
+      if (err) {
+        log('Invalid token:', err.message);
+        return res.status(401).json({ 
+          success: false,
+          message: "Invalid or expired token" 
+        });
+      }
+
+      try {
+        const [user] = await db
+          .select()
+          .from(users)
+          .where(eq(users.id, decoded.id))
+          .limit(1);
+
+        if (!user) {
+          log('User not found for token');
+          return res.status(401).json({ 
+            success: false,
+            message: "User not found" 
+          });
+        }
+
+        (req as any).user = user;
+        next();
+      } catch (error) {
+        log('Database error in auth middleware:', error);
+        return res.status(500).json({ 
+          success: false,
+          message: "Internal server error" 
+        });
+      }
+    });
+  } catch (error) {
+    log('Authentication error:', error);
+    return res.status(500).json({ 
+      success: false,
+      message: "Authentication failed" 
+    });
+  }
 }
 
 export function generateToken(user: SelectUser) {
@@ -97,7 +111,6 @@ const loginSchema = z.object({
 });
 
 export function setupAuth(app: Express) {
-  // Login endpoint
   app.post("/api/login", async (req, res) => {
     try {
       const { email, password } = req.body;
@@ -106,13 +119,6 @@ export function setupAuth(app: Express) {
       // Validate request body
       const validatedData = loginSchema.parse(req.body);
       log('Request validation passed');
-
-      if (!email || !password) {
-        return res.status(400).json({
-          success: false,
-          message: "Email and password are required"
-        });
-      }
 
       // Find user by email
       log('Querying database for user...');
@@ -146,7 +152,6 @@ export function setupAuth(app: Express) {
       const token = generateToken(user);
       log(`Login successful for user: ${user.id}`);
 
-      // Send response
       res.json({
         success: true,
         user,
@@ -170,7 +175,6 @@ export function setupAuth(app: Express) {
     }
   });
 
-  // Register endpoint
   app.post("/api/register", async (req, res) => {
     try {
       const result = insertUserSchema.safeParse(req.body);
