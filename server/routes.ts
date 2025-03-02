@@ -45,7 +45,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Metrics endpoint (protected for admin access only)
-  app.get('/metrics', async (req, res) => {
+  app.get('/api/metrics', async (req: any, res) => {
     try {
       // Only allow access from admin users
       if (!req.user?.superAdmin) {
