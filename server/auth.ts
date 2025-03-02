@@ -149,20 +149,29 @@ export function setupAuth(app: Express) {
       log(`Login attempt for email: ${email}`);
 
       if (!email || !password) {
-        return res.status(400).json({ message: "Email and password are required" });
+        return res.status(400).json({
+          success: false,
+          message: "Email and password are required"
+        });
       }
 
       const [user] = await getUserByEmail(email);
 
       if (!user) {
         log(`No user found with email: ${email}`);
-        return res.status(401).json({ message: "Invalid credentials" });
+        return res.status(401).json({
+          success: false,
+          message: "Invalid credentials"
+        });
       }
 
       const isValidPassword = await comparePasswords(password, user.password);
       if (!isValidPassword) {
         log(`Invalid password for user: ${email}`);
-        return res.status(401).json({ message: "Invalid credentials" });
+        return res.status(401).json({
+          success: false,
+          message: "Invalid credentials"
+        });
       }
 
       // Generate JWT token
@@ -170,10 +179,18 @@ export function setupAuth(app: Express) {
       log(`Login successful for user: ${user.id}`);
 
       // Send response with user data and token
-      res.json({ user, token });
+      res.json({
+        success: true,
+        user,
+        token
+      });
     } catch (error) {
       log(`Login error: ${error}`);
-      res.status(500).json({ message: "Internal server error during login" });
+      res.status(500).json({
+        success: false,
+        message: "Internal server error during login",
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
   });
 
@@ -183,7 +200,6 @@ export function setupAuth(app: Express) {
       res.sendStatus(200);
     });
   });
-
 
   app.post("/api/auth/forgot-password", async (req, res) => {
     try {
