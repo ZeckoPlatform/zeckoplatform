@@ -17,10 +17,15 @@ export async function hashPassword(password: string) {
 }
 
 export async function comparePasswords(supplied: string, stored: string) {
-  const [hashed, salt] = stored.split(".");
-  const hashedBuf = Buffer.from(hashed, "hex");
-  const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-  return timingSafeEqual(hashedBuf, suppliedBuf);
+  try {
+    const [hashed, salt] = stored.split(".");
+    const hashedBuf = Buffer.from(hashed, "hex");
+    const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+    return timingSafeEqual(hashedBuf, suppliedBuf);
+  } catch (error) {
+    log('Password comparison error:', error);
+    return false;
+  }
 }
 
 export function generateToken(user: any) {
@@ -47,6 +52,7 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
 
   jwt.verify(token, JWT_SECRET, async (err: any, decoded: any) => {
     if (err) {
+      log('Token verification failed:', err.message);
       return res.status(401).json({
         message: "Invalid or expired token"
       });
@@ -60,11 +66,13 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
         .limit(1);
 
       if (!user) {
+        log('User not found for token:', decoded.id);
         return res.status(401).json({
           message: "User not found"
         });
       }
 
+      // @ts-ignore - we need to add user to the request
       req.user = user;
       next();
     } catch (error) {
@@ -79,14 +87,17 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
 export function setupAuth(app: Express) {
   app.post("/api/login", async (req, res) => {
     try {
+      log('Login attempt received for:', req.body.email);
       const { email, password } = req.body;
 
       if (!email || !password) {
+        log('Login failed: Missing email or password');
         return res.status(400).json({
           message: "Email and password are required"
         });
       }
 
+      // Find user
       const [user] = await db
         .select()
         .from(users)
@@ -94,18 +105,22 @@ export function setupAuth(app: Express) {
         .limit(1);
 
       if (!user) {
+        log('Login failed: No user found with email:', email);
         return res.status(401).json({
           message: "Invalid credentials"
         });
       }
 
       if (!user.password) {
+        log('Login failed: User has no password set:', user.id);
         return res.status(500).json({
           message: "User account configuration error"
         });
       }
 
       const isValidPassword = await comparePasswords(password, user.password);
+      log('Password validation result for user:', user.id, isValidPassword ? 'success' : 'failed');
+
       if (!isValidPassword) {
         return res.status(401).json({
           message: "Invalid credentials"
@@ -113,6 +128,7 @@ export function setupAuth(app: Express) {
       }
 
       const token = generateToken(user);
+      log('Login successful for user:', user.id);
 
       return res.json({
         token,
@@ -125,7 +141,7 @@ export function setupAuth(app: Express) {
         }
       });
     } catch (error) {
-      log(`Login error: ${error instanceof Error ? error.message : String(error)}`);
+      log('Login error:', error);
       return res.status(500).json({
         message: "An error occurred during login"
       });
