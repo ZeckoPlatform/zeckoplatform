@@ -47,7 +47,7 @@ async function initializeDatabase() {
 
       if (retries === 0) {
         log('Failed to connect to database after maximum retries');
-        log('Last error:', lastError);
+        log('Last error:', err instanceof Error ? err.message : String(err));
         throw new Error(`Database connection failed: ${err instanceof Error ? err.message : String(err)}`);
       }
 
@@ -62,8 +62,10 @@ async function initializeDatabase() {
 // Initialize pool
 let pool: Pool;
 
+log('Initializing database connection...');
 try {
   pool = await initializeDatabase();
+  log('Database initialization completed');
 } catch (err) {
   log('Fatal database initialization error:', err instanceof Error ? err.message : String(err));
   process.exit(1);
