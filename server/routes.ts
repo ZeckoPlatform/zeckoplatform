@@ -1,7 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { setupAuth, authenticateToken } from "./auth";
-import { db } from "@db";
+import { setupAuth } from "./auth";
 import { log } from "./vite";
 import express from 'express';
 import path from 'path';
@@ -21,7 +20,6 @@ import socialRoutes from './routes/social';
 import uploadRoutes from './routes/upload';
 import commentsRoutes from './routes/comments';
 
-
 // Ensure uploads directory exists
 const uploadDir = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadDir)) {
@@ -33,40 +31,19 @@ export function registerRoutes(app: Express): Server {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
-  // Trust first proxy for rate limiting to work properly
-  app.set('trust proxy', 1);
-
   // Set default headers for all API routes
   app.use('/api', (req, res, next) => {
     res.setHeader('Content-Type', 'application/json');
     next();
   });
 
+  // Setup authentication
   setupAuth(app);
 
   // Serve uploaded files
   app.use('/uploads', express.static(uploadDir));
 
-  // Register feedback routes before authentication middleware
-  app.use(feedbackRoutes);
-
-  // Authentication middleware for protected routes
-  app.use('/api', (req, res, next) => {
-    if (req.path.endsWith('/login') ||
-        req.path.endsWith('/register') ||
-        req.path.endsWith('/auth/verify') ||
-        req.path.endsWith('/auth/reset-password') ||
-        req.path.endsWith('/auth/reset-password/confirm') ||
-        req.path.endsWith('/vendor/stripe/account') ||
-        req.path.endsWith('/vendor/stripe/account/status') ||
-        req.path.endsWith('/feedback') ||
-        req.method === 'OPTIONS') {
-      return next();
-    }
-    authenticateToken(req, res, next);
-  });
-
-  // Register all route modules
+  // Register routes
   app.use('/api', authRoutes);
   app.use('/api', uploadRoutes);
   app.use('/api', subscriptionRoutes);
@@ -80,6 +57,9 @@ export function registerRoutes(app: Express): Server {
   app.use('/api', socialRoutes);
   app.use('/api', leadsRoutes);
   app.use('/api', commentsRoutes);
+
+  // Register feedback routes
+  app.use(feedbackRoutes);
 
   // Error handling middleware - should be last
   app.use((err: any, req: any, res: any, next: any) => {

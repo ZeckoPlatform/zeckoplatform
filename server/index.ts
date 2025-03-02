@@ -11,11 +11,7 @@ log('=== Server Initialization Started ===');
 log(`Environment: ${process.env.NODE_ENV}`);
 log(`Process ID: ${process.pid}`);
 
-// Body parsing middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// CORS middleware - only apply to /api routes
+// Setup CORS for API routes
 app.use('/api', (req, res, next) => {
   const origin = req.headers.origin;
   if (origin) {
@@ -31,7 +27,7 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-// API routes
+// Register API routes first
 log('Registering routes...');
 const httpServer = registerRoutes(app);
 log('Routes registered successfully');
