@@ -305,37 +305,23 @@ export default function AuthPage() {
               <TabsContent value="login">
                 <form
                   onSubmit={loginForm.handleSubmit((data) => {
-                    if (!data.email || !data.password) {
-                      toast({
-                        title: "Login failed",
-                        description: "Email and password are required",
-                        variant: "destructive",
-                      });
-                      return;
-                    }
-
-                    loginMutation.mutate(
-                      {
-                        email: data.email,
-                        password: data.password,
+                    console.log('Attempting login with:', { email: data.email });
+                    return loginMutation.mutate(data, {
+                      onSuccess: () => {
+                        toast({
+                          title: "Login successful",
+                          description: "Welcome back!",
+                        });
                       },
-                      {
-                        onSuccess: () => {
-                          toast({
-                            title: "Login successful",
-                            description: "Welcome back!",
-                          });
-                        },
-                        onError: (error) => {
-                          console.error('Login error:', error);
-                          toast({
-                            title: "Login failed",
-                            description: error.message || "Invalid email or password",
-                            variant: "destructive",
-                          });
-                        },
-                      }
-                    );
+                      onError: (error) => {
+                        console.error('Login error:', error);
+                        toast({
+                          title: "Login failed",
+                          description: error.message || "Invalid email or password",
+                          variant: "destructive",
+                        });
+                      },
+                    });
                   })}
                   className="space-y-4"
                 >

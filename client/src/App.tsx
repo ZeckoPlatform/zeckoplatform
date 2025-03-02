@@ -29,7 +29,6 @@ import NotificationsPage from "@/pages/notifications-page";
 import { FeedbackDialog } from "@/components/FeedbackDialog";
 import FeedbackManagementPage from "@/pages/admin/feedback-management";
 import SocialFeedPage from "@/pages/social-feed";
-import MonitoringDashboard from "@/pages/admin/monitoring-dashboard";
 
 function Router() {
   return (
@@ -123,10 +122,6 @@ function Router() {
             )}
           />
         )} />
-        <Route path="/admin/monitoring" component={() => (
-            <ProtectedRoute component={MonitoringDashboard} />
-          )} 
-        />
 
         <Route component={NotFound} />
       </Switch>

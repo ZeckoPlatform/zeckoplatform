@@ -1,4 +1,3 @@
-import { monitoring } from '../services/monitoring';
 import { Router } from "express";
 import { authenticateToken } from "../auth";
 import { db } from "@db";
@@ -561,74 +560,6 @@ router.post("/messages/:userId", authenticateToken, checkSuperAdminAccess, async
   } catch (error) {
     console.error("Error sending message:", error);
     return res.status(500).json({ error: "Failed to send message" });
-  }
-});
-
-// Prometheus metrics endpoint
-router.get("/metrics", authenticateToken, checkSuperAdminAccess, async (req, res) => {
-  try {
-    res.set('Content-Type', monitoring.register.contentType);
-    const metrics = await monitoring.register.metrics();
-    res.end(metrics);
-  } catch (error) {
-    console.error("Error collecting metrics:", error);
-    res.status(500).send("Error collecting metrics");
-  }
-});
-
-// Enhanced health check endpoint with more detailed metrics
-router.get("/health", authenticateToken, checkSuperAdminAccess, async (req, res) => {
-  try {
-    // Check database connectivity
-    await db.select().from(users).limit(1);
-
-    // Get system resources usage
-    const memory = process.memoryUsage();
-    const memoryUsagePercent = (memory.heapUsed / memory.heapTotal) * 100;
-
-    // Get CPU usage
-    const startUsage = process.cpuUsage();
-    await new Promise(resolve => setTimeout(resolve, 100));
-    const endUsage = process.cpuUsage(startUsage);
-    const cpuUsagePercent = ((endUsage.user + endUsage.system) / 1000000) * 100;
-
-    // Collect application metrics
-    const [activeUsers] = await db
-      .select({ count: count() })
-      .from(users)
-      .where(eq(users.active, true));
-
-    monitoring.metrics.activeUsersGauge.set(activeUsers?.count || 0);
-
-    const healthData = {
-      status: "healthy",
-      timestamp: new Date().toISOString(),
-      system: {
-        memory: {
-          usagePercent: Math.round(memoryUsagePercent),
-          ...memory
-        },
-        cpu: {
-          usagePercent: Math.round(cpuUsagePercent),
-          ...endUsage
-        },
-        uptime: process.uptime()
-      },
-      application: {
-        activeUsers: activeUsers?.count || 0,
-        version: process.env.npm_package_version
-      }
-    };
-
-    monitoring.logger.info('Health check completed', healthData);
-    return res.json(healthData);
-  } catch (error) {
-    monitoring.logger.error('Health check failed', { error: error.message });
-    return res.status(500).json({
-      status: "unhealthy",
-      error: error.message,
-      timestamp: new Date().toISOString()
-    });
   }
 });
 

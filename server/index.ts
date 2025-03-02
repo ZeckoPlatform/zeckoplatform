@@ -2,45 +2,14 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { Server } from "http";
-import { db } from "@db";
-import { sql } from "drizzle-orm";
 
 const app = express();
 const isProd = app.get('env') === 'production';
-
-// Global error handlers
-process.on('uncaughtException', (error) => {
-  log('Uncaught Exception:', error instanceof Error ? error.stack : String(error));
-  process.exit(1);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  log('Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
-});
 
 // Startup logging
 log('=== Server Initialization Started ===');
 log(`Environment: ${process.env.NODE_ENV}`);
 log(`Process ID: ${process.pid}`);
-
-// Add test endpoint for quick connectivity check
-app.get('/api/healthtest', async (req, res) => {
-  try {
-    const result = await db.execute(sql`SELECT NOW()`);
-    res.json({ 
-      status: "ok",
-      timestamp: new Date().toISOString(),
-      database: "connected"
-    });
-  } catch (error) {
-    log('Health test failed:', error instanceof Error ? error.message : String(error));
-    res.status(500).json({ 
-      status: "error",
-      error: error instanceof Error ? error.message : "Unknown error"
-    });
-  }
-});
 
 // Body parsing middleware
 app.use(express.json());
@@ -49,6 +18,15 @@ app.use(express.urlencoded({ extended: true }));
 // API-specific middleware - only apply to /api routes
 app.use('/api', (req, res, next) => {
   res.setHeader('Content-Type', 'application/json');
+
+  // Debug logging for API requests
+  log('=== API Request Debug Info ===');
+  log(`Path: ${req.method} ${req.path}`);
+  log(`Authorization: ${req.headers.authorization ? 'Present' : 'Missing'}`);
+  log(`Query params: ${JSON.stringify(req.query)}`);
+  log(`Body length: ${req.body ? JSON.stringify(req.body).length : 0}`);
+  log('=== End Debug Info ===');
+
   next();
 });
 
@@ -68,7 +46,6 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-// Create HTTP server and register routes
 log('Registering routes...');
 const httpServer = registerRoutes(app);
 log('Routes registered successfully');
@@ -76,18 +53,29 @@ log('Routes registered successfully');
 // Setup static/Vite serving for frontend routes
 if (isProd) {
   log('Setting up production static file serving');
-  serveStatic(app);
-} else {
-  // Temporarily disable Vite for debugging
-  log('Development mode: Basic server setup without Vite');
-  app.get('/', (req, res) => {
-    res.json({ message: 'Server is running in development mode' });
+  app.use((req, res, next) => {
+    if (!req.path.startsWith('/api')) {
+      serveStatic(app);
+    }
+    next();
   });
+} else {
+  // Handle development mode with Vite
+  log('Setting up Vite development server');
+  (async () => {
+    try {
+      await setupVite(app, httpServer);
+      log('Vite setup completed successfully');
+    } catch (error) {
+      log('Fatal error during Vite setup:', error);
+      process.exit(1);
+    }
+  })();
 }
 
 // Error handling middleware
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-  log('Error handler:', err instanceof Error ? err.stack : String(err));
+  log('Error handler:', err);
 
   if (res.headersSent) {
     return next(err);
@@ -105,34 +93,85 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   res.status(500).send('Internal Server Error');
 });
 
-// Start server
-const PORT = Number(process.env.PORT) || 5000;
-log(`Starting server on port ${PORT}`);
+// Start server function
+const startServer = async (port: number): Promise<boolean> => {
+  return new Promise((resolve) => {
+    let isResolved = false;
 
-httpServer.listen(PORT, '0.0.0.0', () => {
-  log(`Server is running on port ${PORT}`);
-});
+    const cleanup = () => {
+      if (!isResolved) {
+        log(`Cleaning up server on port ${port}`);
+        httpServer.removeAllListeners();
+        if (httpServer.listening) {
+          httpServer.close();
+        }
+      }
+    };
 
-// Handle server errors
-httpServer.on('error', (error: NodeJS.ErrnoException) => {
-  if (error.syscall !== 'listen') {
-    throw error;
+    const onError = (error: NodeJS.ErrnoException) => {
+      if (isResolved) return;
+
+      log(`Server error on port ${port}:`);
+      log(`Error name: ${error.name}`);
+      log(`Error message: ${error.message}`);
+      log(`Error code: ${error.code}`);
+      if (error.code === 'EADDRINUSE') {
+        log(`Port ${port} is already in use`);
+      }
+      cleanup();
+      resolve(false);
+      isResolved = true;
+    };
+
+    const onListening = () => {
+      if (isResolved) return;
+
+      const addr = httpServer.address();
+      const actualPort = typeof addr === 'string' ? addr : addr?.port;
+      log(`Server successfully started and listening on port ${actualPort}`);
+      resolve(true);
+      isResolved = true;
+    };
+
+    httpServer.once('error', onError);
+    httpServer.once('listening', onListening);
+
+    try {
+      log(`Attempting to bind to port ${port} on address 0.0.0.0...`);
+      httpServer.listen(port, '0.0.0.0');
+    } catch (error) {
+      if (!isResolved) {
+        log(`Failed to start server: ${error}`);
+        cleanup();
+        resolve(false);
+        isResolved = true;
+      }
+    }
+  });
+};
+
+// Main startup function
+(async () => {
+  try {
+    log('=== Environment Information ===');
+    log(`NODE_ENV: ${process.env.NODE_ENV}`);
+    log(`PORT: ${process.env.PORT}`);
+    log(`Process ID: ${process.pid}`);
+    log(`Platform: ${process.platform}`);
+    log(`Node Version: ${process.version}`);
+    log('=== End Environment Information ===');
+
+    const PORT = Number(process.env.PORT) || 5000;
+    log(`Starting server on port ${PORT}`);
+
+    const serverStarted = await startServer(PORT);
+    if (!serverStarted) {
+      throw new Error(`Could not start server on port ${PORT}`);
+    }
+
+    log('Server started successfully');
+  } catch (error) {
+    log(`Fatal server startup error: ${error}`);
+    process.exit(1);
   }
-
-  const bind = typeof PORT === 'string'
-    ? 'Pipe ' + PORT
-    : 'Port ' + PORT;
-
-  switch (error.code) {
-    case 'EACCES':
-      log(`${bind} requires elevated privileges`);
-      process.exit(1);
-      break;
-    case 'EADDRINUSE':
-      log(`${bind} is already in use`);
-      process.exit(1);
-      break;
-    default:
-      throw error;
-  }
-});
+})();

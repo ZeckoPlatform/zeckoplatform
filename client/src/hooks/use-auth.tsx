@@ -3,19 +3,9 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import type { SelectUser } from "@db/schema";
+import type { SelectUser, InsertUser } from "@db/schema";
 
-type LoginData = {
-  email: string;
-  password: string;
-};
-
-type RegisterData = {
-  email: string;
-  password: string;
-  userType: string;
-  countryCode: string;
-};
+type LoginData = Pick<InsertUser, "email" | "password">;
 
 export const AuthContext = createContext<ReturnType<typeof useAuthState> | null>(null);
 
@@ -44,8 +34,7 @@ function useAuthState() {
           localStorage.removeItem("token");
           return null;
         }
-        const error = await res.json();
-        throw new Error(error.message || "Failed to fetch user data");
+        throw new Error("Failed to fetch user data");
       }
 
       return res.json();
@@ -57,12 +46,6 @@ function useAuthState() {
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
-      if (!credentials.email || !credentials.password) {
-        throw new Error("Email and password are required");
-      }
-
-      console.log('Attempting login with:', { email: credentials.email, hasPassword: !!credentials.password });
-
       const res = await fetch("/api/login", {
         method: "POST",
         headers: {
@@ -73,26 +56,22 @@ function useAuthState() {
 
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.message || "Invalid credentials");
+        throw new Error(error.message || "Login failed");
       }
 
       const data = await res.json();
-      if (!data.token || !data.user) {
-        throw new Error("Invalid server response");
-      }
-
-      return data;
-    },
-    onSuccess: (data) => {
       localStorage.setItem("token", data.token);
-      queryClient.setQueryData(["/api/user"], data.user);
+      return data.user;
+    },
+    onSuccess: (user: SelectUser) => {
+      queryClient.setQueryData(["/api/user"], user);
       toast({
         title: "Welcome back!",
-        description: "Logged in successfully",
+        description: `Logged in successfully`,
       });
 
       // Redirect based on user type
-      switch (data.user.userType) {
+      switch (user.userType) {
         case "vendor":
           setLocation("/vendor");
           break;
@@ -105,21 +84,17 @@ function useAuthState() {
       }
     },
     onError: (error: Error) => {
-      console.error('Login error:', error);
       toast({
         title: "Login failed",
-        description: error.message || "Invalid credentials",
+        description: error.message,
         variant: "destructive",
       });
     },
   });
 
   const registerMutation = useMutation({
-    mutationFn: async (data: RegisterData) => {
-      if (!data.email || !data.password || !data.userType || !data.countryCode) {
-        throw new Error("All fields are required");
-      }
-
+    mutationFn: async (data: any) => {
+      console.log('Registration data being sent:', data);
       const res = await fetch("/api/register", {
         method: "POST",
         headers: {
@@ -134,21 +109,17 @@ function useAuthState() {
       }
 
       const responseData = await res.json();
-      if (!responseData.token || !responseData.user) {
-        throw new Error("Invalid server response");
-      }
-
-      return responseData;
+      localStorage.setItem("token", responseData.token);
+      return responseData.user;
     },
-    onSuccess: (data) => {
-      localStorage.setItem("token", data.token);
-      queryClient.setQueryData(["/api/user"], data.user);
+    onSuccess: (user: SelectUser) => {
+      queryClient.setQueryData(["/api/user"], user);
       toast({
         title: "Welcome!",
         description: "Your account has been created successfully.",
       });
 
-      if (data.user.userType !== "free") {
+      if (user.userType !== "free") {
         setLocation("/subscription");
       } else {
         setLocation("/leads");
@@ -166,15 +137,13 @@ function useAuthState() {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      const token = localStorage.getItem("token");
-      if (token) {
-        await fetch("/api/logout", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-      }
+      await fetch("/api/logout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
       localStorage.removeItem("token");
       queryClient.setQueryData(["/api/user"], null);
     },
@@ -182,7 +151,14 @@ function useAuthState() {
       setLocation("/");
       toast({
         title: "Logged out",
-        description: "Successfully logged out",
+        description: "You have been logged out successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Logout failed",
+        description: error.message,
+        variant: "destructive",
       });
     },
   });

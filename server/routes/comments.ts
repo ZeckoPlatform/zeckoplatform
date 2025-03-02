@@ -46,13 +46,22 @@ router.post("/social/posts/:postId/comments", authenticateToken, async (req, res
       }
     }
 
+    // Moderate comment content
+    const moderationResult = moderateText(validatedData.content);
+    if (!moderationResult.isAcceptable) {
+      return res.status(400).json({
+        error: "Comment contains inappropriate content",
+        details: moderationResult.message
+      });
+    }
+
     // Create comment
     const [newComment] = await db
       .insert(postComments)
       .values({
         postId,
         userId: req.user.id,
-        content: validatedData.content,
+        content: moderationResult.filteredText || validatedData.content,
         parentCommentId: validatedData.parentCommentId,
         status: "active"
       })
