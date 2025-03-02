@@ -3,48 +3,60 @@ import { Pool } from "pg";
 import { log } from "./vite";
 
 // Initialize database connection with retries
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 5;
 const RETRY_DELAY = 2000; // 2 seconds
 
 async function initializeDatabase() {
   let retries = MAX_RETRIES;
+  let lastError = null;
 
   while (retries > 0) {
     try {
-      log('Attempting database connection...');
+      log(`Attempting database connection (${MAX_RETRIES - retries + 1}/${MAX_RETRIES})...`);
 
       const pool = new Pool({
-        connectionString: process.env.DATABASE_URL,
-        ssl: false // Disable SSL for local development
+        // Using individual credential components instead of connection string
+        user: process.env.PGUSER,
+        password: process.env.PGPASSWORD,
+        host: process.env.PGHOST,
+        port: parseInt(process.env.PGPORT || '5432'),
+        database: process.env.PGDATABASE,
+        // Disable SSL for local development
+        ssl: false
       });
 
       // Test connection
       const client = await pool.connect();
-      log('Successfully connected to PostgreSQL database');
+      const result = await client.query('SELECT NOW()');
+      log('Database connection successful:', result.rows[0]);
+      client.release();
 
-      // Get database information
-      const dbInfo = await client.query('SELECT version(), current_database(), current_user');
-      log('Database info:', dbInfo.rows[0]);
-
-      // Add error handling for the pool
-      pool.on('error', (err: Error) => {
+      // Add error handler
+      pool.on('error', (err) => {
         log('Unexpected error on idle client:', err.message);
-        process.exit(-1);
+        // Don't exit process, just log the error
+        log('Pool error occurred, will attempt to recover');
       });
 
-      client.release();
       return pool;
     } catch (err) {
+      lastError = err;
       retries--;
+
+      log('Database connection error:', err instanceof Error ? err.message : String(err));
+
       if (retries === 0) {
-        log('Failed to connect to database after maximum retries:', err instanceof Error ? err.message : String(err));
-        throw err;
+        log('Failed to connect to database after maximum retries');
+        log('Last error:', lastError);
+        throw new Error(`Database connection failed: ${err instanceof Error ? err.message : String(err)}`);
       }
-      log(`Database connection failed, retrying in ${RETRY_DELAY/1000} seconds...`);
+
+      log(`Retrying in ${RETRY_DELAY/1000} seconds... (${retries} attempts remaining)`);
       await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
     }
   }
-  throw new Error('Failed to initialize database');
+
+  throw lastError;
 }
 
 // Initialize pool
