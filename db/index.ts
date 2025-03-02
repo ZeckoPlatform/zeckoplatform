@@ -9,6 +9,7 @@ if (!process.env.DATABASE_URL) {
 
 log('Initializing database connection...');
 
+// Use standard PostgreSQL connection pool
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: false, // Disable SSL for local development
@@ -25,6 +26,9 @@ pool.on('error', (err) => {
 
 pool.on('connect', () => {
   log('Successfully connected to database');
+  // Log connection details (without sensitive info)
+  const url = new URL(process.env.DATABASE_URL);
+  log(`Connected to PostgreSQL at ${url.hostname}`);
 });
 
 // Test the connection immediately
