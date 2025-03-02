@@ -1,41 +1,25 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from "ws";
+import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from "./schema";
-import { log } from "../server/vite";
-
-neonConfig.webSocketConstructor = ws;
+import { log } from '../server/vite';
 
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL environment variable is required");
 }
 
-let pool: Pool;
-let db: ReturnType<typeof drizzle>;
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
 
-try {
-  log("Initializing database connection...");
-  pool = new Pool({ 
-    connectionString: process.env.DATABASE_URL,
-    connectionTimeoutMillis: 5000,
-  });
+// Add basic error handling
+pool.on('error', (err) => {
+  log('Unexpected error on idle client', err.message);
+});
 
-  // Test the connection
-  pool.on('error', (err) => {
-    log(`Unexpected database error: ${err.message}`);
-    console.error('Unexpected database error:', err);
-  });
+pool.on('connect', () => {
+  log('Successfully connected to database');
+});
 
-  pool.on('connect', () => {
-    log("Successfully connected to database");
-  });
-
-  db = drizzle(pool, { schema });
-  log("Database initialization completed");
-} catch (error) {
-  log(`Database initialization error: ${error instanceof Error ? error.message : String(error)}`);
-  console.error('Database initialization error:', error);
-  throw error;
-}
-
-export { pool, db };
+export const db = drizzle(pool, { schema });
+export { pool };
