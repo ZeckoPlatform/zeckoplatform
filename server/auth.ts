@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { users } from "@db/schema";
-import { db } from "@db";
+import { database as db } from "@db";
 import { eq } from "drizzle-orm";
 import { log } from "./vite";
 import jwt from 'jsonwebtoken';
@@ -69,12 +69,13 @@ export function setupAuth(app: Express) {
       log(`Login attempt received for email: ${email}`);
 
       if (!email || !password) {
+        log(`Login failed: Missing email or password`);
         return res.status(400).json({
           message: "Email and password are required"
         });
       }
 
-      // Find user
+      // Find user and log sanitized information
       const [user] = await db
         .select()
         .from(users)
@@ -100,10 +101,10 @@ export function setupAuth(app: Express) {
       // Verify password
       try {
         const isValidPassword = await comparePasswords(password, user.password);
-        log(`Password validation result for user ${email}: ${isValidPassword}`);
+        log(`Password validation result for user ${user.id}: ${isValidPassword}`);
 
         if (!isValidPassword) {
-          log(`Login failed: Invalid password for user ${email}`);
+          log(`Login failed: Invalid password for user ${user.id}`);
           return res.status(401).json({
             message: "Invalid credentials"
           });

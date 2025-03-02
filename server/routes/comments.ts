@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { authenticateToken } from "../auth";
-import { db } from "@db";
+import { database as db } from "@db";
 import { postComments, postReactions, socialPosts, users } from "@db/schema";
 import { z } from "zod";
 import { eq, and, desc, isNull } from "drizzle-orm";
@@ -46,22 +46,13 @@ router.post("/social/posts/:postId/comments", authenticateToken, async (req, res
       }
     }
 
-    // Moderate comment content
-    const moderationResult = moderateText(validatedData.content);
-    if (!moderationResult.isAcceptable) {
-      return res.status(400).json({
-        error: "Comment contains inappropriate content",
-        details: moderationResult.message
-      });
-    }
-
     // Create comment
     const [newComment] = await db
       .insert(postComments)
       .values({
         postId,
         userId: req.user.id,
-        content: moderationResult.filteredText || validatedData.content,
+        content: validatedData.content,
         parentCommentId: validatedData.parentCommentId,
         status: "active"
       })
