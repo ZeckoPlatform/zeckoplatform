@@ -80,18 +80,16 @@ export function registerRoutes(app: Express): Server {
     (req: any, res, next) => {
       // Debug log for authentication
       log('Grafana auth check:', {
-        isAuthenticated: req.isAuthenticated(),
         user: req.user,
-        isSuperAdmin: req.user?.superAdmin,
-        headers: req.headers
+        isSuperAdmin: req.user?.superAdmin
       });
 
-      if (!req.isAuthenticated()) {
+      if (!req.user) {
         log('Grafana access denied: Not authenticated');
         return res.status(401).json({ error: 'Authentication required' });
       }
 
-      if (!req.user?.superAdmin) {
+      if (!req.user.superAdmin) {
         log('Grafana access denied: Not super admin');
         return res.status(403).json({ error: 'Super admin access required' });
       }
@@ -110,13 +108,13 @@ export function registerRoutes(app: Express): Server {
         '^/admin/analytics/grafana': '',
       },
       ws: true,
-      onProxyReq: (proxyReq, req: any, res) => {
+      onProxyReq: (proxyReq: any, req: any) => {
         log('Grafana proxy request:', {
           originalUrl: req.originalUrl,
           headers: proxyReq.getHeaders()
         });
       },
-      onError: (err: Error, req: any, res) => {
+      onError: (err: Error, req: any, res: any) => {
         log('Grafana proxy error:', err instanceof Error ? err.message : String(err));
         res.status(503).json({ error: 'Grafana service unavailable' });
       }

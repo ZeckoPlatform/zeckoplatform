@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 
 const GRAFANA_PORT = 3001; // Different from our main app port
-const GRAFANA_CONFIG_DIR = path.join(process.cwd(), 'grafana');
+const GRAFANA_CONFIG_DIR = path.resolve(process.cwd(), 'grafana');
 const GRAFANA_DATA_DIR = path.join(GRAFANA_CONFIG_DIR, 'data');
 const GRAFANA_CONFIG_FILE = path.join(GRAFANA_CONFIG_DIR, 'grafana.ini');
 const GRAFANA_PLUGINS_DIR = path.join(GRAFANA_CONFIG_DIR, 'plugins');
@@ -56,7 +56,7 @@ datasources_path = ${GRAFANA_CONFIG_DIR}/datasources
 `;
 
 // Write Grafana configuration
-fs.writeFileSync(GRAFANA_CONFIG_FILE, grafanaConfig);
+fs.writeFileSync(GRAFANA_CONFIG_FILE, grafanaConfig, { mode: 0o644 });
 
 let grafanaProcess: any = null;
 
