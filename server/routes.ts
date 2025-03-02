@@ -75,11 +75,16 @@ export function registerRoutes(app: Express): Server {
   app.use(
     '/admin/analytics/grafana',
     (req: any, res, next) => {
-      if (!req.user?.superAdmin) {
+      // Check if user is authenticated and is a super admin
+      if (!req.user || !req.user.userType === 'admin') {
         return res.status(403).json({ error: 'Access denied' });
       }
+
       // Add auth headers for Grafana
       req.headers['X-WEBAUTH-USER'] = req.user.email;
+      req.headers['X-WEBAUTH-NAME'] = req.user.username || req.user.email;
+      req.headers['X-WEBAUTH-ROLE'] = 'Admin';
+
       next();
     },
     createProxyMiddleware({
@@ -88,7 +93,8 @@ export function registerRoutes(app: Express): Server {
       pathRewrite: {
         '^/admin/analytics/grafana': '',
       },
-      onError: (err, req, res) => {
+      ws: true, // Enable WebSocket proxy
+      onError: (err: Error, req: any, res: any) => {
         log('Grafana proxy error:', err);
         res.status(500).send('Grafana service unavailable');
       },
