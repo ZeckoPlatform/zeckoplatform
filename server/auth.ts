@@ -25,70 +25,63 @@ export async function hashPassword(password: string) {
 
 export async function comparePasswords(supplied: string, stored: string) {
   try {
+    if (!stored || !stored.includes('.')) {
+      log('Invalid stored password format');
+      return false;
+    }
     const [hashed, salt] = stored.split(".");
     const hashedBuf = Buffer.from(hashed, "hex");
     const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
     return timingSafeEqual(hashedBuf, suppliedBuf);
   } catch (error) {
     log('Error comparing passwords:', error);
-    throw new Error('Failed to compare passwords');
+    return false;
   }
 }
 
 export function authenticateToken(req: Request, res: Response, next: NextFunction) {
-  try {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
 
-    if (!token) {
-      log('No authentication token found');
+  if (!token) {
+    return res.status(401).json({ 
+      success: false,
+      message: "Authentication required" 
+    });
+  }
+
+  jwt.verify(token, JWT_SECRET, async (err: any, decoded: any) => {
+    if (err) {
       return res.status(401).json({ 
         success: false,
-        message: "Authentication required" 
+        message: "Invalid or expired token" 
       });
     }
 
-    jwt.verify(token, JWT_SECRET, async (err: any, decoded: any) => {
-      if (err) {
-        log('Invalid token:', err.message);
+    try {
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, decoded.id))
+        .limit(1);
+
+      if (!user) {
         return res.status(401).json({ 
           success: false,
-          message: "Invalid or expired token" 
+          message: "User not found" 
         });
       }
 
-      try {
-        const [user] = await db
-          .select()
-          .from(users)
-          .where(eq(users.id, decoded.id))
-          .limit(1);
-
-        if (!user) {
-          log('User not found for token');
-          return res.status(401).json({ 
-            success: false,
-            message: "User not found" 
-          });
-        }
-
-        (req as any).user = user;
-        next();
-      } catch (error) {
-        log('Database error in auth middleware:', error);
-        return res.status(500).json({ 
-          success: false,
-          message: "Internal server error" 
-        });
-      }
-    });
-  } catch (error) {
-    log('Authentication error:', error);
-    return res.status(500).json({ 
-      success: false,
-      message: "Authentication failed" 
-    });
-  }
+      (req as any).user = user;
+      next();
+    } catch (error) {
+      log('Database error in auth middleware:', error);
+      return res.status(500).json({ 
+        success: false,
+        message: "Internal server error" 
+      });
+    }
+  });
 }
 
 export function generateToken(user: SelectUser) {
@@ -96,9 +89,7 @@ export function generateToken(user: SelectUser) {
     { 
       id: user.id,
       email: user.email,
-      userType: user.userType,
-      subscriptionActive: user.subscriptionActive,
-      subscriptionTier: user.subscriptionTier
+      userType: user.userType
     },
     JWT_SECRET,
     { expiresIn: '24h' }
@@ -117,7 +108,7 @@ export function setupAuth(app: Express) {
       log(`Login attempt for email: ${email}`);
 
       // Validate request body
-      const validatedData = loginSchema.parse(req.body);
+      loginSchema.parse(req.body);
       log('Request validation passed');
 
       // Find user by email
@@ -159,6 +150,7 @@ export function setupAuth(app: Express) {
       });
     } catch (error) {
       log('Login error:', error);
+
       if (error instanceof z.ZodError) {
         return res.status(400).json({
           success: false,
@@ -180,7 +172,6 @@ export function setupAuth(app: Express) {
       const result = insertUserSchema.safeParse(req.body);
 
       if (!result.success) {
-        log(`Registration validation failed: ${fromZodError(result.error).toString()}`);
         return res.status(400).json({
           success: false,
           message: fromZodError(result.error).toString()
@@ -195,24 +186,24 @@ export function setupAuth(app: Express) {
         .limit(1);
 
       if (existingUser) {
-        log(`Registration failed: Email ${result.data.email} already exists`);
         return res.status(400).json({
           success: false,
           message: "Email already registered"
         });
       }
 
-      // Create new user
+      // Hash password and create user
+      const hashedPassword = await hashPassword(result.data.password);
       const [user] = await db
         .insert(users)
         .values({
           ...result.data,
-          password: await hashPassword(result.data.password)
+          password: hashedPassword
         })
         .returning();
 
       const token = generateToken(user);
-      log(`User created successfully: ID ${user.id}`);
+      log(`User registered successfully: ID ${user.id}`);
 
       res.status(201).json({
         success: true,
@@ -220,7 +211,7 @@ export function setupAuth(app: Express) {
         token
       });
     } catch (error) {
-      log(`Registration error: ${error}`);
+      log(`Registration error:`, error);
       res.status(500).json({
         success: false,
         message: "Registration failed",
@@ -230,18 +221,10 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/logout", (req, res) => {
-    try {
-      res.json({
-        success: true,
-        message: "Logged out successfully"
-      });
-    } catch (error) {
-      log('Logout error:', error);
-      res.status(500).json({
-        success: false,
-        message: "Failed to logout"
-      });
-    }
+    res.json({
+      success: true,
+      message: "Logged out successfully"
+    });
   });
 
   app.get("/api/user", authenticateToken, (req, res) => {
