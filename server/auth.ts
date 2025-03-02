@@ -70,32 +70,48 @@ export function setupAuth(app: Express) {
       }
 
       // Verify password
-      const isValidPassword = await comparePasswords(password, user.password);
-      if (!isValidPassword) {
-        log(`Login failed: Invalid password for user ${email}`);
-        return res.status(401).json({
-          message: "Invalid credentials"
+      try {
+        const isValidPassword = await comparePasswords(password, user.password);
+        log(`Password validation result for user ${email}: ${isValidPassword}`);
+
+        if (!isValidPassword) {
+          log(`Login failed: Invalid password for user ${email}`);
+          return res.status(401).json({
+            message: "Invalid credentials"
+          });
+        }
+      } catch (error) {
+        log(`Password validation error: ${error}`);
+        return res.status(500).json({
+          message: "An error occurred during password validation"
         });
       }
 
       // Generate token on successful login
-      const token = generateToken(user);
-      log(`Login successful for user: ${user.id}, token generated`);
+      try {
+        const token = generateToken(user);
+        log(`Login successful for user: ${user.id}, token generated`);
 
-      // Return user data and token
-      res.json({
-        token,
-        user: {
-          id: user.id,
-          email: user.email,
-          userType: user.userType,
-          subscriptionActive: user.subscriptionActive,
-          subscriptionTier: user.subscriptionTier
-        }
-      });
+        // Return user data and token
+        return res.json({
+          token,
+          user: {
+            id: user.id,
+            email: user.email,
+            userType: user.userType,
+            subscriptionActive: user.subscriptionActive,
+            subscriptionTier: user.subscriptionTier
+          }
+        });
+      } catch (error) {
+        log(`Token generation error: ${error}`);
+        return res.status(500).json({
+          message: "An error occurred during token generation"
+        });
+      }
     } catch (error) {
       log(`Login error:`, error);
-      res.status(500).json({
+      return res.status(500).json({
         message: "An error occurred during login"
       });
     }

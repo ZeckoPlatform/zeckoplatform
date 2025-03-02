@@ -61,6 +61,8 @@ function useAuthState() {
         throw new Error("Email and password are required");
       }
 
+      console.log('Attempting login with:', { email: credentials.email, hasPassword: !!credentials.password });
+
       const res = await fetch("/api/login", {
         method: "POST",
         headers: {
@@ -103,6 +105,7 @@ function useAuthState() {
       }
     },
     onError: (error: Error) => {
+      console.error('Login error:', error);
       toast({
         title: "Login failed",
         description: error.message || "Invalid credentials",
@@ -113,6 +116,10 @@ function useAuthState() {
 
   const registerMutation = useMutation({
     mutationFn: async (data: RegisterData) => {
+      if (!data.email || !data.password || !data.userType || !data.countryCode) {
+        throw new Error("All fields are required");
+      }
+
       const res = await fetch("/api/register", {
         method: "POST",
         headers: {
@@ -148,6 +155,7 @@ function useAuthState() {
       }
     },
     onError: (error: Error) => {
+      console.error('Registration error:', error);
       toast({
         title: "Registration failed",
         description: error.message,
