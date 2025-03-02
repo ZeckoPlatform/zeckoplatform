@@ -1,20 +1,13 @@
-import type { Express, Request } from "express";
+import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth, authenticateToken } from "./auth";
 import { db } from "@db";
-import { leads, users, subscriptions, products, leadResponses, messages } from "@db/schema";
-import { eq, and, or, gt, not, sql, desc } from "drizzle-orm";
 import { log } from "./vite";
-import { comparePasswords, hashPassword } from './auth';
-import fs from 'fs';
 import express from 'express';
 import path from 'path';
-import { createConnectedAccount, retrieveConnectedAccount } from './stripe';
-import { sendEmail } from './services/email';
+import fs from 'fs';
 import subscriptionRoutes from './routes/subscriptions';
 import invoiceRoutes from './routes/invoices';
-import { insertUserSchema } from "@db/schema";
-import { fromZodError } from 'zod-validation-error';
 import authRoutes from './routes/auth';
 import analyticsRoutes from './routes/analytics';
 import notificationRoutes from './routes/notifications';
@@ -23,38 +16,16 @@ import documentRoutes from './routes/documents';
 import reviewRoutes from './routes/reviews';
 import orderRoutes from './routes/orders';
 import leadsRoutes from './routes/leads';
-import { cleanupExpiredLeads } from './services/cleanup';
 import feedbackRoutes from './routes/feedback';
 import socialRoutes from './routes/social';
 import uploadRoutes from './routes/upload';
 import commentsRoutes from './routes/comments';
 
+
 // Ensure uploads directory exists
 const uploadDir = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true, mode: 0o755 });
-}
-
-interface User {
-  id: number;
-  email: string;
-  userType: string;
-  subscriptionActive: boolean;
-  stripeAccountId?: string;
-  stripeAccountStatus?: string;
-  profile?: any;
-  countryCode?: string;
-}
-
-declare global {
-  namespace Express {
-    interface Request {
-      user?: User;
-      login: any;
-      isAuthenticated(): boolean;
-      sessionID: string;
-    }
-  }
 }
 
 export function registerRoutes(app: Express): Server {

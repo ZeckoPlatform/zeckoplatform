@@ -15,21 +15,6 @@ log(`Process ID: ${process.pid}`);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// API-specific middleware - only apply to /api routes
-app.use('/api', (req, res, next) => {
-  res.setHeader('Content-Type', 'application/json');
-
-  // Debug logging for API requests
-  log('=== API Request Debug Info ===');
-  log(`Path: ${req.method} ${req.path}`);
-  log(`Authorization: ${req.headers.authorization ? 'Present' : 'Missing'}`);
-  log(`Query params: ${JSON.stringify(req.query)}`);
-  log(`Body length: ${req.body ? JSON.stringify(req.body).length : 0}`);
-  log('=== End Debug Info ===');
-
-  next();
-});
-
 // CORS middleware - only apply to /api routes
 app.use('/api', (req, res, next) => {
   const origin = req.headers.origin;
@@ -46,16 +31,17 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
+// API routes
 log('Registering routes...');
 const httpServer = registerRoutes(app);
 log('Routes registered successfully');
 
-// Setup static/Vite serving for frontend routes
+// Setup frontend serving
 if (isProd) {
   log('Setting up production static file serving');
-  app.use((req, res, next) => {
+  app.use('*', (req, res, next) => {
     if (!req.path.startsWith('/api')) {
-      serveStatic(app);
+      return serveStatic(req, res, next);
     }
     next();
   });
@@ -93,7 +79,7 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   res.status(500).send('Internal Server Error');
 });
 
-// Start server function
+// Start server
 const startServer = async (port: number): Promise<boolean> => {
   return new Promise((resolve) => {
     let isResolved = false;
@@ -115,9 +101,6 @@ const startServer = async (port: number): Promise<boolean> => {
       log(`Error name: ${error.name}`);
       log(`Error message: ${error.message}`);
       log(`Error code: ${error.code}`);
-      if (error.code === 'EADDRINUSE') {
-        log(`Port ${port} is already in use`);
-      }
       cleanup();
       resolve(false);
       isResolved = true;
