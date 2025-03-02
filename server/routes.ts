@@ -40,6 +40,9 @@ export function registerRoutes(app: Express): Server {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
+  // Setup authentication - this needs to come before other middleware
+  setupAuth(app);
+
   // Add metrics middleware
   app.use(metricsMiddleware);
 
@@ -60,13 +63,10 @@ export function registerRoutes(app: Express): Server {
       res.set('Content-Type', 'text/plain');
       res.send(metrics);
     } catch (error) {
-      log('Error serving metrics:', error);
+      log('Error serving metrics:', error instanceof Error ? error.message : String(error));
       res.status(500).send('Error collecting metrics');
     }
   });
-
-  // Setup authentication
-  setupAuth(app);
 
   // Serve uploaded files
   app.use('/uploads', express.static(uploadDir));
@@ -75,8 +75,19 @@ export function registerRoutes(app: Express): Server {
   app.use(
     '/admin/analytics/grafana',
     (req: any, res, next) => {
+      // Debug log
+      log('Grafana auth middleware:', {
+        user: req.user,
+        isSuperAdmin: req.user?.superAdmin,
+        path: req.path
+      });
+
       // Check if user is authenticated and is a super admin
       if (!req.user || !req.user.superAdmin) {
+        log('Grafana access denied:', {
+          user: req.user,
+          reason: !req.user ? 'No user' : 'Not super admin'
+        });
         return res.status(403).json({ error: 'Access denied' });
       }
 
@@ -94,8 +105,16 @@ export function registerRoutes(app: Express): Server {
         '^/admin/analytics/grafana': '',
       },
       ws: true, // Enable WebSocket proxy
+      logLevel: 'debug', // Enable debug logging
+      onProxyReq: (proxyReq, req, res) => {
+        // Debug log proxy request
+        log('Grafana proxy request:', {
+          path: req.path,
+          headers: proxyReq.getHeaders()
+        });
+      },
       onError: (err: Error, req: any, res: any) => {
-        log('Grafana proxy error:', err);
+        log('Grafana proxy error:', err instanceof Error ? err.message : String(err));
         res.status(500).send('Grafana service unavailable');
       },
     })
@@ -121,7 +140,7 @@ export function registerRoutes(app: Express): Server {
 
   // Error handling middleware - should be last
   app.use((err: any, req: any, res: any, next: any) => {
-    log('Global error handler:', err);
+    log('Global error handler:', err instanceof Error ? err.message : String(err));
     // If headers are not sent yet and it's an API route
     if (!res.headersSent && req.path.startsWith('/api')) {
       res.status(err.status || 500).json({

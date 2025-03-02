@@ -74,10 +74,12 @@ let grafanaProcess: any = null;
 
 export function startGrafanaServer() {
   if (grafanaProcess) {
+    log('Grafana server already running');
     return;
   }
 
   try {
+    log('Starting Grafana server...');
     grafanaProcess = spawn('grafana-server', [
       '--config', GRAFANA_CONFIG_FILE,
       '--homepath', '/usr/share/grafana',
