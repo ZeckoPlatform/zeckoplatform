@@ -23,6 +23,7 @@ serve_from_sub_path = true
 [security]
 admin_user = admin
 admin_password = ${process.env.GRAFANA_ADMIN_PASSWORD || 'admin'}
+disable_initial_admin_creation = false
 
 [auth]
 disable_login_form = false
@@ -32,6 +33,13 @@ enabled = true
 header_name = X-WEBAUTH-USER
 header_property = username
 auto_sign_up = true
+sync_ttl = 60
+whitelist = 127.0.0.1
+
+[users]
+allow_sign_up = false
+auto_assign_org = true
+auto_assign_org_role = Admin
 
 [datasources]
 datasources_path = ${GRAFANA_CONFIG_DIR}/datasources
