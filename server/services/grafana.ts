@@ -13,7 +13,7 @@ const GRAFANA_PROVISIONING_DIR = path.join(GRAFANA_CONFIG_DIR, 'provisioning');
 // Ensure Grafana directories exist
 [GRAFANA_CONFIG_DIR, GRAFANA_DATA_DIR, GRAFANA_PLUGINS_DIR, GRAFANA_PROVISIONING_DIR].forEach(dir => {
   if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+    fs.mkdirSync(dir, { recursive: true, mode: 0o755 });
   }
 });
 
@@ -57,36 +57,6 @@ datasources_path = ${GRAFANA_CONFIG_DIR}/datasources
 
 // Write Grafana configuration
 fs.writeFileSync(GRAFANA_CONFIG_FILE, grafanaConfig);
-
-// Create datasources directory
-const datasourcesDir = path.join(GRAFANA_CONFIG_DIR, 'datasources');
-if (!fs.existsSync(datasourcesDir)) {
-  fs.mkdirSync(datasourcesDir, { recursive: true });
-}
-
-// Configure Prometheus datasource
-const prometheusDataSource = {
-  apiVersion: 1,
-  datasources: [
-    {
-      name: 'Prometheus',
-      type: 'prometheus',
-      access: 'proxy',
-      url: 'http://localhost:9090',
-      isDefault: true,
-      jsonData: {
-        httpMethod: 'GET',
-        timeInterval: '15s',
-      },
-      editable: true,
-    },
-  ],
-};
-
-fs.writeFileSync(
-  path.join(datasourcesDir, 'prometheus.yaml'),
-  JSON.stringify(prometheusDataSource, null, 2)
-);
 
 let grafanaProcess: any = null;
 
