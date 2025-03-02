@@ -563,4 +563,83 @@ router.post("/messages/:userId", authenticateToken, checkSuperAdminAccess, async
   }
 });
 
+// Add new monitoring routes
+// Metrics endpoint for Prometheus
+router.get("/admin/metrics", authenticateToken, checkSuperAdminAccess, async (req, res) => {
+  try {
+    // Collect system metrics
+    const metrics = {
+      systemInfo: {
+        cpu: process.cpuUsage(),
+        memory: process.memoryUsage(),
+        uptime: process.uptime()
+      }
+    };
+
+    // Add application-specific metrics
+    const [activeUsers] = await db
+      .select({ count: count() })
+      .from(users)
+      .where(eq(users.active, true));
+
+    const [totalMessages] = await db
+      .select({ count: count() })
+      .from(messages);
+
+    // Add business metrics
+    const [businessMetrics] = await db
+      .select({
+        totalLeads: count(leads.id),
+        totalProducts: count(products.id),
+      })
+      .from(leads)
+      .crossJoin(products);
+
+    return res.json({
+      ...metrics,
+      applicationMetrics: {
+        activeUsers: activeUsers?.count || 0,
+        totalMessages: totalMessages?.count || 0,
+        totalLeads: businessMetrics?.totalLeads || 0,
+        totalProducts: businessMetrics?.totalProducts || 0,
+      }
+    });
+  } catch (error) {
+    console.error("Error collecting metrics:", error);
+    return res.status(500).json({ error: "Failed to collect metrics" });
+  }
+});
+
+// Health check endpoint
+router.get("/admin/health", authenticateToken, checkSuperAdminAccess, async (req, res) => {
+  try {
+    // Check database connectivity
+    await db.select().from(users).limit(1);
+
+    // Get system resources usage
+    const memory = process.memoryUsage();
+    const memoryUsagePercent = (memory.heapUsed / memory.heapTotal) * 100;
+
+    // Get CPU usage
+    const startUsage = process.cpuUsage();
+    // Wait for a short period to calculate CPU usage
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const endUsage = process.cpuUsage(startUsage);
+    const cpuUsagePercent = ((endUsage.user + endUsage.system) / 1000000) * 100;
+
+    return res.json({
+      status: "healthy",
+      memory: Math.round(memoryUsagePercent),
+      cpu: Math.round(cpuUsagePercent),
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error("Health check failed:", error);
+    return res.status(500).json({
+      status: "unhealthy",
+      error: error.message
+    });
+  }
+});
+
 export default router;
