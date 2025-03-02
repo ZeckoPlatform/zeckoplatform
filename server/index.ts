@@ -4,7 +4,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { Server } from "http";
 
 const app = express();
-const isProd = app.get('env') === 'production';
+const isProd = process.env.NODE_ENV === 'production';
 
 // Startup logging
 log('=== Server Initialization Started ===');
@@ -35,11 +35,14 @@ log('Routes registered successfully');
 // Setup frontend serving
 if (isProd) {
   log('Setting up production static file serving');
-  app.use('*', (req, res, next) => {
+  app.use(serveStatic);
+
+  // Fallback route for SPA
+  app.get('*', (req, res) => {
     if (!req.path.startsWith('/api')) {
-      return serveStatic(req, res, next);
+      log(`Serving index.html for path: ${req.path}`);
+      res.sendFile('index.html', { root: './client/dist' });
     }
-    next();
   });
 } else {
   // Handle development mode with Vite
