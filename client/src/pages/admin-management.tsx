@@ -882,7 +882,7 @@ export default function AdminManagementPage() {
             </Button>
             <Button
               variant="outline"
-              onClick={() => setLocation('/admin/settings/analytics')}
+              onClick={() => setLocation('/admin/analytics/settings')}
             >
               <BarChart4 className="w-4 h-4 mr-2" />
               Analytics Settings
