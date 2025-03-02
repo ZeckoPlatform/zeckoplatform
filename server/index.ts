@@ -2,6 +2,8 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { Server } from "http";
+import { db } from "@db";
+import { sql } from "drizzle-orm";
 
 const app = express();
 const isProd = app.get('env') === 'production';
@@ -10,6 +12,24 @@ const isProd = app.get('env') === 'production';
 log('=== Server Initialization Started ===');
 log(`Environment: ${process.env.NODE_ENV}`);
 log(`Process ID: ${process.pid}`);
+
+// Add test endpoint for quick connectivity check
+app.get('/api/healthtest', async (req, res) => {
+  try {
+    const result = await db.execute(sql`SELECT NOW()`);
+    res.json({ 
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      database: "connected"
+    });
+  } catch (error) {
+    log('Health test failed:', error instanceof Error ? error.message : String(error));
+    res.status(500).json({ 
+      status: "error",
+      error: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
 
 // Body parsing middleware
 app.use(express.json());
@@ -45,29 +65,18 @@ log('Routes registered successfully');
 // Setup static/Vite serving for frontend routes
 if (isProd) {
   log('Setting up production static file serving');
-  app.use((req, res, next) => {
-    if (!req.path.startsWith('/api')) {
-      serveStatic(app);
-    }
-    next();
-  });
+  serveStatic(app);
 } else {
-  // Handle development mode with Vite
-  log('Setting up Vite development server');
-  (async () => {
-    try {
-      await setupVite(app, httpServer);
-      log('Vite setup completed successfully');
-    } catch (error) {
-      log('Fatal error during Vite setup:', error);
-      process.exit(1);
-    }
-  })();
+  // Temporarily disable Vite for debugging
+  log('Development mode: Basic server setup without Vite');
+  app.get('/', (req, res) => {
+    res.json({ message: 'Server is running in development mode' });
+  });
 }
 
 // Error handling middleware
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-  log('Error handler:', err);
+  log('Error handler:', err instanceof Error ? err.stack : String(err));
 
   if (res.headersSent) {
     return next(err);
