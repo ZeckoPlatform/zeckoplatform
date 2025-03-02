@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { Server } from "http";
+import { initializeDatabase } from "@db";
 
 const app = express();
 const isProd = app.get('env') === 'production';
@@ -45,33 +46,6 @@ app.use('/api', (req, res, next) => {
   }
   next();
 });
-
-log('Registering routes...');
-const httpServer = registerRoutes(app);
-log('Routes registered successfully');
-
-// Setup static/Vite serving for frontend routes
-if (isProd) {
-  log('Setting up production static file serving');
-  app.use((req, res, next) => {
-    if (!req.path.startsWith('/api')) {
-      serveStatic(app);
-    }
-    next();
-  });
-} else {
-  // Handle development mode with Vite
-  log('Setting up Vite development server');
-  (async () => {
-    try {
-      await setupVite(app, httpServer);
-      log('Vite setup completed successfully');
-    } catch (error) {
-      log('Fatal error during Vite setup:', error);
-      process.exit(1);
-    }
-  })();
-}
 
 // Error handling middleware
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
@@ -133,6 +107,10 @@ const startServer = async (port: number): Promise<boolean> => {
       isResolved = true;
     };
 
+    log('Registering routes...');
+    const httpServer = registerRoutes(app);
+    log('Routes registered successfully');
+
     httpServer.once('error', onError);
     httpServer.once('listening', onListening);
 
@@ -160,6 +138,32 @@ const startServer = async (port: number): Promise<boolean> => {
     log(`Platform: ${process.platform}`);
     log(`Node Version: ${process.version}`);
     log('=== End Environment Information ===');
+
+    // Initialize database first
+    log('Initializing database...');
+    await initializeDatabase();
+    log('Database initialization completed');
+
+    // Setup static/Vite serving for frontend routes
+    if (isProd) {
+      log('Setting up production static file serving');
+      app.use((req, res, next) => {
+        if (!req.path.startsWith('/api')) {
+          serveStatic(app);
+        }
+        next();
+      });
+    } else {
+      // Handle development mode with Vite
+      log('Setting up Vite development server');
+      try {
+        await setupVite(app, httpServer);
+        log('Vite setup completed successfully');
+      } catch (error) {
+        log('Fatal error during Vite setup:', error);
+        process.exit(1);
+      }
+    }
 
     const PORT = Number(process.env.PORT) || 5000;
     log(`Starting server on port ${PORT}`);
