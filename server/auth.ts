@@ -51,7 +51,7 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
         });
       }
 
-      req.user = user;
+      (req as any).user = user;
       log('User authenticated via JWT token');
       next();
     } catch (error) {
@@ -80,7 +80,7 @@ export async function comparePasswords(supplied: string, stored: string) {
 export function generateToken(user: SelectUser) {
   return jwt.sign(
     { 
-      id: user.id, 
+      id: user.id,
       email: user.email,
       userType: user.userType,
       subscriptionActive: user.subscriptionActive,
@@ -91,28 +91,13 @@ export function generateToken(user: SelectUser) {
   );
 }
 
-async function getUserByEmail(email: string): Promise<SelectUser[]> {
-  try {
-    log(`Looking up user with email: ${email}`);
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, email))
-      .limit(1);
-    log(`User lookup result: ${user ? 'Found' : 'Not found'}`);
-    return [user];
-  } catch (error) {
-    log(`Database error in getUserByEmail: ${error}`);
-    throw new Error(`Failed to lookup user: ${error instanceof Error ? error.message : String(error)}`);
-  }
-}
-
 const loginSchema = z.object({
   email: z.string().email("Invalid email format"),
   password: z.string().min(1, "Password is required")
 });
 
 export function setupAuth(app: Express) {
+  // Login endpoint
   app.post("/api/login", async (req, res) => {
     try {
       const { email, password } = req.body;
@@ -129,48 +114,46 @@ export function setupAuth(app: Express) {
         });
       }
 
-      const [user] = await getUserByEmail(email);
+      // Find user by email
+      log('Querying database for user...');
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1);
+
       log(`User lookup result: ${user ? 'Found' : 'Not found'}`);
 
       if (!user) {
-        log(`No user found with email: ${email}`);
         return res.status(401).json({
           success: false,
           message: "Invalid credentials"
         });
       }
 
-      try {
-        const isValidPassword = await comparePasswords(password, user.password);
-        log(`Password validation result: ${isValidPassword ? 'Valid' : 'Invalid'}`);
+      // Verify password
+      const isValidPassword = await comparePasswords(password, user.password);
+      log(`Password validation result: ${isValidPassword ? 'Valid' : 'Invalid'}`);
 
-        if (!isValidPassword) {
-          log(`Invalid password for user: ${email}`);
-          return res.status(401).json({
-            success: false,
-            message: "Invalid credentials"
-          });
-        }
-      } catch (passwordError) {
-        log(`Password comparison error:`, passwordError);
-        throw passwordError;
+      if (!isValidPassword) {
+        return res.status(401).json({
+          success: false,
+          message: "Invalid credentials"
+        });
       }
 
       // Generate JWT token
       const token = generateToken(user);
       log(`Login successful for user: ${user.id}`);
 
-      // Send response with user data and token
+      // Send response
       res.json({
         success: true,
         user,
         token
       });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      log(`Login error: ${errorMessage}`);
-      log(`Stack trace:`, error instanceof Error ? error.stack : 'No stack trace');
-
+      log('Login error:', error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({
           success: false,
@@ -182,11 +165,12 @@ export function setupAuth(app: Express) {
       res.status(500).json({
         success: false,
         message: "Internal server error during login",
-        error: errorMessage
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });
 
+  // Register endpoint
   app.post("/api/register", async (req, res) => {
     try {
       const result = insertUserSchema.safeParse(req.body);
@@ -200,7 +184,11 @@ export function setupAuth(app: Express) {
       }
 
       // Check for existing email
-      const [existingUser] = await getUserByEmail(result.data.email);
+      const [existingUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, result.data.email))
+        .limit(1);
 
       if (existingUser) {
         log(`Registration failed: Email ${result.data.email} already exists`);
@@ -210,11 +198,12 @@ export function setupAuth(app: Express) {
         });
       }
 
+      // Create new user
       const [user] = await db
         .insert(users)
         .values({
           ...result.data,
-          password: await hashPassword(result.data.password),
+          password: await hashPassword(result.data.password)
         })
         .returning();
 
@@ -227,14 +216,11 @@ export function setupAuth(app: Express) {
         token
       });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      log(`Registration error: ${errorMessage}`);
-      log(`Stack trace:`, error instanceof Error ? error.stack : 'No stack trace');
-
+      log(`Registration error: ${error}`);
       res.status(500).json({
         success: false,
         message: "Registration failed",
-        error: errorMessage
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });
@@ -255,6 +241,6 @@ export function setupAuth(app: Express) {
   });
 
   app.get("/api/user", authenticateToken, (req, res) => {
-    res.json(req.user);
+    res.json((req as any).user);
   });
 }
