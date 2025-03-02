@@ -10,6 +10,15 @@ import jwt from 'jsonwebtoken';
 const scryptAsync = promisify(scrypt);
 const JWT_SECRET = process.env.JWT_SECRET || randomBytes(32).toString('hex');
 
+// Add type declarations for Express Request
+declare global {
+  namespace Express {
+    interface Request {
+      user?: any;
+    }
+  }
+}
+
 export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;
@@ -23,7 +32,7 @@ export async function comparePasswords(supplied: string, stored: string) {
     const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
     return timingSafeEqual(hashedBuf, suppliedBuf);
   } catch (error) {
-    log('Password comparison error:', error);
+    log('Password comparison error:', error instanceof Error ? error.message : String(error));
     return false;
   }
 }
@@ -72,11 +81,10 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
         });
       }
 
-      // @ts-ignore - we need to add user to the request
       req.user = user;
       next();
     } catch (error) {
-      log('Database error in auth middleware:', error);
+      log('Database error in auth middleware:', error instanceof Error ? error.message : String(error));
       return res.status(500).json({
         message: "Internal server error"
       });
@@ -112,14 +120,14 @@ export function setupAuth(app: Express) {
       }
 
       if (!user.password) {
-        log('Login failed: User has no password set:', user.id);
+        log('Login failed: User has no password set');
         return res.status(500).json({
           message: "User account configuration error"
         });
       }
 
       const isValidPassword = await comparePasswords(password, user.password);
-      log('Password validation result for user:', user.id, isValidPassword ? 'success' : 'failed');
+      log('Password validation result:', isValidPassword);
 
       if (!isValidPassword) {
         return res.status(401).json({
@@ -141,7 +149,7 @@ export function setupAuth(app: Express) {
         }
       });
     } catch (error) {
-      log('Login error:', error);
+      log('Login error:', error instanceof Error ? error.message : String(error));
       return res.status(500).json({
         message: "An error occurred during login"
       });
