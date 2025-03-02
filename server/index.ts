@@ -8,6 +8,17 @@ import { sql } from "drizzle-orm";
 const app = express();
 const isProd = app.get('env') === 'production';
 
+// Global error handlers
+process.on('uncaughtException', (error) => {
+  log('Uncaught Exception:', error instanceof Error ? error.stack : String(error));
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  log('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+
 // Startup logging
 log('=== Server Initialization Started ===');
 log(`Environment: ${process.env.NODE_ENV}`);

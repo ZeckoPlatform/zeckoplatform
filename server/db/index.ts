@@ -1,3 +1,7 @@
+// This file is deprecated. Use @db/index.ts instead.
+// Keeping this file temporarily to prevent import errors, will be removed in cleanup.
+export * from "../../db/index";
+
 import pg from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from "../db/schema";
