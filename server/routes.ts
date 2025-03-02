@@ -81,6 +81,7 @@ export function registerRoutes(app: Express): Server {
       // Debug log for authentication
       log('Grafana auth check:', {
         user: req.user,
+        session: req.session,
         isSuperAdmin: req.user?.superAdmin
       });
 
@@ -109,6 +110,11 @@ export function registerRoutes(app: Express): Server {
       },
       ws: true,
       onProxyReq: (proxyReq: any, req: any) => {
+        // Copy authentication headers to the proxied request
+        proxyReq.setHeader('X-WEBAUTH-USER', req.headers['X-WEBAUTH-USER']);
+        proxyReq.setHeader('X-WEBAUTH-NAME', req.headers['X-WEBAUTH-NAME']);
+        proxyReq.setHeader('X-WEBAUTH-ROLE', req.headers['X-WEBAUTH-ROLE']);
+
         log('Grafana proxy request:', {
           originalUrl: req.originalUrl,
           headers: proxyReq.getHeaders()

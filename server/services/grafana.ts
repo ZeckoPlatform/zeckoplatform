@@ -36,7 +36,8 @@ admin_password = ${process.env.GRAFANA_ADMIN_PASSWORD || 'admin'}
 disable_initial_admin_creation = false
 
 [auth]
-disable_login_form = false
+disable_login_form = true
+disable_signout_menu = true
 
 [auth.proxy]
 enabled = true
