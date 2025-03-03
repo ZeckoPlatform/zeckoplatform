@@ -41,35 +41,26 @@ serve_from_sub_path = true
 root_url = %(protocol)s://%(domain)s/admin/analytics/grafana/
 
 [security]
-admin_user = zeckoinfo
+admin_user = zeckoinfo@gmail.com
 admin_password = Bobo19881
-disable_initial_admin_creation = false
 allow_embedding = true
+disable_initial_admin_creation = false
 cookie_samesite = none
 cookie_secure = false
 
 [auth]
 disable_login_form = false
 disable_signout_menu = false
-oauth_auto_login = false
 
-[auth.proxy]
+[auth.anonymous]
 enabled = true
-header_name = X-WEBAUTH-USER
-header_property = email
-auto_sign_up = true
-sync_ttl = 60
-whitelist = *
-headers = Name:X-WEBAUTH-NAME Role:X-WEBAUTH-ROLE Organization:X-WEBAUTH-ORG
-enable_login_token = true
+org_name = Main Org.
+org_role = Admin
 
 [users]
 allow_sign_up = false
 auto_assign_org = true
 auto_assign_org_role = Admin
-
-[auth.anonymous]
-enabled = false
 
 [dashboards]
 versions_to_keep = 20
