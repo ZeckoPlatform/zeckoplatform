@@ -42,24 +42,6 @@ export default function AnalyticsSettingsPage() {
             width: '100%',
             height: '100%'
           }}
-          onLoad={(e) => {
-            const iframe = e.target as HTMLIFrameElement;
-            if (iframe.contentWindow) {
-              // Set up error handler
-              const handleMessage = (event: MessageEvent) => {
-                if (event.data.type === 'grafana-error') {
-                  toast({
-                    title: "Grafana Error",
-                    description: "Failed to load Grafana dashboard. Please try refreshing the page.",
-                    variant: "destructive"
-                  });
-                }
-              };
-
-              window.addEventListener('message', handleMessage);
-              return () => window.removeEventListener('message', handleMessage);
-            }
-          }}
         />
       </div>
 
@@ -108,6 +90,7 @@ export default function AnalyticsSettingsPage() {
           </div>
         </CardContent>
       </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Performance Metrics</CardTitle>
