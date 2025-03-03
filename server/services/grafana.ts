@@ -33,7 +33,7 @@ serve_from_sub_path = true
 [security]
 admin_user = admin
 admin_password = ${process.env.GRAFANA_ADMIN_PASSWORD || 'admin'}
-disable_initial_admin_creation = false
+disable_initial_admin_creation = true
 
 [auth]
 disable_login_form = true

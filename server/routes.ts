@@ -57,10 +57,17 @@ export function registerRoutes(app: Express): Server {
   // Metrics endpoint (protected for admin access only)
   app.get('/api/metrics', async (req: any, res) => {
     try {
+      log('Metrics request:', JSON.stringify({
+        user: req.user,
+        isSuperAdmin: req.user?.superAdmin,
+        headers: req.headers
+      }));
+
       if (!req.user?.superAdmin) {
         log('Metrics access denied:', JSON.stringify({ user: req.user }));
         return res.status(403).json({ error: 'Access denied' });
       }
+
       const metrics = await getMetrics();
       res.set('Content-Type', 'text/plain');
       res.send(metrics);
@@ -77,21 +84,15 @@ export function registerRoutes(app: Express): Server {
   app.use(
     '/admin/analytics/grafana',
     (req: any, res, next) => {
-      // Set auth headers before proxy
-      req.headers['X-WEBAUTH-USER'] = req.user?.email || '';
-      req.headers['X-WEBAUTH-NAME'] = req.user?.username || req.user?.email || '';
-      req.headers['X-WEBAUTH-ROLE'] = req.user?.superAdmin ? 'Admin' : '';
-      req.headers['X-WEBAUTH-ORG'] = 'main';
-
       // Debug log for authentication
       log('Grafana auth check:', JSON.stringify({
         user: req.user,
         session: req.session,
         isSuperAdmin: req.user?.superAdmin,
         headers: {
-          'X-WEBAUTH-USER': req.headers['X-WEBAUTH-USER'],
-          'X-WEBAUTH-NAME': req.headers['X-WEBAUTH-NAME'],
-          'X-WEBAUTH-ROLE': req.headers['X-WEBAUTH-ROLE']
+          'X-WEBAUTH-USER': req.user?.email || '',
+          'X-WEBAUTH-NAME': req.user?.username || req.user?.email || '',
+          'X-WEBAUTH-ROLE': req.user?.superAdmin ? 'Admin' : ''
         }
       }));
 
@@ -104,6 +105,12 @@ export function registerRoutes(app: Express): Server {
         log('Grafana access denied: Not super admin');
         return res.status(403).json({ error: 'Super admin access required' });
       }
+
+      // Set auth headers before proxy
+      req.headers['X-WEBAUTH-USER'] = req.user.email;
+      req.headers['X-WEBAUTH-NAME'] = req.user.username || req.user.email;
+      req.headers['X-WEBAUTH-ROLE'] = 'Admin';
+      req.headers['X-WEBAUTH-ORG'] = 'main';
 
       next();
     },
