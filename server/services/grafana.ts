@@ -45,12 +45,12 @@ oauth_auto_login = true
 
 [auth.proxy]
 enabled = true
-header_name = x-webauth-user
+header_name = X-WEBAUTH-USER
 header_property = email
 auto_sign_up = true
 sync_ttl = 60
 whitelist = *
-headers = Name:x-webauth-name Role:x-webauth-role Organization:x-webauth-org
+headers = Name:X-WEBAUTH-NAME Role:X-WEBAUTH-ROLE Organization:X-WEBAUTH-ORG
 enable_login_token = true
 
 [users]

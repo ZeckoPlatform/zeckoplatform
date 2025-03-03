@@ -26,12 +26,6 @@ import socialRoutes from './routes/social';
 import uploadRoutes from './routes/upload';
 import commentsRoutes from './routes/comments';
 
-// Ensure uploads directory exists
-const uploadDir = path.join(process.cwd(), 'uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true, mode: 0o755 });
-}
-
 // Verify JWT token
 const verifyToken = (token: string) => {
   try {
@@ -54,7 +48,7 @@ export function registerRoutes(app: Express): Server {
   // Start Grafana server
   startGrafanaServer();
 
-  // JSON and urlencoded middleware should come first
+  // JSON and urlencoded middleware
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
@@ -70,7 +64,7 @@ export function registerRoutes(app: Express): Server {
     next();
   });
 
-  // Metrics endpoint with JWT authentication
+  // Metrics endpoint with JWT auth
   app.get('/api/metrics', async (req: any, res) => {
     try {
       const authHeader = req.headers.authorization;
@@ -92,10 +86,6 @@ export function registerRoutes(app: Express): Server {
       }
 
       const metrics = await getMetrics();
-      if (!metrics) {
-        return res.status(404).json({ error: 'No metrics available' });
-      }
-
       res.set('Content-Type', 'text/plain');
       res.send(metrics);
     } catch (error) {
@@ -105,14 +95,12 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Serve uploaded files
-  app.use('/uploads', express.static(uploadDir));
-
   // Grafana proxy middleware with JWT auth
   app.use(
     '/admin/analytics/grafana',
     (req: any, res, next) => {
       let token;
+
       // Check for token in query params (for iframe) or Authorization header
       if (req.query.auth_token) {
         token = req.query.auth_token;
@@ -123,6 +111,7 @@ export function registerRoutes(app: Express): Server {
       log('Grafana auth check:', JSON.stringify({
         hasQueryToken: !!req.query.auth_token,
         hasHeaderToken: !!req.headers.authorization,
+        token: token ? '[REDACTED]' : 'none',
         headers: req.headers
       }));
 
@@ -139,10 +128,10 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Set auth headers for Grafana proxy
-      req.headers['x-webauth-user'] = decoded.email;
-      req.headers['x-webauth-name'] = decoded.username || decoded.email;
-      req.headers['x-webauth-role'] = 'Admin';
-      req.headers['x-webauth-org'] = 'main';
+      req.headers['X-WEBAUTH-USER'] = decoded.email;
+      req.headers['X-WEBAUTH-NAME'] = decoded.username || decoded.email;
+      req.headers['X-WEBAUTH-ROLE'] = 'Admin';
+      req.headers['X-WEBAUTH-ORG'] = 'main';
 
       next();
     },
@@ -155,13 +144,13 @@ export function registerRoutes(app: Express): Server {
       ws: true,
       onProxyReq: (proxyReq: any, req: any) => {
         // Copy authentication headers to the proxied request
-        proxyReq.setHeader('x-webauth-user', req.headers['x-webauth-user']);
-        proxyReq.setHeader('x-webauth-name', req.headers['x-webauth-name']);
-        proxyReq.setHeader('x-webauth-role', req.headers['x-webauth-role']);
-        proxyReq.setHeader('x-webauth-org', req.headers['x-webauth-org']);
+        proxyReq.setHeader('X-WEBAUTH-USER', req.headers['X-WEBAUTH-USER']);
+        proxyReq.setHeader('X-WEBAUTH-NAME', req.headers['X-WEBAUTH-NAME']);
+        proxyReq.setHeader('X-WEBAUTH-ROLE', req.headers['X-WEBAUTH-ROLE']);
+        proxyReq.setHeader('X-WEBAUTH-ORG', req.headers['X-WEBAUTH-ORG']);
 
         log('Grafana proxy request:', JSON.stringify({
-          originalUrl: req.originalUrl,
+          url: req.url,
           headers: proxyReq.getHeaders()
         }));
       },
@@ -190,6 +179,9 @@ export function registerRoutes(app: Express): Server {
   // Register feedback routes
   app.use(feedbackRoutes);
 
+  // Serve uploaded files
+  app.use('/uploads', express.static(uploadDir));
+
   // Error handling middleware
   app.use((err: any, req: any, res: any, next: any) => {
     log('Global error handler:', err instanceof Error ? err.message : String(err));
@@ -205,4 +197,10 @@ export function registerRoutes(app: Express): Server {
 
   const httpServer = createServer(app);
   return httpServer;
+}
+
+// Ensure uploads directory exists
+const uploadDir = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true, mode: 0o755 });
 }
