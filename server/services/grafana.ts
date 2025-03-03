@@ -12,7 +12,7 @@ const GRAFANA_PROVISIONING_DIR = path.join(GRAFANA_CONFIG_DIR, 'provisioning');
 const GRAFANA_DASHBOARDS_DIR = path.join(GRAFANA_PROVISIONING_DIR, 'dashboards');
 const GRAFANA_DATASOURCES_DIR = path.join(GRAFANA_PROVISIONING_DIR, 'datasources');
 
-// Ensure all Grafana directories exist
+// Ensure all Grafana directories exist with proper permissions
 [
   GRAFANA_CONFIG_DIR,
   GRAFANA_DATA_DIR,
@@ -46,9 +46,9 @@ http_addr = 0.0.0.0
 admin_user = zeckoinfo@gmail.com
 admin_password = Bobo19881
 allow_embedding = true
-disable_initial_admin_creation = false
 cookie_secure = false
 cookie_samesite = none
+disable_initial_admin_creation = false
 secret_key = SW2YcwTIb9zpOOhoPsMm
 
 [auth]
@@ -56,9 +56,7 @@ disable_login_form = false
 signout_redirect_url = /
 
 [auth.anonymous]
-enabled = true
-org_name = Main Org.
-org_role = Admin
+enabled = false
 
 [auth.basic]
 enabled = true

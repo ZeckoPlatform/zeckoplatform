@@ -95,7 +95,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Grafana proxy middleware with JWT auth
+  // Grafana proxy middleware with auth
   app.use(
     '/admin/analytics/grafana',
     (req: any, res, next) => {
