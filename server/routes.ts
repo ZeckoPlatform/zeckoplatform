@@ -8,6 +8,7 @@ import fs from 'fs';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { metricsMiddleware, getMetrics, initializeMonitoring } from './services/monitoring';
 import { startGrafanaServer, GRAFANA_INTERNAL_URL } from './services/grafana';
+import jwt from 'jsonwebtoken';
 
 // Import route handlers
 import subscriptionRoutes from './routes/subscriptions';
@@ -30,6 +31,15 @@ const uploadDir = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true, mode: 0o755 });
 }
+
+// Verify JWT token
+const verifyToken = (token: string) => {
+  try {
+    return jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+  } catch (error) {
+    return null;
+  }
+};
 
 export function registerRoutes(app: Express): Server {
   // Initialize monitoring
@@ -54,30 +64,23 @@ export function registerRoutes(app: Express): Server {
     next();
   });
 
-  // Metrics endpoint with detailed logging
+  // Metrics endpoint with JWT authentication
   app.get('/api/metrics', async (req: any, res) => {
     try {
-      log('Metrics request:', JSON.stringify({
-        headers: req.headers,
-        user: req.user,
-        isSuperAdmin: req.user?.superAdmin,
-        token: req.headers.authorization
-      }));
-
-      // Check authentication and super admin status
-      if (!req.isAuthenticated()) {
-        log('Metrics access denied: Not authenticated');
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'Authentication required' });
       }
 
-      if (!req.user?.superAdmin) {
-        log('Metrics access denied: Not super admin');
+      const token = authHeader.split(' ')[1];
+      const decoded = verifyToken(token);
+
+      if (!decoded || !decoded.superAdmin) {
         return res.status(403).json({ error: 'Access denied' });
       }
 
       const metrics = await getMetrics();
       if (!metrics) {
-        log('No metrics data available');
         return res.status(404).json({ error: 'No metrics available' });
       }
 
@@ -93,33 +96,25 @@ export function registerRoutes(app: Express): Server {
   // Serve uploaded files
   app.use('/uploads', express.static(uploadDir));
 
-  // Grafana proxy middleware (protected for admin access only)
+  // Grafana proxy middleware (protected with JWT auth)
   app.use(
     '/admin/analytics/grafana',
     (req: any, res, next) => {
-      // Debug log for authentication
-      log('Grafana auth check:', JSON.stringify({
-        headers: req.headers,
-        user: req.user,
-        session: req.session,
-        isSuperAdmin: req.user?.superAdmin,
-        token: req.headers.authorization
-      }));
-
-      // Authentication checks
-      if (!req.isAuthenticated()) {
-        log('Grafana access denied: Not authenticated');
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'Authentication required' });
       }
 
-      if (!req.user?.superAdmin) {
-        log('Grafana access denied: Not super admin');
-        return res.status(403).json({ error: 'Super admin access required' });
+      const token = authHeader.split(' ')[1];
+      const decoded = verifyToken(token);
+
+      if (!decoded || !decoded.superAdmin) {
+        return res.status(403).json({ error: 'Access denied' });
       }
 
-      // Set auth headers for Grafana proxy auth
-      req.headers['x-webauth-user'] = req.user.email;
-      req.headers['x-webauth-name'] = req.user.username || req.user.email;
+      // Set auth headers for Grafana proxy
+      req.headers['x-webauth-user'] = decoded.email;
+      req.headers['x-webauth-name'] = decoded.username || decoded.email;
       req.headers['x-webauth-role'] = 'Admin';
       req.headers['x-webauth-org'] = 'main';
 
