@@ -44,12 +44,11 @@ http_addr = 0.0.0.0
 
 [security]
 admin_user = zeckoinfo@gmail.com
-admin_password = Bobo19881
+admin_password = ${process.env.GRAFANA_ADMIN_PASSWORD || 'admin'}
 allow_embedding = true
 cookie_secure = false
 cookie_samesite = none
 secret_key = SW2YcwTIb9zpOOhoPsMm
-disable_initial_admin_creation = false
 
 [auth]
 disable_login_form = false

@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +24,34 @@ export default function AnalyticsSettingsPage() {
         <Button variant="outline" onClick={() => setLocation("/admin-management")}>
           Back to Dashboard
         </Button>
+      </div>
+
+      <div className="w-full h-[600px] rounded-lg overflow-hidden border mb-8">
+        <iframe
+          src={`/admin/analytics/grafana/d/system-health/system-health-dashboard?orgId=1&kiosk`}
+          className="w-full h-full"
+          frameBorder="0"
+          title="Grafana Dashboard"
+          allow="fullscreen"
+          style={{ 
+            border: 'none',
+            width: '100%',
+            height: '100%'
+          }}
+          onLoad={(e) => {
+            const iframe = e.target as HTMLIFrameElement;
+            if (iframe.contentWindow) {
+              // Forward the JWT token
+              iframe.contentWindow.postMessage(
+                { 
+                  type: 'authorization',
+                  token: `Bearer ${user.token}`
+                },
+                '*'
+              );
+            }
+          }}
+        />
       </div>
 
       <Card>
@@ -70,7 +99,6 @@ export default function AnalyticsSettingsPage() {
           </div>
         </CardContent>
       </Card>
-
       <Card>
         <CardHeader>
           <CardTitle>Performance Metrics</CardTitle>

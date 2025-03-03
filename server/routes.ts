@@ -109,7 +109,8 @@ export function registerRoutes(app: Express): Server {
       log('Grafana auth check:', {
         hasHeaderToken: !!req.headers.authorization,
         url: req.url,
-        method: req.method
+        method: req.method,
+        path: req.path
       });
 
       if (!token) {
@@ -125,7 +126,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Set Basic Auth header for Grafana
-      const grafanaAuth = Buffer.from('zeckoinfo@gmail.com:Bobo19881').toString('base64');
+      const grafanaAuth = Buffer.from(`zeckoinfo@gmail.com:${process.env.GRAFANA_ADMIN_PASSWORD || 'admin'}`).toString('base64');
       req.headers['Authorization'] = `Basic ${grafanaAuth}`;
 
       next();
