@@ -29,12 +29,7 @@ import commentsRoutes from './routes/comments';
 // Verify JWT token
 const verifyToken = (token: string) => {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-    log('Token verification succeeded:', {
-      isSuperAdmin: decoded?.superAdmin,
-      email: decoded?.email
-    });
-    return decoded;
+    return jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
   } catch (error) {
     log('Token verification failed:', error instanceof Error ? error.message : String(error));
     return null;
@@ -107,7 +102,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       log('Grafana auth check:', {
-        hasHeaderToken: !!req.headers.authorization,
+        hasToken: !!token,
         url: req.url,
         method: req.method,
         path: req.path
@@ -125,6 +120,9 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).json({ error: 'Access denied' });
       }
 
+      // Set proxy auth headers
+      req.headers['X-WEBAUTH-USER'] = decoded.email;
+
       // Set Basic Auth header for Grafana
       const grafanaAuth = Buffer.from(`zeckoinfo@gmail.com:${process.env.GRAFANA_ADMIN_PASSWORD || 'admin'}`).toString('base64');
       req.headers['Authorization'] = `Basic ${grafanaAuth}`;
@@ -138,16 +136,19 @@ export function registerRoutes(app: Express): Server {
         '^/admin/analytics/grafana': '',
       },
       ws: true,
-      onProxyReq: (proxyReq: any, req: any) => {
-        // Copy the Basic Auth header to the proxied request
+      onProxyReq: (proxyReq, req: any) => {
+        // Preserve the auth headers
         if (req.headers['authorization']) {
           proxyReq.setHeader('Authorization', req.headers['authorization']);
         }
+        if (req.headers['x-webauth-user']) {
+          proxyReq.setHeader('X-WEBAUTH-USER', req.headers['x-webauth-user']);
+        }
 
-        log('Grafana proxy request:', {
+        log('Proxying Grafana request:', {
           url: req.url,
-          method: req.method,
-          hasAuth: !!req.headers['authorization']
+          hasAuth: !!req.headers['authorization'],
+          hasWebAuth: !!req.headers['x-webauth-user']
         });
       },
       onError: (err: Error, req: any, res: any) => {

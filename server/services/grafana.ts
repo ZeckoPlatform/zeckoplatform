@@ -38,7 +38,7 @@ provisioning = ${GRAFANA_PROVISIONING_DIR}
 protocol = http
 http_port = ${GRAFANA_PORT}
 domain = localhost
-root_url = %(protocol)s://%(domain)s/admin/analytics/grafana
+root_url = %(protocol)s://%(domain)s:%(http_port)s/admin/analytics/grafana
 serve_from_sub_path = true
 http_addr = 0.0.0.0
 
@@ -49,17 +49,20 @@ allow_embedding = true
 cookie_secure = false
 cookie_samesite = none
 secret_key = SW2YcwTIb9zpOOhoPsMm
+disable_initial_admin_creation = false
 
 [auth]
 disable_login_form = false
 disable_signout_menu = false
 signout_redirect_url = /
 
-[auth.basic]
-enabled = true
-
 [auth.proxy]
-enabled = false
+enabled = true
+header_name = X-WEBAUTH-USER
+header_property = email
+auto_sign_up = true
+sync_ttl = 60
+whitelist = 127.0.0.1, ::1
 
 [users]
 allow_sign_up = false

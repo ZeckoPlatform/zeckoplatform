@@ -17,6 +17,8 @@ export default function AnalyticsSettingsPage() {
     return null;
   }
 
+  const grafanaUrl = `/admin/analytics/grafana/d/system-health/system-health-dashboard?orgId=1&kiosk&theme=light`;
+
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div className="flex justify-between items-center">
@@ -28,7 +30,7 @@ export default function AnalyticsSettingsPage() {
 
       <div className="w-full h-[600px] rounded-lg overflow-hidden border mb-8">
         <iframe
-          src={`/admin/analytics/grafana/d/system-health/system-health-dashboard?orgId=1&kiosk`}
+          src={`/admin/analytics/grafana/d/system-health/system-health-dashboard?orgId=1&kiosk&theme=light`}
           className="w-full h-full"
           frameBorder="0"
           title="Grafana Dashboard"
@@ -45,10 +47,20 @@ export default function AnalyticsSettingsPage() {
               iframe.contentWindow.postMessage(
                 { 
                   type: 'authorization',
-                  token: `Bearer ${user.token}`
+                  token: `Bearer ${user?.token}`
                 },
                 '*'
               );
+
+              // Handle authentication errors
+              const handleMessage = (event: MessageEvent) => {
+                if (event.data.type === 'grafana-error') {
+                  console.error('Grafana authentication error:', event.data.error);
+                }
+              };
+
+              window.addEventListener('message', handleMessage);
+              return () => window.removeEventListener('message', handleMessage);
             }
           }}
         />
