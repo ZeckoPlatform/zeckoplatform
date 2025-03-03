@@ -55,11 +55,6 @@ register.registerMetric(apiErrorsCounter);
 export const metricsMiddleware = (req: any, res: any, next: any) => {
   const start = Date.now();
 
-  // Record initial request
-  httpRequestsTotalCounter
-    .labels(req.method, req.path, "pending")
-    .inc();
-
   res.on('finish', () => {
     const duration = Date.now() - start;
     const route = req.route?.path || req.path;
@@ -123,7 +118,7 @@ export const trackSystemMemory = () => {
 
   // Convert bytes to megabytes for clearer metrics
   Object.entries(used).forEach(([key, value]) => {
-    systemMemoryGauge.labels(key).set(value / 1024 / 1024);
+    systemMemoryGauge.labels(key).set(value);
   });
 
   logInfo('System Memory', {
@@ -157,16 +152,17 @@ export const getMetrics = async () => {
     const metrics = await register.metrics();
 
     logInfo('Metrics collected successfully', {
-      metricsLength: metrics.length,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      metricsLength: metrics.length
     });
 
     return metrics;
   } catch (error) {
     logError('Failed to collect metrics:', {
-      error: error instanceof Error ? error.message : String(error)
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
     });
-    throw error;
+    throw new Error('Failed to collect metrics');
   }
 };
 
@@ -183,9 +179,17 @@ export const initializeMonitoring = () => {
     logInfo('Initializing Prometheus monitoring...');
 
     // Reset all metrics
-    register.resetMetrics();
+    register.clear();
 
-    // Start collecting default metrics - only do this once
+    // Re-register our custom metrics
+    register.registerMetric(httpRequestDurationMicroseconds);
+    register.registerMetric(httpRequestsTotalCounter);
+    register.registerMetric(databaseQueryDurationHistogram);
+    register.registerMetric(activeUsersGauge);
+    register.registerMetric(systemMemoryGauge);
+    register.registerMetric(apiErrorsCounter);
+
+    // Start collecting default metrics
     promClient.collectDefaultMetrics({
       register,
       prefix: 'zecko_'
@@ -203,7 +207,8 @@ export const initializeMonitoring = () => {
     logInfo('Prometheus monitoring initialized successfully');
   } catch (error) {
     logError('Failed to initialize monitoring:', {
-      error: error instanceof Error ? error.message : String(error)
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
     });
     // Don't throw the error, just log it
   }
