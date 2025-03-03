@@ -43,6 +43,14 @@ const apiErrorsCounter = new promClient.Counter({
   labelNames: ['endpoint', 'error_type']
 });
 
+// Register metrics
+register.registerMetric(httpRequestDurationMicroseconds);
+register.registerMetric(httpRequestsTotalCounter);
+register.registerMetric(databaseQueryDurationHistogram);
+register.registerMetric(activeUsersGauge);
+register.registerMetric(systemMemoryGauge);
+register.registerMetric(apiErrorsCounter);
+
 // Initialize some sample data
 function initializeSampleMetrics() {
   try {
@@ -69,6 +77,7 @@ function initializeSampleMetrics() {
     const used = process.memoryUsage();
     Object.entries(used).forEach(([key, value]) => {
       systemMemoryGauge.labels(key).set(value);
+      log(`Setting initial memory metric for ${key}: ${value} bytes`);
     });
 
     log('Sample metrics initialized successfully');
@@ -125,6 +134,7 @@ export const getMetrics = async () => {
     const used = process.memoryUsage();
     Object.entries(used).forEach(([key, value]) => {
       systemMemoryGauge.labels(key).set(value);
+      log(`Updated memory metric for ${key}: ${value} bytes`);
     });
 
     // Get all metrics
@@ -142,13 +152,7 @@ export const getMetrics = async () => {
     return metrics;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorStack = error instanceof Error ? error.stack : undefined;
-
-    log('Failed to collect metrics:', {
-      error: errorMessage,
-      stack: errorStack
-    });
-
+    log('Failed to collect metrics:', errorMessage);
     throw new Error(`Failed to collect metrics: ${errorMessage}`);
   }
 };
@@ -165,21 +169,11 @@ export const initializeMonitoring = () => {
   try {
     log('Initializing Prometheus monitoring...');
 
-    // Clear any existing metrics
-    register.clear();
-
-    // Register metrics
-    register.registerMetric(httpRequestDurationMicroseconds);
-    register.registerMetric(httpRequestsTotalCounter);
-    register.registerMetric(databaseQueryDurationHistogram);
-    register.registerMetric(activeUsersGauge);
-    register.registerMetric(systemMemoryGauge);
-    register.registerMetric(apiErrorsCounter);
-
     // Start collecting default metrics
     promClient.collectDefaultMetrics({
       register,
-      prefix: 'zecko_'
+      prefix: 'zecko_',
+      gcDurationBuckets: [0.001, 0.01, 0.1, 1, 2, 5]
     });
 
     // Initialize sample metrics
@@ -189,12 +183,8 @@ export const initializeMonitoring = () => {
     log('Prometheus monitoring initialized successfully');
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorStack = error instanceof Error ? error.stack : undefined;
-
-    log('Failed to initialize monitoring:', {
-      error: errorMessage,
-      stack: errorStack
-    });
+    log('Failed to initialize monitoring:', errorMessage);
+    throw error;
   }
 };
 
@@ -206,31 +196,26 @@ export const trackDatabaseQuery = (queryType: string, table: string, duration: n
     .labels(queryType, table)
     .observe(duration / 1000);
 
-  logInfo('Database Query', {
+  logInfo('Database Query Metric', {
     type: queryType,
     table: table,
     duration: duration
   });
 };
 
-// Active users tracking
 export const updateActiveUsers = (count: number) => {
   activeUsersGauge.set(count);
+  logInfo('Active Users Updated', { count });
 };
 
-// System memory tracking
 export const trackSystemMemory = () => {
   const used = process.memoryUsage();
-
-  // Convert bytes to megabytes for clearer metrics
   Object.entries(used).forEach(([key, value]) => {
     systemMemoryGauge.labels(key).set(value);
   });
 
-  logInfo('System Memory', {
+  logInfo('System Memory Updated', {
     ...used,
     timestamp: new Date().toISOString()
   });
 };
-
-// Register custom metrics (This part is redundant because metrics are already registered in initializeMonitoring)
