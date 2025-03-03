@@ -49,6 +49,7 @@ allow_embedding = true
 cookie_secure = false
 cookie_samesite = none
 secret_key = SW2YcwTIb9zpOOhoPsMm
+disable_initial_admin_creation = false
 
 [auth]
 disable_login_form = false
@@ -57,6 +58,9 @@ signout_redirect_url = /
 
 [auth.basic]
 enabled = true
+
+[auth.proxy]
+enabled = false
 
 [users]
 allow_sign_up = false
