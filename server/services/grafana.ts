@@ -48,7 +48,6 @@ admin_password = Bobo19881
 allow_embedding = true
 cookie_secure = false
 cookie_samesite = none
-disable_initial_admin_creation = false
 secret_key = SW2YcwTIb9zpOOhoPsMm
 
 [auth]
