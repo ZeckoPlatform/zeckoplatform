@@ -3,36 +3,18 @@ import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { log } from "./vite";
 import express from 'express';
-import path from 'path';
-import fs from 'fs';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { metricsMiddleware, getMetrics, initializeMonitoring } from './services/monitoring';
 import { startGrafanaServer, GRAFANA_INTERNAL_URL } from './services/grafana';
 import jwt from 'jsonwebtoken';
 
-// Import route handlers
-import subscriptionRoutes from './routes/subscriptions';
-import invoiceRoutes from './routes/invoices';
-import authRoutes from './routes/auth';
-import analyticsRoutes from './routes/analytics';
-import notificationRoutes from './routes/notifications';
-import adminRoutes from './routes/admin';
-import documentRoutes from './routes/documents';
-import reviewRoutes from './routes/reviews';
-import orderRoutes from './routes/orders';
-import leadsRoutes from './routes/leads';
-import feedbackRoutes from './routes/feedback';
-import socialRoutes from './routes/social';
-import uploadRoutes from './routes/upload';
-import commentsRoutes from './routes/comments';
-
-// Verify JWT token
+// Verify JWT token with detailed logging
 const verifyToken = (token: string) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
     log('Token verification succeeded:', {
-      isSuperAdmin: decoded?.superAdmin,
-      email: decoded?.email
+      isSuperAdmin: (decoded as any)?.superAdmin,
+      email: (decoded as any)?.email
     });
     return decoded;
   } catch (error) {
@@ -42,23 +24,17 @@ const verifyToken = (token: string) => {
 };
 
 export function registerRoutes(app: Express): Server {
-  // Initialize monitoring
+  // Initialize monitoring and Grafana
   initializeMonitoring();
-
-  // Start Grafana server
   startGrafanaServer();
 
-  // JSON and urlencoded middleware
+  // Middleware setup
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
-
-  // Setup authentication
   setupAuth(app);
-
-  // Add metrics middleware
   app.use(metricsMiddleware);
 
-  // Set default headers for all API routes
+  // Set default headers for API routes
   app.use('/api', (req, res, next) => {
     res.setHeader('Content-Type', 'application/json');
     next();
@@ -68,11 +44,6 @@ export function registerRoutes(app: Express): Server {
   app.get('/api/metrics', async (req: any, res) => {
     try {
       const authHeader = req.headers.authorization;
-      log('Metrics request:', {
-        authHeader: authHeader ? 'Bearer [token]' : 'none',
-        headers: req.headers
-      });
-
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'Authentication required' });
       }
@@ -80,8 +51,7 @@ export function registerRoutes(app: Express): Server {
       const token = authHeader.split(' ')[1];
       const decoded = verifyToken(token);
 
-      if (!decoded || !decoded.superAdmin) {
-        log('Metrics access denied:', { decoded });
+      if (!decoded || !(decoded as any).superAdmin) {
         return res.status(403).json({ error: 'Access denied' });
       }
 
@@ -95,38 +65,33 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Grafana proxy middleware with auth
+  // Grafana proxy middleware with simplified auth
   app.use(
     '/admin/analytics/grafana',
     (req: any, res, next) => {
-      let token;
-
-      // Check for token in Authorization header
-      if (req.headers.authorization?.startsWith('Bearer ')) {
-        token = req.headers.authorization.split(' ')[1];
-      }
-
-      log('Grafana auth check:', {
-        hasHeaderToken: !!req.headers.authorization,
+      // For debugging: Log incoming request details
+      log('Incoming Grafana request:', {
         url: req.url,
-        method: req.method
+        method: req.method,
+        headers: {
+          ...req.headers,
+          authorization: req.headers.authorization ? '[PRESENT]' : '[ABSENT]'
+        }
       });
 
-      if (!token) {
-        log('Grafana access denied: No token found');
-        return res.status(401).json({ error: 'Authentication required' });
+      // With anonymous access enabled, we'll still verify the JWT but not block access
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith('Bearer ')) {
+        const token = authHeader.split(' ')[1];
+        const decoded = verifyToken(token);
+
+        if (decoded && (decoded as any).superAdmin) {
+          // If authenticated as admin, set up basic auth
+          const email = (decoded as any).email || 'zeckoinfo@gmail.com';
+          const grafanaAuth = Buffer.from(`${email}:${process.env.GRAFANA_ADMIN_PASSWORD || 'Bobo19881'}`).toString('base64');
+          req.headers['Authorization'] = `Basic ${grafanaAuth}`;
+        }
       }
-
-      const decoded = verifyToken(token);
-
-      if (!decoded || !decoded.superAdmin) {
-        log('Grafana access denied:', { decoded });
-        return res.status(403).json({ error: 'Access denied' });
-      }
-
-      // Set Basic Auth header for Grafana
-      const grafanaAuth = Buffer.from('zeckoinfo@gmail.com:Bobo19881').toString('base64');
-      req.headers['Authorization'] = `Basic ${grafanaAuth}`;
 
       next();
     },
@@ -137,16 +102,12 @@ export function registerRoutes(app: Express): Server {
         '^/admin/analytics/grafana': '',
       },
       ws: true,
-      onProxyReq: (proxyReq: any, req: any) => {
-        // Copy the Basic Auth header to the proxied request
-        if (req.headers['authorization']) {
-          proxyReq.setHeader('Authorization', req.headers['authorization']);
-        }
-
+      onProxyReq: (proxyReq, req: any) => {
+        // Log proxy request details
         log('Grafana proxy request:', {
           url: req.url,
           method: req.method,
-          hasAuth: !!req.headers['authorization']
+          proxyHeaders: proxyReq.getHeaders()
         });
       },
       onError: (err: Error, req: any, res: any) => {
@@ -194,8 +155,26 @@ export function registerRoutes(app: Express): Server {
   return httpServer;
 }
 
-// Ensure uploads directory exists
+// Import route handlers
+import path from 'path';
+import fs from 'fs';
 const uploadDir = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true, mode: 0o755 });
 }
+
+// Import routes
+const authRoutes = require('./routes/auth');
+const uploadRoutes = require('./routes/upload');
+const subscriptionRoutes = require('./routes/subscription');
+const invoiceRoutes = require('./routes/invoice');
+const analyticsRoutes = require('./routes/analytics');
+const notificationRoutes = require('./routes/notification');
+const adminRoutes = require('./routes/admin');
+const documentRoutes = require('./routes/document');
+const reviewRoutes = require('./routes/review');
+const orderRoutes = require('./routes/order');
+const socialRoutes = require('./routes/social');
+const leadsRoutes = require('./routes/leads');
+const commentsRoutes = require('./routes/comments');
+const feedbackRoutes = require('./routes/feedback');

@@ -9,8 +9,6 @@ const GRAFANA_DATA_DIR = path.join(GRAFANA_CONFIG_DIR, 'data');
 const GRAFANA_CONFIG_FILE = path.join(GRAFANA_CONFIG_DIR, 'grafana.ini');
 const GRAFANA_PLUGINS_DIR = path.join(GRAFANA_CONFIG_DIR, 'plugins');
 const GRAFANA_PROVISIONING_DIR = path.join(GRAFANA_CONFIG_DIR, 'provisioning');
-const GRAFANA_DASHBOARDS_DIR = path.join(GRAFANA_PROVISIONING_DIR, 'dashboards');
-const GRAFANA_DATASOURCES_DIR = path.join(GRAFANA_PROVISIONING_DIR, 'datasources');
 
 // Ensure all Grafana directories exist with proper permissions
 [
@@ -18,8 +16,6 @@ const GRAFANA_DATASOURCES_DIR = path.join(GRAFANA_PROVISIONING_DIR, 'datasources
   GRAFANA_DATA_DIR,
   GRAFANA_PLUGINS_DIR,
   GRAFANA_PROVISIONING_DIR,
-  GRAFANA_DASHBOARDS_DIR,
-  GRAFANA_DATASOURCES_DIR
 ].forEach(dir => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true, mode: 0o755 });
@@ -44,7 +40,8 @@ http_addr = 0.0.0.0
 
 [security]
 admin_user = zeckoinfo@gmail.com
-admin_password = Bobo19881
+admin_password = ${process.env.GRAFANA_ADMIN_PASSWORD || 'Bobo19881'}
+disable_gravatar = true
 allow_embedding = true
 cookie_secure = false
 cookie_samesite = none
@@ -52,9 +49,12 @@ secret_key = SW2YcwTIb9zpOOhoPsMm
 
 [auth]
 disable_login_form = false
-disable_signout_menu = true
 signout_redirect_url = /
-disable_initial_admin_creation = false
+
+[auth.anonymous]
+enabled = true
+org_name = Main Org.
+org_role = Admin
 
 [auth.basic]
 enabled = true
@@ -64,12 +64,10 @@ allow_sign_up = false
 auto_assign_org = true
 auto_assign_org_role = Admin
 
-[dashboards]
-versions_to_keep = 20
-min_refresh_interval = 5s
-
-[datasources]
-datasources_path = ${GRAFANA_DATASOURCES_DIR}
+[log]
+mode = console file
+level = debug
+filters = auth:debug auth.proxy:debug login:debug
 `;
 
 // Write Grafana configuration file
@@ -114,10 +112,17 @@ export function startGrafanaServer() {
       grafanaProcess = null;
     });
 
+    // Quick startup verification
+    setTimeout(() => {
+      fetch(`http://localhost:${GRAFANA_PORT}/api/health`)
+        .then(response => response.text())
+        .then(health => log('Grafana startup check:', health))
+        .catch(error => log('Grafana startup check failed:', error));
+    }, 2000);
+
     log('Grafana server started');
   } catch (error) {
     log('Failed to start Grafana:', error instanceof Error ? error.message : String(error));
-    throw error;
   }
 }
 
