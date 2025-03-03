@@ -41,18 +41,17 @@ serve_from_sub_path = true
 root_url = %(protocol)s://%(domain)s/admin/analytics/grafana/
 
 [security]
-admin_user = admin
-admin_password = ${process.env.GRAFANA_ADMIN_PASSWORD || 'admin'}
-disable_initial_admin_creation = true
+admin_user = zeckoinfo
+admin_password = Bobo19881
+disable_initial_admin_creation = false
 allow_embedding = true
 cookie_samesite = none
 cookie_secure = false
 
 [auth]
-disable_login_form = true
-disable_signout_menu = true
-oauth_auto_login = true
-disable_login_form = true
+disable_login_form = false
+disable_signout_menu = false
+oauth_auto_login = false
 
 [auth.proxy]
 enabled = true
