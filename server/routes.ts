@@ -64,8 +64,14 @@ export function registerRoutes(app: Express): Server {
         token: req.headers.authorization
       }));
 
+      // Check authentication and super admin status
+      if (!req.isAuthenticated()) {
+        log('Metrics access denied: Not authenticated');
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
       if (!req.user?.superAdmin) {
-        log('Metrics access denied:', JSON.stringify({ user: req.user }));
+        log('Metrics access denied: Not super admin');
         return res.status(403).json({ error: 'Access denied' });
       }
 
@@ -94,17 +100,18 @@ export function registerRoutes(app: Express): Server {
         token: req.headers.authorization
       }));
 
-      if (!req.user) {
+      // Authentication checks
+      if (!req.isAuthenticated()) {
         log('Grafana access denied: Not authenticated');
         return res.status(401).json({ error: 'Authentication required' });
       }
 
-      if (!req.user.superAdmin) {
+      if (!req.user?.superAdmin) {
         log('Grafana access denied: Not super admin');
         return res.status(403).json({ error: 'Super admin access required' });
       }
 
-      // Set auth headers before proxy
+      // Set auth headers for Grafana proxy auth
       req.headers['x-webauth-user'] = req.user.email;
       req.headers['x-webauth-name'] = req.user.username || req.user.email;
       req.headers['x-webauth-role'] = 'Admin';
@@ -120,7 +127,7 @@ export function registerRoutes(app: Express): Server {
       },
       ws: true,
       onProxyReq: (proxyReq: any, req: any) => {
-        // Copy authentication headers to the proxied request
+        // Ensure case-sensitive header names match Grafana's expectations
         proxyReq.setHeader('x-webauth-user', req.headers['x-webauth-user']);
         proxyReq.setHeader('x-webauth-name', req.headers['x-webauth-name']);
         proxyReq.setHeader('x-webauth-role', req.headers['x-webauth-role']);

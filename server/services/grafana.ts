@@ -34,6 +34,7 @@ serve_from_sub_path = true
 admin_user = admin
 admin_password = ${process.env.GRAFANA_ADMIN_PASSWORD || 'admin'}
 disable_initial_admin_creation = true
+allow_embedding = true
 
 [auth]
 disable_login_form = true
@@ -42,11 +43,11 @@ disable_signout_menu = true
 [auth.proxy]
 enabled = true
 header_name = x-webauth-user
-header_property = username
+header_property = email
 auto_sign_up = true
 sync_ttl = 60
 whitelist = *
-headers = Name:x-webauth-name Role:x-webauth-role Org:x-webauth-org
+headers = Name:x-webauth-name Role:x-webauth-role Organization:x-webauth-org
 
 [users]
 allow_sign_up = false
