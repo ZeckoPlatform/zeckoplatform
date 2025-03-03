@@ -160,6 +160,7 @@ export default function AdminAnalyticsDashboard() {
                     // Add Authorization header to the iframe
                     const iframe = e.target as HTMLIFrameElement;
                     if (iframe.contentWindow) {
+                      // Forward the JWT token
                       iframe.contentWindow.postMessage(
                         { 
                           type: 'authorization',
