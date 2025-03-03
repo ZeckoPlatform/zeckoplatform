@@ -6,10 +6,12 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { BarChart, LineChart, PieChart } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AnalyticsSettingsPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
 
   // Redirect if user is not a super admin
   if (!user?.superAdmin) {
@@ -30,7 +32,7 @@ export default function AnalyticsSettingsPage() {
 
       <div className="w-full h-[600px] rounded-lg overflow-hidden border mb-8">
         <iframe
-          src={`/admin/analytics/grafana/d/system-health/system-health-dashboard?orgId=1&kiosk&theme=light`}
+          src={grafanaUrl}
           className="w-full h-full"
           frameBorder="0"
           title="Grafana Dashboard"
@@ -43,19 +45,14 @@ export default function AnalyticsSettingsPage() {
           onLoad={(e) => {
             const iframe = e.target as HTMLIFrameElement;
             if (iframe.contentWindow) {
-              // Forward the JWT token
-              iframe.contentWindow.postMessage(
-                { 
-                  type: 'authorization',
-                  token: `Bearer ${user?.token}`
-                },
-                '*'
-              );
-
-              // Handle authentication errors
+              // Set up error handler
               const handleMessage = (event: MessageEvent) => {
                 if (event.data.type === 'grafana-error') {
-                  console.error('Grafana authentication error:', event.data.error);
+                  toast({
+                    title: "Grafana Error",
+                    description: "Failed to load Grafana dashboard. Please try refreshing the page.",
+                    variant: "destructive"
+                  });
                 }
               };
 

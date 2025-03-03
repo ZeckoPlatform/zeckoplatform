@@ -43,31 +43,27 @@ serve_from_sub_path = true
 http_addr = 0.0.0.0
 
 [security]
-admin_user = zeckoinfo@gmail.com
+admin_user = admin
 admin_password = ${process.env.GRAFANA_ADMIN_PASSWORD || 'admin'}
 allow_embedding = true
 cookie_secure = false
 cookie_samesite = none
 secret_key = SW2YcwTIb9zpOOhoPsMm
-disable_initial_admin_creation = false
 
 [auth]
 disable_login_form = false
-disable_signout_menu = false
-signout_redirect_url = /
+disable_signout_menu = true
 
-[auth.proxy]
+[auth.basic]
 enabled = true
-header_name = X-WEBAUTH-USER
-header_property = email
-auto_sign_up = true
-sync_ttl = 60
-whitelist = 127.0.0.1, ::1
 
 [users]
 allow_sign_up = false
 auto_assign_org = true
 auto_assign_org_role = Admin
+
+[auth.anonymous]
+enabled = false
 
 [dashboards]
 versions_to_keep = 20

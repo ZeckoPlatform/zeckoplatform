@@ -120,11 +120,8 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).json({ error: 'Access denied' });
       }
 
-      // Set proxy auth headers
-      req.headers['X-WEBAUTH-USER'] = decoded.email;
-
       // Set Basic Auth header for Grafana
-      const grafanaAuth = Buffer.from(`zeckoinfo@gmail.com:${process.env.GRAFANA_ADMIN_PASSWORD || 'admin'}`).toString('base64');
+      const grafanaAuth = Buffer.from(`admin:${process.env.GRAFANA_ADMIN_PASSWORD || 'admin'}`).toString('base64');
       req.headers['Authorization'] = `Basic ${grafanaAuth}`;
 
       next();
@@ -136,19 +133,15 @@ export function registerRoutes(app: Express): Server {
         '^/admin/analytics/grafana': '',
       },
       ws: true,
-      onProxyReq: (proxyReq, req: any) => {
+      onProxyReq: (proxyReq: any, req: any) => {
         // Preserve the auth headers
         if (req.headers['authorization']) {
           proxyReq.setHeader('Authorization', req.headers['authorization']);
         }
-        if (req.headers['x-webauth-user']) {
-          proxyReq.setHeader('X-WEBAUTH-USER', req.headers['x-webauth-user']);
-        }
 
         log('Proxying Grafana request:', {
           url: req.url,
-          hasAuth: !!req.headers['authorization'],
-          hasWebAuth: !!req.headers['x-webauth-user']
+          hasAuth: !!req.headers['authorization']
         });
       },
       onError: (err: Error, req: any, res: any) => {
