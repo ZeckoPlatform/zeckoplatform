@@ -53,10 +53,8 @@ secret_key = SW2YcwTIb9zpOOhoPsMm
 
 [auth]
 disable_login_form = false
+disable_signout_menu = false
 signout_redirect_url = /
-
-[auth.anonymous]
-enabled = false
 
 [auth.basic]
 enabled = true
@@ -96,46 +94,6 @@ export function startGrafanaServer() {
       fs.mkdirSync(GRAFANA_DATA_DIR, { recursive: true, mode: 0o755 });
       log('Reset Grafana data directory');
     }
-
-    // Copy provisioning files if they don't exist
-    const provisioningFiles = {
-      'dashboards/dashboards.yaml': `
-apiVersion: 1
-
-providers:
-  - name: 'Default'
-    orgId: 1
-    folder: ''
-    type: file
-    disableDeletion: false
-    editable: true
-    allowUiUpdates: true
-    options:
-      path: ${GRAFANA_DASHBOARDS_DIR}
-`,
-      'datasources/prometheus.yaml': `
-apiVersion: 1
-datasources:
-  - name: Prometheus
-    type: prometheus
-    access: proxy
-    url: http://localhost:9090
-    isDefault: true
-    editable: true
-    jsonData:
-      timeInterval: '15s'
-      queryTimeout: '60s'
-      httpMethod: GET
-`
-    };
-
-    Object.entries(provisioningFiles).forEach(([file, content]) => {
-      const filePath = path.join(GRAFANA_PROVISIONING_DIR, file);
-      if (!fs.existsSync(filePath)) {
-        fs.writeFileSync(filePath, content, { mode: 0o644 });
-        log(`Created provisioning file: ${file}`);
-      }
-    });
 
     grafanaProcess = spawn(grafanaServerPath, [
       '--config', GRAFANA_CONFIG_FILE,
