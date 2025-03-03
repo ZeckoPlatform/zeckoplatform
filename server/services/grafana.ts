@@ -98,6 +98,40 @@ export function startGrafanaServer() {
       log('Reset Grafana data directory');
     }
 
+    // Create initial provisioning files
+    const dashboardsYaml = path.join(GRAFANA_DASHBOARDS_DIR, 'dashboards.yaml');
+    const datasourcesYaml = path.join(GRAFANA_DATASOURCES_DIR, 'prometheus.yaml');
+
+    fs.writeFileSync(dashboardsYaml, `
+apiVersion: 1
+
+providers:
+  - name: 'Default'
+    orgId: 1
+    folder: ''
+    type: file
+    disableDeletion: false
+    editable: true
+    allowUiUpdates: true
+    options:
+      path: ${GRAFANA_DASHBOARDS_DIR}
+`, { mode: 0o644 });
+
+    fs.writeFileSync(datasourcesYaml, `
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://localhost:9090
+    isDefault: true
+    editable: true
+    jsonData:
+      timeInterval: '15s'
+      queryTimeout: '60s'
+      httpMethod: GET
+`, { mode: 0o644 });
+
     grafanaProcess = spawn(grafanaServerPath, [
       '--config', GRAFANA_CONFIG_FILE,
       '--homepath', '/nix/store/2m2kacwqa9v8wd09c1p4pp2cx99bviww-grafana-10.4.3/share/grafana',
