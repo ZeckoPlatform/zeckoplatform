@@ -9,11 +9,21 @@ const GRAFANA_DATA_DIR = path.join(GRAFANA_CONFIG_DIR, 'data');
 const GRAFANA_CONFIG_FILE = path.join(GRAFANA_CONFIG_DIR, 'grafana.ini');
 const GRAFANA_PLUGINS_DIR = path.join(GRAFANA_CONFIG_DIR, 'plugins');
 const GRAFANA_PROVISIONING_DIR = path.join(GRAFANA_CONFIG_DIR, 'provisioning');
+const GRAFANA_DASHBOARDS_DIR = path.join(GRAFANA_PROVISIONING_DIR, 'dashboards');
+const GRAFANA_DATASOURCES_DIR = path.join(GRAFANA_PROVISIONING_DIR, 'datasources');
 
-// Ensure Grafana directories exist
-[GRAFANA_CONFIG_DIR, GRAFANA_DATA_DIR, GRAFANA_PLUGINS_DIR, GRAFANA_PROVISIONING_DIR].forEach(dir => {
+// Ensure all Grafana directories exist
+[
+  GRAFANA_CONFIG_DIR,
+  GRAFANA_DATA_DIR,
+  GRAFANA_PLUGINS_DIR,
+  GRAFANA_PROVISIONING_DIR,
+  GRAFANA_DASHBOARDS_DIR,
+  GRAFANA_DATASOURCES_DIR
+].forEach(dir => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true, mode: 0o755 });
+    log(`Created Grafana directory: ${dir}`);
   }
 });
 
@@ -66,11 +76,12 @@ versions_to_keep = 20
 min_refresh_interval = 5s
 
 [datasources]
-datasources_path = ${GRAFANA_PROVISIONING_DIR}/datasources
+datasources_path = ${GRAFANA_DATASOURCES_DIR}
 `;
 
-// Write Grafana configuration
+// Write Grafana configuration file
 fs.writeFileSync(GRAFANA_CONFIG_FILE, grafanaConfig, { mode: 0o644 });
+log('Wrote Grafana configuration file');
 
 let grafanaProcess: any = null;
 
@@ -83,6 +94,46 @@ export function startGrafanaServer() {
   try {
     log('Starting Grafana server...');
     const grafanaServerPath = '/nix/store/2m2kacwqa9v8wd09c1p4pp2cx99bviww-grafana-10.4.3/bin/grafana-server';
+
+    // Copy provisioning files if they don't exist
+    const provisioningFiles = {
+      'dashboards/dashboards.yaml': `
+apiVersion: 1
+
+providers:
+  - name: 'Default'
+    orgId: 1
+    folder: ''
+    type: file
+    disableDeletion: false
+    editable: true
+    allowUiUpdates: true
+    options:
+      path: /app/grafana/provisioning/dashboards
+`,
+      'datasources/prometheus.yaml': `
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://localhost:9090
+    isDefault: true
+    editable: true
+    jsonData:
+      timeInterval: '15s'
+      queryTimeout: '60s'
+      httpMethod: GET
+`
+    };
+
+    Object.entries(provisioningFiles).forEach(([file, content]) => {
+      const filePath = path.join(GRAFANA_PROVISIONING_DIR, file);
+      if (!fs.existsSync(filePath)) {
+        fs.writeFileSync(filePath, content, { mode: 0o644 });
+        log(`Created provisioning file: ${file}`);
+      }
+    });
 
     grafanaProcess = spawn(grafanaServerPath, [
       '--config', GRAFANA_CONFIG_FILE,

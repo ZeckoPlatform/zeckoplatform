@@ -30,10 +30,10 @@ import commentsRoutes from './routes/comments';
 const verifyToken = (token: string) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-    log('Token verification succeeded:', JSON.stringify({
-      decoded,
-      isSuperAdmin: decoded?.superAdmin
-    }));
+    log('Token verification succeeded:', {
+      isSuperAdmin: decoded?.superAdmin,
+      email: decoded?.email
+    });
     return decoded;
   } catch (error) {
     log('Token verification failed:', error instanceof Error ? error.message : String(error));
@@ -68,10 +68,10 @@ export function registerRoutes(app: Express): Server {
   app.get('/api/metrics', async (req: any, res) => {
     try {
       const authHeader = req.headers.authorization;
-      log('Metrics request:', JSON.stringify({
+      log('Metrics request:', {
         authHeader: authHeader ? 'Bearer [token]' : 'none',
         headers: req.headers
-      }));
+      });
 
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'Authentication required' });
@@ -81,7 +81,7 @@ export function registerRoutes(app: Express): Server {
       const decoded = verifyToken(token);
 
       if (!decoded || !decoded.superAdmin) {
-        log('Metrics access denied:', JSON.stringify({ decoded }));
+        log('Metrics access denied:', { decoded });
         return res.status(403).json({ error: 'Access denied' });
       }
 
@@ -108,12 +108,11 @@ export function registerRoutes(app: Express): Server {
         token = req.headers.authorization.split(' ')[1];
       }
 
-      log('Grafana auth check:', JSON.stringify({
+      log('Grafana auth check:', {
         hasQueryToken: !!req.query.auth_token,
         hasHeaderToken: !!req.headers.authorization,
-        token: token ? '[REDACTED]' : 'none',
-        headers: req.headers
-      }));
+        token: token ? '[REDACTED]' : 'none'
+      });
 
       if (!token) {
         log('Grafana access denied: No token found');
@@ -123,7 +122,7 @@ export function registerRoutes(app: Express): Server {
       const decoded = verifyToken(token);
 
       if (!decoded || !decoded.superAdmin) {
-        log('Grafana access denied:', JSON.stringify({ decoded }));
+        log('Grafana access denied:', { decoded });
         return res.status(403).json({ error: 'Access denied' });
       }
 
@@ -149,10 +148,10 @@ export function registerRoutes(app: Express): Server {
         proxyReq.setHeader('X-WEBAUTH-ROLE', req.headers['X-WEBAUTH-ROLE']);
         proxyReq.setHeader('X-WEBAUTH-ORG', req.headers['X-WEBAUTH-ORG']);
 
-        log('Grafana proxy request:', JSON.stringify({
+        log('Grafana proxy request:', {
           url: req.url,
           headers: proxyReq.getHeaders()
-        }));
+        });
       },
       onError: (err: Error, req: any, res: any) => {
         log('Grafana proxy error:', err instanceof Error ? err.message : String(err));
