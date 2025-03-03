@@ -7,16 +7,9 @@ const GRAFANA_PORT = 3001;
 const GRAFANA_CONFIG_DIR = path.resolve(process.cwd(), 'grafana');
 const GRAFANA_DATA_DIR = path.join(GRAFANA_CONFIG_DIR, 'data');
 const GRAFANA_CONFIG_FILE = path.join(GRAFANA_CONFIG_DIR, 'grafana.ini');
-const GRAFANA_PLUGINS_DIR = path.join(GRAFANA_CONFIG_DIR, 'plugins');
-const GRAFANA_PROVISIONING_DIR = path.join(GRAFANA_CONFIG_DIR, 'provisioning');
 
-// Ensure all Grafana directories exist with proper permissions
-[
-  GRAFANA_CONFIG_DIR,
-  GRAFANA_DATA_DIR,
-  GRAFANA_PLUGINS_DIR,
-  GRAFANA_PROVISIONING_DIR,
-].forEach(dir => {
+// Ensure directories exist
+[GRAFANA_CONFIG_DIR, GRAFANA_DATA_DIR].forEach(dir => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true, mode: 0o755 });
     log(`Created Grafana directory: ${dir}`);
@@ -27,8 +20,6 @@ const GRAFANA_PROVISIONING_DIR = path.join(GRAFANA_CONFIG_DIR, 'provisioning');
 const grafanaConfig = `
 [paths]
 data = ${GRAFANA_DATA_DIR}
-plugins = ${GRAFANA_PLUGINS_DIR}
-provisioning = ${GRAFANA_PROVISIONING_DIR}
 
 [server]
 protocol = http
@@ -39,35 +30,23 @@ serve_from_sub_path = true
 http_addr = 0.0.0.0
 
 [security]
-admin_user = zeckoinfo@gmail.com
-admin_password = ${process.env.GRAFANA_ADMIN_PASSWORD || 'Bobo19881'}
-disable_gravatar = true
+admin_user = admin
+admin_password = admin
 allow_embedding = true
 cookie_secure = false
 cookie_samesite = none
-secret_key = SW2YcwTIb9zpOOhoPsMm
 
 [auth]
 disable_login_form = false
-signout_redirect_url = /
 
 [auth.anonymous]
 enabled = true
 org_name = Main Org.
-org_role = Admin
-
-[auth.basic]
-enabled = true
-
-[users]
-allow_sign_up = false
-auto_assign_org = true
-auto_assign_org_role = Admin
+org_role = Viewer
 
 [log]
-mode = console file
+mode = console
 level = debug
-filters = auth:debug auth.proxy:debug login:debug
 `;
 
 // Write Grafana configuration file
@@ -96,7 +75,6 @@ export function startGrafanaServer() {
     grafanaProcess = spawn(grafanaServerPath, [
       '--config', GRAFANA_CONFIG_FILE,
       '--homepath', '/nix/store/2m2kacwqa9v8wd09c1p4pp2cx99bviww-grafana-10.4.3/share/grafana',
-      '--pidfile', path.join(GRAFANA_CONFIG_DIR, 'grafana.pid'),
     ]);
 
     grafanaProcess.stdout.on('data', (data: Buffer) => {
@@ -111,14 +89,6 @@ export function startGrafanaServer() {
       log(`Grafana process exited with code ${code}`);
       grafanaProcess = null;
     });
-
-    // Quick startup verification
-    setTimeout(() => {
-      fetch(`http://localhost:${GRAFANA_PORT}/api/health`)
-        .then(response => response.text())
-        .then(health => log('Grafana startup check:', health))
-        .catch(error => log('Grafana startup check failed:', error));
-    }, 2000);
 
     log('Grafana server started');
   } catch (error) {
