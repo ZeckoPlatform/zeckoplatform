@@ -5,9 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Button } from "@/components/ui/button";
 
-// Helper function to parse Prometheus metrics
 function parseMetrics(metricsText: string) {
   const metrics = {
     httpRequests: [] as string[],
@@ -19,7 +17,7 @@ function parseMetrics(metricsText: string) {
 
   const lines = metricsText.split('\n');
   lines.forEach(line => {
-    if (line.startsWith('#')) return; // Skip comments
+    if (line.startsWith('#')) return;
 
     if (line.includes('http_request_duration_seconds')) {
       metrics.responseTimes.push(line);
@@ -51,7 +49,7 @@ export default function AdminAnalyticsDashboard() {
 
       const response = await apiRequest('GET', '/api/metrics', undefined, {
         headers: {
-          'Authorization': `Bearer ${user.token}`, // Include auth token
+          'Authorization': `Bearer ${user.token}`,
           'Accept': 'text/plain'
         }
       });
@@ -86,26 +84,12 @@ export default function AdminAnalyticsDashboard() {
 
   return (
     <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">System Analytics Dashboard</h1>
-        <Button
-          variant="outline"
-          onClick={() => {
-            // Open Grafana in new tab with auth token
-            const url = new URL('/admin/analytics/grafana', window.location.origin);
-            const win = window.open(url.toString(), '_blank');
-            if (win) {
-              win.focus();
-            }
-          }}
-        >
-          Open Grafana Dashboard
-        </Button>
-      </div>
+      <h1 className="text-3xl font-bold mb-6">System Analytics Dashboard</h1>
 
       <Tabs defaultValue="metrics" className="w-full">
         <TabsList className="mb-4">
           <TabsTrigger value="metrics">System Metrics</TabsTrigger>
+          <TabsTrigger value="grafana">Grafana Dashboard</TabsTrigger>
           <TabsTrigger value="logs">Application Logs</TabsTrigger>
           <TabsTrigger value="alerts">Performance Alerts</TabsTrigger>
           <TabsTrigger value="database">Database Metrics</TabsTrigger>
@@ -157,6 +141,19 @@ export default function AdminAnalyticsDashboard() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="grafana">
+          <Card className="p-6">
+            <h2 className="text-xl font-semibold mb-4">Grafana Dashboard</h2>
+            <div className="w-full h-[800px] rounded-lg overflow-hidden border">
+              <iframe
+                src={`/admin/analytics/grafana?auth_token=${user?.token}`}
+                className="w-full h-full"
+                frameBorder="0"
+                title="Grafana Dashboard"
+              />
+            </div>
+          </Card>
+        </TabsContent>
         <TabsContent value="logs">
           <Card className="p-6">
             <h2 className="text-xl font-semibold mb-4">Application Logs</h2>

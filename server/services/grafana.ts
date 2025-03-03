@@ -3,7 +3,7 @@ import { log } from '../vite';
 import path from 'path';
 import fs from 'fs';
 
-const GRAFANA_PORT = 3001; // Different from our main app port
+const GRAFANA_PORT = 3001;
 const GRAFANA_CONFIG_DIR = path.resolve(process.cwd(), 'grafana');
 const GRAFANA_DATA_DIR = path.join(GRAFANA_CONFIG_DIR, 'data');
 const GRAFANA_CONFIG_FILE = path.join(GRAFANA_CONFIG_DIR, 'grafana.ini');
@@ -27,18 +27,21 @@ provisioning = ${GRAFANA_PROVISIONING_DIR}
 [server]
 http_port = ${GRAFANA_PORT}
 domain = localhost
-root_url = %(protocol)s://%(domain)s/admin/analytics/grafana/
 serve_from_sub_path = true
+root_url = %(protocol)s://%(domain)s/admin/analytics/grafana/
 
 [security]
 admin_user = admin
 admin_password = ${process.env.GRAFANA_ADMIN_PASSWORD || 'admin'}
 disable_initial_admin_creation = true
 allow_embedding = true
+cookie_samesite = none
+cookie_secure = false
 
 [auth]
 disable_login_form = true
 disable_signout_menu = true
+oauth_auto_login = true
 
 [auth.proxy]
 enabled = true
@@ -48,11 +51,19 @@ auto_sign_up = true
 sync_ttl = 60
 whitelist = *
 headers = Name:x-webauth-name Role:x-webauth-role Organization:x-webauth-org
+enable_login_token = true
 
 [users]
 allow_sign_up = false
 auto_assign_org = true
 auto_assign_org_role = Admin
+
+[auth.anonymous]
+enabled = false
+
+[dashboards]
+versions_to_keep = 20
+min_refresh_interval = 5s
 
 [datasources]
 datasources_path = ${GRAFANA_PROVISIONING_DIR}/datasources

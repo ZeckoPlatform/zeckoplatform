@@ -108,7 +108,7 @@ export function registerRoutes(app: Express): Server {
   // Serve uploaded files
   app.use('/uploads', express.static(uploadDir));
 
-  // Grafana proxy middleware (protected with JWT auth)
+  // Grafana proxy middleware with JWT auth
   app.use(
     '/admin/analytics/grafana',
     (req: any, res, next) => {
@@ -126,6 +126,7 @@ export function registerRoutes(app: Express): Server {
       const decoded = verifyToken(token);
 
       if (!decoded || !decoded.superAdmin) {
+        log('Grafana access denied:', JSON.stringify({ decoded }));
         return res.status(403).json({ error: 'Access denied' });
       }
 
@@ -145,7 +146,7 @@ export function registerRoutes(app: Express): Server {
       },
       ws: true,
       onProxyReq: (proxyReq: any, req: any) => {
-        // Ensure case-sensitive header names match Grafana's expectations
+        // Copy authentication headers to the proxied request
         proxyReq.setHeader('x-webauth-user', req.headers['x-webauth-user']);
         proxyReq.setHeader('x-webauth-name', req.headers['x-webauth-name']);
         proxyReq.setHeader('x-webauth-role', req.headers['x-webauth-role']);
