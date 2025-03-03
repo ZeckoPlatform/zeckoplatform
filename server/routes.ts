@@ -76,11 +76,17 @@ export function registerRoutes(app: Express): Server {
       }
 
       const metrics = await getMetrics();
+      if (!metrics) {
+        log('No metrics data available');
+        return res.status(404).json({ error: 'No metrics available' });
+      }
+
       res.set('Content-Type', 'text/plain');
       res.send(metrics);
     } catch (error) {
-      log('Error serving metrics:', error instanceof Error ? error.message : String(error));
-      res.status(500).send('Error collecting metrics');
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log('Error serving metrics:', errorMessage);
+      res.status(500).json({ error: errorMessage });
     }
   });
 
