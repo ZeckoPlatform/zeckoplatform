@@ -52,6 +52,7 @@ cookie_secure = false
 disable_login_form = true
 disable_signout_menu = true
 oauth_auto_login = true
+disable_login_form = true
 
 [auth.proxy]
 enabled = true

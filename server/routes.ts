@@ -101,15 +101,12 @@ export function registerRoutes(app: Express): Server {
     (req: any, res, next) => {
       let token;
 
-      // Check for token in query params (for iframe) or Authorization header
-      if (req.query.auth_token) {
-        token = req.query.auth_token;
-      } else if (req.headers.authorization?.startsWith('Bearer ')) {
+      // Check for token in Authorization header
+      if (req.headers.authorization?.startsWith('Bearer ')) {
         token = req.headers.authorization.split(' ')[1];
       }
 
       log('Grafana auth check:', {
-        hasQueryToken: !!req.query.auth_token,
         hasHeaderToken: !!req.headers.authorization,
         token: token ? '[REDACTED]' : 'none'
       });

@@ -142,24 +142,37 @@ export default function AdminAnalyticsDashboard() {
         </TabsContent>
 
         <TabsContent value="grafana">
-          <Card className="p-6">
-            <h2 className="text-xl font-semibold mb-4">Grafana Dashboard</h2>
-            <div className="w-full h-[800px] rounded-lg overflow-hidden border">
-              <iframe
-                src={`/admin/analytics/grafana/d/system-health/system-health-dashboard?orgId=1`}
-                className="w-full h-full"
-                frameBorder="0"
-                title="Grafana Dashboard"
-                allow="fullscreen"
-                style={{ 
-                  border: 'none',
-                  width: '100%',
-                  height: '100%'
-                }}
-              />
-            </div>
-          </Card>
-        </TabsContent>
+            <Card className="p-6">
+              <h2 className="text-xl font-semibold mb-4">Grafana Dashboard</h2>
+              <div className="w-full h-[800px] rounded-lg overflow-hidden border">
+                <iframe
+                  src={`/admin/analytics/grafana/d/system-health/system-health-dashboard?orgId=1&kiosk`}
+                  className="w-full h-full"
+                  frameBorder="0"
+                  title="Grafana Dashboard"
+                  allow="fullscreen"
+                  style={{ 
+                    border: 'none',
+                    width: '100%',
+                    height: '100%'
+                  }}
+                  onLoad={(e) => {
+                    // Add Authorization header to the iframe
+                    const iframe = e.target as HTMLIFrameElement;
+                    if (iframe.contentWindow) {
+                      iframe.contentWindow.postMessage(
+                        { 
+                          type: 'authorization',
+                          token: `Bearer ${user?.token}`
+                        },
+                        '*'
+                      );
+                    }
+                  }}
+                />
+              </div>
+            </Card>
+          </TabsContent>
 
         <TabsContent value="logs">
           <Card className="p-6">
