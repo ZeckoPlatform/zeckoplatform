@@ -35,18 +35,20 @@ plugins = ${GRAFANA_PLUGINS_DIR}
 provisioning = ${GRAFANA_PROVISIONING_DIR}
 
 [server]
+protocol = http
 http_port = ${GRAFANA_PORT}
 domain = localhost
+root_url = %(protocol)s://%(domain)s/admin/analytics/grafana
 serve_from_sub_path = true
-root_url = %(protocol)s://%(domain)s/admin/analytics/grafana/
+http_addr = 0.0.0.0
 
 [security]
 admin_user = zeckoinfo@gmail.com
 admin_password = Bobo19881
 allow_embedding = true
 disable_initial_admin_creation = false
-cookie_samesite = none
 cookie_secure = false
+cookie_samesite = none
 secret_key = SW2YcwTIb9zpOOhoPsMm
 
 [auth]
@@ -90,6 +92,13 @@ export function startGrafanaServer() {
     log('Starting Grafana server...');
     const grafanaServerPath = '/nix/store/2m2kacwqa9v8wd09c1p4pp2cx99bviww-grafana-10.4.3/bin/grafana-server';
 
+    // Force remove Grafana's data directory to ensure clean state
+    if (fs.existsSync(GRAFANA_DATA_DIR)) {
+      fs.rmSync(GRAFANA_DATA_DIR, { recursive: true, force: true });
+      fs.mkdirSync(GRAFANA_DATA_DIR, { recursive: true, mode: 0o755 });
+      log('Reset Grafana data directory');
+    }
+
     // Copy provisioning files if they don't exist
     const provisioningFiles = {
       'dashboards/dashboards.yaml': `
@@ -104,7 +113,7 @@ providers:
     editable: true
     allowUiUpdates: true
     options:
-      path: /app/grafana/provisioning/dashboards
+      path: ${GRAFANA_DASHBOARDS_DIR}
 `,
       'datasources/prometheus.yaml': `
 apiVersion: 1
