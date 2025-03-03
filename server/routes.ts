@@ -35,8 +35,14 @@ if (!fs.existsSync(uploadDir)) {
 // Verify JWT token
 const verifyToken = (token: string) => {
   try {
-    return jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    log('Token verification succeeded:', JSON.stringify({
+      decoded,
+      isSuperAdmin: decoded?.superAdmin
+    }));
+    return decoded;
   } catch (error) {
+    log('Token verification failed:', error instanceof Error ? error.message : String(error));
     return null;
   }
 };
@@ -52,7 +58,7 @@ export function registerRoutes(app: Express): Server {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
-  // Setup authentication - this needs to come before other middleware
+  // Setup authentication
   setupAuth(app);
 
   // Add metrics middleware
@@ -68,6 +74,11 @@ export function registerRoutes(app: Express): Server {
   app.get('/api/metrics', async (req: any, res) => {
     try {
       const authHeader = req.headers.authorization;
+      log('Metrics request:', JSON.stringify({
+        authHeader: authHeader ? 'Bearer [token]' : 'none',
+        headers: req.headers
+      }));
+
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'Authentication required' });
       }
@@ -76,6 +87,7 @@ export function registerRoutes(app: Express): Server {
       const decoded = verifyToken(token);
 
       if (!decoded || !decoded.superAdmin) {
+        log('Metrics access denied:', JSON.stringify({ decoded }));
         return res.status(403).json({ error: 'Access denied' });
       }
 
@@ -101,6 +113,11 @@ export function registerRoutes(app: Express): Server {
     '/admin/analytics/grafana',
     (req: any, res, next) => {
       const authHeader = req.headers.authorization;
+      log('Grafana auth check:', JSON.stringify({
+        authHeader: authHeader ? 'Bearer [token]' : 'none',
+        headers: req.headers
+      }));
+
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'Authentication required' });
       }
@@ -164,7 +181,7 @@ export function registerRoutes(app: Express): Server {
   // Register feedback routes
   app.use(feedbackRoutes);
 
-  // Error handling middleware - should be last
+  // Error handling middleware
   app.use((err: any, req: any, res: any, next: any) => {
     log('Global error handler:', err instanceof Error ? err.message : String(err));
     if (!res.headersSent && req.path.startsWith('/api')) {

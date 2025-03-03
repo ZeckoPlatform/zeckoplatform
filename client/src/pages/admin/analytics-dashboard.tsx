@@ -37,31 +37,34 @@ function parseMetrics(metricsText: string) {
   return metrics;
 }
 
-// Format metric values for display
-function formatMetricValue(value: string): string {
-  const match = value.match(/\{.*?\}\s*([\d.]+)/);
-  if (!match) return value;
-  const num = parseFloat(match[1]);
-  if (num > 1000000) return `${(num / 1000000).toFixed(2)}M`;
-  if (num > 1000) return `${(num / 1000).toFixed(2)}K`;
-  return num.toFixed(2);
-}
-
 export default function AdminAnalyticsDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // Fetch metrics data
+  // Fetch metrics data with auth token
   const { data: metricsData, isLoading: metricsLoading } = useQuery({
     queryKey: ['/api/metrics'],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/metrics');
-      if (!response.ok) {
-        throw new Error('Failed to fetch metrics');
+      if (!user?.superAdmin) {
+        throw new Error('Super admin access required');
       }
+
+      const response = await apiRequest('GET', '/api/metrics', undefined, {
+        headers: {
+          'Authorization': `Bearer ${user.token}`, // Include auth token
+          'Accept': 'text/plain'
+        }
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch metrics');
+      }
+
       const text = await response.text();
       return parseMetrics(text);
-    }
+    },
+    enabled: !!user?.superAdmin && !!user?.token
   });
 
   if (!user?.superAdmin) {
@@ -87,7 +90,14 @@ export default function AdminAnalyticsDashboard() {
         <h1 className="text-3xl font-bold">System Analytics Dashboard</h1>
         <Button
           variant="outline"
-          onClick={() => window.open('/admin/analytics/grafana', '_blank')}
+          onClick={() => {
+            // Open Grafana in new tab with auth token
+            const url = new URL('/admin/analytics/grafana', window.location.origin);
+            const win = window.open(url.toString(), '_blank');
+            if (win) {
+              win.focus();
+            }
+          }}
         >
           Open Grafana Dashboard
         </Button>
@@ -244,4 +254,13 @@ export default function AdminAnalyticsDashboard() {
       </Tabs>
     </div>
   );
+}
+
+function formatMetricValue(value: string): string {
+  const match = value.match(/\{.*?\}\s*([\d.]+)/);
+  if (!match) return value;
+  const num = parseFloat(match[1]);
+  if (num > 1000000) return `${(num / 1000000).toFixed(2)}M`;
+  if (num > 1000) return `${(num / 1000).toFixed(2)}K`;
+  return num.toFixed(2);
 }
