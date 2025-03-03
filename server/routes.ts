@@ -57,7 +57,6 @@ export function registerRoutes(app: Express): Server {
   // Metrics endpoint (protected for admin access only)
   app.get('/api/metrics', async (req: any, res) => {
     try {
-      // Only allow access from admin users
       if (!req.user?.superAdmin) {
         log('Metrics access denied:', { user: req.user });
         return res.status(403).json({ error: 'Access denied' });
@@ -78,6 +77,11 @@ export function registerRoutes(app: Express): Server {
   app.use(
     '/admin/analytics/grafana',
     (req: any, res, next) => {
+      // Set these headers on the request object before proxying
+      req.headers['X-WEBAUTH-USER'] = req.user?.email;
+      req.headers['X-WEBAUTH-NAME'] = req.user?.username || req.user?.email;
+      req.headers['X-WEBAUTH-ROLE'] = 'Admin';
+
       // Debug log for authentication
       log('Grafana auth check:', {
         user: req.user,
@@ -94,11 +98,6 @@ export function registerRoutes(app: Express): Server {
         log('Grafana access denied: Not super admin');
         return res.status(403).json({ error: 'Super admin access required' });
       }
-
-      // Add auth headers for Grafana
-      req.headers['X-WEBAUTH-USER'] = req.user.email;
-      req.headers['X-WEBAUTH-NAME'] = req.user.username || req.user.email;
-      req.headers['X-WEBAUTH-ROLE'] = 'Admin';
 
       next();
     },

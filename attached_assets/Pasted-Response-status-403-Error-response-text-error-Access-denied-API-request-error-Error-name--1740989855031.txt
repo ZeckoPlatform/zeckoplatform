@@ -1,0 +1,76 @@
+Response status: 403
+Error response text: {"error":"Access denied"}
+API request error: 
+Error {name: "ForbiddenError"}
+
+API Request - GET /api/metrics
+Request payload: undefined
+Request options: 
+Object {method: "GET", headers: {…}, bodyLength: 0}
+Response status: 403
+Error response text: {"error":"Access denied"}
+API request error: 
+Error {name: "ForbiddenError"}
+
+API Request - GET /api/metrics
+Request payload: undefined
+Request options: 
+Object {method: "GET", headers: {…}, bodyLength: 0}
+Response status: 403
+Error response text: {"error":"Access denied"}
+API request error: 
+Error {name: "ForbiddenError"}
+
+Query request - /api/notifications
+Query response status: 200
+API Request - GET /api/metrics
+Request payload: undefined
+Request options: 
+Object {method: "GET", headers: {…}, bodyLength: 0}
+Response status: 403
+Error response text: {"error":"Access denied"}
+API request error: 
+Error {name: "ForbiddenError"}
+
+Query request - /api/notifications
+Query response status: 200
+API Request - GET /api/metrics
+Request payload: undefined
+Request options: 
+Object {method: "GET", headers: {…}, bodyLength: 0}
+Response status: 403
+Error response text: {"error":"Access denied"}
+API request error: 
+Error {name: "ForbiddenError"}
+name: "ForbiddenError"
+column: 30
+line: 118
+message: "{"error":"Access denied"}"
+sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/lib/queryClient.ts"
+stack: "@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/lib/queryClient.ts:118:30"
+[[Prototype]]: Object
+
+API Request - GET /api/metrics
+Request payload: undefined
+Request options: 
+Object {method: "GET", headers: {…}, bodyLength: 0}
+Response status: 403
+Error response text: {"error":"Access denied"}
+API request error: 
+Error {name: "ForbiddenError"}
+
+API Request - GET /api/metrics
+Request payload: undefined
+Request options: 
+Object {method: "GET", headers: {…}, bodyLength: 0}
+Response status: 403
+Error response text: {"error":"Access denied"}
+API request error: 
+Error {name: "ForbiddenError"}
+name: "ForbiddenError"
+column: 30
+line: 118
+message: "{"error":"Access denied"}"
+sourceURL: "https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/lib/queryClient.ts"
+stack: "@https://e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev/src/lib/queryClient.ts:118:30"
+[[Prototype]]: Object

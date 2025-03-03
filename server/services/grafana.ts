@@ -45,7 +45,7 @@ header_name = X-WEBAUTH-USER
 header_property = username
 auto_sign_up = true
 sync_ttl = 60
-whitelist = 127.0.0.1
+whitelist = *
 
 [users]
 allow_sign_up = false
@@ -53,7 +53,7 @@ auto_assign_org = true
 auto_assign_org_role = Admin
 
 [datasources]
-datasources_path = ${GRAFANA_CONFIG_DIR}/datasources
+datasources_path = ${GRAFANA_PROVISIONING_DIR}/datasources
 `;
 
 // Write Grafana configuration
