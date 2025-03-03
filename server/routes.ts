@@ -54,13 +54,14 @@ export function registerRoutes(app: Express): Server {
     next();
   });
 
-  // Metrics endpoint (protected for admin access only)
+  // Metrics endpoint with detailed logging
   app.get('/api/metrics', async (req: any, res) => {
     try {
       log('Metrics request:', JSON.stringify({
+        headers: req.headers,
         user: req.user,
         isSuperAdmin: req.user?.superAdmin,
-        headers: req.headers
+        token: req.headers.authorization
       }));
 
       if (!req.user?.superAdmin) {
@@ -86,14 +87,11 @@ export function registerRoutes(app: Express): Server {
     (req: any, res, next) => {
       // Debug log for authentication
       log('Grafana auth check:', JSON.stringify({
+        headers: req.headers,
         user: req.user,
         session: req.session,
         isSuperAdmin: req.user?.superAdmin,
-        headers: {
-          'X-WEBAUTH-USER': req.user?.email || '',
-          'X-WEBAUTH-NAME': req.user?.username || req.user?.email || '',
-          'X-WEBAUTH-ROLE': req.user?.superAdmin ? 'Admin' : ''
-        }
+        token: req.headers.authorization
       }));
 
       if (!req.user) {
@@ -107,10 +105,10 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Set auth headers before proxy
-      req.headers['X-WEBAUTH-USER'] = req.user.email;
-      req.headers['X-WEBAUTH-NAME'] = req.user.username || req.user.email;
-      req.headers['X-WEBAUTH-ROLE'] = 'Admin';
-      req.headers['X-WEBAUTH-ORG'] = 'main';
+      req.headers['x-webauth-user'] = req.user.email;
+      req.headers['x-webauth-name'] = req.user.username || req.user.email;
+      req.headers['x-webauth-role'] = 'Admin';
+      req.headers['x-webauth-org'] = 'main';
 
       next();
     },
@@ -123,10 +121,10 @@ export function registerRoutes(app: Express): Server {
       ws: true,
       onProxyReq: (proxyReq: any, req: any) => {
         // Copy authentication headers to the proxied request
-        proxyReq.setHeader('X-WEBAUTH-USER', req.headers['x-webauth-user']);
-        proxyReq.setHeader('X-WEBAUTH-NAME', req.headers['x-webauth-name']);
-        proxyReq.setHeader('X-WEBAUTH-ROLE', req.headers['x-webauth-role']);
-        proxyReq.setHeader('X-WEBAUTH-ORG', req.headers['x-webauth-org']);
+        proxyReq.setHeader('x-webauth-user', req.headers['x-webauth-user']);
+        proxyReq.setHeader('x-webauth-name', req.headers['x-webauth-name']);
+        proxyReq.setHeader('x-webauth-role', req.headers['x-webauth-role']);
+        proxyReq.setHeader('x-webauth-org', req.headers['x-webauth-org']);
 
         log('Grafana proxy request:', JSON.stringify({
           originalUrl: req.originalUrl,
