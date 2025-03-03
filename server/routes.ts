@@ -112,17 +112,25 @@ export function registerRoutes(app: Express): Server {
   app.use(
     '/admin/analytics/grafana',
     (req: any, res, next) => {
-      const authHeader = req.headers.authorization;
+      let token;
+      // Check for token in query params (for iframe) or Authorization header
+      if (req.query.auth_token) {
+        token = req.query.auth_token;
+      } else if (req.headers.authorization?.startsWith('Bearer ')) {
+        token = req.headers.authorization.split(' ')[1];
+      }
+
       log('Grafana auth check:', JSON.stringify({
-        authHeader: authHeader ? 'Bearer [token]' : 'none',
+        hasQueryToken: !!req.query.auth_token,
+        hasHeaderToken: !!req.headers.authorization,
         headers: req.headers
       }));
 
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      if (!token) {
+        log('Grafana access denied: No token found');
         return res.status(401).json({ error: 'Authentication required' });
       }
 
-      const token = authHeader.split(' ')[1];
       const decoded = verifyToken(token);
 
       if (!decoded || !decoded.superAdmin) {
