@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { initializeMonitoring, metricsMiddleware, getMetrics, queryMetrics } from './services/monitoring';
+import { initializeMonitoring, metricsMiddleware, getMetrics, getMetricsAsJSON } from './services/monitoring';
 import jwt from 'jsonwebtoken';
 import { log } from "./vite";
 import path from 'path';
@@ -41,34 +41,7 @@ export function registerRoutes(app: Express): Server {
     // Add metrics middleware
     app.use(metricsMiddleware);
 
-    // Expose Prometheus query API endpoint (protected)
-    app.get('/api/v1/query', async (req, res) => {
-      const authHeader = req.headers.authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ error: 'Authentication required' });
-      }
-
-      const token = authHeader.split(' ')[1];
-      const decoded = verifyToken(token);
-
-      if (!decoded || !(decoded as any).superAdmin) {
-        return res.status(403).json({ error: 'Access denied' });
-      }
-
-      const query = req.query.query as string;
-      if (!query) {
-        return res.status(400).json({ error: 'Query parameter is required' });
-      }
-
-      try {
-        const result = await queryMetrics(query);
-        res.json(result);
-      } catch (error) {
-        res.status(500).json({ error: 'Failed to query metrics' });
-      }
-    });
-
-    // Expose raw metrics endpoint (protected)
+    // Expose metrics endpoint (protected)
     app.get('/api/metrics', async (req, res) => {
       const authHeader = req.headers.authorization;
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -87,6 +60,30 @@ export function registerRoutes(app: Express): Server {
         res.set('Content-Type', 'text/plain');
         res.send(metrics);
       } catch (error) {
+        log('Error fetching metrics:', error instanceof Error ? error.message : String(error));
+        res.status(500).json({ error: 'Failed to collect metrics' });
+      }
+    });
+
+    // Expose metrics in JSON format (protected)
+    app.get('/api/metrics/json', async (req, res) => {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const token = authHeader.split(' ')[1];
+      const decoded = verifyToken(token);
+
+      if (!decoded || !(decoded as any).superAdmin) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      try {
+        const metrics = await getMetricsAsJSON();
+        res.json(metrics);
+      } catch (error) {
+        log('Error fetching metrics JSON:', error instanceof Error ? error.message : String(error));
         res.status(500).json({ error: 'Failed to collect metrics' });
       }
     });

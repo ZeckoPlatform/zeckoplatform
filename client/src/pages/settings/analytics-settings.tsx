@@ -36,7 +36,15 @@ export default function AnalyticsSettingsPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [metricsError, setMetricsError] = useState(false);
+  const [metricsData, setMetricsData] = useState<{
+    system: SystemMetrics[];
+    api: APIMetrics[];
+    database: DatabaseMetrics[];
+  }>({
+    system: [],
+    api: [],
+    database: []
+  });
 
   // Redirect if user is not a super admin
   if (!user?.superAdmin) {
@@ -45,12 +53,13 @@ export default function AnalyticsSettingsPage() {
   }
 
   // Fetch metrics with auto-refresh
-  const { data: metrics, error } = useQuery({
+  const { error } = useQuery({
     queryKey: ['/api/metrics'],
     queryFn: async () => {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No auth token');
 
+      console.log('Fetching metrics...');
       const response = await fetch('/api/metrics', {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -58,24 +67,41 @@ export default function AnalyticsSettingsPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch metrics');
+        throw new Error(`Failed to fetch metrics: ${response.statusText}`);
       }
 
-      return response.text();
+      const text = await response.text();
+      console.log('Raw metrics:', text);
+      return text;
     },
-    refetchInterval: 5000, // Refresh every 5 seconds
-  });
-
-  useEffect(() => {
-    if (error) {
-      setMetricsError(true);
+    refetchInterval: 5000,
+    onSuccess: (metricsText) => {
+      try {
+        const parsedData = parseMetrics(metricsText);
+        console.log('Parsed metrics:', parsedData);
+        setMetricsData(curr => ({
+          system: [...(curr.system || []).slice(-10), ...parsedData.system],
+          api: [...(curr.api || []).slice(-10), ...parsedData.api],
+          database: [...(curr.database || []).slice(-10), ...parsedData.database]
+        }));
+      } catch (err) {
+        console.error('Error parsing metrics:', err);
+        toast({
+          title: "Metrics Parse Error",
+          description: "Failed to parse metrics data. Check console for details.",
+          variant: "destructive"
+        });
+      }
+    },
+    onError: (err) => {
+      console.error('Metrics fetch error:', err);
       toast({
         title: "Metrics Error",
         description: "Failed to load system metrics. Please try again later.",
         variant: "destructive"
       });
     }
-  }, [error, toast]);
+  });
 
   // Parse Prometheus metrics into structured data
   const parseMetrics = (metricsText: string) => {
@@ -85,65 +111,74 @@ export default function AnalyticsSettingsPage() {
       database: [] as DatabaseMetrics[]
     };
 
-    metricsText.split('\n').forEach(line => {
-      if (line.startsWith('#')) return;
+    const lines = metricsText.split('\n');
+    console.log('Processing metrics lines:', lines.length);
 
-      // Parse system metrics
-      if (line.includes('process_cpu_seconds_total')) {
-        const match = line.match(/\{.*?\} (\d+)/);
-        if (match) {
-          data.system.push({
-            cpu_usage: parseFloat(match[1]),
-            memory_used: 0,
-            memory_total: 0,
-            timestamp: Date.now()
-          });
-        }
-      }
+    lines.forEach(line => {
+      if (line.startsWith('#') || !line.trim()) return;
 
-      // Parse memory metrics
-      if (line.includes('process_resident_memory_bytes')) {
-        const match = line.match(/\{.*?\} (\d+)/);
-        if (match) {
-          const lastSystemMetric = data.system[data.system.length - 1];
-          if (lastSystemMetric) {
-            lastSystemMetric.memory_used = parseInt(match[1]) / (1024 * 1024); // Convert to MB
+      try {
+        // Parse system metrics
+        if (line.includes('process_cpu_usage_percent')) {
+          const match = line.match(/\{.*?\} ([\d.]+)/);
+          if (match) {
+            data.system.push({
+              cpu_usage: parseFloat(match[1]),
+              memory_used: 0,
+              memory_total: 0,
+              timestamp: Date.now()
+            });
           }
         }
-      }
 
-      // Parse API metrics
-      if (line.includes('http_requests_total')) {
-        const match = line.match(/status_code="(\d+)"\} (\d+)/);
-        if (match) {
-          const statusCode = parseInt(match[1]);
-          const count = parseInt(match[2]);
-          data.api.push({
-            request_count: count,
-            error_count: statusCode >= 400 ? count : 0,
-            avg_response_time: 0,
-            timestamp: Date.now()
-          });
+        // Parse memory metrics
+        if (line.includes('process_memory_usage_bytes')) {
+          const match = line.match(/type="(\w+)"\} ([\d.]+)/);
+          if (match && match[1] === 'heapUsed') {
+            const lastSystemMetric = data.system[data.system.length - 1];
+            if (lastSystemMetric) {
+              lastSystemMetric.memory_used = parseInt(match[2]) / (1024 * 1024); // Convert to MB
+            }
+          }
         }
-      }
 
-      // Parse Database metrics
-      if (line.includes('database_query_duration_seconds')) {
-        const match = line.match(/\{.*?\} (\d+)/);
-        if (match) {
-          data.database.push({
-            active_connections: 0,
-            query_duration: parseFloat(match[1]),
-            timestamp: Date.now()
-          });
+        // Parse API metrics
+        if (line.includes('http_requests_total')) {
+          const match = line.match(/status_code="(\d+)"\} ([\d.]+)/);
+          if (match) {
+            const statusCode = parseInt(match[1]);
+            const count = parseInt(match[2]);
+            data.api.push({
+              request_count: count,
+              error_count: statusCode >= 400 ? count : 0,
+              avg_response_time: 0,
+              timestamp: Date.now()
+            });
+          }
         }
+
+        // Parse Database metrics
+        if (line.includes('database_query_duration_seconds')) {
+          const match = line.match(/\{.*?\} ([\d.]+)/);
+          if (match) {
+            data.database.push({
+              active_connections: 0,
+              query_duration: parseFloat(match[1]),
+              timestamp: Date.now()
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Error parsing metric line:', line, err);
       }
     });
 
     return data;
   };
 
-  const metricsData = metrics ? parseMetrics(metrics) : null;
+  const formatTime = (timestamp: number) => {
+    return new Date(timestamp).toLocaleTimeString();
+  };
 
   return (
     <div className="container mx-auto py-8 space-y-8">
@@ -161,18 +196,21 @@ export default function AnalyticsSettingsPage() {
         </CardHeader>
         <CardContent>
           <div className="h-[300px]">
-            {metricsError ? (
+            {error ? (
               <div className="flex items-center justify-center h-full">
                 <p className="text-destructive">Failed to load metrics.</p>
               </div>
-            ) : metricsData ? (
+            ) : metricsData.system.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={metricsData.system}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="timestamp" type="number" domain={['auto', 'auto']} />
+                  <XAxis 
+                    dataKey="timestamp" 
+                    tickFormatter={formatTime}
+                  />
                   <YAxis yAxisId="left" />
                   <YAxis yAxisId="right" orientation="right" />
-                  <Tooltip />
+                  <Tooltip labelFormatter={formatTime} />
                   <Legend />
                   <Line
                     yAxisId="left"
@@ -206,13 +244,16 @@ export default function AnalyticsSettingsPage() {
         </CardHeader>
         <CardContent>
           <div className="h-[300px]">
-            {metricsData ? (
+            {metricsData.api.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={metricsData.api}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="timestamp" />
+                  <XAxis 
+                    dataKey="timestamp"
+                    tickFormatter={formatTime}
+                  />
                   <YAxis />
-                  <Tooltip />
+                  <Tooltip labelFormatter={formatTime} />
                   <Legend />
                   <Bar dataKey="request_count" name="Total Requests" fill="#8884d8" />
                   <Bar dataKey="error_count" name="Error Count" fill="#ff8042" />
@@ -234,13 +275,16 @@ export default function AnalyticsSettingsPage() {
         </CardHeader>
         <CardContent>
           <div className="h-[300px]">
-            {metricsData ? (
+            {metricsData.database.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={metricsData.database}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="timestamp" />
+                  <XAxis 
+                    dataKey="timestamp"
+                    tickFormatter={formatTime}
+                  />
                   <YAxis />
-                  <Tooltip />
+                  <Tooltip labelFormatter={formatTime} />
                   <Legend />
                   <Line
                     type="monotone"
