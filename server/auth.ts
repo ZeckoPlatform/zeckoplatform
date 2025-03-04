@@ -18,7 +18,9 @@ const registerSchema = z.object({
 });
 
 export function hashPassword(password: string): string {
-  return createHash('sha256').update(password).digest('hex');
+  const hashed = createHash('sha256').update(password).digest('hex');
+  log('Password hashing:', { originalLength: password.length, hashedLength: hashed.length });
+  return hashed;
 }
 
 export function setupAuth(app: Express) {
@@ -31,22 +33,33 @@ export function setupAuth(app: Express) {
   app.post("/api/login", async (req, res) => {
     try {
       const { email, password } = req.body;
-      log('Login attempt:', { email });
+      log('Login attempt:', { email, hasPassword: !!password });
 
       if (!email || !password) {
+        log('Missing credentials:', { email: !!email, password: !!password });
         return res.status(400).json({
           success: false,
           message: "Email and password are required"
         });
       }
 
+      // Find user
       const [user] = await db
         .select()
         .from(users)
         .where(eq(users.email, email))
         .limit(1);
 
-      log('User lookup result:', { found: !!user, email });
+      log('User lookup result:', { 
+        found: !!user, 
+        email,
+        userDetails: user ? {
+          id: user.id,
+          email: user.email,
+          userType: user.userType,
+          hasPassword: !!user.password
+        } : null
+      });
 
       if (!user) {
         return res.status(401).json({
@@ -55,9 +68,16 @@ export function setupAuth(app: Express) {
         });
       }
 
+      // Verify password
       const hashedPassword = hashPassword(password);
       const passwordMatch = hashedPassword === user.password;
-      log('Password verification:', { email, matches: passwordMatch });
+
+      log('Password verification:', { 
+        email, 
+        matches: passwordMatch,
+        providedHashLength: hashedPassword.length,
+        storedHashLength: user.password.length
+      });
 
       if (!passwordMatch) {
         return res.status(401).json({
@@ -66,6 +86,7 @@ export function setupAuth(app: Express) {
         });
       }
 
+      // Generate token
       const token = jwt.sign(
         {
           id: user.id,
@@ -102,7 +123,9 @@ export function setupAuth(app: Express) {
   app.post("/api/register", async (req, res) => {
     try {
       const validatedData = registerSchema.parse(req.body);
+      log('Registration attempt:', { email: validatedData.email });
 
+      // Check if user already exists
       const [existingUser] = await db
         .select()
         .from(users)
@@ -116,11 +139,19 @@ export function setupAuth(app: Express) {
         });
       }
 
+      const hashedPassword = hashPassword(validatedData.password);
+      log('Creating new user:', { 
+        email: validatedData.email,
+        userType: validatedData.userType || 'free',
+        hashedPasswordLength: hashedPassword.length
+      });
+
+      // Create new user
       const [user] = await db
         .insert(users)
         .values({
           email: validatedData.email,
-          password: hashPassword(validatedData.password),
+          password: hashedPassword,
           userType: validatedData.userType || 'free',
           superAdmin: false
         })
@@ -136,6 +167,8 @@ export function setupAuth(app: Express) {
         JWT_SECRET,
         { expiresIn: '24h' }
       );
+
+      log('Registration successful:', { email: user.email });
 
       return res.status(201).json({
         success: true,
