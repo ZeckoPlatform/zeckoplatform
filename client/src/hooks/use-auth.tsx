@@ -10,6 +10,12 @@ type LoginData = {
   password: string;
 };
 
+type RegisterData = {
+  email: string;
+  password: string;
+  userType?: string;
+};
+
 type ApiResponse<T> = {
   success: boolean;
   message?: string;
@@ -65,7 +71,7 @@ function useAuthState() {
 
       console.log('Login attempt:', {
         email: credentials.email,
-        password: credentials.password // Temporarily log for debugging
+        password: credentials.password // Temporarily log actual password for debugging
       });
 
       const res = await fetch("/api/login", {
@@ -74,10 +80,7 @@ function useAuthState() {
           "Content-Type": "application/json",
           "Accept": "application/json"
         },
-        body: JSON.stringify({
-          email: credentials.email,
-          password: credentials.password
-        }),
+        body: JSON.stringify(credentials),
       });
 
       const text = await res.text();
@@ -114,6 +117,60 @@ function useAuthState() {
     },
   });
 
+  const registerMutation = useMutation({
+    mutationFn: async (data: RegisterData) => {
+      if (!data.email || !data.password) {
+        throw new Error("Email and password are required");
+      }
+
+      console.log('Registration attempt:', {
+        email: data.email,
+        hasPassword: !!data.password
+      });
+
+      const res = await fetch("/api/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify(data),
+      });
+
+      const text = await res.text();
+      console.log('Raw register response:', text);
+
+      const responseData = JSON.parse(text) as ApiResponse<SelectUser>;
+      console.log('Parsed register response:', responseData);
+
+      if (!responseData.success) {
+        throw new Error(responseData.message || "Registration failed");
+      }
+
+      if (!responseData.token || !responseData.user) {
+        throw new Error("Invalid server response");
+      }
+
+      localStorage.setItem("token", responseData.token);
+      return responseData.user;
+    },
+    onSuccess: (user) => {
+      queryClient.setQueryData(["/api/user"], user);
+      toast({
+        title: "Welcome!",
+        description: "Your account has been created successfully.",
+      });
+      setLocation("/");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Registration failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const logoutMutation = useMutation({
     mutationFn: async () => {
       localStorage.removeItem("token");
@@ -133,7 +190,8 @@ function useAuthState() {
     isLoading,
     error,
     loginMutation,
-    logoutMutation
+    logoutMutation,
+    registerMutation
   };
 }
 
