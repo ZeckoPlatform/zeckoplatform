@@ -6,7 +6,6 @@ import { setupAuth } from "./auth";
 import { logInfo, logError } from "./services/logging";
 import { initializeMonitoring } from "./services/monitoring";
 import { checkPerformanceMetrics } from "./services/admin-notifications";
-import { startGrafanaServer } from "./services/grafana";
 
 const app = express();
 const isProd = process.env.NODE_ENV === 'production';
@@ -61,9 +60,10 @@ try {
 const httpServer = createServer(app);
 log('Created HTTP server instance');
 
-// Initialize monitoring first before registering routes
+// Initialize monitoring
 try {
   initializeMonitoring();
+  logInfo('Monitoring system initialized successfully');
 } catch (error) {
   logError('Failed to initialize monitoring:', {
     error: error instanceof Error ? error.message : String(error)
@@ -71,24 +71,6 @@ try {
   // Continue server startup even if monitoring fails
 }
 
-// Start Grafana server
-logInfo('Starting Grafana server...');
-try {
-  // Use async/await with top-level await since this is critical initialization
-  startGrafanaServer()
-    .then(() => {
-      logInfo('Grafana server started successfully');
-    })
-    .catch((error) => {
-      logError('Failed to start Grafana server:', {
-        error: error instanceof Error ? error.message : String(error)
-      });
-    });
-} catch (error) {
-  logError('Failed to initialize Grafana server:', {
-    error: error instanceof Error ? error.message : String(error)
-  });
-}
 
 // Setup frontend serving
 if (isProd) {
@@ -103,7 +85,7 @@ if (isProd) {
     }
   });
 } else {
-  // Handle development mode with Vite after API routes
+  // Handle development mode with Vite
   logInfo('Setting up Vite development server');
   (async () => {
     try {
