@@ -60,8 +60,10 @@ export function generateToken(user: SelectUser) {
 export function setupAuth(app: Express) {
   app.post("/api/login", async (req, res) => {
     try {
+      log('Login attempt received:', { email: req.body.email });
+
       const validatedData = loginSchema.parse(req.body);
-      log(`Login attempt for email: ${validatedData.email}`);
+      log(`Validated login data for email: ${validatedData.email}`);
 
       const [user] = await db
         .select()
@@ -70,14 +72,18 @@ export function setupAuth(app: Express) {
         .limit(1);
 
       if (!user) {
+        log('Login failed: User not found');
         return res.status(401).json({
           success: false,
           message: "Invalid credentials"
         });
       }
 
+      log('User found, comparing passwords');
       const isValidPassword = await comparePasswords(validatedData.password, user.password);
+
       if (!isValidPassword) {
+        log('Login failed: Invalid password');
         return res.status(401).json({
           success: false,
           message: "Invalid credentials"
@@ -97,6 +103,7 @@ export function setupAuth(app: Express) {
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
+        log('Login validation error:', error.errors);
         return res.status(400).json({
           success: false,
           message: "Validation error",
@@ -107,67 +114,6 @@ export function setupAuth(app: Express) {
       res.status(500).json({
         success: false,
         message: "Internal server error during login"
-      });
-    }
-  });
-
-  app.post("/api/register", async (req, res) => {
-    try {
-      const result = insertUserSchema.safeParse(req.body);
-
-      if (!result.success) {
-        return res.status(400).json({
-          success: false,
-          message: fromZodError(result.error).toString()
-        });
-      }
-
-      const [existingUser] = await db
-        .select()
-        .from(users)
-        .where(eq(users.email, result.data.email))
-        .limit(1);
-
-      if (existingUser) {
-        return res.status(400).json({
-          success: false,
-          message: "Email already registered"
-        });
-      }
-
-      const hashedPassword = await hashPassword(result.data.password);
-
-      // Correctly type the user data for insertion
-      const userData = {
-        ...result.data,
-        password: hashedPassword,
-        userType: result.data.userType || "free",
-        active: true,
-        subscriptionActive: false,
-        subscriptionTier: "none" as const,
-        stripeAccountStatus: "pending" as const,
-        verificationStatus: "pending" as const
-      };
-
-      const [user] = await db
-        .insert(users)
-        .values(userData)
-        .returning();
-
-      const token = generateToken(user);
-      log(`User registered successfully: ID ${user.id}`);
-
-      res.status(201).json({
-        success: true,
-        user,
-        token
-      });
-    } catch (error) {
-      log(`Registration error:`, error instanceof Error ? error.message : String(error));
-      res.status(500).json({
-        success: false,
-        message: "Registration failed",
-        error: error instanceof Error ? error.message : String(error)
       });
     }
   });
