@@ -16,6 +16,13 @@ type RegisterData = {
   userType?: string;
 };
 
+type ApiResponse<T> = {
+  success: boolean;
+  message?: string;
+  token?: string;
+  user?: T;
+};
+
 export const AuthContext = createContext<ReturnType<typeof useAuthState> | null>(null);
 
 function useAuthState() {
@@ -32,6 +39,7 @@ function useAuthState() {
         const res = await fetch("/api/user", {
           headers: {
             Authorization: `Bearer ${token}`,
+            Accept: 'application/json'
           },
         });
 
@@ -43,7 +51,8 @@ function useAuthState() {
           throw new Error("Failed to fetch user data");
         }
 
-        return await res.json();
+        const data: ApiResponse<SelectUser> = await res.json();
+        return data.success ? data.user || null : null;
       } catch (error) {
         console.error('User fetch error:', error);
         return null;
@@ -56,18 +65,27 @@ function useAuthState() {
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
+      console.log('Login attempt with:', { email: credentials.email });
+
       try {
         const res = await fetch("/api/login", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "Accept": "application/json"
           },
           body: JSON.stringify(credentials),
         });
 
-        const data = await res.json();
+        const data: ApiResponse<SelectUser> = await res.json();
+        console.log('Login response:', { status: res.status, data });
+
         if (!res.ok || !data.success) {
           throw new Error(data.message || "Login failed");
+        }
+
+        if (!data.token || !data.user) {
+          throw new Error("Invalid server response");
         }
 
         localStorage.setItem("token", data.token);
@@ -106,13 +124,18 @@ function useAuthState() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "Accept": "application/json"
           },
           body: JSON.stringify(data),
         });
 
-        const responseData = await res.json();
-        if (!res.ok) {
+        const responseData: ApiResponse<SelectUser> = await res.json();
+        if (!res.ok || !responseData.success) {
           throw new Error(responseData.message || "Registration failed");
+        }
+
+        if (!responseData.token || !responseData.user) {
+          throw new Error("Invalid server response");
         }
 
         localStorage.setItem("token", responseData.token);
@@ -147,6 +170,7 @@ function useAuthState() {
           await fetch("/api/logout", {
             method: "POST",
             headers: {
+              "Content-Type": "application/json",
               Authorization: `Bearer ${token}`,
             },
           });

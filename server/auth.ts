@@ -25,7 +25,15 @@ export function setupAuth(app: Express) {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
+  // Ensure all API responses have proper content type
+  app.use('/api', (req: Request, res: Response, next: NextFunction) => {
+    res.contentType('application/json');
+    next();
+  });
+
   app.post("/api/login", async (req, res) => {
+    console.log('Login request received:', { email: req.body.email });
+
     try {
       const { email, password } = req.body;
 
@@ -42,6 +50,8 @@ export function setupAuth(app: Express) {
         .where(eq(users.email, email))
         .limit(1);
 
+      console.log('User lookup result:', { found: !!user, email });
+
       if (!user) {
         return res.status(401).json({
           success: false,
@@ -50,7 +60,11 @@ export function setupAuth(app: Express) {
       }
 
       const hashedPassword = hashPassword(password);
-      if (hashedPassword !== user.password) {
+      const passwordMatch = hashedPassword === user.password;
+
+      console.log('Password verification:', { email, matches: passwordMatch });
+
+      if (!passwordMatch) {
         return res.status(401).json({
           success: false,
           message: "Invalid credentials"
@@ -67,6 +81,8 @@ export function setupAuth(app: Express) {
         JWT_SECRET,
         { expiresIn: '24h' }
       );
+
+      console.log('Login successful:', { email });
 
       return res.status(200).json({
         success: true,
@@ -92,7 +108,6 @@ export function setupAuth(app: Express) {
     try {
       const validatedData = registerSchema.parse(req.body);
 
-      // Check if user already exists
       const [existingUser] = await db
         .select()
         .from(users)
@@ -106,7 +121,6 @@ export function setupAuth(app: Express) {
         });
       }
 
-      // Create new user
       const [user] = await db
         .insert(users)
         .values({
@@ -161,7 +175,10 @@ export function setupAuth(app: Express) {
   });
 
   app.get("/api/user", authenticateToken, (req, res) => {
-    return res.json(req.user);
+    return res.json({
+      success: true,
+      user: req.user
+    });
   });
 }
 
