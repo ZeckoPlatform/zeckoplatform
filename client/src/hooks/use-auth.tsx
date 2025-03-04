@@ -32,21 +32,26 @@ function useAuthState() {
       const token = localStorage.getItem("token");
       if (!token) return null;
 
-      const res = await fetch("/api/user", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      try {
+        const res = await fetch("/api/user", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
-      if (!res.ok) {
-        if (res.status === 401) {
-          localStorage.removeItem("token");
-          return null;
+        if (!res.ok) {
+          if (res.status === 401) {
+            localStorage.removeItem("token");
+            return null;
+          }
+          throw new Error("Failed to fetch user data");
         }
-        throw new Error("Failed to fetch user data");
-      }
 
-      return res.json();
+        return await res.json();
+      } catch (error) {
+        console.error('User fetch error:', error);
+        return null;
+      }
     },
     retry: false,
     retryOnMount: false,
@@ -55,33 +60,41 @@ function useAuthState() {
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
-      console.log('Attempting login with credentials:', { email: credentials.email });
-      const res = await fetch("/api/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(credentials),
-      });
+      console.log('Login attempt with:', { email: credentials.email });
 
-      const data = await res.json();
+      try {
+        const res = await fetch("/api/login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(credentials),
+        });
 
-      if (!res.ok || !data.success) {
-        console.error('Login response error:', data);
-        throw new Error(data.message || "Login failed");
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error("Invalid server response format");
+        }
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.message || "Login failed");
+        }
+
+        localStorage.setItem("token", data.token);
+        return data.user;
+      } catch (error) {
+        console.error('Login error:', error);
+        throw error;
       }
-
-      localStorage.setItem("token", data.token);
-      return data.user;
     },
     onSuccess: (user) => {
       queryClient.setQueryData(["/api/user"], user);
       toast({
         title: "Welcome back!",
-        description: `Logged in successfully`,
+        description: "Logged in successfully",
       });
 
-      // Redirect based on user type
       if (user.superAdmin) {
         setLocation("/admin-management");
       } else {
@@ -89,7 +102,6 @@ function useAuthState() {
       }
     },
     onError: (error: Error) => {
-      console.error('Login error:', error);
       toast({
         title: "Login failed",
         description: error.message,
@@ -100,23 +112,31 @@ function useAuthState() {
 
   const registerMutation = useMutation({
     mutationFn: async (data: RegisterData) => {
-      console.log('Registration attempt for:', { email: data.email });
-      const res = await fetch("/api/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
+      try {
+        const res = await fetch("/api/register", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(data),
+        });
 
-      const responseData = await res.json();
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error("Invalid server response format");
+        }
 
-      if (!res.ok) {
-        throw new Error(responseData.message || "Registration failed");
+        const responseData = await res.json();
+        if (!res.ok) {
+          throw new Error(responseData.message || "Registration failed");
+        }
+
+        localStorage.setItem("token", responseData.token);
+        return responseData.user;
+      } catch (error) {
+        console.error('Registration error:', error);
+        throw error;
       }
-
-      localStorage.setItem("token", responseData.token);
-      return responseData.user;
     },
     onSuccess: (user) => {
       queryClient.setQueryData(["/api/user"], user);
@@ -127,7 +147,6 @@ function useAuthState() {
       setLocation("/");
     },
     onError: (error: Error) => {
-      console.error('Registration error:', error);
       toast({
         title: "Registration failed",
         description: error.message,
@@ -140,12 +159,16 @@ function useAuthState() {
     mutationFn: async () => {
       const token = localStorage.getItem("token");
       if (token) {
-        await fetch("/api/logout", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        try {
+          await fetch("/api/logout", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+        } catch (error) {
+          console.error('Logout error:', error);
+        }
       }
       localStorage.removeItem("token");
       queryClient.setQueryData(["/api/user"], null);

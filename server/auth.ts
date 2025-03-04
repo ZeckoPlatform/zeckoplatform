@@ -21,9 +21,16 @@ const registerSchema = z.object({
 });
 
 export function setupAuth(app: Express) {
+  // Ensure JSON responses
+  app.use((req, res, next) => {
+    res.setHeader('Content-Type', 'application/json');
+    next();
+  });
+
   app.post("/api/login", async (req, res) => {
     try {
       const { email, password } = req.body;
+      log('Login attempt for:', email);
 
       // Find user
       const [user] = await db
@@ -33,6 +40,7 @@ export function setupAuth(app: Express) {
         .limit(1);
 
       if (!user) {
+        log('User not found:', email);
         return res.status(401).json({
           success: false,
           message: "Invalid credentials"
@@ -41,6 +49,8 @@ export function setupAuth(app: Express) {
 
       // Verify password
       const hashedPassword = hashPassword(password);
+      log('Password verification:', { email, matches: hashedPassword === user.password });
+
       if (hashedPassword !== user.password) {
         return res.status(401).json({
           success: false,
@@ -60,7 +70,8 @@ export function setupAuth(app: Express) {
         { expiresIn: '24h' }
       );
 
-      res.json({
+      log('Login successful for:', email);
+      return res.json({
         success: true,
         token,
         user: {
@@ -72,8 +83,8 @@ export function setupAuth(app: Express) {
       });
 
     } catch (error) {
-      console.error('Login error:', error);
-      res.status(500).json({
+      log('Login error:', error instanceof Error ? error.message : String(error));
+      return res.status(500).json({
         success: false,
         message: "Internal server error"
       });
@@ -121,7 +132,7 @@ export function setupAuth(app: Express) {
         { expiresIn: '24h' }
       );
 
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
         token,
         user: {
@@ -141,8 +152,8 @@ export function setupAuth(app: Express) {
         });
       }
 
-      console.error('Registration error:', error);
-      res.status(500).json({
+      log('Registration error:', error instanceof Error ? error.message : String(error));
+      return res.status(500).json({
         success: false,
         message: "Failed to create account"
       });
@@ -150,11 +161,11 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/logout", (req, res) => {
-    res.json({ success: true });
+    return res.json({ success: true });
   });
 
   app.get("/api/user", authenticateToken, (req, res) => {
-    res.json((req as any).user);
+    return res.json(req.user);
   });
 }
 
@@ -199,7 +210,7 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
       };
       next();
     } catch (error) {
-      console.error('Token verification error:', error);
+      log('Token verification error:', error instanceof Error ? error.message : String(error));
       return res.status(500).json({
         success: false,
         message: "Internal server error"
