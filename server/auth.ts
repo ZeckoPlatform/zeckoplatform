@@ -25,6 +25,7 @@ export function setupAuth(app: Express) {
     try {
       // Validate input
       const validatedData = loginSchema.parse(req.body);
+      log('Login attempt for:', validatedData.email);
 
       // Find user
       const [user] = await db
@@ -34,6 +35,7 @@ export function setupAuth(app: Express) {
         .limit(1);
 
       if (!user) {
+        log('User not found:', validatedData.email);
         return res.status(401).json({
           success: false,
           message: "Invalid credentials"
@@ -42,6 +44,11 @@ export function setupAuth(app: Express) {
 
       // Verify password
       const hashedPassword = hashPassword(validatedData.password);
+      log('Password check:', {
+        email: validatedData.email,
+        matches: hashedPassword === user.password
+      });
+
       if (hashedPassword !== user.password) {
         return res.status(401).json({
           success: false,
@@ -60,6 +67,8 @@ export function setupAuth(app: Express) {
         JWT_SECRET,
         { expiresIn: '24h' }
       );
+
+      log('Login successful for:', user.email);
 
       // Send response
       res.json({
@@ -82,7 +91,7 @@ export function setupAuth(app: Express) {
         });
       }
 
-      console.error('Login error:', error);
+      log('Login error:', error instanceof Error ? error.message : String(error));
       res.status(500).json({
         success: false,
         message: "Internal server error"
@@ -99,7 +108,6 @@ export function setupAuth(app: Express) {
   });
 }
 
-// Token verification middleware
 export function authenticateToken(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -141,7 +149,7 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
       };
       next();
     } catch (error) {
-      console.error('Token verification error:', error);
+      log('Token verification error:', error instanceof Error ? error.message : String(error));
       return res.status(500).json({
         success: false,
         message: "Internal server error"
