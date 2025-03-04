@@ -4,20 +4,22 @@ import path from 'path';
 import fs from 'fs';
 
 const GRAFANA_PORT = 3001;
-export const GRAFANA_INTERNAL_URL = `http://localhost:${GRAFANA_PORT}`;
-
 const GRAFANA_CONFIG_DIR = path.resolve(process.cwd(), 'grafana');
 const GRAFANA_DATA_DIR = path.join(GRAFANA_CONFIG_DIR, 'data');
 const GRAFANA_CONFIG_FILE = path.join(GRAFANA_CONFIG_DIR, 'grafana.ini');
 const GRAFANA_PLUGINS_DIR = path.join(GRAFANA_CONFIG_DIR, 'plugins');
 const GRAFANA_PROVISIONING_DIR = path.join(GRAFANA_CONFIG_DIR, 'provisioning');
+const GRAFANA_DASHBOARDS_DIR = path.join(GRAFANA_PROVISIONING_DIR, 'dashboards');
+const GRAFANA_DATASOURCES_DIR = path.join(GRAFANA_PROVISIONING_DIR, 'datasources');
 
-// Create directories if they don't exist
+// Ensure all Grafana directories exist with proper permissions
 [
   GRAFANA_CONFIG_DIR,
   GRAFANA_DATA_DIR,
   GRAFANA_PLUGINS_DIR,
-  GRAFANA_PROVISIONING_DIR
+  GRAFANA_PROVISIONING_DIR,
+  GRAFANA_DASHBOARDS_DIR,
+  GRAFANA_DATASOURCES_DIR
 ].forEach(dir => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true, mode: 0o755 });
@@ -42,29 +44,33 @@ http_addr = 0.0.0.0
 
 [security]
 admin_user = admin
-admin_password = admin
+admin_password = ${process.env.GRAFANA_ADMIN_PASSWORD || 'admin'}
 allow_embedding = true
 cookie_secure = false
 cookie_samesite = none
-disable_initial_admin_creation = false
+secret_key = SW2YcwTIb9zpOOhoPsMm
 
 [auth]
-disable_login_form = true
+disable_login_form = false
 disable_signout_menu = true
 
-[auth.anonymous]
+[auth.basic]
 enabled = true
-org_name = Main Org.
-org_role = Admin
 
 [users]
 allow_sign_up = false
 auto_assign_org = true
 auto_assign_org_role = Admin
 
+[auth.anonymous]
+enabled = false
+
 [dashboards]
 versions_to_keep = 20
 min_refresh_interval = 5s
+
+[datasources]
+datasources_path = ${GRAFANA_DATASOURCES_DIR}
 `;
 
 // Write Grafana configuration file
@@ -90,6 +96,40 @@ export function startGrafanaServer() {
       log('Reset Grafana data directory');
     }
 
+    // Create initial provisioning files
+    const dashboardsYaml = path.join(GRAFANA_DASHBOARDS_DIR, 'dashboards.yaml');
+    const datasourcesYaml = path.join(GRAFANA_DATASOURCES_DIR, 'prometheus.yaml');
+
+    fs.writeFileSync(dashboardsYaml, `
+apiVersion: 1
+
+providers:
+  - name: 'Default'
+    orgId: 1
+    folder: ''
+    type: file
+    disableDeletion: false
+    editable: true
+    allowUiUpdates: true
+    options:
+      path: ${GRAFANA_DASHBOARDS_DIR}
+`, { mode: 0o644 });
+
+    fs.writeFileSync(datasourcesYaml, `
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://localhost:9090
+    isDefault: true
+    editable: true
+    jsonData:
+      timeInterval: '15s'
+      queryTimeout: '60s'
+      httpMethod: GET
+`, { mode: 0o644 });
+
     grafanaProcess = spawn(grafanaServerPath, [
       '--config', GRAFANA_CONFIG_FILE,
       '--homepath', '/nix/store/2m2kacwqa9v8wd09c1p4pp2cx99bviww-grafana-10.4.3/share/grafana',
@@ -97,11 +137,11 @@ export function startGrafanaServer() {
     ]);
 
     grafanaProcess.stdout.on('data', (data: Buffer) => {
-      log('Grafana stdout:', data.toString());
+      log('Grafana:', data.toString());
     });
 
     grafanaProcess.stderr.on('data', (data: Buffer) => {
-      log('Grafana stderr:', data.toString());
+      log('Grafana Error:', data.toString());
     });
 
     grafanaProcess.on('close', (code: number) => {
@@ -123,3 +163,5 @@ export function stopGrafanaServer() {
     log('Grafana server stopped');
   }
 }
+
+export const GRAFANA_INTERNAL_URL = `http://localhost:${GRAFANA_PORT}`;
