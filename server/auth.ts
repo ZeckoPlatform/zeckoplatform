@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import jwt from 'jsonwebtoken';
 import { log } from "./vite";
 import * as z from 'zod';
+import express from 'express';
 
 const JWT_SECRET = process.env.REPL_ID!;
 
@@ -13,7 +14,6 @@ export function hashPassword(password: string): string {
   return createHash('sha256').update(password).digest('hex');
 }
 
-// Add registration schema
 const registerSchema = z.object({
   email: z.string().email("Invalid email format"),
   password: z.string().min(6, "Password must be at least 6 characters"),
@@ -21,16 +21,23 @@ const registerSchema = z.object({
 });
 
 export function setupAuth(app: Express) {
-  // Ensure JSON responses
-  app.use((req, res, next) => {
-    res.setHeader('Content-Type', 'application/json');
+  // JSON parsing middleware
+  app.use(express.json());
+
+  // API response middleware
+  app.use('/api', (req: Request, res: Response, next: NextFunction) => {
+    res.type('application/json');
+    const originalJson = res.json;
+    res.json = function(body) {
+      res.set('Content-Type', 'application/json');
+      return originalJson.call(this, body);
+    };
     next();
   });
 
   app.post("/api/login", async (req, res) => {
     try {
       const { email, password } = req.body;
-      log('Login attempt for:', email);
 
       // Find user
       const [user] = await db
@@ -40,7 +47,6 @@ export function setupAuth(app: Express) {
         .limit(1);
 
       if (!user) {
-        log('User not found:', email);
         return res.status(401).json({
           success: false,
           message: "Invalid credentials"
@@ -49,8 +55,6 @@ export function setupAuth(app: Express) {
 
       // Verify password
       const hashedPassword = hashPassword(password);
-      log('Password verification:', { email, matches: hashedPassword === user.password });
-
       if (hashedPassword !== user.password) {
         return res.status(401).json({
           success: false,
@@ -70,7 +74,6 @@ export function setupAuth(app: Express) {
         { expiresIn: '24h' }
       );
 
-      log('Login successful for:', email);
       return res.json({
         success: true,
         token,
@@ -165,7 +168,7 @@ export function setupAuth(app: Express) {
   });
 
   app.get("/api/user", authenticateToken, (req, res) => {
-    return res.json(req.user);
+    return res.json((req as any).user);
   });
 }
 
