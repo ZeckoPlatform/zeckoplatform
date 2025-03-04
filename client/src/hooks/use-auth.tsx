@@ -10,6 +10,12 @@ type LoginData = {
   password: string;
 };
 
+type RegisterData = {
+  email: string;
+  password: string;
+  userType?: string;
+};
+
 export const AuthContext = createContext<ReturnType<typeof useAuthState> | null>(null);
 
 function useAuthState() {
@@ -93,6 +99,46 @@ function useAuthState() {
     },
   });
 
+  const registerMutation = useMutation({
+    mutationFn: async (data: RegisterData) => {
+      try {
+        const res = await fetch("/api/register", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(data),
+        });
+
+        const responseData = await res.json();
+        if (!res.ok) {
+          throw new Error(responseData.message || "Registration failed");
+        }
+
+        localStorage.setItem("token", responseData.token);
+        return responseData.user;
+      } catch (error) {
+        console.error('Registration error:', error);
+        throw error;
+      }
+    },
+    onSuccess: (user) => {
+      queryClient.setQueryData(["/api/user"], user);
+      toast({
+        title: "Welcome!",
+        description: "Your account has been created successfully.",
+      });
+      setLocation("/");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Registration failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const logoutMutation = useMutation({
     mutationFn: async () => {
       const token = localStorage.getItem("token");
@@ -126,6 +172,7 @@ function useAuthState() {
     error,
     loginMutation,
     logoutMutation,
+    registerMutation,
   };
 }
 
