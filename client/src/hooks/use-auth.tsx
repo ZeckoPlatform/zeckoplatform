@@ -51,8 +51,16 @@ function useAuthState() {
           throw new Error("Failed to fetch user data");
         }
 
-        const data: ApiResponse<SelectUser> = await res.json();
-        return data.success ? data.user || null : null;
+        const text = await res.text();
+        console.log('Raw user response:', text);
+
+        try {
+          const data = JSON.parse(text) as ApiResponse<SelectUser>;
+          return data.success && data.user ? data.user : null;
+        } catch (err) {
+          console.error('Failed to parse user response:', err);
+          return null;
+        }
       } catch (error) {
         console.error('User fetch error:', error);
         return null;
@@ -65,20 +73,23 @@ function useAuthState() {
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
-      console.log('Login attempt with:', { email: credentials.email });
+      console.log('Login attempt:', { email: credentials.email });
+
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify(credentials),
+      });
+
+      const text = await res.text();
+      console.log('Raw login response:', text);
 
       try {
-        const res = await fetch("/api/login", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-          },
-          body: JSON.stringify(credentials),
-        });
-
-        const data: ApiResponse<SelectUser> = await res.json();
-        console.log('Login response:', { status: res.status, data });
+        const data = JSON.parse(text) as ApiResponse<SelectUser>;
+        console.log('Parsed login response:', data);
 
         if (!res.ok || !data.success) {
           throw new Error(data.message || "Login failed");
@@ -90,9 +101,9 @@ function useAuthState() {
 
         localStorage.setItem("token", data.token);
         return data.user;
-      } catch (error) {
-        console.error('Login error:', error);
-        throw error;
+      } catch (err) {
+        console.error('Failed to parse login response:', err);
+        throw new Error("Failed to process server response");
       }
     },
     onSuccess: (user) => {
@@ -119,30 +130,33 @@ function useAuthState() {
 
   const registerMutation = useMutation({
     mutationFn: async (data: RegisterData) => {
-      try {
-        const res = await fetch("/api/register", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-          },
-          body: JSON.stringify(data),
-        });
+      const res = await fetch("/api/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify(data),
+      });
 
-        const responseData: ApiResponse<SelectUser> = await res.json();
-        if (!res.ok || !responseData.success) {
-          throw new Error(responseData.message || "Registration failed");
+      const text = await res.text();
+      console.log('Raw register response:', text);
+
+      try {
+        const data = JSON.parse(text) as ApiResponse<SelectUser>;
+        if (!res.ok || !data.success) {
+          throw new Error(data.message || "Registration failed");
         }
 
-        if (!responseData.token || !responseData.user) {
+        if (!data.token || !data.user) {
           throw new Error("Invalid server response");
         }
 
-        localStorage.setItem("token", responseData.token);
-        return responseData.user;
-      } catch (error) {
-        console.error('Registration error:', error);
-        throw error;
+        localStorage.setItem("token", data.token);
+        return data.user;
+      } catch (err) {
+        console.error('Failed to parse register response:', err);
+        throw new Error("Failed to process server response");
       }
     },
     onSuccess: (user) => {

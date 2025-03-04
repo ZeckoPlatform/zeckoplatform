@@ -9,25 +9,24 @@ import express from 'express';
 
 const JWT_SECRET = process.env.REPL_ID!;
 
-// Schema validation
+export function hashPassword(password: string): string {
+  return createHash('sha256').update(password).digest('hex');
+}
+
 const registerSchema = z.object({
   email: z.string().email("Invalid email format"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   userType: z.string().optional()
 });
 
-export function hashPassword(password: string): string {
-  return createHash('sha256').update(password).digest('hex');
-}
-
 export function setupAuth(app: Express) {
   // Basic middleware setup
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
-  // Ensure all API responses have proper content type
+  // API middleware for consistent JSON responses
   app.use('/api', (req: Request, res: Response, next: NextFunction) => {
-    res.contentType('application/json');
+    res.type('application/json');
     next();
   });
 
@@ -38,6 +37,7 @@ export function setupAuth(app: Express) {
       const { email, password } = req.body;
 
       if (!email || !password) {
+        console.log('Missing credentials:', { email: !!email, password: !!password });
         return res.status(400).json({
           success: false,
           message: "Email and password are required"
@@ -84,7 +84,7 @@ export function setupAuth(app: Express) {
 
       console.log('Login successful:', { email });
 
-      return res.status(200).json({
+      const response = {
         success: true,
         token,
         user: {
@@ -93,7 +93,10 @@ export function setupAuth(app: Express) {
           userType: user.userType,
           superAdmin: user.superAdmin
         }
-      });
+      };
+
+      console.log('Sending response:', response);
+      return res.status(200).json(response);
 
     } catch (error) {
       console.error('Login error:', error);
