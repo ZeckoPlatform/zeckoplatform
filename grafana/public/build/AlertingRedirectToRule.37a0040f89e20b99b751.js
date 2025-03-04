@@ -1,0 +1,19 @@
+"use strict";(self.webpackChunkgrafana=self.webpackChunkgrafana||[]).push([[5516],{10042:(W,i,a)=>{a.r(i),a.d(i,{RedirectToRuleViewer:()=>K,default:()=>y});var o=a(32196),e=a(96540),_=a(24180),d=a(87586),D=a(32264),O=a(17172),v=a(40845),P=a(42418),f=a(39558),n=a(10860),r=a(14578),m=a(66602),p=a(69087),c=a(25992),R=a(730),N=a(57220),I=a(56361),A=a(18461);const u="Find rule",B=D.$.appSubUrl;function $(){const t=(0,d.A)();return(0,e.useMemo)(()=>{const E=t.pathname?.replace(B,"").split("/")??[],s=(0,A.c)(decodeURIComponent((0,A.c)(E[3]))),C=decodeURIComponent(E[2]),g=new URLSearchParams(t.search);return{name:s,sourceName:C,namespace:g.get("namespace")??void 0,group:g.get("group")??void 0}},[t])}function K(){const t=(0,v.of)(h),{name:E,sourceName:s,namespace:C,group:g}=$(),{error:L,loading:x,rules:M=[]}=(0,R.we)(E,s,{namespace:C,groupName:g});if(!E||!s)return e.createElement(_.rd,{to:"/notfound"});if(L)return e.createElement(c.r,{title:u},e.createElement(P.F,{title:`Failed to load rules from ${s}`},(0,O.NF)(L)&&e.createElement("details",{className:t.errorMessage},L.message,e.createElement("br",null))));if(x)return e.createElement(c.r,{title:u},e.createElement(f._,{text:"Loading rule..."}));const T=(0,N.Zw)(s);if(!T)return e.createElement(c.r,{title:u},e.createElement(P.F,{title:"Could not view rule"},e.createElement("details",{className:t.errorMessage},`Could not find data source with name: ${s}.`)));if(M.length===1){const[l]=M,U=(0,I.w$)(T,l,"/alerting/list").replace(B,"");return e.createElement(_.rd,{to:U})}return M.length===0?e.createElement(c.r,{title:u},e.createElement("div",{"data-testid":"no-rules"},"No rules in ",e.createElement("span",{className:t.param},s)," matched the name"," ",e.createElement("span",{className:t.param},E))):e.createElement(c.r,{title:u},e.createElement("div",null,"Several rules in ",e.createElement("span",{className:t.param},s)," matched the name"," ",e.createElement("span",{className:t.param},E),", please select the rule you want to view."),e.createElement("div",{className:t.rules},M.map((l,U)=>e.createElement(n.Z,{key:`${l.name}-${U}`,href:(0,I.w$)(T,l,"/alerting/list")},e.createElement(n.Z.Heading,null,l.name),e.createElement(n.Z.Meta,{separator:""},e.createElement(r.I,{name:"folder"}),e.createElement("span",{className:t.namespace},`${l.namespace.name} / ${l.group.name}`)),e.createElement(n.Z.Tags,null,e.createElement(p.m,{labels:l.labels}))))))}function h(t){return{param:(0,o.css)`
+      font-style: italic;
+      color: ${t.colors.text.secondary};
+    `,rules:(0,o.css)`
+      margin-top: ${t.spacing(2)};
+    `,namespace:(0,o.css)`
+      margin-left: ${t.spacing(1)};
+    `,errorMessage:(0,o.css)`
+      white-space: pre-wrap;
+    `}}const y=(0,m.Xc)(K,{style:"page"})},25992:(W,i,a)=>{a.d(i,{r:()=>O});var o=a(32196),e=a(96540),_=a(40845),d=a(36830);const D={icon:"bell",id:"alert-rule-view"};function O(n){const{wrapInContent:r=!0,children:m,title:p,renderTitle:c}=n,R=(0,_.of)(P);return e.createElement(d.Y,{pageNav:{...D,text:p},renderTitle:c,navId:"alert-list"},e.createElement(d.Y.Contents,null,e.createElement("div",{className:R.content},r?e.createElement(v,{...n}):m)))}function v({children:n,padding:r=2}){const m=(0,_.of)(f(r));return e.createElement("div",{className:m.wrapper},n)}const P=n=>({content:(0,o.css)`
+      max-width: ${n.breakpoints.values.xxl}px;
+    `}),f=n=>r=>({wrapper:(0,o.css)`
+      background: ${r.colors.background.primary};
+      border: 1px solid ${r.colors.border.weak};
+      border-radius: ${r.shape.radius.default};
+      padding: ${r.spacing(n)};
+    `})}}]);
+
+//# sourceMappingURL=AlertingRedirectToRule.37a0040f89e20b99b751.js.map

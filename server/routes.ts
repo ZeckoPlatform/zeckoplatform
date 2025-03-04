@@ -1,7 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { createProxyMiddleware } from 'http-proxy-middleware';
-import { metricsMiddleware, getMetrics, initializeMonitoring } from './services/monitoring';
 import { GRAFANA_INTERNAL_URL } from './services/grafana';
 import jwt from 'jsonwebtoken';
 import { log } from "./vite";
@@ -24,6 +23,7 @@ import socialRoutes from './routes/social';
 import leadsRoutes from './routes/leads';
 import commentsRoutes from './routes/comments';
 import feedbackRoutes from './routes/feedback';
+import { metricsMiddleware, getMetrics, initializeMonitoring } from './services/monitoring';
 
 // Verify JWT token
 const verifyToken = (token: string) => {
@@ -49,31 +49,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Add metrics middleware
     app.use(metricsMiddleware);
 
-    // Metrics endpoint with JWT auth
-    app.get('/api/metrics', async (req: any, res) => {
-      try {
-        const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-          return res.status(401).json({ error: 'Authentication required' });
-        }
-
-        const token = authHeader.split(' ')[1];
-        const decoded = verifyToken(token);
-
-        if (!decoded || !decoded.superAdmin) {
-          log('Metrics access denied:', { decoded });
-          return res.status(403).json({ error: 'Access denied' });
-        }
-
-        const metrics = await getMetrics();
-        res.set('Content-Type', 'text/plain');
-        res.send(metrics);
-      } catch (error) {
-        log('Error serving metrics:', error instanceof Error ? error.message : String(error));
-        res.status(500).json({ error: 'Failed to fetch metrics' });
-      }
-    });
-
     // Single authentication middleware for Grafana
     app.use('/admin/analytics/grafana', (req: any, res, next) => {
       try {
@@ -98,7 +73,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Set Basic Auth header for Grafana
-        const grafanaAuth = Buffer.from(`admin:${process.env.GRAFANA_ADMIN_PASSWORD || 'admin'}`).toString('base64');
+        const grafanaAuth = Buffer.from(`zeckoinfo@gmail.com:Bobo19881`).toString('base64');
         req.headers.authorization = `Basic ${grafanaAuth}`;
 
         log('Grafana auth success:', {
