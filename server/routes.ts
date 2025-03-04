@@ -78,7 +78,8 @@ export function registerRoutes(app: Express): Server {
 
         log('Grafana auth success:', {
           path: req.path,
-          basicAuthSet: true
+          basicAuthSet: true,
+          headers: req.headers
         });
 
         next();
@@ -97,11 +98,17 @@ export function registerRoutes(app: Express): Server {
         '^/admin/analytics/grafana': ''
       },
       onProxyReq: (proxyReq, req: any) => {
+        // Ensure Basic Auth header is preserved
+        const basicAuth = req.headers.authorization;
+        if (basicAuth && basicAuth.startsWith('Basic ')) {
+          proxyReq.setHeader('Authorization', basicAuth);
+        }
+
         log('Grafana proxy request:', {
           originalPath: req.path,
           targetPath: proxyReq.path,
           method: req.method,
-          hasAuth: !!req.headers.authorization
+          hasAuth: !!proxyReq.getHeader('Authorization')
         });
       },
       onProxyRes: (proxyRes, req: any) => {
