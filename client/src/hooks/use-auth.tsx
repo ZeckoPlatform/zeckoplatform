@@ -69,10 +69,14 @@ function useAuthState() {
         throw new Error("Email and password are required");
       }
 
-      console.log('Login attempt:', {
+      console.log('Attempting login with:', { email: credentials.email });
+
+      const requestBody = {
         email: credentials.email,
-        passwordProvided: !!credentials.password
-      });
+        password: credentials.password
+      };
+
+      console.log('Login attempt:', requestBody);
 
       const res = await fetch("/api/login", {
         method: "POST",
@@ -80,7 +84,7 @@ function useAuthState() {
           "Content-Type": "application/json",
           "Accept": "application/json"
         },
-        body: JSON.stringify(credentials),
+        body: JSON.stringify(requestBody),
       });
 
       const text = await res.text();
