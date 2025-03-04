@@ -55,7 +55,6 @@ export function hashPassword(password: string): string {
 }
 
 export function setupAuth(app: Express) {
-  // API middleware for consistent JSON responses
   app.use('/api/auth', (req, res, next) => {
     res.setHeader('Content-Type', 'application/json');
     next();
@@ -160,7 +159,7 @@ export function setupAuth(app: Express) {
       const validatedData = registerSchema.parse(req.body);
       log('Registration attempt:', { email: validatedData.email });
 
-      // Check if user exists
+      // Check if user already exists
       const [existingUser] = await db
         .select()
         .from(users)

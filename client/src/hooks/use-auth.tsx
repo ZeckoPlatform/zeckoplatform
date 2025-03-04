@@ -71,8 +71,8 @@ function useAuthState() {
 
       console.log('Login attempt:', {
         email: credentials.email,
-        password: '********',
-        hasPassword: !!credentials.password
+        hasPassword: !!credentials.password,
+        passwordLength: credentials.password.length
       });
 
       const res = await fetch("/api/login", {
