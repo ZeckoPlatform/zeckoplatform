@@ -4,11 +4,11 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 import { GRAFANA_INTERNAL_URL } from './services/grafana';
 import jwt from 'jsonwebtoken';
 import { log } from "./vite";
-import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import fetch from 'node-fetch';
 
-// Import routes using ES modules
+// Import routes
 import authRoutes from './routes/auth';
 import uploadRoutes from './routes/upload';
 import subscriptionRoutes from './routes/subscription';
@@ -25,13 +25,15 @@ import commentsRoutes from './routes/comments';
 import feedbackRoutes from './routes/feedback';
 import { metricsMiddleware } from './services/monitoring';
 
+const JWT_SECRET = process.env.REPL_ID!;
+
 // Verify JWT token
 const verifyToken = (token: string) => {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-    log('Token verification:', {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    log('Token verification result:', {
       isValid: !!decoded,
-      isSuperAdmin: decoded?.superAdmin,
+      isSuperAdmin: (decoded as any)?.superAdmin,
       decodedToken: decoded
     });
     return decoded;
@@ -41,24 +43,76 @@ const verifyToken = (token: string) => {
   }
 };
 
+async function checkGrafanaConnection(): Promise<boolean> {
+  try {
+    const response = await fetch(GRAFANA_INTERNAL_URL);
+    log('Grafana connection check:', {
+      status: response.status,
+      statusText: response.statusText
+    });
+    return response.status === 200;
+  } catch (error) {
+    log('Grafana connection check failed:', error instanceof Error ? error.message : String(error));
+    return false;
+  }
+}
+
 export function registerRoutes(app: Express): Server {
   try {
-    // Initialize monitoring
-    //initializeMonitoring(); //This line was removed because it's not in the edited code and seems unrelated to the primary change.
-
     // Add metrics middleware
     app.use(metricsMiddleware);
 
-    // Grafana proxy middleware - Separate from main app auth
-    app.use('/admin/analytics/grafana', (req: any, res, next) => {
+    // Grafana proxy setup
+    const grafanaBasicAuth = Buffer.from(`zeckoinfo@gmail.com:${process.env.GRAFANA_ADMIN_PASSWORD || 'Bobo19881'}`).toString('base64');
+
+    // First middleware to check JWT auth for protected paths
+    app.use('/admin/analytics/grafana', async (req: any, res, next) => {
+      // Check Grafana connectivity first
+      const isGrafanaAvailable = await checkGrafanaConnection();
+      if (!isGrafanaAvailable) {
+        log('Grafana service is not available');
+        return res.status(503).json({ error: 'Grafana service is unavailable' });
+      }
+
+      // Allow public access to certain paths
+      if (req.path.startsWith('/public/')) {
+        return next();
+      }
+
+      // Get token from Authorization header or query parameter
+      let token: string | undefined;
       const authHeader = req.headers.authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+
+      if (authHeader?.startsWith('Bearer ')) {
+        token = authHeader.split(' ')[1];
+      } else {
+        token = req.query.token as string;
+      }
+
+      log('Token extraction:', {
+        hasAuthHeader: !!authHeader,
+        authHeaderType: authHeader?.split(' ')[0],
+        hasQueryToken: !!req.query.token,
+        token: token?.substring(0, 10) + '...' // Log first 10 chars for debugging
+      });
+
+      if (!token) {
+        log('No token found in request');
         return res.status(401).json({ error: 'Authentication required' });
       }
 
-      // Set Grafana Basic Auth header
-      const grafanaAuth = Buffer.from(`zeckoinfo@gmail.com:${process.env.GRAFANA_ADMIN_PASSWORD}`).toString('base64');
-      req.headers.authorization = `Basic ${grafanaAuth}`;
+      const decoded = verifyToken(token);
+
+      if (!decoded || !(decoded as any).superAdmin) {
+        log('User not authorized for Grafana access:', { decoded });
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      // Store the original token
+      req.originalToken = token;
+
+      // Set Grafana auth header for this request
+      req.headers.authorization = `Basic ${grafanaBasicAuth}`;
       next();
     });
 
@@ -69,14 +123,35 @@ export function registerRoutes(app: Express): Server {
       ws: true,
       pathRewrite: {
         '^/admin/analytics/grafana': ''
+      },
+      onProxyReq: (proxyReq: any) => {
+        // Ensure Grafana auth header is set
+        proxyReq.setHeader('Authorization', `Basic ${grafanaBasicAuth}`);
+
+        log('Proxy request headers:', {
+          headers: proxyReq.getHeaders()
+        });
+      },
+      onProxyRes: (proxyRes: any) => {
+        // Add CORS headers for iframe support
+        proxyRes.headers['Access-Control-Allow-Origin'] = '*';
+        proxyRes.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS';
+        proxyRes.headers['Access-Control-Allow-Headers'] = 'Authorization, Content-Type';
+
+        log('Grafana proxy response:', {
+          statusCode: proxyRes.statusCode,
+          headers: proxyRes.headers
+        });
+      },
+      onError: (err: Error, req: any, res: any) => {
+        log('Grafana proxy error:', {
+          error: err.message,
+          stack: err.stack,
+          path: req.path
+        });
+        res.status(502).json({ error: 'Failed to connect to Grafana service' });
       }
     }));
-
-    // Ensure uploads directory exists
-    const uploadDir = path.join(process.cwd(), 'uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
 
     // Register API routes
     app.use('/api', authRoutes);
@@ -93,6 +168,12 @@ export function registerRoutes(app: Express): Server {
     app.use('/api', leadsRoutes);
     app.use('/api', commentsRoutes);
     app.use('/api', feedbackRoutes);
+
+    // Ensure uploads directory exists
+    const uploadDir = path.join(process.cwd(), 'uploads');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
 
     // Serve uploaded files
     app.use('/uploads', express.static(uploadDir));

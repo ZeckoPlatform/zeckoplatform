@@ -74,15 +74,21 @@ try {
 // Start Grafana server
 logInfo('Starting Grafana server...');
 try {
-  await startGrafanaServer();
-  logInfo('Grafana server started successfully');
+  // Use async/await with top-level await since this is critical initialization
+  startGrafanaServer()
+    .then(() => {
+      logInfo('Grafana server started successfully');
+    })
+    .catch((error) => {
+      logError('Failed to start Grafana server:', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    });
 } catch (error) {
-  logError('Failed to start Grafana server:', {
+  logError('Failed to initialize Grafana server:', {
     error: error instanceof Error ? error.message : String(error)
   });
-  // Continue server startup even if Grafana fails
 }
-
 
 // Setup frontend serving
 if (isProd) {
@@ -111,32 +117,6 @@ if (isProd) {
     }
   })();
 }
-
-// Error handling middleware
-app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-  logError('Error handler:', {
-    error: err instanceof Error ? err.message : String(err),
-    stack: err.stack
-  });
-
-  if (res.headersSent) {
-    return next(err);
-  }
-
-  // Store error for metrics middleware
-  res.locals.error = err;
-
-  // Send JSON responses for API routes
-  if (req.path.startsWith('/api')) {
-    return res.status(err.status || 500).json({
-      success: false,
-      error: err.message || 'An unexpected error occurred'
-    });
-  }
-
-  // Send HTML error for frontend routes
-  res.status(500).send('Internal Server Error');
-});
 
 // Start server
 const PORT = Number(process.env.PORT) || 5000;

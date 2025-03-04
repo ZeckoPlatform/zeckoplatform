@@ -1,18 +1,40 @@
 import { log } from '../vite';
 import { spawn } from 'child_process';
 import path from 'path';
+import fetch from 'node-fetch';
 
 export const GRAFANA_PORT = 3001;
 export const GRAFANA_INTERNAL_URL = `http://localhost:${GRAFANA_PORT}`;
 
 let grafanaProcess: any = null;
 
+async function checkGrafanaHealth(): Promise<boolean> {
+  try {
+    const response = await fetch(`${GRAFANA_INTERNAL_URL}/api/health`);
+    const data = await response.json();
+    log('Grafana health check:', {
+      status: response.status,
+      response: data
+    });
+    return response.status === 200;
+  } catch (error) {
+    log('Grafana health check failed:', error instanceof Error ? error.message : String(error));
+    return false;
+  }
+}
+
 export function startGrafanaServer(): Promise<void> {
   return new Promise((resolve, reject) => {
     try {
       if (grafanaProcess) {
         log('Grafana process already running');
-        resolve();
+        checkGrafanaHealth().then(isHealthy => {
+          if (isHealthy) {
+            resolve();
+          } else {
+            reject(new Error('Grafana is running but not healthy'));
+          }
+        });
         return;
       }
 
@@ -64,11 +86,23 @@ export function startGrafanaServer(): Promise<void> {
         reject(err);
       });
 
-      // Wait a bit to ensure Grafana has started
+      // Wait for Grafana to start and verify health
+      const healthCheckInterval = setInterval(async () => {
+        if (await checkGrafanaHealth()) {
+          clearInterval(healthCheckInterval);
+          log('Grafana server started and healthy');
+          resolve();
+        }
+      }, 1000);
+
+      // Set timeout for health check
       setTimeout(() => {
-        log('Grafana server started');
-        resolve();
-      }, 5000);
+        clearInterval(healthCheckInterval);
+        if (grafanaProcess) {
+          log('Grafana failed to become healthy within timeout');
+          reject(new Error('Grafana failed to start within timeout'));
+        }
+      }, 30000);
 
     } catch (error) {
       log('Error starting Grafana:', error instanceof Error ? error.message : String(error));

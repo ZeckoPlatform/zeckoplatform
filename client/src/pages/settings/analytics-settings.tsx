@@ -26,6 +26,17 @@ export default function AnalyticsSettingsPage() {
     return null;
   }
 
+  // Get auth token from localStorage
+  const token = localStorage.getItem('token');
+  if (!token) {
+    console.log('No auth token found');
+    setLocation("/auth");
+    return null;
+  }
+
+  // Include token in URL for authentication
+  const grafanaUrl = `/admin/analytics/grafana/d/system-health/system-health?orgId=1&kiosk&token=${encodeURIComponent(token)}`;
+
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div className="flex justify-between items-center">
@@ -48,7 +59,7 @@ export default function AnalyticsSettingsPage() {
               </div>
             ) : (
               <iframe
-                src="/admin/analytics/grafana/d/system-health/system-health?orgId=1&kiosk"
+                src={grafanaUrl}
                 className="w-full h-full"
                 frameBorder="0"
                 title="System Health Dashboard"
@@ -58,12 +69,12 @@ export default function AnalyticsSettingsPage() {
                   width: '100%',
                   height: '100%'
                 }}
-                onError={() => {
-                  console.error('Grafana iframe load error');
+                onError={(e) => {
+                  console.error('Grafana iframe load error:', e);
                   setGrafanaError(true);
                   toast({
                     title: "Dashboard Error",
-                    description: "Failed to load system metrics dashboard. Please ensure Grafana service is running.",
+                    description: "Failed to load system metrics dashboard. Please try again later.",
                     variant: "destructive"
                   });
                 }}
