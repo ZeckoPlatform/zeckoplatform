@@ -1,4 +1,3 @@
-
 apiVersion: 1
 datasources:
   - name: Prometheus
@@ -11,3 +10,6 @@ datasources:
       timeInterval: '15s'
       queryTimeout: '60s'
       httpMethod: GET
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: tempo
