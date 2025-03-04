@@ -101,61 +101,12 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 });
 
 // Start server
-const startServer = async (port: number): Promise<boolean> => {
-  return new Promise((resolve) => {
-    let isResolved = false;
+const PORT = Number(process.env.PORT) || 5000;
+logInfo(`Starting server on port ${PORT}`);
 
-    const cleanup = () => {
-      if (!isResolved) {
-        logInfo(`Cleaning up server on port ${port}`);
-        httpServer.removeAllListeners();
-        if (httpServer.listening) {
-          httpServer.close();
-        }
-      }
-    };
-
-    const onError = (error: NodeJS.ErrnoException) => {
-      if (isResolved) return;
-
-      logError(`Server error on port ${port}:`, {
-        name: error.name,
-        message: error.message,
-        code: error.code
-      });
-      cleanup();
-      resolve(false);
-      isResolved = true;
-    };
-
-    const onListening = () => {
-      if (isResolved) return;
-
-      const addr = httpServer.address();
-      const actualPort = typeof addr === 'string' ? addr : addr?.port;
-      logInfo(`Server successfully started and listening on port ${actualPort}`);
-      resolve(true);
-      isResolved = true;
-    };
-
-    httpServer.once('error', onError);
-    httpServer.once('listening', onListening);
-
-    try {
-      logInfo(`Attempting to bind to port ${port} on address 0.0.0.0...`);
-      httpServer.listen(port, '0.0.0.0');
-    } catch (error) {
-      if (!isResolved) {
-        logError(`Failed to start server:`, {
-          error: error instanceof Error ? error.message : String(error)
-        });
-        cleanup();
-        resolve(false);
-        isResolved = true;
-      }
-    }
-  });
-};
+httpServer.listen(PORT, '0.0.0.0', () => {
+  logInfo('Server started successfully on port ' + PORT);
+});
 
 // Schedule periodic performance checks
 const PERFORMANCE_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
@@ -167,30 +118,19 @@ setInterval(() => {
   });
 }, PERFORMANCE_CHECK_INTERVAL);
 
-// Main startup function
-(async () => {
-  try {
-    logInfo('=== Environment Information ===', {
-      NODE_ENV: process.env.NODE_ENV,
-      PORT: process.env.PORT,
-      processId: process.pid,
-      platform: process.platform,
-      nodeVersion: process.version
-    });
+// Handle process termination
+process.on('SIGTERM', () => {
+  logInfo('Received SIGTERM signal, shutting down gracefully');
+  httpServer.close(() => {
+    logInfo('HTTP server closed');
+    process.exit(0);
+  });
+});
 
-    const PORT = Number(process.env.PORT) || 5000;
-    logInfo(`Starting server on port ${PORT}`);
-
-    const serverStarted = await startServer(PORT);
-    if (!serverStarted) {
-      throw new Error(`Could not start server on port ${PORT}`);
-    }
-
-    logInfo('Server started successfully');
-  } catch (error) {
-    logError(`Fatal server startup error:`, {
-      error: error instanceof Error ? error.message : String(error)
-    });
-    process.exit(1);
-  }
-})();
+process.on('uncaughtException', (error) => {
+  logError('Uncaught Exception:', {
+    error: error instanceof Error ? error.message : String(error),
+    stack: error.stack
+  });
+  process.exit(1);
+});

@@ -19,14 +19,26 @@ export function startGrafanaServer(): Promise<void> {
       log('Starting Grafana server setup...');
 
       const configPath = path.join(process.cwd(), 'grafana', 'grafana.ini');
-      const homePath = '/home/runner/workspace/grafana';
+      const homePath = path.join(process.cwd(), 'grafana');
+
+      // Set environment variables for Grafana
+      const env = {
+        ...process.env,
+        GF_PATHS_DATA: path.join(homePath, 'data'),
+        GF_PATHS_LOGS: path.join(homePath, 'logs'),
+        GF_PATHS_PLUGINS: path.join(homePath, 'plugins'),
+        GF_PATHS_PROVISIONING: path.join(homePath, 'provisioning'),
+        GF_SECURITY_ADMIN_USER: 'zeckoinfo@gmail.com',
+        GF_SECURITY_ADMIN_PASSWORD: 'Bobo19881'
+      };
 
       grafanaProcess = spawn('grafana', ['server', 
         '--config', configPath,
         '--homepath', homePath
       ], {
         detached: true,
-        stdio: 'pipe'
+        stdio: 'pipe',
+        env
       });
 
       // Log output
