@@ -18,21 +18,17 @@ const loginSchema = z.object({
 
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16).toString('hex');
-  const buf = (await scryptAsync(password, salt, 32)) as Buffer;
-  return `${buf.toString('hex')}.${salt}`;
+  const derivedKey = (await scryptAsync(password, salt, 32)) as Buffer;
+  return `${derivedKey.toString('hex')}.${salt}`;
 }
 
 async function comparePasswords(supplied: string, stored: string): Promise<boolean> {
   try {
     const [hash, salt] = stored.split('.');
-    if (!hash || !salt) return false;
-
-    const suppliedBuf = (await scryptAsync(supplied, salt, 32)) as Buffer;
-    const suppliedHash = suppliedBuf.toString('hex');
-
-    return hash === suppliedHash;
+    const derivedKey = (await scryptAsync(supplied, salt, 32)) as Buffer;
+    return derivedKey.toString('hex') === hash;
   } catch (error) {
-    log('Password comparison error:', error instanceof Error ? error.message : String(error));
+    log('Password comparison error:', error);
     return false;
   }
 }
@@ -41,7 +37,6 @@ export function setupAuth(app: Express) {
   app.post("/api/login", async (req, res) => {
     try {
       const validatedData = loginSchema.parse(req.body);
-      log('Login attempt for:', validatedData.email);
 
       // Find user
       const [user] = await db
@@ -51,7 +46,6 @@ export function setupAuth(app: Express) {
         .limit(1);
 
       if (!user) {
-        log('User not found:', validatedData.email);
         return res.status(401).json({
           success: false,
           message: "Invalid credentials"
@@ -60,10 +54,6 @@ export function setupAuth(app: Express) {
 
       // Verify password
       const isValid = await comparePasswords(validatedData.password, user.password);
-      log('Password verification result:', {
-        userId: user.id,
-        isValid
-      });
 
       if (!isValid) {
         return res.status(401).json({
@@ -72,7 +62,7 @@ export function setupAuth(app: Express) {
         });
       }
 
-      // Generate JWT token
+      // Generate token
       const token = jwt.sign(
         {
           id: user.id,
@@ -103,8 +93,6 @@ export function setupAuth(app: Express) {
           errors: error.errors
         });
       }
-
-      log('Login error:', error instanceof Error ? error.message : String(error));
       res.status(500).json({
         success: false,
         message: "Internal server error"
@@ -162,7 +150,6 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
       };
       next();
     } catch (error) {
-      log('Token verification error:', error instanceof Error ? error.message : String(error));
       return res.status(500).json({
         success: false,
         message: "Internal server error"
