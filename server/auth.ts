@@ -3,16 +3,10 @@ import { createHash } from "crypto";
 import { users } from "@db/schema";
 import { db } from "@db";
 import { eq } from "drizzle-orm";
-import { z } from "zod";
 import jwt from 'jsonwebtoken';
+import { log } from "./vite";
 
 const JWT_SECRET = process.env.REPL_ID!;
-
-// Simple schema validation
-const loginSchema = z.object({
-  email: z.string().min(1, "Email is required"),
-  password: z.string().min(1, "Password is required")
-});
 
 export function hashPassword(password: string): string {
   return createHash('sha256').update(password).digest('hex');
@@ -22,6 +16,7 @@ export function setupAuth(app: Express) {
   app.post("/api/login", async (req, res) => {
     try {
       const { email, password } = req.body;
+      log('Login attempt:', { email });
 
       // Find user
       const [user] = await db
@@ -31,6 +26,7 @@ export function setupAuth(app: Express) {
         .limit(1);
 
       if (!user) {
+        log('User not found:', email);
         return res.status(401).json({
           success: false,
           message: "Invalid credentials"
@@ -39,6 +35,8 @@ export function setupAuth(app: Express) {
 
       // Verify password
       const hashedPassword = hashPassword(password);
+      log('Password check:', { email, matches: hashedPassword === user.password });
+
       if (hashedPassword !== user.password) {
         return res.status(401).json({
           success: false,
@@ -58,6 +56,8 @@ export function setupAuth(app: Express) {
         { expiresIn: '24h' }
       );
 
+      log('Login successful:', { email });
+
       res.json({
         success: true,
         token,
@@ -70,6 +70,7 @@ export function setupAuth(app: Express) {
       });
 
     } catch (error) {
+      log('Login error:', error instanceof Error ? error.message : String(error));
       res.status(500).json({
         success: false,
         message: "Internal server error"
