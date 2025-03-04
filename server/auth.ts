@@ -1,6 +1,5 @@
 import type { Express, Request, Response, NextFunction } from "express";
-import { scrypt, randomBytes, timingSafeEqual } from "crypto";
-import { promisify } from "util";
+import { createHash } from "crypto";
 import { users, type SelectUser } from "@db/schema";
 import { db } from "@db";
 import { eq } from "drizzle-orm";
@@ -8,79 +7,49 @@ import { z } from "zod";
 import { log } from "./vite";
 import jwt from 'jsonwebtoken';
 
-const scryptAsync = promisify(scrypt);
 const JWT_SECRET = process.env.REPL_ID!;
 
-// Temporary debug function
-async function debugHashPassword(password: string) {
-  const salt = "debugsalt123456789";
-  const buf = (await scryptAsync(password, salt, 32)) as Buffer;
-  const hash = buf.toString("hex");
-  log('Debug: Generated hash', { hash, salt });
-  return `${hash}.${salt}`;
-}
-
+// Basic schema validation
 const loginSchema = z.object({
   email: z.string().email("Invalid email format"),
   password: z.string().min(1, "Password is required")
 });
 
-export function setupAuth(app: Express) {
-  // Temporary debug endpoint
-  app.post("/api/debug-hash", async (req, res) => {
-    if (process.env.NODE_ENV !== 'development') {
-      return res.status(404).send();
-    }
-    const hash = await debugHashPassword(req.body.password);
-    res.json({ hash });
-  });
+// Simple password hashing - exported for password reset functionality
+export function hashPassword(password: string): string {
+  return createHash('sha256').update(password).digest('hex');
+}
 
+export function setupAuth(app: Express) {
   app.post("/api/login", async (req, res) => {
     try {
-      const { email, password } = loginSchema.parse(req.body);
-      log('Login attempt:', { email });
+      // Validate input
+      const validatedData = loginSchema.parse(req.body);
 
+      // Find user
       const [user] = await db
         .select()
         .from(users)
-        .where(eq(users.email, email))
+        .where(eq(users.email, validatedData.email))
         .limit(1);
 
       if (!user) {
-        log('User not found');
         return res.status(401).json({
           success: false,
           message: "Invalid credentials"
         });
       }
 
-      log('Found user:', { id: user.id });
-
-      // Debug log password check
-      const salt = user.password.split('.')[1];
-      const inputBuf = (await scryptAsync(password, salt, 32)) as Buffer;
-      const inputHash = inputBuf.toString('hex');
-      const storedHash = user.password.split('.')[0];
-
-      log('Debug password check:', {
-        inputHashLength: inputHash.length,
-        storedHashLength: storedHash.length,
-        saltUsed: salt
-      });
-
-      const isValid = timingSafeEqual(
-        Buffer.from(inputHash, 'hex'),
-        Buffer.from(storedHash, 'hex')
-      );
-
-      if (!isValid) {
-        log('Password mismatch');
+      // Verify password
+      const hashedPassword = hashPassword(validatedData.password);
+      if (hashedPassword !== user.password) {
         return res.status(401).json({
           success: false,
           message: "Invalid credentials"
         });
       }
 
+      // Generate token
       const token = jwt.sign(
         {
           id: user.id,
@@ -92,7 +61,7 @@ export function setupAuth(app: Express) {
         { expiresIn: '24h' }
       );
 
-      log('Login successful');
+      // Send response
       res.json({
         success: true,
         token,
@@ -108,31 +77,29 @@ export function setupAuth(app: Express) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({
           success: false,
-          message: "Validation error",
+          message: "Invalid input",
           errors: error.errors
         });
       }
 
-      log('Login error:', error instanceof Error ? error.message : String(error));
+      console.error('Login error:', error);
       res.status(500).json({
         success: false,
-        message: "Internal server error during login"
+        message: "Internal server error"
       });
     }
+  });
+
+  app.post("/api/logout", (req, res) => {
+    res.json({ success: true });
   });
 
   app.get("/api/user", authenticateToken, (req, res) => {
     res.json((req as any).user);
   });
-
-  app.post("/api/logout", (req, res) => {
-    res.json({
-      success: true,
-      message: "Logged out successfully"
-    });
-  });
 }
 
+// Token verification middleware
 export function authenticateToken(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -174,6 +141,7 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
       };
       next();
     } catch (error) {
+      console.error('Token verification error:', error);
       return res.status(500).json({
         success: false,
         message: "Internal server error"
