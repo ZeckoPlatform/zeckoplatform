@@ -1,5 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
-import { createHash } from "crypto";
+import { scrypt, randomBytes, timingSafeEqual } from "crypto";
+import { promisify } from "util";
 import { users, type SelectUser } from "@db/schema";
 import { db } from "@db";
 import { eq } from "drizzle-orm";
@@ -7,6 +8,7 @@ import { z } from "zod";
 import { log } from "./vite";
 import jwt from 'jsonwebtoken';
 
+const scryptAsync = promisify(scrypt);
 const JWT_SECRET = process.env.REPL_ID!;
 
 // Basic schema validation
@@ -15,9 +17,29 @@ const loginSchema = z.object({
   password: z.string().min(1, "Password is required")
 });
 
-// Simple password hashing - exported for password reset functionality
-export function hashPassword(password: string): string {
-  return createHash('sha256').update(password).digest('hex');
+// Password hashing with salt
+export async function hashPassword(password: string): Promise<string> {
+  const salt = randomBytes(16).toString('hex');
+  const buf = (await scryptAsync(password, salt, 32)) as Buffer;
+  return `${buf.toString('hex')}.${salt}`;
+}
+
+// Password verification
+async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
+  try {
+    const [hash, salt] = storedHash.split('.');
+    if (!hash || !salt) {
+      log('Invalid stored password format');
+      return false;
+    }
+
+    const hashBuffer = Buffer.from(hash, 'hex');
+    const suppliedBuffer = (await scryptAsync(password, salt, 32)) as Buffer;
+    return timingSafeEqual(hashBuffer, suppliedBuffer);
+  } catch (error) {
+    log('Password verification error:', error instanceof Error ? error.message : String(error));
+    return false;
+  }
 }
 
 export function setupAuth(app: Express) {
@@ -43,20 +65,20 @@ export function setupAuth(app: Express) {
       }
 
       // Verify password
-      const hashedPassword = hashPassword(validatedData.password);
-      log('Password check:', {
-        email: validatedData.email,
-        matches: hashedPassword === user.password
+      const isValid = await verifyPassword(validatedData.password, user.password);
+      log('Password verification result:', {
+        userId: user.id,
+        isValid
       });
 
-      if (hashedPassword !== user.password) {
+      if (!isValid) {
         return res.status(401).json({
           success: false,
           message: "Invalid credentials"
         });
       }
 
-      // Generate token
+      // Generate JWT token
       const token = jwt.sign(
         {
           id: user.id,
@@ -70,7 +92,6 @@ export function setupAuth(app: Express) {
 
       log('Login successful for:', user.email);
 
-      // Send response
       res.json({
         success: true,
         token,
