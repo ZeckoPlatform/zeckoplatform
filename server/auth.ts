@@ -15,7 +15,7 @@ const JWT_SECRET = process.env.REPL_ID!;
 export async function hashPassword(password: string) {
   try {
     const salt = randomBytes(16).toString("hex");
-    const buf = (await scryptAsync(password, salt, 64)) as Buffer;
+    const buf = (await scryptAsync(password, salt, 32)) as Buffer;
     return `${buf.toString("hex")}.${salt}`;
   } catch (error) {
     log('Error hashing password:', error instanceof Error ? error.message : String(error));
@@ -29,9 +29,11 @@ export async function comparePasswords(supplied: string, stored: string) {
       log('Invalid stored password format');
       return false;
     }
+
     const [hashed, salt] = stored.split(".");
     const hashedBuf = Buffer.from(hashed, "hex");
-    const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+    const suppliedBuf = (await scryptAsync(supplied, salt, 32)) as Buffer;
+
     return timingSafeEqual(hashedBuf, suppliedBuf);
   } catch (error) {
     log('Error comparing passwords:', error instanceof Error ? error.message : String(error));
@@ -60,10 +62,14 @@ export function generateToken(user: SelectUser) {
 export function setupAuth(app: Express) {
   app.post("/api/login", async (req, res) => {
     try {
-      log('Login attempt received:', { email: req.body.email });
+      log('Login attempt received:', { 
+        email: req.body.email,
+        hasPassword: !!req.body.password,
+        passwordLength: req.body.password?.length 
+      });
 
       const validatedData = loginSchema.parse(req.body);
-      log(`Validated login data for email: ${validatedData.email}`);
+      log('Validation passed for:', validatedData.email);
 
       const [user] = await db
         .select()
@@ -79,8 +85,12 @@ export function setupAuth(app: Express) {
         });
       }
 
-      log('User found, comparing passwords');
       const isValidPassword = await comparePasswords(validatedData.password, user.password);
+      log('Password validation result:', { 
+        isValid: isValidPassword,
+        storedPasswordFormat: user.password.includes('.'),
+        storedPasswordLength: user.password.length
+      });
 
       if (!isValidPassword) {
         log('Login failed: Invalid password');
@@ -91,7 +101,7 @@ export function setupAuth(app: Express) {
       }
 
       const token = generateToken(user);
-      log(`Login successful for user: ${user.id}`);
+      log('Login successful for user:', user.id);
 
       res.json({
         success: true,
