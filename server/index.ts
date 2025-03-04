@@ -1,7 +1,8 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { Server } from "http";
+import { Server, createServer } from "http";
+import { setupAuth } from "./auth";
 import { logInfo, logError } from "./services/logging";
 import { initializeMonitoring } from "./services/monitoring";
 import { checkPerformanceMetrics } from "./services/admin-notifications";
@@ -14,6 +15,16 @@ const isProd = process.env.NODE_ENV === 'production';
 logInfo('=== Server Initialization Started ===', {
   environment: process.env.NODE_ENV,
   processId: process.pid
+});
+
+// Basic middleware setup
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// API middleware for consistent JSON responses
+app.use('/api', (req, res, next) => {
+  res.setHeader('Content-Type', 'application/json');
+  next();
 });
 
 // Setup CORS for API routes
@@ -31,6 +42,24 @@ app.use('/api', (req, res, next) => {
   }
   next();
 });
+
+// Initialize authentication first
+setupAuth(app);
+
+// Register API routes
+try {
+  registerRoutes(app);
+  logInfo('Routes registered successfully');
+} catch (error) {
+  logError('Fatal error during route registration:', {
+    error: error instanceof Error ? error.message : String(error)
+  });
+  process.exit(1);
+}
+
+// Create HTTP server
+const httpServer = createServer(app);
+log('Created HTTP server instance');
 
 // Initialize monitoring first before registering routes
 try {
@@ -54,18 +83,6 @@ try {
   // Continue server startup even if Grafana fails
 }
 
-// Register API routes
-logInfo('Registering routes...');
-let httpServer: Server;
-try {
-  httpServer = registerRoutes(app);
-  logInfo('Routes registered successfully');
-} catch (error) {
-  logError('Fatal error during route registration:', {
-    error: error instanceof Error ? error.message : String(error)
-  });
-  process.exit(1);
-}
 
 // Setup frontend serving
 if (isProd) {
@@ -80,7 +97,7 @@ if (isProd) {
     }
   });
 } else {
-  // Handle development mode with Vite
+  // Handle development mode with Vite after API routes
   logInfo('Setting up Vite development server');
   (async () => {
     try {
@@ -123,8 +140,6 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 
 // Start server
 const PORT = Number(process.env.PORT) || 5000;
-logInfo(`Starting server on port ${PORT}`);
-
 httpServer.listen(PORT, '0.0.0.0', () => {
   logInfo('Server started successfully on port ' + PORT);
 });

@@ -6,38 +6,34 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import jwt from 'jsonwebtoken';
 import express from 'express';
+import { log } from "./vite";
 
 const JWT_SECRET = process.env.REPL_ID!;
 
-export function hashPassword(password: string): string {
-  return createHash('sha256').update(password).digest('hex');
-}
-
+// Schema validation
 const registerSchema = z.object({
   email: z.string().email("Invalid email format"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   userType: z.string().optional()
 });
 
-export function setupAuth(app: Express) {
-  // Basic middleware setup
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
+export function hashPassword(password: string): string {
+  return createHash('sha256').update(password).digest('hex');
+}
 
+export function setupAuth(app: Express) {
   // API middleware for consistent JSON responses
-  app.use('/api', (req: Request, res: Response, next: NextFunction) => {
-    res.type('application/json');
+  app.use('/api/auth', (req: Request, res: Response, next: NextFunction) => {
+    res.setHeader('Content-Type', 'application/json');
     next();
   });
 
   app.post("/api/login", async (req, res) => {
-    console.log('Login request received:', { email: req.body.email });
-
     try {
       const { email, password } = req.body;
+      log('Login attempt:', { email });
 
       if (!email || !password) {
-        console.log('Missing credentials:', { email: !!email, password: !!password });
         return res.status(400).json({
           success: false,
           message: "Email and password are required"
@@ -50,7 +46,7 @@ export function setupAuth(app: Express) {
         .where(eq(users.email, email))
         .limit(1);
 
-      console.log('User lookup result:', { found: !!user, email });
+      log('User lookup result:', { found: !!user, email });
 
       if (!user) {
         return res.status(401).json({
@@ -61,8 +57,7 @@ export function setupAuth(app: Express) {
 
       const hashedPassword = hashPassword(password);
       const passwordMatch = hashedPassword === user.password;
-
-      console.log('Password verification:', { email, matches: passwordMatch });
+      log('Password verification:', { email, matches: passwordMatch });
 
       if (!passwordMatch) {
         return res.status(401).json({
@@ -82,9 +77,9 @@ export function setupAuth(app: Express) {
         { expiresIn: '24h' }
       );
 
-      console.log('Login successful:', { email });
+      log('Login successful:', { email });
 
-      const response = {
+      return res.status(200).json({
         success: true,
         token,
         user: {
@@ -93,13 +88,10 @@ export function setupAuth(app: Express) {
           userType: user.userType,
           superAdmin: user.superAdmin
         }
-      };
-
-      console.log('Sending response:', response);
-      return res.status(200).json(response);
+      });
 
     } catch (error) {
-      console.error('Login error:', error);
+      log('Login error:', error instanceof Error ? error.message : String(error));
       return res.status(500).json({
         success: false,
         message: "Internal server error"
@@ -165,7 +157,7 @@ export function setupAuth(app: Express) {
         });
       }
 
-      console.error('Registration error:', error);
+      log('Registration error:', error instanceof Error ? error.message : String(error));
       return res.status(500).json({
         success: false,
         message: "Failed to create account"
@@ -226,7 +218,7 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
       };
       next();
     } catch (error) {
-      console.error('Token verification error:', error);
+      log('Token verification error:', error instanceof Error ? error.message : String(error));
       return res.status(500).json({
         success: false,
         message: "Internal server error"
