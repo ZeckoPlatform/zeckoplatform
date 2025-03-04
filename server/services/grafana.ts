@@ -12,7 +12,7 @@ const GRAFANA_PROVISIONING_DIR = path.join(GRAFANA_CONFIG_DIR, 'provisioning');
 const GRAFANA_DASHBOARDS_DIR = path.join(GRAFANA_PROVISIONING_DIR, 'dashboards');
 const GRAFANA_DATASOURCES_DIR = path.join(GRAFANA_PROVISIONING_DIR, 'datasources');
 
-// Ensure all Grafana directories exist with proper permissions
+// Ensure all Grafana directories exist
 [
   GRAFANA_CONFIG_DIR,
   GRAFANA_DATA_DIR,
@@ -22,7 +22,7 @@ const GRAFANA_DATASOURCES_DIR = path.join(GRAFANA_PROVISIONING_DIR, 'datasources
   GRAFANA_DATASOURCES_DIR
 ].forEach(dir => {
   if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true, mode: 0o755 });
+    fs.mkdirSync(dir, { recursive: true });
     log(`Created Grafana directory: ${dir}`);
   }
 });
@@ -62,20 +62,9 @@ allow_sign_up = false
 auto_assign_org = true
 auto_assign_org_role = Admin
 
-[auth.anonymous]
-enabled = false
-
 [dashboards]
-versions_to_keep = 20
 min_refresh_interval = 5s
-
-[datasources]
-datasources_path = ${GRAFANA_DATASOURCES_DIR}
 `;
-
-// Write Grafana configuration file
-fs.writeFileSync(GRAFANA_CONFIG_FILE, grafanaConfig, { mode: 0o644 });
-log('Wrote Grafana configuration file');
 
 let grafanaProcess: any = null;
 
@@ -86,23 +75,19 @@ export function startGrafanaServer() {
   }
 
   try {
-    log('Starting Grafana server...');
-    const grafanaServerPath = '/nix/store/2m2kacwqa9v8wd09c1p4pp2cx99bviww-grafana-10.4.3/bin/grafana-server';
+    log('Starting Grafana server setup...');
 
-    // Force remove Grafana's data directory to ensure clean state
-    if (fs.existsSync(GRAFANA_DATA_DIR)) {
-      fs.rmSync(GRAFANA_DATA_DIR, { recursive: true, force: true });
-      fs.mkdirSync(GRAFANA_DATA_DIR, { recursive: true, mode: 0o755 });
-      log('Reset Grafana data directory');
-    }
+    // Write Grafana configuration file
+    fs.writeFileSync(GRAFANA_CONFIG_FILE, grafanaConfig);
+    log('Wrote Grafana configuration:', { 
+      configPath: GRAFANA_CONFIG_FILE,
+      port: GRAFANA_PORT,
+      adminUser: 'admin'
+    });
 
-    // Create initial provisioning files
-    const dashboardsYaml = path.join(GRAFANA_DASHBOARDS_DIR, 'dashboards.yaml');
-    const datasourcesYaml = path.join(GRAFANA_DATASOURCES_DIR, 'prometheus.yaml');
-
-    fs.writeFileSync(dashboardsYaml, `
+    // Write dashboards provisioning
+    const dashboardsConfig = `
 apiVersion: 1
-
 providers:
   - name: 'Default'
     orgId: 1
@@ -113,9 +98,12 @@ providers:
     allowUiUpdates: true
     options:
       path: ${GRAFANA_DASHBOARDS_DIR}
-`, { mode: 0o644 });
+`;
+    fs.writeFileSync(path.join(GRAFANA_DASHBOARDS_DIR, 'dashboards.yaml'), dashboardsConfig);
+    log('Wrote dashboards provisioning config');
 
-    fs.writeFileSync(datasourcesYaml, `
+    // Write datasources provisioning
+    const datasourcesConfig = `
 apiVersion: 1
 datasources:
   - name: Prometheus
@@ -128,20 +116,23 @@ datasources:
       timeInterval: '15s'
       queryTimeout: '60s'
       httpMethod: GET
-`, { mode: 0o644 });
+`;
+    fs.writeFileSync(path.join(GRAFANA_DATASOURCES_DIR, 'datasources.yaml'), datasourcesConfig);
+    log('Wrote datasources provisioning config');
 
+    // Start Grafana server
+    const grafanaServerPath = '/nix/store/2m2kacwqa9v8wd09c1p4pp2cx99bviww-grafana-10.4.3/bin/grafana-server';
     grafanaProcess = spawn(grafanaServerPath, [
       '--config', GRAFANA_CONFIG_FILE,
-      '--homepath', '/nix/store/2m2kacwqa9v8wd09c1p4pp2cx99bviww-grafana-10.4.3/share/grafana',
-      '--pidfile', path.join(GRAFANA_CONFIG_DIR, 'grafana.pid'),
+      '--homepath', '/nix/store/2m2kacwqa9v8wd09c1p4pp2cx99bviww-grafana-10.4.3/share/grafana'
     ]);
 
     grafanaProcess.stdout.on('data', (data: Buffer) => {
-      log('Grafana:', data.toString());
+      log('Grafana stdout:', data.toString().trim());
     });
 
     grafanaProcess.stderr.on('data', (data: Buffer) => {
-      log('Grafana Error:', data.toString());
+      log('Grafana stderr:', data.toString().trim());
     });
 
     grafanaProcess.on('close', (code: number) => {
@@ -149,7 +140,7 @@ datasources:
       grafanaProcess = null;
     });
 
-    log('Grafana server started');
+    log('Grafana server started successfully');
   } catch (error) {
     log('Failed to start Grafana:', error instanceof Error ? error.message : String(error));
     throw error;
