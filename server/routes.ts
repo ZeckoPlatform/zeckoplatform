@@ -63,11 +63,6 @@ export function registerRoutes(app: Express): Server {
   app.get('/api/metrics', async (req: any, res) => {
     try {
       const authHeader = req.headers.authorization;
-      log('Metrics request:', {
-        authHeader: authHeader ? 'Bearer [token]' : 'none',
-        headers: req.headers
-      });
-
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'Authentication required' });
       }
@@ -76,7 +71,6 @@ export function registerRoutes(app: Express): Server {
       const decoded = verifyToken(token);
 
       if (!decoded || !decoded.superAdmin) {
-        log('Metrics access denied:', { decoded });
         return res.status(403).json({ error: 'Access denied' });
       }
 
@@ -90,33 +84,19 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Grafana proxy middleware with auth
+  // Single Grafana proxy middleware with auth
   app.use(
     '/admin/analytics/grafana',
     (req: any, res, next) => {
-      let token;
-
-      // Check for token in Authorization header
-      if (req.headers.authorization?.startsWith('Bearer ')) {
-        token = req.headers.authorization.split(' ')[1];
-      }
-
-      log('Grafana auth check:', {
-        hasToken: !!token,
-        url: req.url,
-        method: req.method,
-        path: req.path
-      });
-
-      if (!token) {
-        log('Grafana access denied: No token found');
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'Authentication required' });
       }
 
+      const token = authHeader.split(' ')[1];
       const decoded = verifyToken(token);
 
       if (!decoded || !decoded.superAdmin) {
-        log('Grafana access denied:', { decoded });
         return res.status(403).json({ error: 'Access denied' });
       }
 
@@ -134,11 +114,6 @@ export function registerRoutes(app: Express): Server {
       },
       ws: true,
       onProxyReq: (proxyReq: any, req: any) => {
-        // Preserve the auth headers
-        if (req.headers['authorization']) {
-          proxyReq.setHeader('Authorization', req.headers['authorization']);
-        }
-
         log('Proxying Grafana request:', {
           url: req.url,
           hasAuth: !!req.headers['authorization']
