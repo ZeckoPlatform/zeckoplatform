@@ -19,19 +19,21 @@ const registerSchema = z.object({
 
 export function hashPassword(password: string): string {
   try {
+    // Create a UTF-8 encoded Buffer from the password string
+    const pwBuffer = Buffer.from(password, 'utf8');
+
     // Create hash using SHA-256
     const hash = createHash('sha256');
-    // Update with UTF-8 encoded password
-    hash.update(Buffer.from(password, 'utf8'));
+    hash.update(pwBuffer);
+
     // Get hex digest
     const hashedPassword = hash.digest('hex');
 
-    // Log hashing details for debugging
-    log('Password hashing details:', {
+    // Debug log the hashing process
+    log('Password hashing:', {
       input: password,
-      inputLength: password.length,
+      inputBuffer: pwBuffer.toString('hex'),
       hashedOutput: hashedPassword,
-      hashedLength: hashedPassword.length,
       expectedHash: "123f7788d67a5b86df83b8b03d0c8ce0bba9c7c2f0e21df56aef0bc2c48d48d3",
       matches: hashedPassword === "123f7788d67a5b86df83b8b03d0c8ce0bba9c7c2f0e21df56aef0bc2c48d48d3"
     });
@@ -53,7 +55,7 @@ export function setupAuth(app: Express) {
     try {
       const { email, password } = req.body;
 
-      log('Login attempt:', {
+      log('Login request received:', {
         email,
         passwordLength: password?.length || 0
       });
@@ -72,17 +74,17 @@ export function setupAuth(app: Express) {
         .where(eq(users.email, email));
 
       if (!user) {
-        log('User not found:', email);
+        log('No user found:', email);
         return res.status(401).json({
           success: false,
           message: "Invalid credentials"
         });
       }
 
-      log('Found user:', {
+      log('User found:', {
         id: user.id,
         email: user.email,
-        storedPasswordHash: user.password
+        storedHash: user.password
       });
 
       // Hash and verify password
@@ -90,6 +92,7 @@ export function setupAuth(app: Express) {
       const passwordMatch = hashedPassword === user.password;
 
       log('Password verification:', {
+        providedPassword: password,
         providedHash: hashedPassword,
         storedHash: user.password,
         matches: passwordMatch
