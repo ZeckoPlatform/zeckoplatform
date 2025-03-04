@@ -16,7 +16,6 @@ export function setupAuth(app: Express) {
   app.post("/api/login", async (req, res) => {
     try {
       const { email, password } = req.body;
-      log('Login attempt:', { email });
 
       // Find user
       const [user] = await db
@@ -26,7 +25,6 @@ export function setupAuth(app: Express) {
         .limit(1);
 
       if (!user) {
-        log('User not found:', email);
         return res.status(401).json({
           success: false,
           message: "Invalid credentials"
@@ -35,8 +33,6 @@ export function setupAuth(app: Express) {
 
       // Verify password
       const hashedPassword = hashPassword(password);
-      log('Password check:', { email, matches: hashedPassword === user.password });
-
       if (hashedPassword !== user.password) {
         return res.status(401).json({
           success: false,
@@ -56,8 +52,6 @@ export function setupAuth(app: Express) {
         { expiresIn: '24h' }
       );
 
-      log('Login successful:', { email });
-
       res.json({
         success: true,
         token,
@@ -70,7 +64,7 @@ export function setupAuth(app: Express) {
       });
 
     } catch (error) {
-      log('Login error:', error instanceof Error ? error.message : String(error));
+      console.error('Login error:', error);
       res.status(500).json({
         success: false,
         message: "Internal server error"
@@ -128,6 +122,7 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
       };
       next();
     } catch (error) {
+      console.error('Token verification error:', error);
       return res.status(500).json({
         success: false,
         message: "Internal server error"
