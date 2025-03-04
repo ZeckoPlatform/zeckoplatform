@@ -12,31 +12,20 @@ import { z } from "zod";
 const scryptAsync = promisify(scrypt);
 const JWT_SECRET = process.env.REPL_ID!;
 
+// Simple but secure password hashing
 export async function hashPassword(password: string) {
-  try {
-    const salt = randomBytes(16).toString("hex");
-    const buf = (await scryptAsync(password, salt, 32)) as Buffer;
-    return `${buf.toString("hex")}.${salt}`;
-  } catch (error) {
-    log('Error hashing password:', error instanceof Error ? error.message : String(error));
-    throw new Error('Failed to hash password');
-  }
+  const salt = randomBytes(16).toString('hex');
+  const derivedKey = (await scryptAsync(password, salt, 32)) as Buffer;
+  return `${derivedKey.toString('hex')}.${salt}`;
 }
 
 export async function comparePasswords(supplied: string, stored: string) {
   try {
-    if (!stored || !stored.includes('.')) {
-      log('Invalid stored password format');
-      return false;
-    }
-
-    const [hashed, salt] = stored.split(".");
-    const hashedBuf = Buffer.from(hashed, "hex");
-    const suppliedBuf = (await scryptAsync(supplied, salt, 32)) as Buffer;
-
-    return timingSafeEqual(hashedBuf, suppliedBuf);
+    const [hash, salt] = stored.split('.');
+    const hashBuffer = Buffer.from(hash, 'hex');
+    const suppliedBuffer = (await scryptAsync(supplied, salt, 32)) as Buffer;
+    return timingSafeEqual(hashBuffer, suppliedBuffer);
   } catch (error) {
-    log('Error comparing passwords:', error instanceof Error ? error.message : String(error));
     return false;
   }
 }
@@ -48,11 +37,11 @@ const loginSchema = z.object({
 
 export function generateToken(user: SelectUser) {
   return jwt.sign(
-    { 
+    {
       id: user.id,
       email: user.email,
       userType: user.userType,
-      superAdmin: user.userType === 'admin' || user.superAdmin 
+      superAdmin: user.superAdmin
     },
     JWT_SECRET,
     { expiresIn: '24h' }
@@ -62,15 +51,10 @@ export function generateToken(user: SelectUser) {
 export function setupAuth(app: Express) {
   app.post("/api/login", async (req, res) => {
     try {
-      log('Login attempt received:', { 
-        email: req.body.email,
-        hasPassword: !!req.body.password,
-        passwordLength: req.body.password?.length 
-      });
-
+      // Validate request body
       const validatedData = loginSchema.parse(req.body);
-      log('Validation passed for:', validatedData.email);
 
+      // Find user
       const [user] = await db
         .select()
         .from(users)
@@ -78,30 +62,24 @@ export function setupAuth(app: Express) {
         .limit(1);
 
       if (!user) {
-        log('Login failed: User not found');
         return res.status(401).json({
           success: false,
           message: "Invalid credentials"
         });
       }
 
+      // Verify password
       const isValidPassword = await comparePasswords(validatedData.password, user.password);
-      log('Password validation result:', { 
-        isValid: isValidPassword,
-        storedPasswordFormat: user.password.includes('.'),
-        storedPasswordLength: user.password.length
-      });
 
       if (!isValidPassword) {
-        log('Login failed: Invalid password');
         return res.status(401).json({
           success: false,
           message: "Invalid credentials"
         });
       }
 
+      // Generate token and send response
       const token = generateToken(user);
-      log('Login successful for user:', user.id);
 
       res.json({
         success: true,
@@ -111,21 +89,25 @@ export function setupAuth(app: Express) {
         },
         token
       });
+
     } catch (error) {
       if (error instanceof z.ZodError) {
-        log('Login validation error:', error.errors);
         return res.status(400).json({
           success: false,
           message: "Validation error",
           errors: error.errors
         });
       }
-      log('Login error:', error instanceof Error ? error.message : String(error));
+
       res.status(500).json({
         success: false,
         message: "Internal server error during login"
       });
     }
+  });
+
+  app.get("/api/user", authenticateToken, (req, res) => {
+    res.json((req as any).user);
   });
 
   app.post("/api/logout", (req, res) => {
@@ -134,10 +116,6 @@ export function setupAuth(app: Express) {
       message: "Logged out successfully"
     });
   });
-
-  app.get("/api/user", authenticateToken, (req, res) => {
-    res.json((req as any).user);
-  });
 }
 
 export function authenticateToken(req: Request, res: Response, next: NextFunction) {
@@ -145,17 +123,17 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    return res.status(401).json({ 
+    return res.status(401).json({
       success: false,
-      message: "Authentication required" 
+      message: "Authentication required"
     });
   }
 
   jwt.verify(token, JWT_SECRET, async (err: any, decoded: any) => {
     if (err) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        message: "Invalid or expired token" 
+        message: "Invalid or expired token"
       });
     }
 
@@ -167,9 +145,9 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
         .limit(1);
 
       if (!user) {
-        return res.status(401).json({ 
+        return res.status(401).json({
           success: false,
-          message: "User not found" 
+          message: "User not found"
         });
       }
 
@@ -179,10 +157,9 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
       };
       next();
     } catch (error) {
-      log('Database error in auth middleware:', error instanceof Error ? error.message : String(error));
-      return res.status(500).json({ 
+      return res.status(500).json({
         success: false,
-        message: "Internal server error" 
+        message: "Internal server error"
       });
     }
   });
