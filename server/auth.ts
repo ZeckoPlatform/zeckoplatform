@@ -11,33 +11,28 @@ import jwt from 'jsonwebtoken';
 const scryptAsync = promisify(scrypt);
 const JWT_SECRET = process.env.REPL_ID!;
 
-// Basic schema validation
 const loginSchema = z.object({
   email: z.string().email("Invalid email format"),
   password: z.string().min(1, "Password is required")
 });
 
-// Password hashing with salt
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16).toString('hex');
-  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
+  const buf = (await scryptAsync(password, salt, 32)) as Buffer;
   return `${buf.toString('hex')}.${salt}`;
 }
 
-// Password verification
-async function verifyPassword(supplied: string, stored: string): Promise<boolean> {
+async function comparePasswords(supplied: string, stored: string): Promise<boolean> {
   try {
     const [hash, salt] = stored.split('.');
-    if (!hash || !salt) {
-      log('Invalid stored password format');
-      return false;
-    }
+    if (!hash || !salt) return false;
 
-    const hashedBuf = Buffer.from(hash, 'hex');
-    const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-    return hashedBuf.toString('hex') === suppliedBuf.toString('hex');
+    const suppliedBuf = (await scryptAsync(supplied, salt, 32)) as Buffer;
+    const suppliedHash = suppliedBuf.toString('hex');
+
+    return hash === suppliedHash;
   } catch (error) {
-    log('Password verification error:', error instanceof Error ? error.message : String(error));
+    log('Password comparison error:', error instanceof Error ? error.message : String(error));
     return false;
   }
 }
@@ -45,7 +40,6 @@ async function verifyPassword(supplied: string, stored: string): Promise<boolean
 export function setupAuth(app: Express) {
   app.post("/api/login", async (req, res) => {
     try {
-      // Validate request body
       const validatedData = loginSchema.parse(req.body);
       log('Login attempt for:', validatedData.email);
 
@@ -65,8 +59,11 @@ export function setupAuth(app: Express) {
       }
 
       // Verify password
-      const isValid = await verifyPassword(validatedData.password, user.password);
-      log('Password verification result:', { userId: user.id, isValid });
+      const isValid = await comparePasswords(validatedData.password, user.password);
+      log('Password verification result:', {
+        userId: user.id,
+        isValid
+      });
 
       if (!isValid) {
         return res.status(401).json({
@@ -86,8 +83,6 @@ export function setupAuth(app: Express) {
         JWT_SECRET,
         { expiresIn: '24h' }
       );
-
-      log('Login successful for:', user.email);
 
       res.json({
         success: true,
