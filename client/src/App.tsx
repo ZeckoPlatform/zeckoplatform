@@ -49,6 +49,7 @@ function Router() {
         <Route path="/vendor/dashboard" component={() => <ProtectedRoute component={VendorDashboard} />} />
         <Route path="/analytics" component={() => <ProtectedRoute component={AnalyticsDashboard} />} />
         <Route path="/admin/analytics" component={() => <ProtectedRoute component={AdminAnalyticsDashboard} />} />
+        <Route path="/admin/analytics/settings" component={() => <ProtectedRoute component={AnalyticsSettingsPage} />} />
         <Route path="/admin-management" component={() => <ProtectedRoute component={AdminManagementPage} />} />
         <Route path="/reviews" component={() => <ProtectedRoute component={ReviewsDashboard} />} />
         <Route path="/notifications" component={() => <ProtectedRoute component={NotificationsPage} />} />
@@ -94,17 +95,6 @@ function Router() {
               component={() => (
                 <SettingsLayout>
                   <NotificationSettingsPage />
-                </SettingsLayout>
-              )}
-            />
-          )}
-        </Route>
-        <Route path="/settings/analytics">
-          {() => (
-            <ProtectedRoute
-              component={() => (
-                <SettingsLayout>
-                  <AnalyticsSettingsPage />
                 </SettingsLayout>
               )}
             />
