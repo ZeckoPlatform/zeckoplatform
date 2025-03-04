@@ -29,7 +29,7 @@ import { FeedbackDialog } from "@/components/FeedbackDialog";
 import FeedbackManagementPage from "@/pages/admin/feedback-management";
 import SocialFeedPage from "@/pages/social-feed";
 import AdminAnalyticsDashboard from "@/pages/admin/analytics-dashboard";
-import AnalyticsMonitoringPage from "@/pages/settings/analytics-monitoring";
+import AnalyticsSettingsPage from "@/pages/settings/analytics-settings";
 
 function Router() {
   return (
@@ -49,7 +49,6 @@ function Router() {
         <Route path="/vendor/dashboard" component={() => <ProtectedRoute component={VendorDashboard} />} />
         <Route path="/analytics" component={() => <ProtectedRoute component={AnalyticsDashboard} />} />
         <Route path="/admin/analytics" component={() => <ProtectedRoute component={AdminAnalyticsDashboard} />} />
-        <Route path="/admin/analytics/monitoring" component={() => <ProtectedRoute component={AnalyticsMonitoringPage} />} />
         <Route path="/admin-management" component={() => <ProtectedRoute component={AdminManagementPage} />} />
         <Route path="/reviews" component={() => <ProtectedRoute component={ReviewsDashboard} />} />
         <Route path="/notifications" component={() => <ProtectedRoute component={NotificationsPage} />} />
@@ -105,7 +104,7 @@ function Router() {
             <ProtectedRoute
               component={() => (
                 <SettingsLayout>
-                  <AnalyticsMonitoringPage />
+                  <AnalyticsSettingsPage />
                 </SettingsLayout>
               )}
             />
