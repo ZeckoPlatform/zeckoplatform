@@ -1,5 +1,5 @@
 import type { Express, Request, Response, NextFunction } from "express";
-import { scrypt, randomBytes, timingSafeEqual } from "crypto";
+import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
 import { users, type SelectUser } from "@db/schema";
 import { db } from "@db";
@@ -20,22 +20,22 @@ const loginSchema = z.object({
 // Password hashing with salt
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16).toString('hex');
-  const buf = (await scryptAsync(password, salt, 32)) as Buffer;
+  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
   return `${buf.toString('hex')}.${salt}`;
 }
 
 // Password verification
-async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
+async function verifyPassword(supplied: string, stored: string): Promise<boolean> {
   try {
-    const [hash, salt] = storedHash.split('.');
+    const [hash, salt] = stored.split('.');
     if (!hash || !salt) {
       log('Invalid stored password format');
       return false;
     }
 
-    const hashBuffer = Buffer.from(hash, 'hex');
-    const suppliedBuffer = (await scryptAsync(password, salt, 32)) as Buffer;
-    return timingSafeEqual(hashBuffer, suppliedBuffer);
+    const hashedBuf = Buffer.from(hash, 'hex');
+    const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+    return hashedBuf.toString('hex') === suppliedBuf.toString('hex');
   } catch (error) {
     log('Password verification error:', error instanceof Error ? error.message : String(error));
     return false;
@@ -45,7 +45,7 @@ async function verifyPassword(password: string, storedHash: string): Promise<boo
 export function setupAuth(app: Express) {
   app.post("/api/login", async (req, res) => {
     try {
-      // Validate input
+      // Validate request body
       const validatedData = loginSchema.parse(req.body);
       log('Login attempt for:', validatedData.email);
 
@@ -66,10 +66,7 @@ export function setupAuth(app: Express) {
 
       // Verify password
       const isValid = await verifyPassword(validatedData.password, user.password);
-      log('Password verification result:', {
-        userId: user.id,
-        isValid
-      });
+      log('Password verification result:', { userId: user.id, isValid });
 
       if (!isValid) {
         return res.status(401).json({
