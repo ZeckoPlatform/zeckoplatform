@@ -51,16 +51,8 @@ function useAuthState() {
           throw new Error("Failed to fetch user data");
         }
 
-        const text = await res.text();
-        console.log('Raw user response:', text);
-
-        try {
-          const data = JSON.parse(text) as ApiResponse<SelectUser>;
-          return data.success && data.user ? data.user : null;
-        } catch (err) {
-          console.error('Failed to parse user response:', err);
-          return null;
-        }
+        const data = await res.json() as ApiResponse<SelectUser>;
+        return data.success && data.user ? data.user : null;
       } catch (error) {
         console.error('User fetch error:', error);
         return null;
@@ -77,9 +69,10 @@ function useAuthState() {
         throw new Error("Email and password are required");
       }
 
-      console.log('Login attempt:', { 
+      console.log('Login attempt:', {
         email: credentials.email,
-        passwordProvided: !!credentials.password 
+        password: '********', // Log presence of password without revealing value
+        hasPassword: !!credentials.password
       });
 
       const res = await fetch("/api/login", {
@@ -136,7 +129,7 @@ function useAuthState() {
 
       console.log('Registration attempt:', {
         email: data.email,
-        passwordProvided: !!data.password
+        hasPassword: !!data.password
       });
 
       const res = await fetch("/api/register", {
