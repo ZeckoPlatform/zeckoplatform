@@ -1,33 +1,23 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { users, insertUserSchema, type SelectUser } from "@db/schema";
+import { users, type SelectUser } from "@db/schema";
 import { db } from "@db";
 import { eq } from "drizzle-orm";
-import { fromZodError } from "zod-validation-error";
+import { z } from "zod";
 import { log } from "./vite";
 import jwt from 'jsonwebtoken';
-import { z } from "zod";
 
 const scryptAsync = promisify(scrypt);
 const JWT_SECRET = process.env.REPL_ID!;
 
-// Simple but secure password hashing
-export async function hashPassword(password: string) {
-  const salt = randomBytes(16).toString('hex');
-  const derivedKey = (await scryptAsync(password, salt, 32)) as Buffer;
-  return `${derivedKey.toString('hex')}.${salt}`;
-}
-
-export async function comparePasswords(supplied: string, stored: string) {
-  try {
-    const [hash, salt] = stored.split('.');
-    const hashBuffer = Buffer.from(hash, 'hex');
-    const suppliedBuffer = (await scryptAsync(supplied, salt, 32)) as Buffer;
-    return timingSafeEqual(hashBuffer, suppliedBuffer);
-  } catch (error) {
-    return false;
-  }
+// Temporary debug function
+async function debugHashPassword(password: string) {
+  const salt = "debugsalt123456789";
+  const buf = (await scryptAsync(password, salt, 32)) as Buffer;
+  const hash = buf.toString("hex");
+  log('Debug: Generated hash', { hash, salt });
+  return `${hash}.${salt}`;
 }
 
 const loginSchema = z.object({
@@ -35,59 +25,83 @@ const loginSchema = z.object({
   password: z.string().min(1, "Password is required")
 });
 
-export function generateToken(user: SelectUser) {
-  return jwt.sign(
-    {
-      id: user.id,
-      email: user.email,
-      userType: user.userType,
-      superAdmin: user.superAdmin
-    },
-    JWT_SECRET,
-    { expiresIn: '24h' }
-  );
-}
-
 export function setupAuth(app: Express) {
+  // Temporary debug endpoint
+  app.post("/api/debug-hash", async (req, res) => {
+    if (process.env.NODE_ENV !== 'development') {
+      return res.status(404).send();
+    }
+    const hash = await debugHashPassword(req.body.password);
+    res.json({ hash });
+  });
+
   app.post("/api/login", async (req, res) => {
     try {
-      // Validate request body
-      const validatedData = loginSchema.parse(req.body);
+      const { email, password } = loginSchema.parse(req.body);
+      log('Login attempt:', { email });
 
-      // Find user
       const [user] = await db
         .select()
         .from(users)
-        .where(eq(users.email, validatedData.email))
+        .where(eq(users.email, email))
         .limit(1);
 
       if (!user) {
+        log('User not found');
         return res.status(401).json({
           success: false,
           message: "Invalid credentials"
         });
       }
 
-      // Verify password
-      const isValidPassword = await comparePasswords(validatedData.password, user.password);
+      log('Found user:', { id: user.id });
 
-      if (!isValidPassword) {
+      // Debug log password check
+      const salt = user.password.split('.')[1];
+      const inputBuf = (await scryptAsync(password, salt, 32)) as Buffer;
+      const inputHash = inputBuf.toString('hex');
+      const storedHash = user.password.split('.')[0];
+
+      log('Debug password check:', {
+        inputHashLength: inputHash.length,
+        storedHashLength: storedHash.length,
+        saltUsed: salt
+      });
+
+      const isValid = timingSafeEqual(
+        Buffer.from(inputHash, 'hex'),
+        Buffer.from(storedHash, 'hex')
+      );
+
+      if (!isValid) {
+        log('Password mismatch');
         return res.status(401).json({
           success: false,
           message: "Invalid credentials"
         });
       }
 
-      // Generate token and send response
-      const token = generateToken(user);
+      const token = jwt.sign(
+        {
+          id: user.id,
+          email: user.email,
+          userType: user.userType,
+          superAdmin: user.superAdmin
+        },
+        JWT_SECRET,
+        { expiresIn: '24h' }
+      );
 
+      log('Login successful');
       res.json({
         success: true,
+        token,
         user: {
-          ...user,
-          superAdmin: user.userType === 'admin' || user.superAdmin
-        },
-        token
+          id: user.id,
+          email: user.email,
+          userType: user.userType,
+          superAdmin: user.superAdmin
+        }
       });
 
     } catch (error) {
@@ -99,6 +113,7 @@ export function setupAuth(app: Express) {
         });
       }
 
+      log('Login error:', error instanceof Error ? error.message : String(error));
       res.status(500).json({
         success: false,
         message: "Internal server error during login"
@@ -152,8 +167,10 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
       }
 
       (req as any).user = {
-        ...user,
-        superAdmin: user.userType === 'admin' || user.superAdmin
+        id: user.id,
+        email: user.email,
+        userType: user.userType,
+        superAdmin: user.superAdmin
       };
       next();
     } catch (error) {
