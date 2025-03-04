@@ -60,37 +60,14 @@ export function generateToken(user: SelectUser) {
 export function setupAuth(app: Express) {
   app.post("/api/login", async (req, res) => {
     try {
-      const { email, password } = req.body;
-      log(`Login attempt for email: ${email}`);
+      const validatedData = loginSchema.parse(req.body);
+      log(`Login attempt for email: ${validatedData.email}`);
 
-      try {
-        loginSchema.parse(req.body);
-        log('Request validation passed');
-      } catch (validationError) {
-        if (validationError instanceof z.ZodError) {
-          return res.status(400).json({
-            success: false,
-            message: "Validation error",
-            errors: validationError.errors
-          });
-        }
-        throw validationError;
-      }
-
-      let user: SelectUser | undefined;
-      try {
-        log('Querying database for user...');
-        const result = await db
-          .select()
-          .from(users)
-          .where(eq(users.email, email))
-          .limit(1);
-        user = result[0];
-        log(`User lookup result: ${user ? 'Found' : 'Not found'}`);
-      } catch (dbError) {
-        log('Database error during user lookup:', dbError instanceof Error ? dbError.message : String(dbError));
-        throw new Error('Database error during user lookup');
-      }
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, validatedData.email))
+        .limit(1);
 
       if (!user) {
         return res.status(401).json({
@@ -99,9 +76,7 @@ export function setupAuth(app: Express) {
         });
       }
 
-      const isValidPassword = await comparePasswords(password, user.password);
-      log(`Password validation result: ${isValidPassword ? 'Valid' : 'Invalid'}`);
-
+      const isValidPassword = await comparePasswords(validatedData.password, user.password);
       if (!isValidPassword) {
         return res.status(401).json({
           success: false,
@@ -118,6 +93,13 @@ export function setupAuth(app: Express) {
         token
       });
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          success: false,
+          message: "Validation error",
+          errors: error.errors
+        });
+      }
       log('Login error:', error instanceof Error ? error.message : String(error));
       res.status(500).json({
         success: false,
@@ -151,12 +133,22 @@ export function setupAuth(app: Express) {
       }
 
       const hashedPassword = await hashPassword(result.data.password);
+
+      // Correctly type the user data for insertion
+      const userData = {
+        ...result.data,
+        password: hashedPassword,
+        userType: result.data.userType || "free",
+        active: true,
+        subscriptionActive: false,
+        subscriptionTier: "none" as const,
+        stripeAccountStatus: "pending" as const,
+        verificationStatus: "pending" as const
+      };
+
       const [user] = await db
         .insert(users)
-        .values({
-          ...result.data,
-          password: hashedPassword
-        })
+        .values(userData)
         .returning();
 
       const token = generateToken(user);
