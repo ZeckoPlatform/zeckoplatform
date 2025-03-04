@@ -1,14 +1,11 @@
 import type { Express, Request, Response, NextFunction } from "express";
-import { scrypt, randomBytes } from "crypto";
-import { promisify } from "util";
-import { users, type SelectUser } from "@db/schema";
+import { createHash } from "crypto";
+import { users } from "@db/schema";
 import { db } from "@db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { log } from "./vite";
 import jwt from 'jsonwebtoken';
 
-const scryptAsync = promisify(scrypt);
 const JWT_SECRET = process.env.REPL_ID!;
 
 const loginSchema = z.object({
@@ -16,21 +13,8 @@ const loginSchema = z.object({
   password: z.string().min(1, "Password is required")
 });
 
-export async function hashPassword(password: string): Promise<string> {
-  const salt = randomBytes(16).toString('hex');
-  const derivedKey = (await scryptAsync(password, salt, 32)) as Buffer;
-  return `${derivedKey.toString('hex')}.${salt}`;
-}
-
-async function comparePasswords(supplied: string, stored: string): Promise<boolean> {
-  try {
-    const [hash, salt] = stored.split('.');
-    const derivedKey = (await scryptAsync(supplied, salt, 32)) as Buffer;
-    return derivedKey.toString('hex') === hash;
-  } catch (error) {
-    log('Password comparison error:', error);
-    return false;
-  }
+export function hashPassword(password: string): string {
+  return createHash('sha256').update(password).digest('hex');
 }
 
 export function setupAuth(app: Express) {
@@ -38,7 +22,6 @@ export function setupAuth(app: Express) {
     try {
       const validatedData = loginSchema.parse(req.body);
 
-      // Find user
       const [user] = await db
         .select()
         .from(users)
@@ -52,17 +35,14 @@ export function setupAuth(app: Express) {
         });
       }
 
-      // Verify password
-      const isValid = await comparePasswords(validatedData.password, user.password);
-
-      if (!isValid) {
+      const hashedPassword = hashPassword(validatedData.password);
+      if (hashedPassword !== user.password) {
         return res.status(401).json({
           success: false,
           message: "Invalid credentials"
         });
       }
 
-      // Generate token
       const token = jwt.sign(
         {
           id: user.id,
