@@ -5,6 +5,7 @@ import { Server } from "http";
 import { logInfo, logError } from "./services/logging";
 import { initializeMonitoring } from "./services/monitoring";
 import { checkPerformanceMetrics } from "./services/admin-notifications";
+import { startGrafanaServer } from "./services/grafana";
 
 const app = express();
 const isProd = process.env.NODE_ENV === 'production';
@@ -39,6 +40,18 @@ try {
     error: error instanceof Error ? error.message : String(error)
   });
   // Continue server startup even if monitoring fails
+}
+
+// Start Grafana server
+logInfo('Starting Grafana server...');
+try {
+  await startGrafanaServer();
+  logInfo('Grafana server started successfully');
+} catch (error) {
+  logError('Failed to start Grafana server:', {
+    error: error instanceof Error ? error.message : String(error)
+  });
+  // Continue server startup even if Grafana fails
 }
 
 // Register API routes

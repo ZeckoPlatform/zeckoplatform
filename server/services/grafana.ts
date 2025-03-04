@@ -29,7 +29,16 @@ export function startGrafanaServer(): Promise<void> {
         GF_PATHS_PLUGINS: path.join(homePath, 'plugins'),
         GF_PATHS_PROVISIONING: path.join(homePath, 'provisioning'),
         GF_SECURITY_ADMIN_USER: 'zeckoinfo@gmail.com',
-        GF_SECURITY_ADMIN_PASSWORD: 'Bobo19881'
+        GF_SECURITY_ADMIN_PASSWORD: 'Bobo19881',
+        GF_SERVER_HTTP_PORT: GRAFANA_PORT.toString(),
+        GF_SERVER_PROTOCOL: 'http',
+        GF_SERVER_DOMAIN: 'localhost',
+        GF_AUTH_DISABLE_LOGIN_FORM: 'false',
+        GF_AUTH_BASIC_ENABLED: 'true',
+        GF_USERS_ALLOW_SIGN_UP: 'false',
+        GF_SECURITY_ALLOW_EMBEDDING: 'true',
+        GF_SECURITY_COOKIE_SECURE: 'false',
+        GF_SECURITY_COOKIE_SAMESITE: 'none'
       };
 
       grafanaProcess = spawn('grafana', ['server', 
