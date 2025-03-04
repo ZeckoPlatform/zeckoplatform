@@ -71,7 +71,7 @@ function useAuthState() {
 
       console.log('Login attempt:', {
         email: credentials.email,
-        password: '********', // Log presence of password without revealing value
+        password: '********',
         hasPassword: !!credentials.password
       });
 

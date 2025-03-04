@@ -56,7 +56,7 @@ export function hashPassword(password: string): string {
 
 export function setupAuth(app: Express) {
   // API middleware for consistent JSON responses
-  app.use('/api/auth', (req: Request, res: Response, next: NextFunction) => {
+  app.use('/api/auth', (req, res, next) => {
     res.setHeader('Content-Type', 'application/json');
     next();
   });
