@@ -10,23 +10,13 @@ type LoginData = {
   password: string;
 };
 
-type RegisterData = {
-  email: string;
-  password: string;
-  userType?: string;
-};
-
 export const AuthContext = createContext<ReturnType<typeof useAuthState> | null>(null);
 
 function useAuthState() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
-  const {
-    data: user,
-    error,
-    isLoading,
-  } = useQuery<SelectUser | null>({
+  const { data: user, error, isLoading } = useQuery<SelectUser | null>({
     queryKey: ["/api/user"],
     queryFn: async () => {
       const token = localStorage.getItem("token");
@@ -60,8 +50,6 @@ function useAuthState() {
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
-      console.log('Login attempt with:', { email: credentials.email });
-
       try {
         const res = await fetch("/api/login", {
           method: "POST",
@@ -70,11 +58,6 @@ function useAuthState() {
           },
           body: JSON.stringify(credentials),
         });
-
-        const contentType = res.headers.get("content-type");
-        if (!contentType || !contentType.includes("application/json")) {
-          throw new Error("Invalid server response format");
-        }
 
         const data = await res.json();
         if (!res.ok || !data.success) {
@@ -104,51 +87,6 @@ function useAuthState() {
     onError: (error: Error) => {
       toast({
         title: "Login failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const registerMutation = useMutation({
-    mutationFn: async (data: RegisterData) => {
-      try {
-        const res = await fetch("/api/register", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(data),
-        });
-
-        const contentType = res.headers.get("content-type");
-        if (!contentType || !contentType.includes("application/json")) {
-          throw new Error("Invalid server response format");
-        }
-
-        const responseData = await res.json();
-        if (!res.ok) {
-          throw new Error(responseData.message || "Registration failed");
-        }
-
-        localStorage.setItem("token", responseData.token);
-        return responseData.user;
-      } catch (error) {
-        console.error('Registration error:', error);
-        throw error;
-      }
-    },
-    onSuccess: (user) => {
-      queryClient.setQueryData(["/api/user"], user);
-      toast({
-        title: "Welcome!",
-        description: "Your account has been created successfully.",
-      });
-      setLocation("/");
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Registration failed",
         description: error.message,
         variant: "destructive",
       });
@@ -188,7 +126,6 @@ function useAuthState() {
     error,
     loginMutation,
     logoutMutation,
-    registerMutation,
   };
 }
 
