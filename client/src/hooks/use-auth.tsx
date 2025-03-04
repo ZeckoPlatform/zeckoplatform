@@ -10,12 +10,6 @@ type LoginData = {
   password: string;
 };
 
-type RegisterData = {
-  email: string;
-  password: string;
-  userType?: string;
-};
-
 type ApiResponse<T> = {
   success: boolean;
   message?: string;
@@ -52,8 +46,6 @@ function useAuthState() {
         }
 
         const text = await res.text();
-        console.log('Raw user response:', text);
-
         try {
           const data = JSON.parse(text) as ApiResponse<SelectUser>;
           return data.success && data.user ? data.user : null;
@@ -87,24 +79,19 @@ function useAuthState() {
       const text = await res.text();
       console.log('Raw login response:', text);
 
-      try {
-        const data = JSON.parse(text) as ApiResponse<SelectUser>;
-        console.log('Parsed login response:', data);
+      const data = JSON.parse(text) as ApiResponse<SelectUser>;
+      console.log('Parsed login response:', data);
 
-        if (!res.ok || !data.success) {
-          throw new Error(data.message || "Login failed");
-        }
-
-        if (!data.token || !data.user) {
-          throw new Error("Invalid server response");
-        }
-
-        localStorage.setItem("token", data.token);
-        return data.user;
-      } catch (err) {
-        console.error('Failed to parse login response:', err);
-        throw new Error("Failed to process server response");
+      if (!data.success) {
+        throw new Error(data.message || "Login failed");
       }
+
+      if (!data.token || !data.user) {
+        throw new Error("Invalid server response");
+      }
+
+      localStorage.setItem("token", data.token);
+      return data.user;
     },
     onSuccess: (user) => {
       queryClient.setQueryData(["/api/user"], user);
@@ -128,54 +115,6 @@ function useAuthState() {
     },
   });
 
-  const registerMutation = useMutation({
-    mutationFn: async (data: RegisterData) => {
-      const res = await fetch("/api/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
-        body: JSON.stringify(data),
-      });
-
-      const text = await res.text();
-      console.log('Raw register response:', text);
-
-      try {
-        const data = JSON.parse(text) as ApiResponse<SelectUser>;
-        if (!res.ok || !data.success) {
-          throw new Error(data.message || "Registration failed");
-        }
-
-        if (!data.token || !data.user) {
-          throw new Error("Invalid server response");
-        }
-
-        localStorage.setItem("token", data.token);
-        return data.user;
-      } catch (err) {
-        console.error('Failed to parse register response:', err);
-        throw new Error("Failed to process server response");
-      }
-    },
-    onSuccess: (user) => {
-      queryClient.setQueryData(["/api/user"], user);
-      toast({
-        title: "Welcome!",
-        description: "Your account has been created successfully.",
-      });
-      setLocation("/");
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Registration failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
   const logoutMutation = useMutation({
     mutationFn: async () => {
       const token = localStorage.getItem("token");
@@ -184,7 +123,6 @@ function useAuthState() {
           await fetch("/api/logout", {
             method: "POST",
             headers: {
-              "Content-Type": "application/json",
               Authorization: `Bearer ${token}`,
             },
           });
@@ -210,7 +148,6 @@ function useAuthState() {
     error,
     loginMutation,
     logoutMutation,
-    registerMutation,
   };
 }
 
