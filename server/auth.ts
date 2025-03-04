@@ -5,12 +5,20 @@ import { db } from "@db";
 import { eq } from "drizzle-orm";
 import jwt from 'jsonwebtoken';
 import { log } from "./vite";
+import * as z from 'zod';
 
 const JWT_SECRET = process.env.REPL_ID!;
 
 export function hashPassword(password: string): string {
   return createHash('sha256').update(password).digest('hex');
 }
+
+// Add registration schema
+const registerSchema = z.object({
+  email: z.string().email("Invalid email format"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  userType: z.string().optional()
+});
 
 export function setupAuth(app: Express) {
   app.post("/api/login", async (req, res) => {
@@ -68,6 +76,75 @@ export function setupAuth(app: Express) {
       res.status(500).json({
         success: false,
         message: "Internal server error"
+      });
+    }
+  });
+
+  app.post("/api/register", async (req, res) => {
+    try {
+      const validatedData = registerSchema.parse(req.body);
+
+      // Check if user already exists
+      const [existingUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, validatedData.email))
+        .limit(1);
+
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: "Email already registered"
+        });
+      }
+
+      // Create new user
+      const [user] = await db
+        .insert(users)
+        .values({
+          email: validatedData.email,
+          password: hashPassword(validatedData.password),
+          userType: validatedData.userType || 'free',
+          superAdmin: false
+        })
+        .returning();
+
+      // Generate token
+      const token = jwt.sign(
+        {
+          id: user.id,
+          email: user.email,
+          userType: user.userType,
+          superAdmin: user.superAdmin
+        },
+        JWT_SECRET,
+        { expiresIn: '24h' }
+      );
+
+      res.status(201).json({
+        success: true,
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          userType: user.userType,
+          superAdmin: user.superAdmin
+        }
+      });
+
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid input",
+          errors: error.errors
+        });
+      }
+
+      console.error('Registration error:', error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to create account"
       });
     }
   });
