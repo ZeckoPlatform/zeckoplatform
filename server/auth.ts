@@ -19,17 +19,32 @@ const registerSchema = z.object({
 
 export function hashPassword(password: string): string {
   try {
+    // First, let's log the input
+    log('Hashing password input:', {
+      rawLength: password.length,
+      rawValue: password // Only for debugging!
+    });
+
     // Create hash using SHA-256
     const hash = createHash('sha256');
+
     // Update with password
     hash.update(password);
+
     // Get hex digest
     const hashedPassword = hash.digest('hex');
 
-    log('Password hashing details:', {
+    log('Password hashing result:', {
       inputLength: password.length,
-      outputLength: hashedPassword.length,
-      hashValue: hashedPassword // For debugging only
+      hashedLength: hashedPassword.length,
+      hashedValue: hashedPassword // For debugging only
+    });
+
+    // Also log expected hash comparison
+    log('Hash comparison:', {
+      hashedValue: hashedPassword,
+      expectedHash: "123f7788d67a5b86df83b8b03d0c8ce0bba9c7c2f0e21df56aef0bc2c48d48d3",
+      matches: hashedPassword === "123f7788d67a5b86df83b8b03d0c8ce0bba9c7c2f0e21df56aef0bc2c48d48d3"
     });
 
     return hashedPassword;
@@ -49,10 +64,13 @@ export function setupAuth(app: Express) {
   app.post("/api/login", async (req, res) => {
     try {
       const { email, password } = req.body;
-      log('Login attempt:', { email, hasPassword: !!password });
+      log('Login attempt:', { 
+        email, 
+        hasPassword: !!password,
+        passwordValue: password // Only for debugging!
+      });
 
       if (!email || !password) {
-        log('Missing credentials:', { email: !!email, password: !!password });
         return res.status(400).json({
           success: false,
           message: "Email and password are required"
@@ -65,12 +83,13 @@ export function setupAuth(app: Express) {
         .from(users)
         .where(eq(users.email, email));
 
-      log('User lookup result:', {
-        found: !!user,
+      log('User lookup result:', { 
+        found: !!user, 
         email,
         userDetails: user ? {
           id: user.id,
           email: user.email,
+          userType: user.userType,
           storedHash: user.password
         } : null
       });
@@ -86,14 +105,16 @@ export function setupAuth(app: Express) {
       const providedHash = hashPassword(password);
 
       // Compare hashes
+      const passwordMatch = providedHash === user.password;
+
       log('Password verification:', {
         email,
         providedHash,
         storedHash: user.password,
-        matches: providedHash === user.password
+        matches: passwordMatch
       });
 
-      if (providedHash !== user.password) {
+      if (!passwordMatch) {
         return res.status(401).json({
           success: false,
           message: "Invalid credentials"
