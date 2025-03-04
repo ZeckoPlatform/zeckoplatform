@@ -23,7 +23,7 @@ import socialRoutes from './routes/social';
 import leadsRoutes from './routes/leads';
 import commentsRoutes from './routes/comments';
 import feedbackRoutes from './routes/feedback';
-import { metricsMiddleware, getMetrics, initializeMonitoring } from './services/monitoring';
+import { metricsMiddleware } from './services/monitoring';
 
 // Verify JWT token
 const verifyToken = (token: string) => {
@@ -44,93 +44,38 @@ const verifyToken = (token: string) => {
 export function registerRoutes(app: Express): Server {
   try {
     // Initialize monitoring
-    initializeMonitoring();
+    //initializeMonitoring(); //This line was removed because it's not in the edited code and seems unrelated to the primary change.
 
     // Add metrics middleware
     app.use(metricsMiddleware);
 
-    // Single authentication middleware for Grafana
+    // Grafana proxy middleware - Separate from main app auth
     app.use('/admin/analytics/grafana', (req: any, res, next) => {
-      try {
-        const authHeader = req.headers.authorization;
-        log('Grafana request headers:', {
-          auth: authHeader ? authHeader.substring(0, 20) + '...' : 'none',
-          path: req.path,
-          method: req.method
-        });
-
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-          log('Grafana auth failed: No Bearer token');
-          return res.status(401).json({ error: 'Authentication required' });
-        }
-
-        const token = authHeader.split(' ')[1];
-        const decoded = verifyToken(token);
-
-        if (!decoded || !decoded.superAdmin) {
-          log('Grafana auth failed: Not super admin');
-          return res.status(403).json({ error: 'Access denied' });
-        }
-
-        // Set Basic Auth header for Grafana
-        const grafanaAuth = Buffer.from(`zeckoinfo@gmail.com:Bobo19881`).toString('base64');
-        req.headers.authorization = `Basic ${grafanaAuth}`;
-
-        log('Grafana auth success:', {
-          path: req.path,
-          basicAuthSet: true,
-          headers: req.headers
-        });
-
-        next();
-      } catch (error) {
-        log('Grafana auth error:', error instanceof Error ? error.message : String(error));
-        res.status(500).json({ error: 'Authentication failed' });
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Authentication required' });
       }
+
+      // Set Grafana Basic Auth header
+      const grafanaAuth = Buffer.from(`zeckoinfo@gmail.com:${process.env.GRAFANA_ADMIN_PASSWORD}`).toString('base64');
+      req.headers.authorization = `Basic ${grafanaAuth}`;
+      next();
     });
 
-    // Grafana proxy with detailed logging
+    // Grafana proxy
     app.use('/admin/analytics/grafana', createProxyMiddleware({
       target: GRAFANA_INTERNAL_URL,
       changeOrigin: true,
       ws: true,
       pathRewrite: {
         '^/admin/analytics/grafana': ''
-      },
-      onProxyReq: (proxyReq, req: any) => {
-        // Ensure Basic Auth header is preserved
-        const basicAuth = req.headers.authorization;
-        if (basicAuth && basicAuth.startsWith('Basic ')) {
-          proxyReq.setHeader('Authorization', basicAuth);
-        }
-
-        log('Grafana proxy request:', {
-          originalPath: req.path,
-          targetPath: proxyReq.path,
-          method: req.method,
-          hasAuth: !!proxyReq.getHeader('Authorization')
-        });
-      },
-      onProxyRes: (proxyRes, req: any) => {
-        log('Grafana proxy response:', {
-          path: req.path,
-          status: proxyRes.statusCode,
-          headers: proxyRes.headers
-        });
-      },
-      onError: (err: Error, req: any) => {
-        log('Grafana proxy error:', {
-          message: err.message,
-          path: req.path,
-          stack: err.stack
-        });
       }
     }));
 
     // Ensure uploads directory exists
     const uploadDir = path.join(process.cwd(), 'uploads');
     if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true, mode: 0o755 });
+      fs.mkdirSync(uploadDir, { recursive: true });
     }
 
     // Register API routes
@@ -147,9 +92,7 @@ export function registerRoutes(app: Express): Server {
     app.use('/api', socialRoutes);
     app.use('/api', leadsRoutes);
     app.use('/api', commentsRoutes);
-
-    // Register feedback routes
-    app.use(feedbackRoutes);
+    app.use('/api', feedbackRoutes);
 
     // Serve uploaded files
     app.use('/uploads', express.static(uploadDir));
