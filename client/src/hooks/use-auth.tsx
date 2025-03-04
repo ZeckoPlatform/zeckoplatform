@@ -52,6 +52,8 @@ function useAuthState() {
         }
 
         const text = await res.text();
+        console.log('Raw user response:', text);
+
         try {
           const data = JSON.parse(text) as ApiResponse<SelectUser>;
           return data.success && data.user ? data.user : null;

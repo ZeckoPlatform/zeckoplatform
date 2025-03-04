@@ -19,7 +19,11 @@ const registerSchema = z.object({
 
 export function hashPassword(password: string): string {
   const hashed = createHash('sha256').update(password).digest('hex');
-  log('Password hashing:', { originalLength: password.length, hashedLength: hashed.length });
+  log('Password hashing:', { 
+    originalLength: password.length, 
+    hashedLength: hashed.length,
+    hashedValue: hashed // Only for debugging!
+  });
   return hashed;
 }
 
@@ -57,7 +61,7 @@ export function setupAuth(app: Express) {
           id: user.id,
           email: user.email,
           userType: user.userType,
-          hasPassword: !!user.password
+          storedPasswordHash: user.password // Only for debugging!
         } : null
       });
 
@@ -69,14 +73,14 @@ export function setupAuth(app: Express) {
       }
 
       // Verify password
-      const hashedPassword = hashPassword(password);
-      const passwordMatch = hashedPassword === user.password;
+      const providedHash = hashPassword(password);
+      const passwordMatch = providedHash === user.password;
 
       log('Password verification:', { 
         email, 
         matches: passwordMatch,
-        providedHashLength: hashedPassword.length,
-        storedHashLength: user.password.length
+        providedHash, // Only for debugging!
+        storedHash: user.password // Only for debugging!
       });
 
       if (!passwordMatch) {
@@ -143,7 +147,7 @@ export function setupAuth(app: Express) {
       log('Creating new user:', { 
         email: validatedData.email,
         userType: validatedData.userType || 'free',
-        hashedPasswordLength: hashedPassword.length
+        hashedPassword // Only for debugging!
       });
 
       // Create new user
