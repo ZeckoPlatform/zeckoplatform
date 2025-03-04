@@ -1,9 +1,10 @@
-import { spawn } from 'child_process';
 import { log } from '../vite';
 import path from 'path';
 import fs from 'fs';
 
-const GRAFANA_PORT = 3001;
+export const GRAFANA_PORT = 3001;
+export const GRAFANA_INTERNAL_URL = `http://localhost:${GRAFANA_PORT}`;
+
 const GRAFANA_CONFIG_DIR = path.resolve(process.cwd(), 'grafana');
 const GRAFANA_DATA_DIR = path.join(GRAFANA_CONFIG_DIR, 'data');
 const GRAFANA_CONFIG_FILE = path.join(GRAFANA_CONFIG_DIR, 'grafana.ini');
@@ -38,8 +39,8 @@ provisioning = ${GRAFANA_PROVISIONING_DIR}
 protocol = http
 http_port = ${GRAFANA_PORT}
 domain = localhost
-root_url = %(protocol)s://%(domain)s:%(http_port)s/admin/analytics/grafana
-serve_from_sub_path = true
+root_url = %(protocol)s://%(domain)s:%(http_port)s
+serve_from_sub_path = false
 http_addr = 0.0.0.0
 
 [security]
@@ -48,7 +49,6 @@ admin_password = ${process.env.GRAFANA_ADMIN_PASSWORD || 'admin'}
 allow_embedding = true
 cookie_secure = false
 cookie_samesite = none
-secret_key = SW2YcwTIb9zpOOhoPsMm
 
 [auth]
 disable_login_form = false
@@ -66,27 +66,18 @@ auto_assign_org_role = Admin
 min_refresh_interval = 5s
 `;
 
-let grafanaProcess: any = null;
+// No need to manage Grafana process anymore since we're using system service
+export function startGrafanaServer(): Promise<void> {
+  return new Promise((resolve) => {
+    try {
+      log('Starting Grafana server setup...');
 
-export function startGrafanaServer() {
-  if (grafanaProcess) {
-    log('Grafana server already running');
-    return;
-  }
+      // Write Grafana configuration file
+      fs.writeFileSync(GRAFANA_CONFIG_FILE, grafanaConfig);
+      log('Wrote Grafana configuration file');
 
-  try {
-    log('Starting Grafana server setup...');
-
-    // Write Grafana configuration file
-    fs.writeFileSync(GRAFANA_CONFIG_FILE, grafanaConfig);
-    log('Wrote Grafana configuration:', { 
-      configPath: GRAFANA_CONFIG_FILE,
-      port: GRAFANA_PORT,
-      adminUser: 'admin'
-    });
-
-    // Write dashboards provisioning
-    const dashboardsConfig = `
+      // Write dashboards provisioning
+      fs.writeFileSync(path.join(GRAFANA_DASHBOARDS_DIR, 'dashboards.yaml'), `
 apiVersion: 1
 providers:
   - name: 'Default'
@@ -98,12 +89,11 @@ providers:
     allowUiUpdates: true
     options:
       path: ${GRAFANA_DASHBOARDS_DIR}
-`;
-    fs.writeFileSync(path.join(GRAFANA_DASHBOARDS_DIR, 'dashboards.yaml'), dashboardsConfig);
-    log('Wrote dashboards provisioning config');
+`);
+      log('Wrote dashboards provisioning config');
 
-    // Write datasources provisioning
-    const datasourcesConfig = `
+      // Write datasources provisioning
+      fs.writeFileSync(path.join(GRAFANA_DATASOURCES_DIR, 'datasources.yaml'), `
 apiVersion: 1
 datasources:
   - name: Prometheus
@@ -116,43 +106,26 @@ datasources:
       timeInterval: '15s'
       queryTimeout: '60s'
       httpMethod: GET
-`;
-    fs.writeFileSync(path.join(GRAFANA_DATASOURCES_DIR, 'datasources.yaml'), datasourcesConfig);
-    log('Wrote datasources provisioning config');
-
-    // Start Grafana server
-    const grafanaServerPath = '/nix/store/2m2kacwqa9v8wd09c1p4pp2cx99bviww-grafana-10.4.3/bin/grafana-server';
-    grafanaProcess = spawn(grafanaServerPath, [
-      '--config', GRAFANA_CONFIG_FILE,
-      '--homepath', '/nix/store/2m2kacwqa9v8wd09c1p4pp2cx99bviww-grafana-10.4.3/share/grafana'
-    ]);
-
-    grafanaProcess.stdout.on('data', (data: Buffer) => {
-      log('Grafana stdout:', data.toString().trim());
-    });
-
-    grafanaProcess.stderr.on('data', (data: Buffer) => {
-      log('Grafana stderr:', data.toString().trim());
-    });
-
-    grafanaProcess.on('close', (code: number) => {
-      log(`Grafana process exited with code ${code}`);
-      grafanaProcess = null;
-    });
-
-    log('Grafana server started successfully');
-  } catch (error) {
-    log('Failed to start Grafana:', error instanceof Error ? error.message : String(error));
-    throw error;
-  }
+`);
+      log('Wrote datasources provisioning config');
+      resolve();
+    } catch (error) {
+      log('Failed to start Grafana:', error instanceof Error ? error.message : String(error));
+      reject(error);
+    }
+  });
 }
 
 export function stopGrafanaServer() {
-  if (grafanaProcess) {
-    grafanaProcess.kill();
-    grafanaProcess = null;
-    log('Grafana server stopped');
-  }
+  // No-op since we're not managing the process
 }
 
-export const GRAFANA_INTERNAL_URL = `http://localhost:${GRAFANA_PORT}`;
+process.on('SIGINT', () => {
+  stopGrafanaServer();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  stopGrafanaServer();
+  process.exit(0);
+});

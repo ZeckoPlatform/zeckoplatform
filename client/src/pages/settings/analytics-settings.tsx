@@ -3,12 +3,13 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 export default function AnalyticsSettingsPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [grafanaError, setGrafanaError] = useState(false);
 
   useEffect(() => {
     // Log auth state on component mount
@@ -41,26 +42,33 @@ export default function AnalyticsSettingsPage() {
         </CardHeader>
         <CardContent>
           <div className="w-full h-[600px] rounded-lg overflow-hidden border">
-            <iframe
-              src="/admin/analytics/grafana/d/system-health/system-health?orgId=1&kiosk"
-              className="w-full h-full"
-              frameBorder="0"
-              title="System Health Dashboard"
-              allow="fullscreen"
-              style={{ 
-                border: 'none',
-                width: '100%',
-                height: '100%'
-              }}
-              onError={() => {
-                console.error('Grafana iframe load error');
-                toast({
-                  title: "Dashboard Error",
-                  description: "Failed to load system metrics dashboard. Please try refreshing the page.",
-                  variant: "destructive"
-                });
-              }}
-            />
+            {grafanaError ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-destructive">Failed to load Grafana dashboard. Please try again later.</p>
+              </div>
+            ) : (
+              <iframe
+                src="/admin/analytics/grafana/d/system-health/system-health?orgId=1&kiosk"
+                className="w-full h-full"
+                frameBorder="0"
+                title="System Health Dashboard"
+                allow="fullscreen"
+                style={{ 
+                  border: 'none',
+                  width: '100%',
+                  height: '100%'
+                }}
+                onError={() => {
+                  console.error('Grafana iframe load error');
+                  setGrafanaError(true);
+                  toast({
+                    title: "Dashboard Error",
+                    description: "Failed to load system metrics dashboard. Please ensure Grafana service is running.",
+                    variant: "destructive"
+                  });
+                }}
+              />
+            )}
           </div>
         </CardContent>
       </Card>
