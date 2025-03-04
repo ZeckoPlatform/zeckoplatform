@@ -43,8 +43,16 @@ try {
 
 // Register API routes
 logInfo('Registering routes...');
-const httpServer = registerRoutes(app);
-logInfo('Routes registered successfully');
+let httpServer: Server;
+try {
+  httpServer = registerRoutes(app);
+  logInfo('Routes registered successfully');
+} catch (error) {
+  logError('Fatal error during route registration:', {
+    error: error instanceof Error ? error.message : String(error)
+  });
+  process.exit(1);
+}
 
 // Setup frontend serving
 if (isProd) {

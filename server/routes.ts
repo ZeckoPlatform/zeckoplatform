@@ -41,7 +41,7 @@ const verifyToken = (token: string) => {
   }
 };
 
-export async function registerRoutes(app: Express): Promise<Server> {
+export function registerRoutes(app: Express): Server {
   try {
     // Initialize monitoring
     initializeMonitoring();
@@ -162,6 +162,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     // Create HTTP server
     const httpServer = createServer(app);
+    log('Created HTTP server instance');
+
     return httpServer;
 
   } catch (error) {
