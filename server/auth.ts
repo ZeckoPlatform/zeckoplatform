@@ -8,8 +8,9 @@ import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.REPL_ID!;
 
+// Simple schema validation
 const loginSchema = z.object({
-  email: z.string().email("Invalid email format"),
+  email: z.string().min(1, "Email is required"),
   password: z.string().min(1, "Password is required")
 });
 
@@ -20,12 +21,13 @@ export function hashPassword(password: string): string {
 export function setupAuth(app: Express) {
   app.post("/api/login", async (req, res) => {
     try {
-      const validatedData = loginSchema.parse(req.body);
+      const { email, password } = req.body;
 
+      // Find user
       const [user] = await db
         .select()
         .from(users)
-        .where(eq(users.email, validatedData.email))
+        .where(eq(users.email, email))
         .limit(1);
 
       if (!user) {
@@ -35,7 +37,8 @@ export function setupAuth(app: Express) {
         });
       }
 
-      const hashedPassword = hashPassword(validatedData.password);
+      // Verify password
+      const hashedPassword = hashPassword(password);
       if (hashedPassword !== user.password) {
         return res.status(401).json({
           success: false,
@@ -43,6 +46,7 @@ export function setupAuth(app: Express) {
         });
       }
 
+      // Generate token
       const token = jwt.sign(
         {
           id: user.id,
@@ -66,13 +70,6 @@ export function setupAuth(app: Express) {
       });
 
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid input",
-          errors: error.errors
-        });
-      }
       res.status(500).json({
         success: false,
         message: "Internal server error"
