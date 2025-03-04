@@ -18,13 +18,25 @@ const registerSchema = z.object({
 });
 
 export function hashPassword(password: string): string {
-  const hashed = createHash('sha256').update(password).digest('hex');
-  log('Password hashing:', { 
-    originalLength: password.length, 
-    hashedLength: hashed.length,
-    hashedValue: hashed // Only for debugging!
-  });
-  return hashed;
+  try {
+    // Create hash using SHA-256
+    const hash = createHash('sha256');
+    // Update with password
+    hash.update(password);
+    // Get hex digest
+    const hashedPassword = hash.digest('hex');
+
+    log('Password hashing details:', {
+      inputLength: password.length,
+      outputLength: hashedPassword.length,
+      hashValue: hashedPassword // For debugging only
+    });
+
+    return hashedPassword;
+  } catch (error) {
+    log('Password hashing error:', error instanceof Error ? error.message : String(error));
+    throw error;
+  }
 }
 
 export function setupAuth(app: Express) {
@@ -51,17 +63,15 @@ export function setupAuth(app: Express) {
       const [user] = await db
         .select()
         .from(users)
-        .where(eq(users.email, email))
-        .limit(1);
+        .where(eq(users.email, email));
 
-      log('User lookup result:', { 
-        found: !!user, 
+      log('User lookup result:', {
+        found: !!user,
         email,
         userDetails: user ? {
           id: user.id,
           email: user.email,
-          userType: user.userType,
-          storedPasswordHash: user.password // Only for debugging!
+          storedHash: user.password
         } : null
       });
 
@@ -72,18 +82,18 @@ export function setupAuth(app: Express) {
         });
       }
 
-      // Verify password
+      // Hash the provided password
       const providedHash = hashPassword(password);
-      const passwordMatch = providedHash === user.password;
 
-      log('Password verification:', { 
-        email, 
-        matches: passwordMatch,
-        providedHash, // Only for debugging!
-        storedHash: user.password // Only for debugging!
+      // Compare hashes
+      log('Password verification:', {
+        email,
+        providedHash,
+        storedHash: user.password,
+        matches: providedHash === user.password
       });
 
-      if (!passwordMatch) {
+      if (providedHash !== user.password) {
         return res.status(401).json({
           success: false,
           message: "Invalid credentials"
@@ -129,12 +139,11 @@ export function setupAuth(app: Express) {
       const validatedData = registerSchema.parse(req.body);
       log('Registration attempt:', { email: validatedData.email });
 
-      // Check if user already exists
+      // Check if user exists
       const [existingUser] = await db
         .select()
         .from(users)
-        .where(eq(users.email, validatedData.email))
-        .limit(1);
+        .where(eq(users.email, validatedData.email));
 
       if (existingUser) {
         return res.status(400).json({
@@ -143,14 +152,13 @@ export function setupAuth(app: Express) {
         });
       }
 
+      // Hash password and create user
       const hashedPassword = hashPassword(validatedData.password);
-      log('Creating new user:', { 
+      log('Creating new user:', {
         email: validatedData.email,
-        userType: validatedData.userType || 'free',
-        hashedPassword // Only for debugging!
+        hashedPassword
       });
 
-      // Create new user
       const [user] = await db
         .insert(users)
         .values({
@@ -171,8 +179,6 @@ export function setupAuth(app: Express) {
         JWT_SECRET,
         { expiresIn: '24h' }
       );
-
-      log('Registration successful:', { email: user.email });
 
       return res.status(201).json({
         success: true,
@@ -237,8 +243,7 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
       const [user] = await db
         .select()
         .from(users)
-        .where(eq(users.id, decoded.id))
-        .limit(1);
+        .where(eq(users.id, decoded.id));
 
       if (!user) {
         return res.status(401).json({
