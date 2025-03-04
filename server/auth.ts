@@ -50,7 +50,7 @@ export function generateToken(user: SelectUser) {
       id: user.id,
       email: user.email,
       userType: user.userType,
-      superAdmin: user.userType === 'admin' 
+      superAdmin: user.userType === 'admin' || user.superAdmin 
     },
     JWT_SECRET,
     { expiresIn: '24h' }
@@ -89,7 +89,10 @@ export function setupAuth(app: Express) {
 
       res.json({
         success: true,
-        user,
+        user: {
+          ...user,
+          superAdmin: user.userType === 'admin' || user.superAdmin
+        },
         token
       });
     } catch (error) {
@@ -216,7 +219,7 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
 
       (req as any).user = {
         ...user,
-        superAdmin: user.userType === 'admin'
+        superAdmin: user.userType === 'admin' || user.superAdmin
       };
       next();
     } catch (error) {
