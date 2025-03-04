@@ -29,6 +29,7 @@ import { FeedbackDialog } from "@/components/FeedbackDialog";
 import FeedbackManagementPage from "@/pages/admin/feedback-management";
 import SocialFeedPage from "@/pages/social-feed";
 import AdminAnalyticsDashboard from "@/pages/admin/analytics-dashboard";
+import AnalyticsMonitoringPage from "@/pages/settings/analytics-monitoring";
 
 function Router() {
   return (
@@ -48,7 +49,7 @@ function Router() {
         <Route path="/vendor/dashboard" component={() => <ProtectedRoute component={VendorDashboard} />} />
         <Route path="/analytics" component={() => <ProtectedRoute component={AnalyticsDashboard} />} />
         <Route path="/admin/analytics" component={() => <ProtectedRoute component={AdminAnalyticsDashboard} />} />
-        <Route path="/admin/analytics/settings" component={() => <ProtectedRoute component={AdminAnalyticsDashboard} />} />
+        <Route path="/admin/analytics/monitoring" component={() => <ProtectedRoute component={AnalyticsMonitoringPage} />} />
         <Route path="/admin-management" component={() => <ProtectedRoute component={AdminManagementPage} />} />
         <Route path="/reviews" component={() => <ProtectedRoute component={ReviewsDashboard} />} />
         <Route path="/notifications" component={() => <ProtectedRoute component={NotificationsPage} />} />
@@ -104,7 +105,7 @@ function Router() {
             <ProtectedRoute
               component={() => (
                 <SettingsLayout>
-                  <AdminAnalyticsDashboard />
+                  <AnalyticsMonitoringPage />
                 </SettingsLayout>
               )}
             />
@@ -115,15 +116,6 @@ function Router() {
         <Route path="/admin/users/edit/:id" component={UserEditPage} />
         <Route path="/admin/reviews" component={ReviewModerationPage} />
         <Route path="/admin/feedback" component={() => <ProtectedRoute component={FeedbackManagementPage} />} />
-        <Route path="/admin/settings/notifications" component={() => (
-          <ProtectedRoute
-            component={() => (
-              <SettingsLayout>
-                <NotificationSettingsPage />
-              </SettingsLayout>
-            )}
-          />
-        )} />
 
         <Route component={NotFound} />
       </Switch>
