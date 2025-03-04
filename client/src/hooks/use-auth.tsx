@@ -71,7 +71,7 @@ function useAuthState() {
 
       console.log('Login attempt:', {
         email: credentials.email,
-        password: credentials.password // Temporarily log actual password for debugging
+        passwordProvided: !!credentials.password
       });
 
       const res = await fetch("/api/login", {
@@ -177,11 +177,11 @@ function useAuthState() {
       queryClient.setQueryData(["/api/user"], null);
     },
     onSuccess: () => {
-      setLocation("/");
       toast({
         title: "Logged out",
         description: "You have been logged out successfully",
       });
+      setLocation("/");
     },
   });
 

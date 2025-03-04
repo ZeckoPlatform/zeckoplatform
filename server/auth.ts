@@ -19,23 +19,21 @@ const registerSchema = z.object({
 
 export function hashPassword(password: string): string {
   try {
-    // First, let's log the input for verification
-    log('Hashing password input:', {
-      rawLength: password.length,
-      rawValue: password // Only for debugging!
-    });
-
     // Create hash using SHA-256
     const hash = createHash('sha256');
-    // Update with password
-    hash.update(password);
+    // Update with UTF-8 encoded password
+    hash.update(Buffer.from(password, 'utf8'));
     // Get hex digest
     const hashedPassword = hash.digest('hex');
 
-    log('Password hashing result:', {
+    // Log hashing details for debugging
+    log('Password hashing details:', {
+      input: password,
       inputLength: password.length,
+      hashedOutput: hashedPassword,
       hashedLength: hashedPassword.length,
-      hashedValue: hashedPassword // For debugging only
+      expectedHash: "123f7788d67a5b86df83b8b03d0c8ce0bba9c7c2f0e21df56aef0bc2c48d48d3",
+      matches: hashedPassword === "123f7788d67a5b86df83b8b03d0c8ce0bba9c7c2f0e21df56aef0bc2c48d48d3"
     });
 
     return hashedPassword;
@@ -55,6 +53,11 @@ export function setupAuth(app: Express) {
     try {
       const { email, password } = req.body;
 
+      log('Login attempt:', {
+        email,
+        passwordLength: password?.length || 0
+      });
+
       if (!email || !password) {
         return res.status(400).json({
           success: false,
@@ -68,37 +71,28 @@ export function setupAuth(app: Express) {
         .from(users)
         .where(eq(users.email, email));
 
-      log('User lookup result:', { 
-        found: !!user,
-        email,
-        userDetails: user ? {
-          id: user.id,
-          email: user.email,
-          userType: user.userType,
-          storedHash: user.password
-        } : null
-      });
-
       if (!user) {
+        log('User not found:', email);
         return res.status(401).json({
           success: false,
           message: "Invalid credentials"
         });
       }
 
-      // Hash the provided password and compare
-      const providedHash = hashPassword(password);
+      log('Found user:', {
+        id: user.id,
+        email: user.email,
+        storedPasswordHash: user.password
+      });
 
-      // Verify password match
-      const passwordMatch = providedHash === user.password;
+      // Hash and verify password
+      const hashedPassword = hashPassword(password);
+      const passwordMatch = hashedPassword === user.password;
 
-      // Log verification details
       log('Password verification:', {
-        email,
-        providedHash,
+        providedHash: hashedPassword,
         storedHash: user.password,
-        matches: passwordMatch,
-        expectedHash: "123f7788d67a5b86df83b8b03d0c8ce0bba9c7c2f0e21df56aef0bc2c48d48d3"
+        matches: passwordMatch
       });
 
       if (!passwordMatch) {
