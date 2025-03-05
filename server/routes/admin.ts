@@ -568,6 +568,19 @@ router.post("/messages/:userId", authenticateToken, checkSuperAdminAccess, async
 // Add logs endpoint to admin routes
 router.get("/admin/logs", authenticateToken, checkSuperAdminAccess, async (req, res) => {
   try {
+    // Check if Elasticsearch is available and configured
+    if (!esClient || process.env.LOGGING_MODE === 'console') {
+      // Fallback to returning recent console logs
+      return res.json([{
+        '@timestamp': new Date().toISOString(),
+        level: 'info',
+        message: 'Logging system running in console mode',
+        service: 'zecko-api',
+        category: 'system',
+        metadata: { mode: 'console' }
+      }]);
+    }
+
     // Query elasticsearch for logs
     const result = await esClient.search({
       index: 'zecko-logs-*',
@@ -593,7 +606,18 @@ router.get("/admin/logs", authenticateToken, checkSuperAdminAccess, async (req, 
     return res.json(logs);
   } catch (error) {
     console.error("Error fetching logs:", error);
-    return res.status(500).json({ error: "Failed to fetch logs" });
+    // Return a fallback response with error information
+    return res.json([{
+      '@timestamp': new Date().toISOString(),
+      level: 'error',
+      message: 'Failed to fetch logs from Elasticsearch',
+      service: 'zecko-api',
+      category: 'error',
+      metadata: {
+        error: error instanceof Error ? error.message : String(error),
+        mode: process.env.LOGGING_MODE || 'default'
+      }
+    }]);
   }
 });
 
