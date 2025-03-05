@@ -11,6 +11,10 @@ elasticsearch.password: "${ELASTICSEARCH_PASSWORD}"
 kibana.index_pattern.id: "zecko-logs-*"
 kibana.defaultAppId: "discover"
 
+# Base path settings
+server.basePath: "/admin/analytics/settings/kibana"
+server.rewriteBasePath: true
+
 # Security settings
 xpack.security.enabled: true
 xpack.reporting.enabled: true
