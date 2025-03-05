@@ -5,7 +5,7 @@ import { Server, createServer } from "http";
 import { setupAuth } from "./auth";
 import { logInfo, logError } from "./services/logging";
 import { initializeMonitoring } from "./services/monitoring";
-import { checkPerformanceMetrics } from "./services/admin-notifications";
+import cors from 'cors';
 
 const app = express();
 const isProd = process.env.NODE_ENV === 'production';
@@ -20,27 +20,25 @@ logInfo('=== Server Initialization Started ===', {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// API middleware for consistent JSON responses
-app.use('/api', (req, res, next) => {
-  res.setHeader('Content-Type', 'application/json');
-  next();
-});
+// Enhanced CORS setup for development
+app.use(cors({
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
 
-// Setup CORS for API routes
-app.use('/api', (req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin) {
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-    res.header('Access-Control-Allow-Credentials', 'true');
-  }
+    // Allow requests from localhost and Replit domains
+    if (origin.includes('localhost') || 
+        origin.includes('.replit.dev') || 
+        origin.includes('replit.app')) {
+      return callback(null, true);
+    }
 
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-  next();
-});
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
+}));
 
 // Initialize authentication first
 setupAuth(app);
@@ -70,7 +68,6 @@ try {
   });
   // Continue server startup even if monitoring fails
 }
-
 
 // Setup frontend serving
 if (isProd) {
@@ -105,16 +102,6 @@ const PORT = Number(process.env.PORT) || 5000;
 httpServer.listen(PORT, '0.0.0.0', () => {
   logInfo('Server started successfully on port ' + PORT);
 });
-
-// Schedule periodic performance checks
-const PERFORMANCE_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
-setInterval(() => {
-  checkPerformanceMetrics().catch(error => {
-    logError('Failed to run performance check:', {
-      error: error instanceof Error ? error.message : String(error)
-    });
-  });
-}, PERFORMANCE_CHECK_INTERVAL);
 
 // Handle process termination
 process.on('SIGTERM', () => {
