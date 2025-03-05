@@ -64,9 +64,12 @@ export default function AnalyticsSettingsPage() {
     queryFn: async () => {
       try {
         const token = localStorage.getItem('token');
-        if (!token) throw new Error('No auth token');
+        if (!token) {
+          console.error('No auth token found');
+          throw new Error('No auth token');
+        }
 
-        console.log('Fetching metrics with token...');
+        console.log('Fetching metrics with token:', token); // Added token logging
         const response = await fetch('/api/metrics/json', {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -107,41 +110,50 @@ export default function AnalyticsSettingsPage() {
 
         // Parse CPU metrics
         const cpuMetric = metrics.find((m: any) => m.name === 'process_cpu_usage_percent');
-        if (cpuMetric && cpuMetric.values && cpuMetric.values.length > 0) {
+        if (cpuMetric?.values?.length > 0) {
           newData.system[0].cpu_usage = parseFloat(cpuMetric.values[0].value);
+          console.log('CPU usage:', newData.system[0].cpu_usage);
         }
 
         // Parse Memory metrics
         const memoryMetric = metrics.find((m: any) => m.name === 'process_memory_usage_bytes');
-        if (memoryMetric && memoryMetric.values && memoryMetric.values.length > 0) {
+        if (memoryMetric?.values?.length > 0) {
           const memoryBytes = parseFloat(memoryMetric.values[0].value);
           newData.system[0].memory_used = memoryBytes / (1024 * 1024); // Convert to MB
-          newData.system[0].memory_total = memoryBytes / (1024 * 1024);
+          console.log('Memory usage (MB):', newData.system[0].memory_used);
         }
 
         // Parse API metrics
         const requestMetrics = metrics.find((m: any) => m.name === 'http_requests_total');
-        if (requestMetrics && requestMetrics.values && requestMetrics.values.length > 0) {
-          newData.api[0].request_count = parseInt(requestMetrics.values[0].value);
-          // Count error requests (status code >= 400)
-          const errorMetrics = metrics.filter((m: any) => 
-            m.name === 'http_requests_total' && 
-            m.labels && 
-            parseInt(m.labels.status_code) >= 400
-          );
-          newData.api[0].error_count = errorMetrics.reduce((sum: number, m: any) => 
-            sum + parseInt(m.values[0].value), 0);
+        if (requestMetrics?.values?.length > 0) {
+          const totalRequests = metrics
+            .filter((m: any) => m.name === 'http_requests_total')
+            .reduce((sum: number, m: any) => sum + (parseInt(m.values[0]?.value) || 0), 0);
+
+          const errorRequests = metrics
+            .filter((m: any) => 
+              m.name === 'http_requests_total' && 
+              m.labels?.status_code && 
+              parseInt(m.labels.status_code) >= 400
+            )
+            .reduce((sum: number, m: any) => sum + (parseInt(m.values[0]?.value) || 0), 0);
+
+          newData.api[0].request_count = totalRequests;
+          newData.api[0].error_count = errorRequests;
+          console.log('Request metrics:', { total: totalRequests, errors: errorRequests });
         }
 
         // Parse Database metrics
         const dbMetric = metrics.find((m: any) => m.name === 'database_query_duration_seconds');
-        if (dbMetric && dbMetric.values && dbMetric.values.length > 0) {
+        if (dbMetric?.values?.length > 0) {
           newData.database[0].query_duration = parseFloat(dbMetric.values[0].value);
+          console.log('Query duration:', newData.database[0].query_duration);
         }
 
         const connectionsMetric = metrics.find((m: any) => m.name === 'database_connections_active');
-        if (connectionsMetric && connectionsMetric.values && connectionsMetric.values.length > 0) {
+        if (connectionsMetric?.values?.length > 0) {
           newData.database[0].active_connections = parseInt(connectionsMetric.values[0].value);
+          console.log('Active connections:', newData.database[0].active_connections);
         }
 
         console.log('Transformed metrics data:', newData);
@@ -168,7 +180,7 @@ export default function AnalyticsSettingsPage() {
         variant: "destructive"
       });
     },
-    enabled: !!user?.superAdmin // Only fetch if user is superAdmin
+    enabled: !!user?.superAdmin
   });
 
   if (!user?.superAdmin) {
