@@ -1,4 +1,9 @@
+// Configure Vite host settings before anything else
 process.env.DANGEROUSLY_DISABLE_HOST_CHECK = "true";
+process.env.VITE_ALLOW_ORIGIN = "*";
+process.env.VITE_DEV_SERVER_HOSTNAME = "0.0.0.0";
+process.env.VITE_HMR_HOST = process.env.REPL_SLUG + "." + process.env.REPL_OWNER + ".repl.co";
+process.env.VITE_HMR_PROTOCOL = "wss";
 
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
@@ -26,6 +31,9 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Cross-Origin-Opener-Policy', 'same-origin');
+  res.header('Cross-Origin-Embedder-Policy', 'require-corp');
 
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
