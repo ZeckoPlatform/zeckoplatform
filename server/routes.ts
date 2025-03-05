@@ -22,6 +22,7 @@ import socialRoutes from './routes/social';
 import leadsRoutes from './routes/leads';
 import commentsRoutes from './routes/comments';
 import feedbackRoutes from './routes/feedback';
+import kibanaRoutes from './routes/kibana';
 
 const JWT_SECRET = process.env.REPL_ID!;
 
@@ -45,57 +46,8 @@ export function registerRoutes(app: Express): Server {
     // Add metrics middleware
     app.use(metricsMiddleware);
 
-
-    // Expose metrics endpoint (protected)
-    app.get('/api/metrics', async (req, res) => {
-      const authHeader = req.headers.authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ error: 'Authentication required' });
-      }
-
-      const token = authHeader.split(' ')[1];
-      const decoded = verifyToken(token);
-
-      if (!decoded || !(decoded as any).superAdmin) {
-        log('Access denied - Not a super admin:', decoded);
-        return res.status(403).json({ error: 'Access denied' });
-      }
-
-      try {
-        log('Getting Prometheus metrics...');
-        const metrics = await getMetrics();
-        res.set('Content-Type', 'text/plain');
-        res.send(metrics);
-      } catch (error) {
-        log('Error fetching metrics:', error instanceof Error ? error.message : String(error));
-        res.status(500).json({ error: 'Failed to collect metrics' });
-      }
-    });
-
-    // Expose metrics in JSON format (protected)
-    app.get('/api/metrics/json', async (req, res) => {
-      const authHeader = req.headers.authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ error: 'Authentication required' });
-      }
-
-      const token = authHeader.split(' ')[1];
-      const decoded = verifyToken(token);
-
-      if (!decoded || !(decoded as any).superAdmin) {
-        log('Access denied - Not a super admin:', decoded);
-        return res.status(403).json({ error: 'Access denied' });
-      }
-
-      try {
-        log('Getting metrics as JSON...');
-        const metrics = await getMetricsAsJSON();
-        res.json(metrics);
-      } catch (error) {
-        log('Error fetching metrics JSON:', error instanceof Error ? error.message : String(error));
-        res.status(500).json({ error: 'Failed to collect metrics' });
-      }
-    });
+    // Mount Kibana routes first to ensure proper path handling
+    app.use('/admin/analytics/settings/kibana', kibanaRoutes);
 
     // Register API routes
     app.use('/api', authRoutes);

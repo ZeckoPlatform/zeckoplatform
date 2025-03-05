@@ -122,7 +122,7 @@ export default function AnalyticsSettingsPage() {
       try {
         // Filter metrics based on search term if provided
         const filteredMetrics = searchTerm
-          ? metricsResponse.filter((m: any) => 
+          ? metricsResponse.filter((m: any) =>
               m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
               m.help.toLowerCase().includes(searchTerm.toLowerCase())
             )
@@ -197,6 +197,9 @@ export default function AnalyticsSettingsPage() {
         <div className="flex gap-4">
           <Link href="/settings/analytics/logs">
             <Button variant="outline">View System Logs</Button>
+          </Link>
+          <Link href="/admin/analytics/settings/kibana" target="_blank" rel="noopener noreferrer">
+            <Button variant="outline">Open Kibana Dashboard</Button>
           </Link>
           <Button variant="outline" onClick={() => setLocation("/admin-management")}>
             Back to Dashboard
