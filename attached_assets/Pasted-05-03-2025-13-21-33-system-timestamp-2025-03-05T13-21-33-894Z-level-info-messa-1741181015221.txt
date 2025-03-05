@@ -1,0 +1,900 @@
+05/03/2025, 13:21:33
+system
+{
+  "timestamp": "2025-03-05T13:21:33.894Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:33
+system
+{
+  "timestamp": "2025-03-05T13:21:33.782Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:33
+system
+{
+  "timestamp": "2025-03-05T13:21:33.781Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:33
+system
+{
+  "timestamp": "2025-03-05T13:21:33.634Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:33
+system
+{
+  "timestamp": "2025-03-05T13:21:33.445Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:33
+system
+{
+  "timestamp": "2025-03-05T13:21:33.443Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:33
+system
+{
+  "timestamp": "2025-03-05T13:21:33.442Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:33
+system
+{
+  "timestamp": "2025-03-05T13:21:33.440Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:33
+system
+{
+  "timestamp": "2025-03-05T13:21:33.311Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:33
+system
+{
+  "timestamp": "2025-03-05T13:21:33.310Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:33
+system
+{
+  "timestamp": "2025-03-05T13:21:33.309Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:33
+system
+{
+  "timestamp": "2025-03-05T13:21:33.296Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:33
+system
+{
+  "timestamp": "2025-03-05T13:21:33.295Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:33
+system
+{
+  "timestamp": "2025-03-05T13:21:33.269Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:33
+system
+{
+  "timestamp": "2025-03-05T13:21:33.185Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:33
+system
+{
+  "timestamp": "2025-03-05T13:21:33.184Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:33
+system
+{
+  "timestamp": "2025-03-05T13:21:33.183Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:33
+system
+{
+  "timestamp": "2025-03-05T13:21:33.172Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:33
+system
+{
+  "timestamp": "2025-03-05T13:21:33.170Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:33
+system
+{
+  "timestamp": "2025-03-05T13:21:33.144Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:33
+system
+{
+  "timestamp": "2025-03-05T13:21:33.059Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:33
+system
+{
+  "timestamp": "2025-03-05T13:21:33.058Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:33
+system
+{
+  "timestamp": "2025-03-05T13:21:33.057Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:33
+system
+{
+  "timestamp": "2025-03-05T13:21:33.045Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:33
+system
+{
+  "timestamp": "2025-03-05T13:21:33.043Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:33
+system
+{
+  "timestamp": "2025-03-05T13:21:33.017Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.934Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.934Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.933Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.923Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.920Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.891Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.810Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.809Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.808Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.800Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.796Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.764Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.685Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.684Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.683Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.673Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.672Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.638Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.560Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.560Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.556Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.550Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.549Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.511Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.430Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.430Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.428Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.426Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.423Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.383Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.305Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.304Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.301Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.300Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.299Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.258Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.173Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.172Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.171Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.127Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.042Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.041Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:32
+system
+{
+  "timestamp": "2025-03-05T13:21:32.040Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:31
+system
+{
+  "timestamp": "2025-03-05T13:21:31.996Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:31
+system
+{
+  "timestamp": "2025-03-05T13:21:31.911Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:31
+system
+{
+  "timestamp": "2025-03-05T13:21:31.910Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:31
+system
+{
+  "timestamp": "2025-03-05T13:21:31.603Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:31
+system
+{
+  "timestamp": "2025-03-05T13:21:31.602Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:31
+system
+{
+  "timestamp": "2025-03-05T13:21:31.591Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:31
+system
+{
+  "timestamp": "2025-03-05T13:21:31.179Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:31
+system
+{
+  "timestamp": "2025-03-05T13:21:31.176Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:30
+system
+{
+  "timestamp": "2025-03-05T13:21:30.639Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:30
+system
+{
+  "timestamp": "2025-03-05T13:21:30.253Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:30
+system
+{
+  "timestamp": "2025-03-05T13:21:30.249Z",
+  "level": "info",
+  "message": "Retrieved metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:30
+system
+{
+  "timestamp": "2025-03-05T13:21:30.241Z",
+  "level": "info",
+  "message": "Getting metrics as JSON",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:30
+system
+{
+  "timestamp": "2025-03-05T13:21:30.192Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:30
+system
+{
+  "timestamp": "2025-03-05T13:21:30.188Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:30
+system
+{
+  "timestamp": "2025-03-05T13:21:30.187Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:30
+system
+{
+  "timestamp": "2025-03-05T13:21:30.185Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:30
+system
+{
+  "timestamp": "2025-03-05T13:21:30.177Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:30
+system
+{
+  "timestamp": "2025-03-05T13:21:30.176Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:30
+system
+{
+  "timestamp": "2025-03-05T13:21:30.065Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:30
+system
+{
+  "timestamp": "2025-03-05T13:21:30.057Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:30
+system
+{
+  "timestamp": "2025-03-05T13:21:30.057Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:30
+system
+{
+  "timestamp": "2025-03-05T13:21:30.054Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:30
+system
+{
+  "timestamp": "2025-03-05T13:21:30.053Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:30
+system
+{
+  "timestamp": "2025-03-05T13:21:30.052Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:29
+system
+{
+  "timestamp": "2025-03-05T13:21:29.941Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:29
+system
+{
+  "timestamp": "2025-03-05T13:21:29.932Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:29
+system
+{
+  "timestamp": "2025-03-05T13:21:29.930Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:29
+system
+{
+  "timestamp": "2025-03-05T13:21:29.930Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:29
+system
+{
+  "timestamp": "2025-03-05T13:21:29.925Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:29
+system
+{
+  "timestamp": "2025-03-05T13:21:29.924Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}
+05/03/2025, 13:21:29
+system
+{
+  "timestamp": "2025-03-05T13:21:29.815Z",
+  "level": "info",
+  "message": "Recorded request metrics",
+  "service": "zecko-api",
+  "category": "system"
+}

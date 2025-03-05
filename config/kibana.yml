@@ -1,0 +1,17 @@
+# Kibana configuration
+server.port: 5601
+server.host: "0.0.0.0"
+
+# Elasticsearch connection
+elasticsearch.hosts: ["http://localhost:9200"]
+elasticsearch.username: "${ELASTICSEARCH_USERNAME}"
+elasticsearch.password: "${ELASTICSEARCH_PASSWORD}"
+
+# Index patterns
+kibana.index_pattern.id: "zecko-logs-*"
+kibana.defaultAppId: "discover"
+
+# Security settings
+xpack.security.enabled: true
+xpack.reporting.enabled: true
+xpack.monitoring.enabled: true
