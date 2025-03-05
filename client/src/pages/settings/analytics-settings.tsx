@@ -37,6 +37,7 @@ export default function AnalyticsSettingsPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [showKibana, setShowKibana] = useState(false);
   const [metricsData, setMetricsData] = useState<{
     system: SystemMetrics[];
     api: APIMetrics[];
@@ -199,10 +200,10 @@ export default function AnalyticsSettingsPage() {
         <h1 className="text-3xl font-bold">System Monitoring</h1>
         <div className="flex gap-4">
           <Button
-            variant="outline"
-            onClick={() => window.open('/admin/analytics/kibana', '_blank')}
+            variant={showKibana ? "secondary" : "outline"}
+            onClick={() => setShowKibana(!showKibana)}
           >
-            Open Kibana Dashboard
+            {showKibana ? "Show Metrics" : "Show Kibana Dashboard"}
           </Button>
           <Link href="/settings/analytics/logs">
             <Button variant="outline">View System Logs</Button>
@@ -213,156 +214,173 @@ export default function AnalyticsSettingsPage() {
         </div>
       </div>
 
-      {/* System Health Metrics */}
-      <Card>
-        <CardHeader>
-          <CardTitle>System Health</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[300px]">
-            {error ? (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-destructive">Failed to load metrics</p>
+      {showKibana ? (
+        <Card className="w-full h-[800px]">
+          <CardHeader>
+            <CardTitle>Kibana Dashboard</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 h-full">
+            <iframe
+              src="/admin/analytics/kibana"
+              className="w-full h-full border-0"
+              title="Kibana Dashboard"
+            />
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* System Health Metrics */}
+          <Card>
+            <CardHeader>
+              <CardTitle>System Health</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                {error ? (
+                  <div className="flex items-center justify-center h-full">
+                    <p className="text-destructive">Failed to load metrics</p>
+                  </div>
+                ) : metricsData.system.length === 0 ? (
+                  <div className="flex items-center justify-center h-full">
+                    <p>Loading metrics...</p>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={metricsData.system}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis
+                        dataKey="timestamp"
+                        tickFormatter={formatTime}
+                      />
+                      <YAxis yAxisId="left" domain={[0, 100]} />
+                      <YAxis yAxisId="right" orientation="right" tickFormatter={formatBytes} />
+                      <Tooltip
+                        labelFormatter={formatTime}
+                        formatter={(value: any, name: string) => {
+                          if (name.includes('Memory')) {
+                            return [formatBytes(value), name];
+                          }
+                          return [`${value.toFixed(2)}%`, name];
+                        }}
+                      />
+                      <Legend />
+                      <Line
+                        yAxisId="left"
+                        type="monotone"
+                        dataKey="cpu_usage"
+                        name="CPU Usage (%)"
+                        stroke="#8884d8"
+                        dot={false}
+                      />
+                      <Line
+                        yAxisId="right"
+                        type="monotone"
+                        dataKey="memory_used"
+                        name="Memory Usage"
+                        stroke="#82ca9d"
+                        dot={false}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
               </div>
-            ) : metricsData.system.length === 0 ? (
-              <div className="flex items-center justify-center h-full">
-                <p>Loading metrics...</p>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={metricsData.system}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="timestamp"
-                    tickFormatter={formatTime}
-                  />
-                  <YAxis yAxisId="left" domain={[0, 100]} />
-                  <YAxis yAxisId="right" orientation="right" tickFormatter={formatBytes} />
-                  <Tooltip
-                    labelFormatter={formatTime}
-                    formatter={(value: any, name: string) => {
-                      if (name.includes('Memory')) {
-                        return [formatBytes(value), name];
-                      }
-                      return [`${value.toFixed(2)}%`, name];
-                    }}
-                  />
-                  <Legend />
-                  <Line
-                    yAxisId="left"
-                    type="monotone"
-                    dataKey="cpu_usage"
-                    name="CPU Usage (%)"
-                    stroke="#8884d8"
-                    dot={false}
-                  />
-                  <Line
-                    yAxisId="right"
-                    type="monotone"
-                    dataKey="memory_used"
-                    name="Memory Usage"
-                    stroke="#82ca9d"
-                    dot={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
 
-      {/* API Performance Metrics */}
-      <Card>
-        <CardHeader>
-          <CardTitle>API Performance</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[300px]">
-            {error ? (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-destructive">Failed to load API metrics</p>
+          {/* API Performance Metrics */}
+          <Card>
+            <CardHeader>
+              <CardTitle>API Performance</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                {error ? (
+                  <div className="flex items-center justify-center h-full">
+                    <p className="text-destructive">Failed to load API metrics</p>
+                  </div>
+                ) : metricsData.api.length === 0 ? (
+                  <div className="flex items-center justify-center h-full">
+                    <p>Loading API metrics...</p>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={metricsData.api}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis
+                        dataKey="timestamp"
+                        tickFormatter={formatTime}
+                      />
+                      <YAxis />
+                      <Tooltip
+                        labelFormatter={formatTime}
+                        formatter={(value: number) => [`${value}`, 'Requests']}
+                      />
+                      <Legend />
+                      <Bar dataKey="request_count" name="Total Requests" fill="#8884d8" />
+                      <Bar dataKey="error_count" name="Error Count" fill="#ff8042" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </div>
-            ) : metricsData.api.length === 0 ? (
-              <div className="flex items-center justify-center h-full">
-                <p>Loading API metrics...</p>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={metricsData.api}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="timestamp"
-                    tickFormatter={formatTime}
-                  />
-                  <YAxis />
-                  <Tooltip
-                    labelFormatter={formatTime}
-                    formatter={(value: number) => [`${value}`, 'Requests']}
-                  />
-                  <Legend />
-                  <Bar dataKey="request_count" name="Total Requests" fill="#8884d8" />
-                  <Bar dataKey="error_count" name="Error Count" fill="#ff8042" />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
 
-      {/* Database Performance Metrics */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Database Performance</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[300px]">
-            {error ? (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-destructive">Failed to load database metrics</p>
+          {/* Database Performance Metrics */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Database Performance</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                {error ? (
+                  <div className="flex items-center justify-center h-full">
+                    <p className="text-destructive">Failed to load database metrics</p>
+                  </div>
+                ) : metricsData.database.length === 0 ? (
+                  <div className="flex items-center justify-center h-full">
+                    <p>Loading database metrics...</p>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={metricsData.database}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis
+                        dataKey="timestamp"
+                        tickFormatter={formatTime}
+                      />
+                      <YAxis />
+                      <Tooltip
+                        labelFormatter={formatTime}
+                        formatter={(value: number, name: string) => {
+                          if (name.includes('Duration')) {
+                            return [`${value.toFixed(3)}s`, name];
+                          }
+                          return [value, name];
+                        }}
+                      />
+                      <Legend />
+                      <Line
+                        type="monotone"
+                        dataKey="query_duration"
+                        name="Query Duration (s)"
+                        stroke="#8884d8"
+                        dot={false}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="active_connections"
+                        name="Active Connections"
+                        stroke="#82ca9d"
+                        dot={false}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
               </div>
-            ) : metricsData.database.length === 0 ? (
-              <div className="flex items-center justify-center h-full">
-                <p>Loading database metrics...</p>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={metricsData.database}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="timestamp"
-                    tickFormatter={formatTime}
-                  />
-                  <YAxis />
-                  <Tooltip
-                    labelFormatter={formatTime}
-                    formatter={(value: number, name: string) => {
-                      if (name.includes('Duration')) {
-                        return [`${value.toFixed(3)}s`, name];
-                      }
-                      return [value, name];
-                    }}
-                  />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="query_duration"
-                    name="Query Duration (s)"
-                    stroke="#8884d8"
-                    dot={false}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="active_connections"
-                    name="Active Connections"
-                    stroke="#82ca9d"
-                    dot={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
 }
