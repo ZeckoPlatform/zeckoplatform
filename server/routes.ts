@@ -22,7 +22,6 @@ import socialRoutes from './routes/social';
 import leadsRoutes from './routes/leads';
 import commentsRoutes from './routes/comments';
 import feedbackRoutes from './routes/feedback';
-import kibanaRoutes from './routes/kibana';
 
 const JWT_SECRET = process.env.REPL_ID!;
 
@@ -46,8 +45,6 @@ export function registerRoutes(app: Express): Server {
     // Add metrics middleware
     app.use(metricsMiddleware);
 
-    // Mount Kibana routes first to ensure proper path handling
-    app.use('/admin/analytics/settings/kibana', kibanaRoutes);
 
     // Expose metrics endpoint (protected)
     app.get('/api/metrics', async (req, res) => {
@@ -93,7 +90,6 @@ export function registerRoutes(app: Express): Server {
       try {
         log('Getting metrics as JSON...');
         const metrics = await getMetricsAsJSON();
-        log('Retrieved metrics:', metrics);
         res.json(metrics);
       } catch (error) {
         log('Error fetching metrics JSON:', error instanceof Error ? error.message : String(error));
