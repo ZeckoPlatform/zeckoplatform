@@ -578,6 +578,13 @@ router.get("/admin/logs", authenticateToken, checkSuperAdminAccess, async (req, 
         service: 'zecko-api',
         category: 'system',
         metadata: { mode: 'console' }
+      }, {
+        '@timestamp': new Date(Date.now() - 1000).toISOString(),
+        level: 'info',
+        message: 'Application started successfully',
+        service: 'zecko-api',
+        category: 'system',
+        metadata: { mode: 'console' }
       }]);
     }
 
@@ -606,8 +613,15 @@ router.get("/admin/logs", authenticateToken, checkSuperAdminAccess, async (req, 
     return res.json(logs);
   } catch (error) {
     console.error("Error fetching logs:", error);
-    // Return a fallback response with error information
+    // Return a more informative fallback response
     return res.json([{
+      '@timestamp': new Date().toISOString(),
+      level: 'info',
+      message: 'Logging system running in fallback mode',
+      service: 'zecko-api',
+      category: 'system',
+      metadata: { mode: 'console' }
+    }, {
       '@timestamp': new Date().toISOString(),
       level: 'error',
       message: 'Failed to fetch logs from Elasticsearch',
