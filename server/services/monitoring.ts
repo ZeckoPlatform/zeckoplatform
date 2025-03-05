@@ -62,7 +62,7 @@ register.registerMetric(errorCounter);
 // Initialize monitoring
 export const initializeMonitoring = () => {
   try {
-    log('Initializing Prometheus monitoring...');
+    logInfo('Initializing Prometheus monitoring...');
 
     // Start collecting default metrics
     promClient.collectDefaultMetrics({
@@ -71,48 +71,62 @@ export const initializeMonitoring = () => {
       gcDurationBuckets: [0.001, 0.01, 0.1, 1, 2, 5]
     });
 
-    // Start periodic system metrics collection
-    setInterval(async () => {
-      try {
-        // Update memory metrics
-        const used = process.memoryUsage();
-        Object.entries(used).forEach(([key, value]) => {
-          memoryUsageGauge.labels(key).set(value);
-        });
+    // Start periodic system metrics collection only in production
+    if (process.env.NODE_ENV === 'production') {
+      setInterval(async () => {
+        try {
+          // Update memory metrics
+          const used = process.memoryUsage();
+          Object.entries(used).forEach(([key, value]) => {
+            memoryUsageGauge.labels(key).set(value);
+          });
 
-        // Calculate CPU usage percentage
-        const startUsage = process.cpuUsage();
-        const startTime = process.hrtime();
+          // Calculate CPU usage percentage
+          const startUsage = process.cpuUsage();
+          const startTime = process.hrtime();
 
-        // Wait a bit to measure CPU usage
-        await new Promise(resolve => setTimeout(resolve, 100));
+          // Wait a bit to measure CPU usage
+          await new Promise(resolve => setTimeout(resolve, 100));
 
-        const elapsedTime = process.hrtime(startTime);
-        const elapsedUsage = process.cpuUsage(startUsage);
+          const elapsedTime = process.hrtime(startTime);
+          const elapsedUsage = process.cpuUsage(startUsage);
 
-        // Calculate CPU usage percentage
-        const elapsedMs = elapsedTime[0] * 1000 + elapsedTime[1] / 1000000;
-        const cpuPercent = ((elapsedUsage.user + elapsedUsage.system) / 1000) / elapsedMs * 100;
+          // Calculate CPU usage percentage
+          const elapsedMs = elapsedTime[0] * 1000 + elapsedTime[1] / 1000000;
+          const cpuPercent = ((elapsedUsage.user + elapsedUsage.system) / 1000) / elapsedMs * 100;
 
-        cpuUsageGauge.set(cpuPercent);
+          cpuUsageGauge.set(cpuPercent);
 
-        log('Updated system metrics:', {
-          cpu: cpuPercent,
-          memory: used
-        });
+          logInfo('Updated system metrics', {
+            metadata: {
+              cpu: cpuPercent,
+              memory: used
+            }
+          });
 
-      } catch (error) {
-        logError('Error collecting system metrics:', {
-          error: error instanceof Error ? error.message : String(error)
-        });
-      }
-    }, 1000);
+        } catch (error) {
+          logError('Error collecting system metrics', {
+            metadata: {
+              error: error instanceof Error ? error.message : String(error)
+            }
+          });
+        }
+      }, 1000);
+    }
 
-    log('Prometheus monitoring initialized successfully');
+    logInfo('Prometheus monitoring initialized successfully');
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    log('Failed to initialize monitoring:', errorMessage);
-    throw error;
+    logError('Failed to initialize monitoring', {
+      metadata: {
+        error: errorMessage,
+        mode: process.env.NODE_ENV
+      }
+    });
+    // Don't throw in development
+    if (process.env.NODE_ENV === 'production') {
+      throw error;
+    }
   }
 };
 
@@ -139,15 +153,21 @@ export const metricsMiddleware = (req: any, res: any, next: any) => {
         errorCounter.labels(res.statusCode >= 500 ? 'server' : 'client').inc();
       }
 
-      log('Recorded request metrics:', {
-        method: req.method,
-        route,
-        statusCode: res.statusCode,
-        duration
+      logInfo('Recorded request metrics', {
+        metadata: {
+          method: req.method,
+          route,
+          statusCode: res.statusCode,
+          duration
+        }
       });
 
     } catch (error) {
-      log('Error recording metrics:', error instanceof Error ? error.message : String(error));
+      logError('Error recording metrics', {
+        metadata: {
+          error: error instanceof Error ? error.message : String(error)
+        }
+      });
     }
   });
 
@@ -157,13 +177,19 @@ export const metricsMiddleware = (req: any, res: any, next: any) => {
 // Get all metrics with JSON format
 export const getMetricsAsJSON = async () => {
   try {
-    log('Getting metrics as JSON...');
+    logInfo('Getting metrics as JSON');
     const metrics = await register.getMetricsAsJSON();
-    log('Retrieved metrics:', metrics);
+    logInfo('Retrieved metrics', {
+      metadata: metrics
+    });
     return metrics;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    log('Failed to collect metrics as JSON:', errorMessage);
+    logError('Failed to collect metrics as JSON', {
+      metadata: {
+        error: errorMessage
+      }
+    });
     throw error;
   }
 };
@@ -171,13 +197,21 @@ export const getMetricsAsJSON = async () => {
 // Get metrics in Prometheus format
 export const getMetrics = async () => {
   try {
-    log('Getting metrics in Prometheus format...');
+    logInfo('Getting metrics in Prometheus format');
     const metrics = await register.metrics();
-    log('Retrieved metrics length:', metrics.length);
+    logInfo('Retrieved metrics length', {
+      metadata: {
+        length: metrics.length
+      }
+    });
     return metrics;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    log('Failed to collect metrics:', errorMessage);
+    logError('Failed to collect metrics', {
+      metadata: {
+        error: errorMessage
+      }
+    });
     throw error;
   }
 };
@@ -189,14 +223,18 @@ export const trackDatabaseQuery = (queryType: string, table: string, duration: n
       .labels(queryType, table)
       .observe(duration / 1000);
 
-    log('Recorded database query metric:', {
-      type: queryType,
-      table,
-      duration
+    logInfo('Recorded database query metric', {
+      metadata: {
+        type: queryType,
+        table,
+        duration
+      }
     });
   } catch (error) {
-    logError('Error recording database metric:', {
-      error: error instanceof Error ? error.message : String(error)
+    logError('Error recording database metric', {
+      metadata: {
+        error: error instanceof Error ? error.message : String(error)
+      }
     });
   }
 };
@@ -204,10 +242,16 @@ export const trackDatabaseQuery = (queryType: string, table: string, duration: n
 export const updateDatabaseConnections = (count: number) => {
   try {
     activeConnectionsGauge.set(count);
-    log('Updated database connections count:', count);
+    logInfo('Updated database connections count', {
+      metadata: {
+        count
+      }
+    });
   } catch (error) {
-    logError('Error updating database connections:', {
-      error: error instanceof Error ? error.message : String(error)
+    logError('Error updating database connections', {
+      metadata: {
+        error: error instanceof Error ? error.message : String(error)
+      }
     });
   }
 };
@@ -216,10 +260,16 @@ export const updateDatabaseConnections = (count: number) => {
 export const trackError = (type: string) => {
   try {
     errorCounter.labels(type).inc();
-    log('Recorded error:', { type });
+    logInfo('Recorded error', {
+      metadata: {
+        type
+      }
+    });
   } catch (error) {
-    logError('Error recording error metric:', {
-      error: error instanceof Error ? error.message : String(error)
+    logError('Error recording error metric', {
+      metadata: {
+        error: error instanceof Error ? error.message : String(error)
+      }
     });
   }
 };
