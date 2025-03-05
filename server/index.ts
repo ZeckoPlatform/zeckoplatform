@@ -71,7 +71,6 @@ try {
   // Continue server startup even if monitoring fails
 }
 
-
 // Setup frontend serving
 if (isProd) {
   logInfo('Setting up production static file serving');
