@@ -32,7 +32,6 @@ import AdminAnalyticsDashboard from "@/pages/admin/analytics-dashboard";
 import AnalyticsSettingsPage from "@/pages/settings/analytics-settings";
 import LogViewer from "@/pages/settings/logs";
 
-
 function Router() {
   return (
     <div className="min-h-screen bg-background">
@@ -92,6 +91,18 @@ function Router() {
           )}
         </Route>
         <Route path="/settings/notifications">
+          {() => (
+            <ProtectedRoute
+              component={() => (
+                <SettingsLayout>
+                  <NotificationSettingsPage />
+                </SettingsLayout>
+              )}
+            />
+          )}
+        </Route>
+        {/* Add the admin notification settings route */}
+        <Route path="/admin/settings/notifications">
           {() => (
             <ProtectedRoute
               component={() => (
