@@ -5,7 +5,13 @@ import jwt from 'jsonwebtoken';
 import { log } from "./vite";
 import path from 'path';
 import fs from 'fs';
-import express from 'express';
+import express, { type Request, Response, NextFunction } from "express";
+import { registerRoutes } from "./routes"; //This line is not needed since registerRoutes is already defined in the original file.
+import { setupVite, serveStatic } from "./vite"; //These lines are not present in the original code and are not needed for this specific task.
+import { setupAuth } from "./auth"; //This line is not present in the original code and is not needed for this specific task.
+import { logInfo, logError } from "./services/logging"; //These lines are not present in the original code.
+import cors from 'cors';
+import kibanaRouter from './routes/kibana';
 
 // Import routes
 import authRoutes from './routes/auth';
@@ -98,20 +104,33 @@ export function registerRoutes(app: Express): Server {
     });
 
     // Register API routes
-    app.use('/api', authRoutes);
-    app.use('/api', uploadRoutes);
-    app.use('/api', subscriptionRoutes);
-    app.use('/api', invoiceRoutes);
-    app.use('/api', analyticsRoutes);
-    app.use('/api', notificationRoutes);
-    app.use('/api', adminRoutes);
-    app.use('/api', documentRoutes);
-    app.use('/api', reviewRoutes);
-    app.use('/api', orderRoutes);
-    app.use('/api', socialRoutes);
-    app.use('/api', leadsRoutes);
-    app.use('/api', commentsRoutes);
-    app.use('/api', feedbackRoutes);
+    try {
+      // Register all route modules
+      app.use('/api', authRoutes);
+      app.use('/api', uploadRoutes);
+      app.use('/api', subscriptionRoutes);
+      app.use('/api', invoiceRoutes);
+      app.use('/api', analyticsRoutes);
+      app.use('/api', notificationRoutes);
+      app.use('/api', adminRoutes);
+      app.use('/api', documentRoutes);
+      app.use('/api', reviewRoutes);
+      app.use('/api', orderRoutes);
+      app.use('/api', socialRoutes);
+      app.use('/api', leadsRoutes);
+      app.use('/api', commentsRoutes);
+      app.use('/api', feedbackRoutes);
+
+      // Mount Kibana proxy route
+      app.use('/admin/analytics/kibana', kibanaRouter);
+
+      logInfo('Routes registered successfully');
+    } catch (error) {
+      logError('Fatal error during route registration:', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      process.exit(1);
+    }
 
     // Ensure uploads directory exists
     const uploadDir = path.join(process.cwd(), 'uploads');

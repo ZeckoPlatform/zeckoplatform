@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { authenticateToken, checkSuperAdminAccess } from "../auth";
+import { logInfo, logError } from "../services/logging";
 
 const router = Router();
 
@@ -14,14 +15,22 @@ router.use(
     target: "http://localhost:5601",
     changeOrigin: true,
     pathRewrite: {
-      "^/admin/analytics/settings/kibana": "",
+      "^/admin/analytics/kibana": "",
     },
-    onProxyReq: (proxyReq, req, res) => {
-      // Add any necessary headers or authentication
-      proxyReq.setHeader("kbn-xsrf", "true");
+    onProxyReq: (proxyReq) => {
+      // Add Kibana authentication headers
+      proxyReq.setHeader('kbn-xsrf', 'true');
+      if (process.env.ELASTICSEARCH_USERNAME && process.env.ELASTICSEARCH_PASSWORD) {
+        proxyReq.setHeader(
+          'Authorization',
+          'Basic ' + Buffer.from(
+            `${process.env.ELASTICSEARCH_USERNAME}:${process.env.ELASTICSEARCH_PASSWORD}`
+          ).toString('base64')
+        );
+      }
     },
     onError: (err, req, res) => {
-      console.error("Kibana proxy error:", err);
+      logError('Kibana proxy error:', { error: err instanceof Error ? err.message : String(err) });
       res.status(503).send("Kibana service unavailable");
     },
   })

@@ -198,6 +198,12 @@ export default function AnalyticsSettingsPage() {
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">System Monitoring</h1>
         <div className="flex gap-4">
+          <Button
+            variant="outline"
+            onClick={() => window.open('/admin/analytics/kibana', '_blank')}
+          >
+            Open Kibana Dashboard
+          </Button>
           <Link href="/settings/analytics/logs">
             <Button variant="outline">View System Logs</Button>
           </Link>

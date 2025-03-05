@@ -255,3 +255,13 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
     }
   });
 }
+
+export function checkSuperAdminAccess(req: Request, res: Response, next: NextFunction) {
+  if (!req.user || !req.user.superAdmin) {
+    return res.status(403).json({
+      success: false,
+      message: "Super admin access required"
+    });
+  }
+  next();
+}
