@@ -23,7 +23,7 @@ type ApiResponse<T> = {
   user?: T;
 };
 
-export const AuthContext = createContext<ReturnType<typeof useAuthState> | null>(null);
+const AuthContext = createContext<ReturnType<typeof useAuthState> | null>(null);
 
 function useAuthState() {
   const { toast } = useToast();
@@ -69,29 +69,16 @@ function useAuthState() {
         throw new Error("Email and password are required");
       }
 
-      console.log('Attempting login with:', { email: credentials.email });
-
-      const requestBody = {
-        email: credentials.email,
-        password: credentials.password
-      };
-
-      console.log('Login attempt:', requestBody);
-
       const res = await fetch("/api/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json"
         },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify(credentials),
       });
 
-      const text = await res.text();
-      console.log('Raw login response:', text);
-
-      const data = JSON.parse(text) as ApiResponse<SelectUser>;
-      console.log('Parsed login response:', data);
+      const data = await res.json() as ApiResponse<SelectUser>;
 
       if (!data.success) {
         throw new Error(data.message || "Login failed");
@@ -127,11 +114,6 @@ function useAuthState() {
         throw new Error("Email and password are required");
       }
 
-      console.log('Registration attempt:', {
-        email: data.email,
-        hasPassword: !!data.password
-      });
-
       const res = await fetch("/api/register", {
         method: "POST",
         headers: {
@@ -141,11 +123,7 @@ function useAuthState() {
         body: JSON.stringify(data),
       });
 
-      const text = await res.text();
-      console.log('Raw register response:', text);
-
-      const responseData = JSON.parse(text) as ApiResponse<SelectUser>;
-      console.log('Parsed register response:', responseData);
+      const responseData = await res.json() as ApiResponse<SelectUser>;
 
       if (!responseData.success) {
         throw new Error(responseData.message || "Registration failed");
@@ -179,6 +157,7 @@ function useAuthState() {
     mutationFn: async () => {
       localStorage.removeItem("token");
       queryClient.setQueryData(["/api/user"], null);
+      await fetch("/api/logout", { method: "POST" });
     },
     onSuccess: () => {
       toast({
