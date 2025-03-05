@@ -11,6 +11,7 @@ import {
   Tooltip, Legend, ResponsiveContainer
 } from "recharts";
 import { Link } from "wouter";
+import LogsView from "./analytics-logs";
 
 // Types for our metrics
 type SystemMetrics = {
@@ -37,7 +38,7 @@ export default function AnalyticsSettingsPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [showKibana, setShowKibana] = useState(false);
+  const [showLogs, setShowLogs] = useState(false);
   const [metricsData, setMetricsData] = useState<{
     system: SystemMetrics[];
     api: APIMetrics[];
@@ -200,31 +201,24 @@ export default function AnalyticsSettingsPage() {
         <h1 className="text-3xl font-bold">System Monitoring</h1>
         <div className="flex gap-4">
           <Button
-            variant={showKibana ? "secondary" : "outline"}
-            onClick={() => setShowKibana(!showKibana)}
+            variant={showLogs ? "secondary" : "outline"}
+            onClick={() => setShowLogs(!showLogs)}
           >
-            {showKibana ? "Show Metrics" : "Show Kibana Dashboard"}
+            {showLogs ? "Show Metrics" : "Show System Logs"}
           </Button>
-          <Link href="/settings/analytics/logs">
-            <Button variant="outline">View System Logs</Button>
-          </Link>
           <Button variant="outline" onClick={() => setLocation("/admin-management")}>
             Back to Dashboard
           </Button>
         </div>
       </div>
 
-      {showKibana ? (
+      {showLogs ? (
         <Card className="w-full h-[800px]">
           <CardHeader>
-            <CardTitle>Kibana Dashboard</CardTitle>
+            <CardTitle>System Logs</CardTitle>
           </CardHeader>
-          <CardContent className="p-0 h-full">
-            <iframe
-              src="/admin/analytics/kibana"
-              className="w-full h-full border-0"
-              title="Kibana Dashboard"
-            />
+          <CardContent className="p-4">
+            <LogsView />
           </CardContent>
         </Card>
       ) : (

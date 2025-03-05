@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { authenticateToken } from "../auth";
+import { authenticateToken, checkSuperAdminAccess } from "../auth";
 import { db } from "@db";
 import {
   analyticsLogs,
@@ -10,8 +10,87 @@ import {
   users,
 } from "@db/schema";
 import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
+import { Client } from '@elastic/elasticsearch';
+import { logInfo, logError } from "../services/logging";
 
 const router = Router();
+
+// Initialize Elasticsearch client
+const esClient = new Client({
+  node: 'http://localhost:9200',
+  auth: {
+    username: process.env.ELASTICSEARCH_USERNAME!,
+    password: process.env.ELASTICSEARCH_PASSWORD!
+  }
+});
+
+// Fetch logs with filtering and search
+router.get("/logs", authenticateToken, checkSuperAdminAccess, async (req, res) => {
+  try {
+    const { search, level, category, from = 0, size = 100 } = req.query;
+
+    // Build Elasticsearch query
+    const query: any = {
+      bool: {
+        must: [{ match_all: {} }]
+      }
+    };
+
+    // Add search filter
+    if (search) {
+      query.bool.must.push({
+        multi_match: {
+          query: search,
+          fields: ['message', 'service', 'category']
+        }
+      });
+    }
+
+    // Add level filter
+    if (level && level !== 'all') {
+      query.bool.must.push({
+        match: { level }
+      });
+    }
+
+    // Add category filter
+    if (category && category !== 'all') {
+      query.bool.must.push({
+        match: { category }
+      });
+    }
+
+    // Execute search
+    const result = await esClient.search({
+      index: 'zecko-logs-*',
+      body: {
+        query,
+        sort: [{ '@timestamp': { order: 'desc' } }],
+        from: Number(from),
+        size: Number(size)
+      }
+    });
+
+    const logs = result.hits.hits.map(hit => ({
+      '@timestamp': hit._source['@timestamp'],
+      level: hit._source.level,
+      message: hit._source.message,
+      service: hit._source.service,
+      category: hit._source.category,
+      metadata: hit._source.metadata || {}
+    }));
+
+    res.json(logs);
+  } catch (error) {
+    logError('Error fetching logs:', {
+      error: error instanceof Error ? error.message : String(error)
+    });
+    res.status(500).json({
+      message: "Failed to fetch logs",
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+});
 
 // Log user activity
 router.post("/analytics/log", authenticateToken, async (req, res) => {
