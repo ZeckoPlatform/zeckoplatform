@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { authenticateToken } from "../auth";
+import { authenticateToken, checkSuperAdminAccess } from "../auth";
 import { db } from "@db";
 import { notifications, notificationPreferences, emailTemplates, newsletters, users } from "@db/schema";
 import { eq } from "drizzle-orm";
@@ -9,13 +9,31 @@ import { sendEmail } from "../services/email";
 
 const router = Router();
 
-// Middleware to check admin access
-const checkAdminAccess = (req, res, next) => {
-  if (!req.user || req.user.userType !== "admin") {
-    return res.status(403).json({ message: "Admin access required" });
+// Add test notification endpoint
+router.post("/notifications/test", authenticateToken, checkSuperAdminAccess, async (req, res) => {
+  try {
+    const { type, message, severity } = req.body;
+
+    // Create the test notification
+    await createNotification({
+      title: `Test ${type} Notification`,
+      message,
+      type: type === 'critical' ? 'api_failure' : 'system_metric',
+      severity,
+      notifyAdmins: true,
+      sendEmail: severity === 'critical',
+      metadata: {
+        test: true,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error("Error creating test notification:", error);
+    res.status(500).json({ error: "Failed to create test notification" });
   }
-  next();
-};
+});
 
 // Email template routes - Admin only
 router.post("/email-templates", authenticateToken, checkAdminAccess, async (req, res) => {
@@ -176,5 +194,13 @@ router.patch("/notification-preferences", authenticateToken, async (req, res) =>
     return res.status(500).json({ error: "Failed to update notification preferences" });
   }
 });
+
+// Middleware to check admin access
+const checkAdminAccess = (req, res, next) => {
+  if (!req.user || req.user.userType !== "admin") {
+    return res.status(403).json({ message: "Admin access required" });
+  }
+  next();
+};
 
 export default router;

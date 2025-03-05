@@ -2,12 +2,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
-import { Bell, Mail, AlertTriangle } from "lucide-react";
+import { Bell, Mail, AlertTriangle, Loader2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -32,6 +31,7 @@ export default function NotificationSettingsPage() {
     database_issues: true,
     security_alerts: true,
   });
+  const [isTesting, setIsTesting] = useState(false);
 
   // WebSocket connection for real-time notifications
   useEffect(() => {
@@ -93,6 +93,52 @@ export default function NotificationSettingsPage() {
     }
   };
 
+  // Test notifications
+  const testNotifications = async () => {
+    setIsTesting(true);
+    try {
+      // Test info notification
+      await apiRequest('POST', '/api/notifications/test', {
+        type: 'info',
+        message: 'This is a test info notification',
+        severity: 'info'
+      });
+
+      // Wait 2 seconds
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Test warning notification
+      await apiRequest('POST', '/api/notifications/test', {
+        type: 'warning',
+        message: 'This is a test warning notification',
+        severity: 'warning'
+      });
+
+      // Wait 2 seconds
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Test critical notification
+      await apiRequest('POST', '/api/notifications/test', {
+        type: 'critical',
+        message: 'This is a test critical notification',
+        severity: 'critical'
+      });
+
+      toast({
+        title: "Success",
+        description: "Test notifications sent successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to send test notifications",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
   // Redirect if user is not a super admin
   if (!user?.superAdmin) {
     setLocation("/");
@@ -103,9 +149,24 @@ export default function NotificationSettingsPage() {
     <div className="container mx-auto py-8 space-y-8">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Notification Settings</h1>
-        <Button variant="outline" onClick={() => setLocation("/admin-management")}>
-          Back to Dashboard
-        </Button>
+        <div className="flex gap-4">
+          <Button variant="outline" onClick={() => setLocation("/admin-management")}>
+            Back to Dashboard
+          </Button>
+          <Button 
+            onClick={testNotifications} 
+            disabled={isTesting}
+          >
+            {isTesting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Testing...
+              </>
+            ) : (
+              'Test Notifications'
+            )}
+          </Button>
+        </div>
       </div>
 
       <Card>
