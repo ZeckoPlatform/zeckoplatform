@@ -1,19 +1,13 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { WebSocketServer } from 'ws';
 import { initializeMonitoring, metricsMiddleware, getMetrics, getMetricsAsJSON } from './services/monitoring';
 import jwt from 'jsonwebtoken';
 import { log } from "./vite";
 import path from 'path';
 import fs from 'fs';
-import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes"; //This line is not needed since registerRoutes is already defined in the original file.
-import { setupVite, serveStatic } from "./vite"; //These lines are not present in the original code and are not needed for this specific task.
-import { setupAuth } from "./auth"; //This line is not present in the original code and is not needed for this specific task.
-import { logInfo, logError } from "./services/logging"; //These lines are not present in the original code.
-import cors from 'cors';
-import kibanaRouter from './routes/kibana';
-
-// Import routes
+import express from "express";
+import { registerWebSocket } from "./services/notifications";
 import authRoutes from './routes/auth';
 import uploadRoutes from './routes/upload';
 import subscriptionRoutes from './routes/subscription';
@@ -28,6 +22,7 @@ import socialRoutes from './routes/social';
 import leadsRoutes from './routes/leads';
 import commentsRoutes from './routes/comments';
 import feedbackRoutes from './routes/feedback';
+import kibanaRouter from './routes/kibana';
 
 const JWT_SECRET = process.env.REPL_ID!;
 
@@ -51,102 +46,54 @@ export function registerRoutes(app: Express): Server {
     // Add metrics middleware
     app.use(metricsMiddleware);
 
-    // Expose metrics endpoint (protected)
-    app.get('/api/metrics', async (req, res) => {
-      const authHeader = req.headers.authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ error: 'Authentication required' });
-      }
-
-      const token = authHeader.split(' ')[1];
-      const decoded = verifyToken(token);
-
-      if (!decoded || !(decoded as any).superAdmin) {
-        log('Access denied - Not a super admin:', decoded);
-        return res.status(403).json({ error: 'Access denied' });
-      }
-
-      try {
-        log('Getting Prometheus metrics...');
-        const metrics = await getMetrics();
-        res.set('Content-Type', 'text/plain');
-        res.send(metrics);
-      } catch (error) {
-        log('Error fetching metrics:', error instanceof Error ? error.message : String(error));
-        res.status(500).json({ error: 'Failed to collect metrics' });
-      }
-    });
-
-    // Expose metrics in JSON format (protected)
-    app.get('/api/metrics/json', async (req, res) => {
-      const authHeader = req.headers.authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ error: 'Authentication required' });
-      }
-
-      const token = authHeader.split(' ')[1];
-      const decoded = verifyToken(token);
-
-      if (!decoded || !(decoded as any).superAdmin) {
-        log('Access denied - Not a super admin:', decoded);
-        return res.status(403).json({ error: 'Access denied' });
-      }
-
-      try {
-        log('Getting metrics as JSON...');
-        const metrics = await getMetricsAsJSON();
-        log('Retrieved metrics:', metrics);
-        res.json(metrics);
-      } catch (error) {
-        log('Error fetching metrics JSON:', error instanceof Error ? error.message : String(error));
-        res.status(500).json({ error: 'Failed to collect metrics' });
-      }
-    });
-
-    // Register API routes
-    try {
-      // Register all route modules
-      app.use('/api', authRoutes);
-      app.use('/api', uploadRoutes);
-      app.use('/api', subscriptionRoutes);
-      app.use('/api', invoiceRoutes);
-      app.use('/api', analyticsRoutes);
-      app.use('/api', notificationRoutes);
-      app.use('/api', adminRoutes);
-      app.use('/api', documentRoutes);
-      app.use('/api', reviewRoutes);
-      app.use('/api', orderRoutes);
-      app.use('/api', socialRoutes);
-      app.use('/api', leadsRoutes);
-      app.use('/api', commentsRoutes);
-      app.use('/api', feedbackRoutes);
-
-      // Mount Kibana proxy route
-      app.use('/admin/analytics/kibana', kibanaRouter);
-
-      logInfo('Routes registered successfully');
-    } catch (error) {
-      logError('Fatal error during route registration:', {
-        error: error instanceof Error ? error.message : String(error)
-      });
-      process.exit(1);
-    }
-
-    // Ensure uploads directory exists
-    const uploadDir = path.join(process.cwd(), 'uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-
-    // Serve uploaded files
-    app.use('/uploads', express.static(uploadDir));
-
     // Create HTTP server
     const httpServer = createServer(app);
-    log('Created HTTP server instance');
+
+    // Create WebSocket server for real-time notifications
+    const wss = new WebSocketServer({ 
+      server: httpServer,
+      path: '/ws/notifications'
+    });
+
+    wss.on('connection', (ws, req) => {
+      log('New WebSocket connection');
+
+      const token = req.url?.split('token=')[1];
+      if (!token) {
+        ws.close(1008, 'Authentication required');
+        return;
+      }
+
+      const decoded = verifyToken(token);
+      if (!decoded || !decoded.sub) {
+        ws.close(1008, 'Invalid token');
+        return;
+      }
+
+      // Register WebSocket connection for notifications
+      registerWebSocket(Number(decoded.sub), ws);
+    });
+
+    // Register all route modules
+    app.use('/api', authRoutes);
+    app.use('/api', uploadRoutes);
+    app.use('/api', subscriptionRoutes);
+    app.use('/api', invoiceRoutes);
+    app.use('/api', analyticsRoutes);
+    app.use('/api', notificationRoutes);
+    app.use('/api', adminRoutes);
+    app.use('/api', documentRoutes);
+    app.use('/api', reviewRoutes);
+    app.use('/api', orderRoutes);
+    app.use('/api', socialRoutes);
+    app.use('/api', leadsRoutes);
+    app.use('/api', commentsRoutes);
+    app.use('/api', feedbackRoutes);
+
+    // Mount Kibana proxy route
+    app.use('/admin/analytics/kibana', kibanaRouter);
 
     return httpServer;
-
   } catch (error) {
     log('Failed to initialize routes:', error instanceof Error ? error.message : String(error));
     throw error;

@@ -5,11 +5,93 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
-import { Bell, Mail, MessageSquare } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useEffect, useState } from "react";
+import { Bell, Mail, AlertTriangle } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { apiRequest } from "@/lib/queryClient";
+
+type NotificationPreference = {
+  email: boolean;
+  critical_alerts: boolean;
+  api_failures: boolean;
+  system_metrics: boolean;
+  database_issues: boolean;
+  security_alerts: boolean;
+};
 
 export default function NotificationSettingsPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const [preferences, setPreferences] = useState<NotificationPreference>({
+    email: true,
+    critical_alerts: true,
+    api_failures: true,
+    system_metrics: true,
+    database_issues: true,
+    security_alerts: true,
+  });
+
+  // WebSocket connection for real-time notifications
+  useEffect(() => {
+    if (!user?.superAdmin) return;
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const token = localStorage.getItem('token');
+    const ws = new WebSocket(`${protocol}//${window.location.host}/ws/notifications?token=${token}`);
+
+    ws.onmessage = (event) => {
+      const notification = JSON.parse(event.data);
+      toast({
+        title: notification.title,
+        description: notification.message,
+        variant: notification.severity === 'critical' ? 'destructive' : 'default',
+      });
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [user, toast]);
+
+  // Load preferences
+  useEffect(() => {
+    const loadPreferences = async () => {
+      try {
+        const response = await apiRequest('GET', '/api/notification-preferences');
+        if (response.ok) {
+          const data = await response.json();
+          setPreferences(data);
+        }
+      } catch (error) {
+        console.error('Failed to load notification preferences:', error);
+      }
+    };
+
+    if (user?.superAdmin) {
+      loadPreferences();
+    }
+  }, [user]);
+
+  // Save preferences
+  const savePreferences = async () => {
+    try {
+      const response = await apiRequest('PATCH', '/api/notification-preferences', preferences);
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: "Notification preferences updated successfully",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update notification preferences",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Redirect if user is not a super admin
   if (!user?.superAdmin) {
@@ -28,68 +110,103 @@ export default function NotificationSettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Email Notifications</CardTitle>
-          <CardDescription>Configure system-wide email notification settings</CardDescription>
+          <CardTitle>Alert Channels</CardTitle>
+          <CardDescription>Configure how you want to receive notifications</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4">
-            <div className="flex items-center space-x-4">
-              <Label>Send Welcome Emails</Label>
-              <Input type="checkbox" defaultChecked />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Mail className="h-4 w-4" />
+              <Label>Email Notifications</Label>
             </div>
-            <div className="flex items-center space-x-4">
-              <Label>Send Password Reset Notifications</Label>
-              <Input type="checkbox" defaultChecked />
-            </div>
-            <div className="space-y-2">
-              <Label>Email Footer Text</Label>
-              <Textarea defaultValue="This email was sent by Zecko. Please do not reply to this email." />
-            </div>
+            <Switch
+              checked={preferences.email}
+              onCheckedChange={(checked) => 
+                setPreferences(prev => ({ ...prev, email: checked }))
+              }
+            />
           </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>System Notifications</CardTitle>
-          <CardDescription>Configure in-app notification preferences</CardDescription>
+          <CardTitle>Notification Types</CardTitle>
+          <CardDescription>Choose which types of alerts you want to receive</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4">
-            <div className="flex items-center space-x-4">
-              <Label>New User Registrations</Label>
-              <Input type="checkbox" defaultChecked />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <AlertTriangle className="h-4 w-4 text-red-500" />
+              <Label>Critical System Alerts</Label>
             </div>
-            <div className="flex items-center space-x-4">
-              <Label>Failed Login Attempts</Label>
-              <Input type="checkbox" defaultChecked />
+            <Switch
+              checked={preferences.critical_alerts}
+              onCheckedChange={(checked) => 
+                setPreferences(prev => ({ ...prev, critical_alerts: checked }))
+              }
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Bell className="h-4 w-4 text-yellow-500" />
+              <Label>API Failure Notifications</Label>
             </div>
-            <div className="flex items-center space-x-4">
-              <Label>Subscription Changes</Label>
-              <Input type="checkbox" defaultChecked />
+            <Switch
+              checked={preferences.api_failures}
+              onCheckedChange={(checked) => 
+                setPreferences(prev => ({ ...prev, api_failures: checked }))
+              }
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Bell className="h-4 w-4 text-blue-500" />
+              <Label>System Metrics Alerts</Label>
             </div>
+            <Switch
+              checked={preferences.system_metrics}
+              onCheckedChange={(checked) => 
+                setPreferences(prev => ({ ...prev, system_metrics: checked }))
+              }
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Bell className="h-4 w-4 text-orange-500" />
+              <Label>Database Issue Alerts</Label>
+            </div>
+            <Switch
+              checked={preferences.database_issues}
+              onCheckedChange={(checked) => 
+                setPreferences(prev => ({ ...prev, database_issues: checked }))
+              }
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Bell className="h-4 w-4 text-purple-500" />
+              <Label>Security Alert Notifications</Label>
+            </div>
+            <Switch
+              checked={preferences.security_alerts}
+              onCheckedChange={(checked) => 
+                setPreferences(prev => ({ ...prev, security_alerts: checked }))
+              }
+            />
           </div>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Notification Templates</CardTitle>
-          <CardDescription>Customize notification message templates</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4">
-            <div className="space-y-2">
-              <Label>Welcome Message Template</Label>
-              <Textarea defaultValue="Welcome to Zecko! We're excited to have you on board." />
-            </div>
-            <div className="space-y-2">
-              <Label>Password Reset Template</Label>
-              <Textarea defaultValue="Your password has been reset. If you did not request this change, please contact support immediately." />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex justify-end">
+        <Button onClick={savePreferences}>
+          Save Preferences
+        </Button>
+      </div>
     </div>
   );
 }
