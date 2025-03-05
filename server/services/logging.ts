@@ -2,11 +2,7 @@ import winston from 'winston';
 import { ElasticsearchTransport } from 'winston-elasticsearch';
 import { Client } from '@elastic/elasticsearch';
 import { log as viteLog } from '../vite';
-
-// Initialize Elasticsearch client
-const esClient = new Client({
-  node: process.env.ELASTICSEARCH_URL || 'http://localhost:9200'
-});
+import { esClient } from '../elasticsearch';
 
 // Create custom format for structured logging
 const structuredFormat = winston.format.combine(
@@ -17,7 +13,7 @@ const structuredFormat = winston.format.combine(
   winston.format.json()
 );
 
-// Create Winston logger
+// Create Winston logger with console transport initially
 const logger = winston.createLogger({
   level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
   format: structuredFormat,
@@ -29,37 +25,50 @@ const logger = winston.createLogger({
         winston.format.colorize(),
         winston.format.simple()
       )
-    }),
-    // Elasticsearch transport
-    new ElasticsearchTransport({
-      client: esClient,
-      level: 'info',
-      indexPrefix: 'zecko-logs',
-      indexSuffixPattern: 'YYYY.MM.DD',
-      mappingTemplate: {
-        index_patterns: ['zecko-logs-*'],
-        settings: {
-          number_of_shards: 1,
-          number_of_replicas: 1,
-          index: {
-            refresh_interval: '5s'
-          }
-        },
-        mappings: {
-          properties: {
-            '@timestamp': { type: 'date' },
-            level: { type: 'keyword' },
-            message: { type: 'text' },
-            service: { type: 'keyword' },
-            category: { type: 'keyword' },
-            traceId: { type: 'keyword' },
-            metadata: { type: 'object' }
-          }
-        }
-      }
     })
   ]
 });
+
+// Add Elasticsearch transport with retry logic
+const esTransport = new ElasticsearchTransport({
+  client: esClient,
+  level: 'info',
+  indexPrefix: 'zecko-logs',
+  indexSuffixPattern: 'YYYY.MM.DD',
+  retryLimit: 5,
+  retryDelay: 1000,
+  handleExceptions: true,
+  mappingTemplate: {
+    index_patterns: ['zecko-logs-*'],
+    settings: {
+      number_of_shards: 1,
+      number_of_replicas: 1,
+      index: {
+        refresh_interval: '5s'
+      }
+    },
+    mappings: {
+      properties: {
+        '@timestamp': { type: 'date' },
+        level: { type: 'keyword' },
+        message: { type: 'text' },
+        service: { type: 'keyword' },
+        category: { type: 'keyword' },
+        traceId: { type: 'keyword' },
+        metadata: { type: 'object' }
+      }
+    }
+  }
+});
+
+// Handle transport errors
+esTransport.on('error', (error) => {
+  console.error('Elasticsearch transport error:', error);
+  viteLog('[ERROR] Elasticsearch transport error - falling back to console logging');
+});
+
+// Add transport after error handler is set up
+logger.add(esTransport);
 
 // Logging categories
 export enum LogCategory {
@@ -149,3 +158,9 @@ export async function testLogging() {
     return false;
   }
 }
+
+// Initialize logging and test connection
+testLogging().catch(error => {
+  console.error('Failed to initialize logging:', error);
+  viteLog('[ERROR] Failed to initialize logging system');
+});
