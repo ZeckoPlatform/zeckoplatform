@@ -30,6 +30,7 @@ import FeedbackManagementPage from "@/pages/admin/feedback-management";
 import SocialFeedPage from "@/pages/social-feed";
 import AdminAnalyticsDashboard from "@/pages/admin/analytics-dashboard";
 import AnalyticsSettingsPage from "@/pages/settings/analytics-settings";
+import LogViewer from "@/pages/admin/log-viewer";
 
 function Router() {
   return (
@@ -105,6 +106,10 @@ function Router() {
         <Route path="/admin/users/edit/:id" component={UserEditPage} />
         <Route path="/admin/reviews" component={ReviewModerationPage} />
         <Route path="/admin/feedback" component={() => <ProtectedRoute component={FeedbackManagementPage} />} />
+        <Route 
+          path="/admin/analytics/logs" 
+          component={() => <ProtectedRoute component={LogViewer} />} 
+        />
 
         <Route component={NotFound} />
       </Switch>

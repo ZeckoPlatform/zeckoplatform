@@ -12,7 +12,7 @@ const esClient = new Client({
 const structuredFormat = winston.format.combine(
   winston.format.timestamp(),
   winston.format.metadata({
-    fillWith: ['timestamp', 'level', 'message', 'service']
+    fillWith: ['timestamp', 'level', 'message', 'service', 'category', 'traceId']
   }),
   winston.format.json()
 );
@@ -29,53 +29,123 @@ const logger = winston.createLogger({
         winston.format.colorize(),
         winston.format.simple()
       )
+    }),
+    // Elasticsearch transport
+    new ElasticsearchTransport({
+      client: esClient,
+      level: 'info',
+      indexPrefix: 'zecko-logs',
+      indexSuffixPattern: 'YYYY.MM.DD',
+      mappingTemplate: {
+        index_patterns: ['zecko-logs-*'],
+        settings: {
+          number_of_shards: 1,
+          number_of_replicas: 1,
+          index: {
+            refresh_interval: '5s'
+          }
+        },
+        mappings: {
+          properties: {
+            '@timestamp': { type: 'date' },
+            level: { type: 'keyword' },
+            message: { type: 'text' },
+            service: { type: 'keyword' },
+            category: { type: 'keyword' },
+            traceId: { type: 'keyword' },
+            metadata: { type: 'object' }
+          }
+        }
+      }
     })
   ]
 });
 
-// Add Elasticsearch transport in production
-if (process.env.NODE_ENV === 'production') {
-  logger.add(new ElasticsearchTransport({
-    client: esClient,
-    level: 'info',
-    index: 'zecko-logs',
-    mappingTemplate: {
-      index_patterns: ['zecko-logs-*'],
-      settings: {
-        number_of_shards: 1,
-        number_of_replicas: 1,
-        index: {
-          refresh_interval: '5s'
-        }
-      },
-      mappings: {
-        dynamic_templates: [{
-          strings_as_keywords: {
-            match_mapping_type: 'string',
-            mapping: {
-              type: 'keyword'
-            }
-          }
-        }]
-      }
-    }
-  }));
+// Logging categories
+export enum LogCategory {
+  REQUEST = 'request',
+  ERROR = 'error',
+  BUSINESS = 'business',
+  SYSTEM = 'system'
 }
 
-// Wrapper function to ensure all logging goes through Winston
-export function logMessage(level: string, message: string, meta?: any) {
-  // Also log to Vite's logger for development visibility
-  viteLog(`[${level}] ${message}`);
-  
-  // Log to Winston (and consequently Elasticsearch in production)
-  logger.log(level, message, meta);
+// Structured logging interface
+interface LogMetadata {
+  category: LogCategory;
+  traceId?: string;
+  [key: string]: any;
 }
 
-// Convenience methods for different log levels
-export const logInfo = (message: string, meta?: any) => logMessage('info', message, meta);
-export const logError = (message: string, meta?: any) => logMessage('error', message, meta);
-export const logWarn = (message: string, meta?: any) => logMessage('warn', message, meta);
-export const logDebug = (message: string, meta?: any) => logMessage('debug', message, meta);
+// Wrapper functions for categorized logging
+export function logRequest(message: string, meta?: Partial<LogMetadata>) {
+  const metadata = {
+    ...meta,
+    category: LogCategory.REQUEST
+  };
+  logger.info(message, metadata);
+  viteLog(`[REQUEST] ${message}`);
+}
+
+export function logError(message: string, meta?: Partial<LogMetadata>) {
+  const metadata = {
+    ...meta,
+    category: LogCategory.ERROR
+  };
+  logger.error(message, metadata);
+  viteLog(`[ERROR] ${message}`);
+}
+
+export function logBusiness(message: string, meta?: Partial<LogMetadata>) {
+  const metadata = {
+    ...meta,
+    category: LogCategory.BUSINESS
+  };
+  logger.info(message, metadata);
+  viteLog(`[BUSINESS] ${message}`);
+}
+
+export function logSystem(message: string, meta?: Partial<LogMetadata>) {
+  const metadata = {
+    ...meta,
+    category: LogCategory.SYSTEM
+  };
+  logger.info(message, metadata);
+  viteLog(`[SYSTEM] ${message}`);
+}
 
 // Export logger instance for direct use if needed
 export { logger };
+
+// Test function to verify Elasticsearch connection and logging
+export async function testLogging() {
+  try {
+    // Test system logging
+    logSystem('Elasticsearch logging test initiated', {
+      metadata: { test: true }
+    });
+
+    // Test request logging
+    logRequest('Test API request', {
+      method: 'GET',
+      path: '/api/test',
+      duration: 100
+    });
+
+    // Test business logging
+    logBusiness('Test business action', {
+      action: 'create_lead',
+      userId: 123
+    });
+
+    // Test error logging
+    logError('Test error occurred', {
+      error: new Error('Test error'),
+      code: 500
+    });
+
+    return true;
+  } catch (error) {
+    console.error('Logging test failed:', error);
+    return false;
+  }
+}

@@ -7,6 +7,8 @@ import { z } from "zod";
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
 import { sendEmail } from "../services/email";
+import { esClient } from '../elasticsearch';
+import { testLogging } from '../services/logging';
 
 const router = Router();
 const scryptAsync = promisify(scrypt);
@@ -560,6 +562,53 @@ router.post("/messages/:userId", authenticateToken, checkSuperAdminAccess, async
   } catch (error) {
     console.error("Error sending message:", error);
     return res.status(500).json({ error: "Failed to send message" });
+  }
+});
+
+// Add logs endpoint to admin routes
+router.get("/admin/logs", authenticateToken, checkSuperAdminAccess, async (req, res) => {
+  try {
+    // Query elasticsearch for logs
+    const result = await esClient.search({
+      index: 'zecko-logs-*',
+      sort: [{ '@timestamp': { order: 'desc' } }],
+      size: 100, // Last 100 logs
+      body: {
+        query: {
+          match_all: {}
+        }
+      }
+    });
+
+    // Transform and return logs
+    const logs = result.hits.hits.map(hit => ({
+      '@timestamp': hit._source['@timestamp'],
+      level: hit._source.level,
+      message: hit._source.message,
+      service: hit._source.service,
+      category: hit._source.category,
+      metadata: hit._source.metadata
+    }));
+
+    return res.json(logs);
+  } catch (error) {
+    console.error("Error fetching logs:", error);
+    return res.status(500).json({ error: "Failed to fetch logs" });
+  }
+});
+
+// Test logging endpoint (temporary, remove in production)
+router.post("/admin/test-logging", authenticateToken, checkSuperAdminAccess, async (req, res) => {
+  try {
+    const result = await testLogging();
+    if (result) {
+      res.json({ message: "Logging test successful" });
+    } else {
+      res.status(500).json({ error: "Logging test failed" });
+    }
+  } catch (error) {
+    console.error("Error testing logging:", error);
+    res.status(500).json({ error: "Failed to test logging" });
   }
 });
 
