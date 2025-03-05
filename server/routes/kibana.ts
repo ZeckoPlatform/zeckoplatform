@@ -1,37 +1,25 @@
 import { Router } from "express";
-import { createProxyMiddleware } from "http-proxy-middleware";
-import { authenticateToken, checkSuperAdminAccess } from "../auth";
+import { authenticateToken } from "../auth";
 import { logInfo, logError } from "../services/logging";
+import { 
+  kibanaAuthMiddleware, 
+  createKibanaProxy,
+  initializeKibana 
+} from "../services/kibana";
 
 const router = Router();
 
-// Protect Kibana access with authentication
-router.use(authenticateToken, checkSuperAdminAccess);
+// Initialize Kibana when the router is created
+initializeKibana().catch(error => {
+  logError('Failed to initialize Kibana router:', {
+    error: error instanceof Error ? error.message : String(error)
+  });
+});
 
-// Proxy Kibana requests
-router.use(
-  "/",
-  createProxyMiddleware({
-    target: "http://localhost:5601",
-    changeOrigin: true,
-    pathRewrite: {
-      "^/admin/analytics/kibana": "",
-    },
-    onProxyReq: (proxyReq) => {
-      // Add Kibana authentication headers
-      proxyReq.setHeader('kbn-xsrf', 'true');
-      proxyReq.setHeader(
-        'Authorization',
-        'Basic ' + Buffer.from(
-          `zeckoinfo@gmail.com:Bobo19881`
-        ).toString('base64')
-      );
-    },
-    onError: (err, req, res) => {
-      logError('Kibana proxy error:', { error: err instanceof Error ? err.message : String(err) });
-      res.status(503).send("Kibana service unavailable");
-    },
-  })
-);
+// Protect Kibana access with authentication and admin check
+router.use(authenticateToken, kibanaAuthMiddleware);
+
+// Mount Kibana proxy
+router.use('/', createKibanaProxy());
 
 export default router;
