@@ -157,7 +157,9 @@ export const metricsMiddleware = (req: any, res: any, next: any) => {
 // Get all metrics with JSON format
 export const getMetricsAsJSON = async () => {
   try {
+    log('Getting metrics as JSON...');
     const metrics = await register.getMetricsAsJSON();
+    log('Retrieved metrics:', metrics);
     return metrics;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -169,7 +171,10 @@ export const getMetricsAsJSON = async () => {
 // Get metrics in Prometheus format
 export const getMetrics = async () => {
   try {
-    return await register.metrics();
+    log('Getting metrics in Prometheus format...');
+    const metrics = await register.metrics();
+    log('Retrieved metrics length:', metrics.length);
+    return metrics;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     log('Failed to collect metrics:', errorMessage);

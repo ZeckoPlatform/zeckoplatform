@@ -56,54 +56,61 @@ export default function AnalyticsSettingsPage() {
   const { error } = useQuery({
     queryKey: ['/api/metrics/json'],
     queryFn: async () => {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('No auth token');
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) throw new Error('No auth token');
 
-      const response = await fetch('/api/metrics/json', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+        const response = await fetch('/api/metrics/json', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
-      if (!response.ok) {
-        console.error('Failed to fetch metrics:', response.statusText);
-        throw new Error(`Failed to fetch metrics: ${response.statusText}`);
+        if (!response.ok) {
+          console.error('Failed to fetch metrics:', response.statusText);
+          throw new Error(`Failed to fetch metrics: ${response.statusText}`);
+        }
+
+        const metrics = await response.json();
+        console.log('Received metrics:', metrics);
+
+        // Transform metrics into time series data
+        const now = Date.now();
+        const systemMetrics = metrics.find((m: any) => m.name === 'process_cpu_usage_percent')?.values || [];
+        const memoryMetrics = metrics.find((m: any) => m.name === 'process_memory_usage_bytes')?.values || [];
+        const requestMetrics = metrics.find((m: any) => m.name === 'http_requests_total')?.values || [];
+        const dbMetrics = metrics.find((m: any) => m.name === 'database_query_duration_seconds')?.values || [];
+
+        const newData = {
+          system: [{
+            cpu_usage: parseFloat(systemMetrics[0]?.value || '0'),
+            memory_used: parseFloat(memoryMetrics[0]?.value || '0') / (1024 * 1024), // Convert to MB
+            memory_total: parseFloat(memoryMetrics[0]?.value || '0') / (1024 * 1024),
+            timestamp: now
+          }],
+          api: [{
+            request_count: parseInt(requestMetrics[0]?.value || '0'),
+            error_count: parseInt(requestMetrics.find((m: any) => m.labels?.status_code >= '400')?.value || '0'),
+            avg_response_time: 0,
+            timestamp: now
+          }],
+          database: [{
+            active_connections: parseInt(metrics.find((m: any) => m.name === 'database_connections_active')?.values[0]?.value || '0'),
+            query_duration: parseFloat(dbMetrics[0]?.value || '0'),
+            timestamp: now
+          }]
+        };
+
+        console.log('Transformed metrics data:', newData);
+        return newData;
+      } catch (err) {
+        console.error('Error in metrics fetch:', err);
+        throw err;
       }
-
-      const metrics = await response.json();
-      console.log('Metrics response:', metrics);
-
-      // Transform metrics into time series data
-      const now = Date.now();
-      const systemMetric = metrics.find((m: any) => m.name === 'process_cpu_usage_percent');
-      const memoryMetric = metrics.find((m: any) => m.name === 'process_memory_usage_bytes');
-      const requestMetric = metrics.find((m: any) => m.name === 'http_requests_total');
-      const dbMetric = metrics.find((m: any) => m.name === 'database_query_duration_seconds');
-
-      const newData = {
-        system: [{
-          cpu_usage: systemMetric?.values[0]?.value || 0,
-          memory_used: (memoryMetric?.values[0]?.value || 0) / (1024 * 1024), // Convert to MB
-          memory_total: (memoryMetric?.values[0]?.value || 0) / (1024 * 1024),
-          timestamp: now
-        }],
-        api: [{
-          request_count: requestMetric?.values[0]?.value || 0,
-          error_count: 0,
-          avg_response_time: 0,
-          timestamp: now
-        }],
-        database: [{
-          active_connections: 0,
-          query_duration: dbMetric?.values[0]?.value || 0,
-          timestamp: now
-        }]
-      };
-
-      return newData;
     },
     refetchInterval: 5000,
     onSuccess: (newData) => {
+      console.log('Setting new metrics data:', newData);
       setMetricsData(current => ({
         system: [...current.system.slice(-9), ...newData.system],
         api: [...current.api.slice(-9), ...newData.api],
@@ -122,6 +129,11 @@ export default function AnalyticsSettingsPage() {
 
   const formatTime = (timestamp: number) => {
     return new Date(timestamp).toLocaleTimeString();
+  };
+
+  const formatBytes = (bytes: number) => {
+    const mb = bytes / (1024 * 1024);
+    return `${mb.toFixed(2)} MB`;
   };
 
   return (
@@ -152,9 +164,17 @@ export default function AnalyticsSettingsPage() {
                     dataKey="timestamp" 
                     tickFormatter={formatTime}
                   />
-                  <YAxis yAxisId="left" />
-                  <YAxis yAxisId="right" orientation="right" />
-                  <Tooltip labelFormatter={formatTime} />
+                  <YAxis yAxisId="left" domain={[0, 100]} />
+                  <YAxis yAxisId="right" orientation="right" tickFormatter={formatBytes} />
+                  <Tooltip 
+                    labelFormatter={formatTime}
+                    formatter={(value: any, name: string) => {
+                      if (name.includes('Memory')) {
+                        return [formatBytes(value), name];
+                      }
+                      return [`${value.toFixed(2)}%`, name];
+                    }}
+                  />
                   <Legend />
                   <Line
                     yAxisId="left"
@@ -162,13 +182,15 @@ export default function AnalyticsSettingsPage() {
                     dataKey="cpu_usage"
                     name="CPU Usage (%)"
                     stroke="#8884d8"
+                    dot={false}
                   />
                   <Line
                     yAxisId="right"
                     type="monotone"
                     dataKey="memory_used"
-                    name="Memory (MB)"
+                    name="Memory Usage"
                     stroke="#82ca9d"
+                    dot={false}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -197,7 +219,10 @@ export default function AnalyticsSettingsPage() {
                     tickFormatter={formatTime}
                   />
                   <YAxis />
-                  <Tooltip labelFormatter={formatTime} />
+                  <Tooltip 
+                    labelFormatter={formatTime}
+                    formatter={(value: number) => [`${value}`, 'Requests']}
+                  />
                   <Legend />
                   <Bar dataKey="request_count" name="Total Requests" fill="#8884d8" />
                   <Bar dataKey="error_count" name="Error Count" fill="#ff8042" />
@@ -228,19 +253,29 @@ export default function AnalyticsSettingsPage() {
                     tickFormatter={formatTime}
                   />
                   <YAxis />
-                  <Tooltip labelFormatter={formatTime} />
+                  <Tooltip 
+                    labelFormatter={formatTime}
+                    formatter={(value: number, name: string) => {
+                      if (name.includes('Duration')) {
+                        return [`${value.toFixed(3)}s`, name];
+                      }
+                      return [value, name];
+                    }}
+                  />
                   <Legend />
                   <Line
                     type="monotone"
                     dataKey="query_duration"
                     name="Query Duration (s)"
                     stroke="#8884d8"
+                    dot={false}
                   />
                   <Line
                     type="monotone"
                     dataKey="active_connections"
                     name="Active Connections"
                     stroke="#82ca9d"
+                    dot={false}
                   />
                 </LineChart>
               </ResponsiveContainer>
