@@ -19,14 +19,19 @@ const router = Router();
 const esClient = new Client({
   node: 'http://localhost:9200',
   auth: {
-    username: process.env.ELASTICSEARCH_USERNAME!,
-    password: process.env.ELASTICSEARCH_PASSWORD!
+    username: 'zeckoinfo@gmail.com',
+    password: 'Bobo19881'
   }
 });
 
 // Fetch logs with filtering and search
 router.get("/logs", authenticateToken, checkSuperAdminAccess, async (req, res) => {
   try {
+    logInfo('Logs request received:', {
+      query: req.query,
+      user: req.user?.email
+    });
+
     const { search, level, category, from = 0, size = 100, dateFrom, dateTo } = req.query;
 
     // Build Elasticsearch query
@@ -73,6 +78,11 @@ router.get("/logs", authenticateToken, checkSuperAdminAccess, async (req, res) =
       });
     }
 
+    logInfo('Executing Elasticsearch query:', {
+      query,
+      indexPattern: 'zecko-logs-*'
+    });
+
     // Execute search with caching
     const result = await esClient.search({
       index: 'zecko-logs-*',
@@ -88,6 +98,11 @@ router.get("/logs", authenticateToken, checkSuperAdminAccess, async (req, res) =
       ignoreUnavailable: true // Continue if some indices are unavailable
     });
 
+    logInfo('Elasticsearch response received:', {
+      total: result.hits.total,
+      hits: result.hits.hits.length
+    });
+
     const logs = result.hits.hits.map(hit => ({
       '@timestamp': hit._source['@timestamp'],
       level: hit._source.level,
@@ -100,7 +115,8 @@ router.get("/logs", authenticateToken, checkSuperAdminAccess, async (req, res) =
     res.json(logs);
   } catch (error) {
     logError('Error fetching logs:', {
-      error: error instanceof Error ? error.message : String(error)
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
     });
     res.status(500).json({
       message: "Failed to fetch logs",
