@@ -10,6 +10,7 @@ import {
   XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer
 } from "recharts";
+import { Link } from "wouter";
 
 // Types for our metrics
 type SystemMetrics = {
@@ -143,7 +144,7 @@ export default function AnalyticsSettingsPage() {
         // Parse API metrics
         const requestMetrics = metricsResponse.filter((m: any) => m.name === 'http_requests_total');
         if (requestMetrics.length > 0) {
-          const totalRequests = requestMetrics.reduce((sum: number, m: any) => 
+          const totalRequests = requestMetrics.reduce((sum: number, m: any) =>
             sum + (parseInt(m.values[0]?.value) || 0), 0);
 
           const errorRequests = requestMetrics
@@ -196,9 +197,14 @@ export default function AnalyticsSettingsPage() {
     <div className="container mx-auto py-8 space-y-8">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">System Monitoring</h1>
-        <Button variant="outline" onClick={() => setLocation("/admin-management")}>
-          Back to Dashboard
-        </Button>
+        <div className="flex gap-4">
+          <Link href="/settings/analytics/logs">
+            <Button variant="outline">View System Logs</Button>
+          </Link>
+          <Button variant="outline" onClick={() => setLocation("/admin-management")}>
+            Back to Dashboard
+          </Button>
+        </div>
       </div>
 
       {/* System Health Metrics */}
@@ -220,13 +226,13 @@ export default function AnalyticsSettingsPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={metricsData.system}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="timestamp" 
+                  <XAxis
+                    dataKey="timestamp"
                     tickFormatter={formatTime}
                   />
                   <YAxis yAxisId="left" domain={[0, 100]} />
                   <YAxis yAxisId="right" orientation="right" tickFormatter={formatBytes} />
-                  <Tooltip 
+                  <Tooltip
                     labelFormatter={formatTime}
                     formatter={(value: any, name: string) => {
                       if (name.includes('Memory')) {
@@ -278,12 +284,12 @@ export default function AnalyticsSettingsPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={metricsData.api}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
+                  <XAxis
                     dataKey="timestamp"
                     tickFormatter={formatTime}
                   />
                   <YAxis />
-                  <Tooltip 
+                  <Tooltip
                     labelFormatter={formatTime}
                     formatter={(value: number) => [`${value}`, 'Requests']}
                   />
@@ -316,12 +322,12 @@ export default function AnalyticsSettingsPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={metricsData.database}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
+                  <XAxis
                     dataKey="timestamp"
                     tickFormatter={formatTime}
                   />
                   <YAxis />
-                  <Tooltip 
+                  <Tooltip
                     labelFormatter={formatTime}
                     formatter={(value: number, name: string) => {
                       if (name.includes('Duration')) {
