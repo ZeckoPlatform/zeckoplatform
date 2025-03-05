@@ -36,7 +36,17 @@ const logger = winston.createLogger({
 const memoryTransport = new winston.Transport({
   log: (info, callback) => {
     try {
-      recentLogs.unshift(info);
+      const logEntry = {
+        '@timestamp': new Date().toISOString(),
+        timestamp: new Date().toISOString(), // For backward compatibility
+        level: info.level,
+        message: info.message,
+        service: info.service || 'zecko-api',
+        category: info.metadata?.category || 'system',
+        metadata: info.metadata || {}
+      };
+
+      recentLogs.unshift(logEntry);
       while (recentLogs.length > MAX_RECENT_LOGS) {
         recentLogs.pop();
       }
@@ -73,7 +83,6 @@ if (esClient && process.env.LOGGING_MODE !== 'console') {
           message: { type: 'text' },
           service: { type: 'keyword' },
           category: { type: 'keyword' },
-          traceId: { type: 'keyword' },
           metadata: { type: 'object' }
         }
       }

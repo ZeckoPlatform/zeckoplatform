@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Filter, RefreshCw } from 'lucide-react';
+import { Search, RefreshCw } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -16,6 +16,7 @@ import {
 
 interface Log {
   '@timestamp': string;
+  timestamp?: string; // For backward compatibility
   level: string;
   message: string;
   service: string;
@@ -88,9 +89,18 @@ export default function LogViewer() {
     const matchesSearch = !filter.search || 
       log.message.toLowerCase().includes(filter.search.toLowerCase()) ||
       JSON.stringify(log.metadata).toLowerCase().includes(filter.search.toLowerCase());
-    
+
     return matchesLevel && matchesCategory && matchesSearch;
   });
+
+  const formatDate = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleString();
+    } catch (error) {
+      return 'Invalid Date';
+    }
+  };
 
   if (!user?.superAdmin) {
     return null;
@@ -122,7 +132,7 @@ export default function LogViewer() {
                 value={filter.search}
                 onChange={(e) => setFilter(f => ({ ...f, search: e.target.value }))}
                 className="w-full"
-                icon={<Search className="h-4 w-4" />}
+                startIcon={<Search className="h-4 w-4" />}
               />
             </div>
             <Select
@@ -165,7 +175,7 @@ export default function LogViewer() {
               <div className="flex items-start justify-between">
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">
-                    {new Date(log['@timestamp']).toLocaleString()}
+                    {formatDate(log['@timestamp'] || log.timestamp || '')}
                   </p>
                   <p className="font-medium">{log.message}</p>
                 </div>
