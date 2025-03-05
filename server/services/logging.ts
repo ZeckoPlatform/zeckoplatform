@@ -1,8 +1,7 @@
 import winston from 'winston';
 import { ElasticsearchTransport } from 'winston-elasticsearch';
-import { Client } from '@elastic/elasticsearch';
 import { log as viteLog } from '../vite';
-import { esClient } from '../elasticsearch';
+import { esClient, checkElasticsearchHealth } from '../elasticsearch';
 
 // Create custom format for structured logging
 const structuredFormat = winston.format.combine(
@@ -29,46 +28,49 @@ const logger = winston.createLogger({
   ]
 });
 
-// Add Elasticsearch transport with retry logic
-const esTransport = new ElasticsearchTransport({
-  client: esClient,
-  level: 'info',
-  indexPrefix: 'zecko-logs',
-  indexSuffixPattern: 'YYYY.MM.DD',
-  retryLimit: 5,
-  retryDelay: 1000,
-  handleExceptions: true,
-  mappingTemplate: {
-    index_patterns: ['zecko-logs-*'],
-    settings: {
-      number_of_shards: 1,
-      number_of_replicas: 1,
-      index: {
-        refresh_interval: '5s'
-      }
-    },
-    mappings: {
-      properties: {
-        '@timestamp': { type: 'date' },
-        level: { type: 'keyword' },
-        message: { type: 'text' },
-        service: { type: 'keyword' },
-        category: { type: 'keyword' },
-        traceId: { type: 'keyword' },
-        metadata: { type: 'object' }
+// Add Elasticsearch transport if available
+if (esClient && process.env.LOGGING_MODE !== 'console') {
+  const esTransport = new ElasticsearchTransport({
+    client: esClient,
+    level: 'info',
+    indexPrefix: 'zecko-logs',
+    indexSuffixPattern: 'YYYY.MM.DD',
+    handleExceptions: true,
+    mappingTemplate: {
+      index_patterns: ['zecko-logs-*'],
+      settings: {
+        number_of_shards: 1,
+        number_of_replicas: 1,
+        index: {
+          refresh_interval: '5s'
+        }
+      },
+      mappings: {
+        properties: {
+          '@timestamp': { type: 'date' },
+          level: { type: 'keyword' },
+          message: { type: 'text' },
+          service: { type: 'keyword' },
+          category: { type: 'keyword' },
+          traceId: { type: 'keyword' },
+          metadata: { type: 'object' }
+        }
       }
     }
-  }
-});
+  });
 
-// Handle transport errors
-esTransport.on('error', (error) => {
-  console.error('Elasticsearch transport error:', error);
-  viteLog('[ERROR] Elasticsearch transport error - falling back to console logging');
-});
+  // Handle transport errors
+  esTransport.on('error', (error) => {
+    console.error('Elasticsearch transport error:', error);
+    viteLog('[ERROR] Elasticsearch transport error - falling back to console logging');
+  });
 
-// Add transport after error handler is set up
-logger.add(esTransport);
+  // Add transport after error handler is set up
+  logger.add(esTransport);
+  viteLog('[INFO] Elasticsearch transport added to logger');
+} else {
+  viteLog('[INFO] Running with console logging only');
+}
 
 // Logging categories
 export enum LogCategory {
@@ -122,31 +124,36 @@ export function logSystem(message: string, meta?: Partial<LogMetadata>) {
   viteLog(`[SYSTEM] ${message}`);
 }
 
+// For backward compatibility and general logging
+export const logInfo = logSystem;
+
 // Export logger instance for direct use if needed
 export { logger };
 
-// Test function to verify Elasticsearch connection and logging
+// Test function to verify logging functionality
 export async function testLogging() {
   try {
-    // Test system logging
-    logSystem('Elasticsearch logging test initiated', {
-      metadata: { test: true }
+    // Check Elasticsearch health first
+    const healthStatus = await checkElasticsearchHealth();
+    logSystem('Logging system test initiated', {
+      metadata: { 
+        elasticsearchStatus: healthStatus,
+        mode: process.env.LOGGING_MODE || 'default'
+      }
     });
 
-    // Test request logging
+    // Test different log categories
     logRequest('Test API request', {
       method: 'GET',
       path: '/api/test',
       duration: 100
     });
 
-    // Test business logging
     logBusiness('Test business action', {
       action: 'create_lead',
       userId: 123
     });
 
-    // Test error logging
     logError('Test error occurred', {
       error: new Error('Test error'),
       code: 500
@@ -159,8 +166,10 @@ export async function testLogging() {
   }
 }
 
-// Initialize logging and test connection
-testLogging().catch(error => {
-  console.error('Failed to initialize logging:', error);
-  viteLog('[ERROR] Failed to initialize logging system');
-});
+// Initialize logging but don't block on errors
+if (process.env.NODE_ENV !== 'production') {
+  testLogging().catch(error => {
+    console.error('Failed to initialize logging:', error);
+    viteLog('[ERROR] Failed to initialize logging system');
+  });
+}
