@@ -3,6 +3,10 @@ import { ElasticsearchTransport } from 'winston-elasticsearch';
 import { log as viteLog } from '../vite';
 import { esClient, checkElasticsearchHealth } from '../elasticsearch';
 
+// Store recent logs in memory when in console mode
+const recentLogs: any[] = [];
+const MAX_RECENT_LOGS = 100;
+
 // Create custom format for structured logging
 const structuredFormat = winston.format.combine(
   winston.format.timestamp(),
@@ -27,6 +31,23 @@ const logger = winston.createLogger({
     })
   ]
 });
+
+// Create a custom transport for storing logs in memory
+const memoryTransport = new winston.Transport({
+  log: (info, callback) => {
+    try {
+      recentLogs.unshift(info);
+      while (recentLogs.length > MAX_RECENT_LOGS) {
+        recentLogs.pop();
+      }
+      callback();
+    } catch (error) {
+      callback(error);
+    }
+  }
+});
+
+logger.add(memoryTransport);
 
 // Add Elasticsearch transport if available
 if (esClient && process.env.LOGGING_MODE !== 'console') {
@@ -72,19 +93,24 @@ if (esClient && process.env.LOGGING_MODE !== 'console') {
   viteLog('[INFO] Running with console logging only');
 }
 
+// Structured logging interface
+interface LogMetadata {
+  category: LogCategory;
+  traceId?: string;
+  [key: string]: any;
+}
+
+// Get recent logs (for console mode)
+export function getRecentLogs() {
+  return recentLogs;
+}
+
 // Logging categories
 export enum LogCategory {
   REQUEST = 'request',
   ERROR = 'error',
   BUSINESS = 'business',
   SYSTEM = 'system'
-}
-
-// Structured logging interface
-interface LogMetadata {
-  category: LogCategory;
-  traceId?: string;
-  [key: string]: any;
 }
 
 // Wrapper functions for categorized logging
@@ -138,7 +164,7 @@ export async function testLogging() {
     logSystem('Logging system test initiated', {
       metadata: { 
         elasticsearchStatus: healthStatus,
-        mode: process.env.LOGGING_MODE || 'default'
+        mode: process.env.LOGGING_MODE || 'console'
       }
     });
 
@@ -161,15 +187,19 @@ export async function testLogging() {
 
     return true;
   } catch (error) {
-    console.error('Logging test failed:', error);
+    console.error('Failed to initialize logging:', error);
     return false;
   }
 }
 
 // Initialize logging but don't block on errors
 if (process.env.NODE_ENV !== 'production') {
-  testLogging().catch(error => {
-    console.error('Failed to initialize logging:', error);
-    viteLog('[ERROR] Failed to initialize logging system');
+  process.env.LOGGING_MODE = 'console';
+  logSystem('Application startup complete', {
+    metadata: {
+      startupTime: new Date().toISOString(),
+      mode: process.env.LOGGING_MODE,
+      environment: process.env.NODE_ENV
+    }
   });
 }

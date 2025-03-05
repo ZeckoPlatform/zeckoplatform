@@ -8,7 +8,7 @@ import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
 import { sendEmail } from "../services/email";
 import { esClient } from '../elasticsearch';
-import { testLogging } from '../services/logging';
+import { testLogging, getRecentLogs } from '../services/logging';
 
 const router = Router();
 const scryptAsync = promisify(scrypt);
@@ -570,22 +570,20 @@ router.get("/admin/logs", authenticateToken, checkSuperAdminAccess, async (req, 
   try {
     // Check if Elasticsearch is available and configured
     if (!esClient || process.env.LOGGING_MODE === 'console') {
-      // Fallback to returning recent console logs
-      return res.json([{
-        '@timestamp': new Date().toISOString(),
-        level: 'info',
-        message: 'Logging system running in console mode',
-        service: 'zecko-api',
-        category: 'system',
-        metadata: { mode: 'console' }
-      }, {
-        '@timestamp': new Date(Date.now() - 1000).toISOString(),
-        level: 'info',
-        message: 'Application started successfully',
-        service: 'zecko-api',
-        category: 'system',
-        metadata: { mode: 'console' }
-      }]);
+      // Return recent logs from memory
+      const logs = getRecentLogs();
+      if (logs.length === 0) {
+        // Add initial log if no logs exist
+        return res.json([{
+          '@timestamp': new Date().toISOString(),
+          level: 'info',
+          message: 'Logging system initialized in console mode',
+          service: 'zecko-api',
+          category: 'system',
+          metadata: { mode: 'console' }
+        }]);
+      }
+      return res.json(logs);
     }
 
     // Query elasticsearch for logs
@@ -613,23 +611,17 @@ router.get("/admin/logs", authenticateToken, checkSuperAdminAccess, async (req, 
     return res.json(logs);
   } catch (error) {
     console.error("Error fetching logs:", error);
-    // Return a more informative fallback response
-    return res.json([{
+    // If error occurs, return logs from memory as fallback
+    const logs = getRecentLogs();
+    return res.json(logs.length > 0 ? logs : [{
       '@timestamp': new Date().toISOString(),
       level: 'info',
       message: 'Logging system running in fallback mode',
       service: 'zecko-api',
       category: 'system',
-      metadata: { mode: 'console' }
-    }, {
-      '@timestamp': new Date().toISOString(),
-      level: 'error',
-      message: 'Failed to fetch logs from Elasticsearch',
-      service: 'zecko-api',
-      category: 'error',
       metadata: {
-        error: error instanceof Error ? error.message : String(error),
-        mode: process.env.LOGGING_MODE || 'default'
+        mode: process.env.LOGGING_MODE || 'console',
+        error: error instanceof Error ? error.message : String(error)
       }
     }]);
   }
