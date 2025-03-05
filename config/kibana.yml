@@ -4,8 +4,8 @@ server.host: "0.0.0.0"
 
 # Elasticsearch connection
 elasticsearch.hosts: ["http://localhost:9200"]
-elasticsearch.username: "${ELASTICSEARCH_USERNAME}"
-elasticsearch.password: "${ELASTICSEARCH_PASSWORD}"
+elasticsearch.username: "zeckoinfo@gmail.com"
+elasticsearch.password: "Bobo19881"
 
 # Index patterns
 kibana.index_pattern.id: "zecko-logs-*"

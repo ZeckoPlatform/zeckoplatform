@@ -20,14 +20,12 @@ router.use(
     onProxyReq: (proxyReq) => {
       // Add Kibana authentication headers
       proxyReq.setHeader('kbn-xsrf', 'true');
-      if (process.env.ELASTICSEARCH_USERNAME && process.env.ELASTICSEARCH_PASSWORD) {
-        proxyReq.setHeader(
-          'Authorization',
-          'Basic ' + Buffer.from(
-            `${process.env.ELASTICSEARCH_USERNAME}:${process.env.ELASTICSEARCH_PASSWORD}`
-          ).toString('base64')
-        );
-      }
+      proxyReq.setHeader(
+        'Authorization',
+        'Basic ' + Buffer.from(
+          `zeckoinfo@gmail.com:Bobo19881`
+        ).toString('base64')
+      );
     },
     onError: (err, req, res) => {
       logError('Kibana proxy error:', { error: err instanceof Error ? err.message : String(err) });
