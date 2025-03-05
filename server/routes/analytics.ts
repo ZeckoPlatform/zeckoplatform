@@ -10,19 +10,27 @@ import {
   users,
 } from "@db/schema";
 import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
-import { Client } from '@elastic/elasticsearch';
 import { logInfo, logError } from "../services/logging";
 
 const router = Router();
 
-// Initialize Elasticsearch client
-const esClient = new Client({
-  node: 'http://localhost:9200',
-  auth: {
-    username: 'zeckoinfo@gmail.com',
-    password: 'Bobo19881'
+// In-memory log storage for development
+let inMemoryLogs: Array<{
+  '@timestamp': string;
+  level: 'info' | 'error' | 'warning';
+  message: string;
+  service: string;
+  category: string;
+  metadata: Record<string, any>;
+}> = [];
+
+// Add a log entry
+export function addLogEntry(logEntry: typeof inMemoryLogs[0]) {
+  inMemoryLogs.unshift(logEntry); // Add to start of array
+  if (inMemoryLogs.length > 1000) { // Keep only last 1000 logs
+    inMemoryLogs = inMemoryLogs.slice(0, 1000);
   }
-});
+}
 
 // Fetch logs with filtering and search
 router.get("/logs", authenticateToken, checkSuperAdminAccess, async (req, res) => {
@@ -34,85 +42,74 @@ router.get("/logs", authenticateToken, checkSuperAdminAccess, async (req, res) =
 
     const { search, level, category, from = 0, size = 100, dateFrom, dateTo } = req.query;
 
-    // Build Elasticsearch query
-    const query: any = {
-      bool: {
-        must: [{ match_all: {} }]
-      }
-    };
+    // Filter logs based on criteria
+    let filteredLogs = [...inMemoryLogs];
 
-    // Add search filter
     if (search) {
-      query.bool.must.push({
-        multi_match: {
-          query: search,
-          fields: ['message', 'service', 'category'],
-          type: 'phrase_prefix' // Enable partial matching
-        }
-      });
+      const searchLower = (search as string).toLowerCase();
+      filteredLogs = filteredLogs.filter(log => 
+        log.message.toLowerCase().includes(searchLower) ||
+        log.service.toLowerCase().includes(searchLower) ||
+        log.category.toLowerCase().includes(searchLower)
+      );
     }
 
-    // Add level filter
     if (level && level !== 'all') {
-      query.bool.must.push({
-        match: { level }
-      });
+      filteredLogs = filteredLogs.filter(log => log.level === level);
     }
 
-    // Add category filter
     if (category && category !== 'all') {
-      query.bool.must.push({
-        match: { category }
-      });
+      filteredLogs = filteredLogs.filter(log => log.category === category);
     }
 
-    // Add date range filter
     if (dateFrom || dateTo) {
-      const range: any = {};
-      if (dateFrom) range.gte = dateFrom;
-      if (dateTo) range.lte = dateTo;
-      query.bool.must.push({
-        range: {
-          '@timestamp': range
-        }
+      filteredLogs = filteredLogs.filter(log => {
+        const timestamp = new Date(log['@timestamp']).getTime();
+        const fromTime = dateFrom ? new Date(dateFrom as string).getTime() : 0;
+        const toTime = dateTo ? new Date(dateTo as string).getTime() : Infinity;
+        return timestamp >= fromTime && timestamp <= toTime;
       });
     }
 
-    logInfo('Executing Elasticsearch query:', {
-      query,
-      indexPattern: 'zecko-logs-*'
+    // Add some sample logs if none exist (for development)
+    if (inMemoryLogs.length === 0) {
+      const sampleLogs = [
+        {
+          '@timestamp': new Date().toISOString(),
+          level: 'info' as const,
+          message: 'Application started successfully',
+          service: 'system',
+          category: 'startup',
+          metadata: {}
+        },
+        {
+          '@timestamp': new Date(Date.now() - 5000).toISOString(),
+          level: 'error' as const,
+          message: 'Failed to connect to database',
+          service: 'database',
+          category: 'connection',
+          metadata: { attempt: 1 }
+        },
+        {
+          '@timestamp': new Date(Date.now() - 10000).toISOString(),
+          level: 'warning' as const,
+          message: 'High memory usage detected',
+          service: 'system',
+          category: 'performance',
+          metadata: { memoryUsage: '85%' }
+        }
+      ];
+
+      inMemoryLogs.push(...sampleLogs);
+      filteredLogs = [...sampleLogs];
+    }
+
+    logInfo('Returning filtered logs:', {
+      total: filteredLogs.length,
+      filters: { search, level, category, dateFrom, dateTo }
     });
 
-    // Execute search with caching
-    const result = await esClient.search({
-      index: 'zecko-logs-*',
-      body: {
-        query,
-        sort: [{ '@timestamp': { order: 'desc' } }],
-        from: Number(from),
-        size: Number(size),
-        track_total_hits: true,
-        _source: ['@timestamp', 'level', 'message', 'service', 'category', 'metadata']
-      },
-      requestCache: true, // Enable request caching
-      ignoreUnavailable: true // Continue if some indices are unavailable
-    });
-
-    logInfo('Elasticsearch response received:', {
-      total: result.hits.total,
-      hits: result.hits.hits.length
-    });
-
-    const logs = result.hits.hits.map(hit => ({
-      '@timestamp': hit._source['@timestamp'],
-      level: hit._source.level,
-      message: hit._source.message,
-      service: hit._source.service,
-      category: hit._source.category,
-      metadata: hit._source.metadata || {}
-    }));
-
-    res.json(logs);
+    res.json(filteredLogs.slice(Number(from), Number(from) + Number(size)));
   } catch (error) {
     logError('Error fetching logs:', {
       error: error instanceof Error ? error.message : String(error),
@@ -133,6 +130,8 @@ router.post("/analytics/log", authenticateToken, async (req, res) => {
     }
 
     const { event_type, metadata } = req.body;
+
+    // Store in database
     const [log] = await db.insert(analyticsLogs)
       .values({
         user_id: req.user.id,
@@ -142,6 +141,19 @@ router.post("/analytics/log", authenticateToken, async (req, res) => {
         user_agent: req.headers["user-agent"],
       })
       .returning();
+
+    // Also add to in-memory logs
+    addLogEntry({
+      '@timestamp': new Date().toISOString(),
+      level: 'info',
+      message: `User activity: ${event_type}`,
+      service: 'analytics',
+      category: 'user_activity',
+      metadata: {
+        userId: req.user.id,
+        ...metadata
+      }
+    });
 
     res.json(log);
   } catch (error) {
