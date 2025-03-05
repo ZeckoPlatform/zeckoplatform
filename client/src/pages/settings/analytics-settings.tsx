@@ -201,9 +201,6 @@ export default function AnalyticsSettingsPage() {
           <Link href="/settings/analytics/logs">
             <Button variant="outline">View System Logs</Button>
           </Link>
-          <Link href="/admin/analytics/settings/kibana">
-            <Button variant="outline">Open Kibana Dashboard</Button>
-          </Link>
           <Button variant="outline" onClick={() => setLocation("/admin-management")}>
             Back to Dashboard
           </Button>

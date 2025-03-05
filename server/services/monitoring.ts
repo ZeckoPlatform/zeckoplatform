@@ -179,26 +179,10 @@ export const getMetricsAsJSON = async () => {
   try {
     logInfo('Getting metrics as JSON');
     const metrics = await register.getMetricsAsJSON();
-
-    // Transform metrics into a more structured format
-    const formattedMetrics = metrics.map(metric => ({
-      name: metric.name,
-      help: metric.help,
-      type: metric.type,
-      values: metric.values.map(val => ({
-        value: parseFloat(val.value).toFixed(3),
-        labels: val.labels || {},
-        timestamp: val.timestamp
-      }))
-    }));
-
     logInfo('Retrieved metrics', {
-      metadata: {
-        metricsCount: formattedMetrics.length
-      }
+      metadata: metrics
     });
-
-    return formattedMetrics;
+    return metrics;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logError('Failed to collect metrics as JSON', {
