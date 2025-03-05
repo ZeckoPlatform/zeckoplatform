@@ -11,8 +11,6 @@ import {
   Tooltip, Legend, ResponsiveContainer
 } from "recharts";
 import { Link } from "wouter";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Types for our metrics
 type SystemMetrics = {
@@ -39,8 +37,6 @@ export default function AnalyticsSettingsPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [timeRange, setTimeRange] = useState("1h"); // 1h, 6h, 24h
-  const [searchTerm, setSearchTerm] = useState("");
   const [metricsData, setMetricsData] = useState<{
     system: SystemMetrics[];
     api: APIMetrics[];
@@ -62,9 +58,14 @@ export default function AnalyticsSettingsPage() {
     }
   }, [user, setLocation, toast]);
 
+  // Debug current user
+  useEffect(() => {
+    console.log('Current user:', user);
+  }, [user]);
+
   // Fetch metrics with auto-refresh
   const { data: metricsResponse, error } = useQuery({
-    queryKey: ['/api/metrics/json', timeRange],
+    queryKey: ['/api/metrics/json'],
     queryFn: async () => {
       try {
         const token = localStorage.getItem('token');
@@ -73,6 +74,7 @@ export default function AnalyticsSettingsPage() {
           throw new Error('No auth token');
         }
 
+        console.log('Fetching metrics with token:', token);
         const response = await fetch('/api/metrics/json', {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -81,10 +83,14 @@ export default function AnalyticsSettingsPage() {
         });
 
         if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Failed to fetch metrics:', response.status, errorText);
           throw new Error(`Failed to fetch metrics: ${response.statusText}`);
         }
 
         const metrics = await response.json();
+        console.log('Raw metrics response:', metrics);
+
         return metrics;
       } catch (err) {
         console.error('Error in metrics fetch:', err);
@@ -120,29 +126,23 @@ export default function AnalyticsSettingsPage() {
       };
 
       try {
-        // Filter metrics based on search term if provided
-        const filteredMetrics = searchTerm
-          ? metricsResponse.filter((m: any) =>
-              m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-              m.help.toLowerCase().includes(searchTerm.toLowerCase())
-            )
-          : metricsResponse;
-
         // Parse CPU metrics
-        const cpuMetric = filteredMetrics.find((m: any) => m.name === 'process_cpu_usage_percent');
+        const cpuMetric = metricsResponse.find((m: any) => m.name === 'process_cpu_usage_percent');
         if (cpuMetric?.values?.length > 0) {
           newData.system[0].cpu_usage = parseFloat(cpuMetric.values[0].value);
+          console.log('CPU usage:', newData.system[0].cpu_usage);
         }
 
         // Parse Memory metrics
-        const memoryMetric = filteredMetrics.find((m: any) => m.name === 'process_memory_usage_bytes');
+        const memoryMetric = metricsResponse.find((m: any) => m.name === 'process_memory_usage_bytes');
         if (memoryMetric?.values?.length > 0) {
           const memoryBytes = parseFloat(memoryMetric.values[0].value);
           newData.system[0].memory_used = memoryBytes / (1024 * 1024); // Convert to MB
+          console.log('Memory usage (MB):', newData.system[0].memory_used);
         }
 
         // Parse API metrics
-        const requestMetrics = filteredMetrics.filter((m: any) => m.name === 'http_requests_total');
+        const requestMetrics = metricsResponse.filter((m: any) => m.name === 'http_requests_total');
         if (requestMetrics.length > 0) {
           const totalRequests = requestMetrics.reduce((sum: number, m: any) =>
             sum + (parseInt(m.values[0]?.value) || 0), 0);
@@ -153,17 +153,20 @@ export default function AnalyticsSettingsPage() {
 
           newData.api[0].request_count = totalRequests;
           newData.api[0].error_count = errorRequests;
+          console.log('Request metrics:', { total: totalRequests, errors: errorRequests });
         }
 
         // Parse Database metrics
-        const dbMetric = filteredMetrics.find((m: any) => m.name === 'database_query_duration_seconds');
+        const dbMetric = metricsResponse.find((m: any) => m.name === 'database_query_duration_seconds');
         if (dbMetric?.values?.length > 0) {
           newData.database[0].query_duration = parseFloat(dbMetric.values[0].value);
+          console.log('Query duration:', newData.database[0].query_duration);
         }
 
-        const connectionsMetric = filteredMetrics.find((m: any) => m.name === 'database_connections_active');
+        const connectionsMetric = metricsResponse.find((m: any) => m.name === 'database_connections_active');
         if (connectionsMetric?.values?.length > 0) {
           newData.database[0].active_connections = parseInt(connectionsMetric.values[0].value);
+          console.log('Active connections:', newData.database[0].active_connections);
         }
 
         setMetricsData(current => ({
@@ -175,7 +178,7 @@ export default function AnalyticsSettingsPage() {
         console.error('Error processing metrics:', err);
       }
     }
-  }, [metricsResponse, searchTerm]);
+  }, [metricsResponse]);
 
   if (!user?.superAdmin) {
     return null;
@@ -198,32 +201,13 @@ export default function AnalyticsSettingsPage() {
           <Link href="/settings/analytics/logs">
             <Button variant="outline">View System Logs</Button>
           </Link>
-          <Link href="/admin/analytics/settings/kibana" target="_blank" rel="noopener noreferrer">
+          <Link href="/admin/analytics/settings/kibana">
             <Button variant="outline">Open Kibana Dashboard</Button>
           </Link>
           <Button variant="outline" onClick={() => setLocation("/admin-management")}>
             Back to Dashboard
           </Button>
         </div>
-      </div>
-
-      <div className="flex gap-4 mb-6">
-        <Input
-          placeholder="Search metrics..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-xs"
-        />
-        <Select value={timeRange} onValueChange={setTimeRange}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Select time range" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="1h">Last Hour</SelectItem>
-            <SelectItem value="6h">Last 6 Hours</SelectItem>
-            <SelectItem value="24h">Last 24 Hours</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
       {/* System Health Metrics */}

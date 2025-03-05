@@ -1,6 +1,5 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { createProxyMiddleware } from "http-proxy-middleware";
 import { initializeMonitoring, metricsMiddleware, getMetrics, getMetricsAsJSON } from './services/monitoring';
 import jwt from 'jsonwebtoken';
 import { log } from "./vite";
@@ -47,30 +46,60 @@ export function registerRoutes(app: Express): Server {
     // Add metrics middleware
     app.use(metricsMiddleware);
 
-    // Development proxy middleware to bypass host verification
-    if (process.env.NODE_ENV !== 'production') {
-      app.use('/', createProxyMiddleware({
-        target: 'http://localhost:5000',
-        changeOrigin: true,
-        ws: true, // Enable WebSocket proxy
-        pathRewrite: {
-          '^/': '/' // Keep the path as is
-        },
-        secure: false,
-        onProxyReq: (proxyReq, req) => {
-          // Add any necessary headers
-          proxyReq.setHeader('X-Forwarded-Host', req.headers.host || '');
-          proxyReq.setHeader('X-Forwarded-Proto', 'http');
-        },
-        onError: (err, req, res) => {
-          console.error('Proxy error:', err);
-          res.status(500).send('Proxy error');
-        }
-      }));
-    }
-
     // Mount Kibana routes first to ensure proper path handling
     app.use('/admin/analytics/settings/kibana', kibanaRoutes);
+
+    // Expose metrics endpoint (protected)
+    app.get('/api/metrics', async (req, res) => {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const token = authHeader.split(' ')[1];
+      const decoded = verifyToken(token);
+
+      if (!decoded || !(decoded as any).superAdmin) {
+        log('Access denied - Not a super admin:', decoded);
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      try {
+        log('Getting Prometheus metrics...');
+        const metrics = await getMetrics();
+        res.set('Content-Type', 'text/plain');
+        res.send(metrics);
+      } catch (error) {
+        log('Error fetching metrics:', error instanceof Error ? error.message : String(error));
+        res.status(500).json({ error: 'Failed to collect metrics' });
+      }
+    });
+
+    // Expose metrics in JSON format (protected)
+    app.get('/api/metrics/json', async (req, res) => {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const token = authHeader.split(' ')[1];
+      const decoded = verifyToken(token);
+
+      if (!decoded || !(decoded as any).superAdmin) {
+        log('Access denied - Not a super admin:', decoded);
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      try {
+        log('Getting metrics as JSON...');
+        const metrics = await getMetricsAsJSON();
+        log('Retrieved metrics:', metrics);
+        res.json(metrics);
+      } catch (error) {
+        log('Error fetching metrics JSON:', error instanceof Error ? error.message : String(error));
+        res.status(500).json({ error: 'Failed to collect metrics' });
+      }
+    });
 
     // Register API routes
     app.use('/api', authRoutes);
