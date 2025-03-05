@@ -17,9 +17,13 @@ initializeKibana().catch(error => {
 });
 
 // Protect Kibana access with authentication and admin check
-router.use(authenticateToken, kibanaAuthMiddleware);
-
-// Mount Kibana proxy
-router.use('/', createKibanaProxy());
+router.use('/', authenticateToken, async (req, res, next) => {
+  logInfo('Received Kibana request:', {
+    path: req.path,
+    method: req.method,
+    user: req.user?.email
+  });
+  next();
+}, kibanaAuthMiddleware, createKibanaProxy());
 
 export default router;

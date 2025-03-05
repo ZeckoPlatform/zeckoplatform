@@ -5,14 +5,27 @@ import { Request, Response, NextFunction } from 'express';
 // Initialize Kibana client
 export async function checkKibanaHealth() {
   try {
+    logInfo('Attempting Kibana health check...', {
+      metadata: {
+        kibanaUrl: 'http://localhost:5601/api/status',
+      }
+    });
+
+    const auth = Buffer.from('zeckoinfo@gmail.com:Bobo19881').toString('base64');
     const response = await fetch('http://localhost:5601/api/status', {
       headers: {
-        'Authorization': 'Basic ' + Buffer.from('zeckoinfo@gmail.com:Bobo19881').toString('base64'),
+        'Authorization': `Basic ${auth}`,
         'kbn-xsrf': 'true'
       }
     });
-    
+
     if (!response.ok) {
+      const responseText = await response.text();
+      logError('Kibana health check failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        responseBody: responseText
+      });
       throw new Error(`Kibana health check failed: ${response.statusText}`);
     }
 
@@ -53,13 +66,15 @@ export function createKibanaProxy() {
     onProxyReq: (proxyReq) => {
       // Add required headers for Kibana
       proxyReq.setHeader('kbn-xsrf', 'true');
-      proxyReq.setHeader(
-        'Authorization',
-        'Basic ' + Buffer.from('zeckoinfo@gmail.com:Bobo19881').toString('base64')
-      );
-      
+      const auth = Buffer.from('zeckoinfo@gmail.com:Bobo19881').toString('base64');
+      proxyReq.setHeader('Authorization', `Basic ${auth}`);
+
       logInfo('Proxying request to Kibana', {
-        path: proxyReq.path
+        path: proxyReq.path,
+        headers: {
+          'kbn-xsrf': proxyReq.getHeader('kbn-xsrf'),
+          'Authorization': 'Basic **********' // Masked for security
+        }
       });
     },
     onProxyRes: (proxyRes, req, res) => {
@@ -90,7 +105,7 @@ export async function initializeKibana() {
       logError('Failed to initialize Kibana - health check failed');
       return false;
     }
-    
+
     logInfo('Kibana initialization successful');
     return true;
   } catch (error) {
