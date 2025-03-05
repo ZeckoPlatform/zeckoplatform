@@ -46,7 +46,6 @@ export default function AnalyticsSettingsPage() {
     database: []
   });
 
-  // Redirect if user is not a super admin
   useEffect(() => {
     if (!user?.superAdmin) {
       setLocation("/");
@@ -58,8 +57,13 @@ export default function AnalyticsSettingsPage() {
     }
   }, [user, setLocation, toast]);
 
+  // Debug current user
+  useEffect(() => {
+    console.log('Current user:', user);
+  }, [user]);
+
   // Fetch metrics with auto-refresh
-  const { error } = useQuery({
+  const { data: metricsResponse, error } = useQuery({
     queryKey: ['/api/metrics/json'],
     queryFn: async () => {
       try {
@@ -69,7 +73,7 @@ export default function AnalyticsSettingsPage() {
           throw new Error('No auth token');
         }
 
-        console.log('Fetching metrics with token:', token); // Added token logging
+        console.log('Fetching metrics with token:', token);
         const response = await fetch('/api/metrics/json', {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -86,37 +90,50 @@ export default function AnalyticsSettingsPage() {
         const metrics = await response.json();
         console.log('Raw metrics response:', metrics);
 
-        // Transform metrics into time series data
-        const now = Date.now();
-        const newData = {
-          system: [{
-            cpu_usage: 0,
-            memory_used: 0,
-            memory_total: 0,
-            timestamp: now
-          }],
-          api: [{
-            request_count: 0,
-            error_count: 0,
-            avg_response_time: 0,
-            timestamp: now
-          }],
-          database: [{
-            active_connections: 0,
-            query_duration: 0,
-            timestamp: now
-          }]
-        };
+        return metrics;
+      } catch (err) {
+        console.error('Error in metrics fetch:', err);
+        throw err;
+      }
+    },
+    refetchInterval: 5000,
+    enabled: !!user?.superAdmin
+  });
 
+  // Process metrics data when available
+  useEffect(() => {
+    if (metricsResponse) {
+      const now = Date.now();
+      const newData = {
+        system: [{
+          cpu_usage: 0,
+          memory_used: 0,
+          memory_total: 0,
+          timestamp: now
+        }],
+        api: [{
+          request_count: 0,
+          error_count: 0,
+          avg_response_time: 0,
+          timestamp: now
+        }],
+        database: [{
+          active_connections: 0,
+          query_duration: 0,
+          timestamp: now
+        }]
+      };
+
+      try {
         // Parse CPU metrics
-        const cpuMetric = metrics.find((m: any) => m.name === 'process_cpu_usage_percent');
+        const cpuMetric = metricsResponse.find((m: any) => m.name === 'process_cpu_usage_percent');
         if (cpuMetric?.values?.length > 0) {
           newData.system[0].cpu_usage = parseFloat(cpuMetric.values[0].value);
           console.log('CPU usage:', newData.system[0].cpu_usage);
         }
 
         // Parse Memory metrics
-        const memoryMetric = metrics.find((m: any) => m.name === 'process_memory_usage_bytes');
+        const memoryMetric = metricsResponse.find((m: any) => m.name === 'process_memory_usage_bytes');
         if (memoryMetric?.values?.length > 0) {
           const memoryBytes = parseFloat(memoryMetric.values[0].value);
           newData.system[0].memory_used = memoryBytes / (1024 * 1024); // Convert to MB
@@ -124,18 +141,13 @@ export default function AnalyticsSettingsPage() {
         }
 
         // Parse API metrics
-        const requestMetrics = metrics.find((m: any) => m.name === 'http_requests_total');
-        if (requestMetrics?.values?.length > 0) {
-          const totalRequests = metrics
-            .filter((m: any) => m.name === 'http_requests_total')
-            .reduce((sum: number, m: any) => sum + (parseInt(m.values[0]?.value) || 0), 0);
+        const requestMetrics = metricsResponse.filter((m: any) => m.name === 'http_requests_total');
+        if (requestMetrics.length > 0) {
+          const totalRequests = requestMetrics.reduce((sum: number, m: any) => 
+            sum + (parseInt(m.values[0]?.value) || 0), 0);
 
-          const errorRequests = metrics
-            .filter((m: any) => 
-              m.name === 'http_requests_total' && 
-              m.labels?.status_code && 
-              parseInt(m.labels.status_code) >= 400
-            )
+          const errorRequests = requestMetrics
+            .filter((m: any) => m.labels?.status_code && parseInt(m.labels.status_code) >= 400)
             .reduce((sum: number, m: any) => sum + (parseInt(m.values[0]?.value) || 0), 0);
 
           newData.api[0].request_count = totalRequests;
@@ -144,44 +156,28 @@ export default function AnalyticsSettingsPage() {
         }
 
         // Parse Database metrics
-        const dbMetric = metrics.find((m: any) => m.name === 'database_query_duration_seconds');
+        const dbMetric = metricsResponse.find((m: any) => m.name === 'database_query_duration_seconds');
         if (dbMetric?.values?.length > 0) {
           newData.database[0].query_duration = parseFloat(dbMetric.values[0].value);
           console.log('Query duration:', newData.database[0].query_duration);
         }
 
-        const connectionsMetric = metrics.find((m: any) => m.name === 'database_connections_active');
+        const connectionsMetric = metricsResponse.find((m: any) => m.name === 'database_connections_active');
         if (connectionsMetric?.values?.length > 0) {
           newData.database[0].active_connections = parseInt(connectionsMetric.values[0].value);
           console.log('Active connections:', newData.database[0].active_connections);
         }
 
-        console.log('Transformed metrics data:', newData);
-        return newData;
+        setMetricsData(current => ({
+          system: [...current.system.slice(-9), ...newData.system],
+          api: [...current.api.slice(-9), ...newData.api],
+          database: [...current.database.slice(-9), ...newData.database]
+        }));
       } catch (err) {
-        console.error('Error in metrics fetch:', err);
-        throw err;
+        console.error('Error processing metrics:', err);
       }
-    },
-    refetchInterval: 5000,
-    onSuccess: (newData) => {
-      console.log('Setting new metrics data:', newData);
-      setMetricsData(current => ({
-        system: [...current.system.slice(-9), ...newData.system],
-        api: [...current.api.slice(-9), ...newData.api],
-        database: [...current.database.slice(-9), ...newData.database]
-      }));
-    },
-    onError: (err) => {
-      console.error('Metrics fetch error:', err);
-      toast({
-        title: "Metrics Error",
-        description: "Failed to load system metrics. Please try again later.",
-        variant: "destructive"
-      });
-    },
-    enabled: !!user?.superAdmin
-  });
+    }
+  }, [metricsResponse]);
 
   if (!user?.superAdmin) {
     return null;
