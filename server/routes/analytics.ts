@@ -27,7 +27,7 @@ const esClient = new Client({
 // Fetch logs with filtering and search
 router.get("/logs", authenticateToken, checkSuperAdminAccess, async (req, res) => {
   try {
-    const { search, level, category, from = 0, size = 100 } = req.query;
+    const { search, level, category, from = 0, size = 100, dateFrom, dateTo } = req.query;
 
     // Build Elasticsearch query
     const query: any = {
@@ -41,7 +41,8 @@ router.get("/logs", authenticateToken, checkSuperAdminAccess, async (req, res) =
       query.bool.must.push({
         multi_match: {
           query: search,
-          fields: ['message', 'service', 'category']
+          fields: ['message', 'service', 'category'],
+          type: 'phrase_prefix' // Enable partial matching
         }
       });
     }
@@ -60,15 +61,31 @@ router.get("/logs", authenticateToken, checkSuperAdminAccess, async (req, res) =
       });
     }
 
-    // Execute search
+    // Add date range filter
+    if (dateFrom || dateTo) {
+      const range: any = {};
+      if (dateFrom) range.gte = dateFrom;
+      if (dateTo) range.lte = dateTo;
+      query.bool.must.push({
+        range: {
+          '@timestamp': range
+        }
+      });
+    }
+
+    // Execute search with caching
     const result = await esClient.search({
       index: 'zecko-logs-*',
       body: {
         query,
         sort: [{ '@timestamp': { order: 'desc' } }],
         from: Number(from),
-        size: Number(size)
-      }
+        size: Number(size),
+        track_total_hits: true,
+        _source: ['@timestamp', 'level', 'message', 'service', 'category', 'metadata']
+      },
+      requestCache: true, // Enable request caching
+      ignoreUnavailable: true // Continue if some indices are unavailable
     });
 
     const logs = result.hits.hits.map(hit => ({
