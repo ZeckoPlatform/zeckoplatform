@@ -47,10 +47,16 @@ export default function AnalyticsSettingsPage() {
   });
 
   // Redirect if user is not a super admin
-  if (!user?.superAdmin) {
-    setLocation("/");
-    return null;
-  }
+  useEffect(() => {
+    if (!user?.superAdmin) {
+      setLocation("/");
+      toast({
+        title: "Access Denied",
+        description: "You need super admin privileges to access this page.",
+        variant: "destructive"
+      });
+    }
+  }, [user, setLocation, toast]);
 
   // Fetch metrics with auto-refresh
   const { error } = useQuery({
@@ -60,46 +66,83 @@ export default function AnalyticsSettingsPage() {
         const token = localStorage.getItem('token');
         if (!token) throw new Error('No auth token');
 
+        console.log('Fetching metrics with token...');
         const response = await fetch('/api/metrics/json', {
           headers: {
-            Authorization: `Bearer ${token}`,
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
           },
         });
 
         if (!response.ok) {
-          console.error('Failed to fetch metrics:', response.statusText);
+          const errorText = await response.text();
+          console.error('Failed to fetch metrics:', response.status, errorText);
           throw new Error(`Failed to fetch metrics: ${response.statusText}`);
         }
 
         const metrics = await response.json();
-        console.log('Received metrics:', metrics);
+        console.log('Raw metrics response:', metrics);
 
         // Transform metrics into time series data
         const now = Date.now();
-        const systemMetrics = metrics.find((m: any) => m.name === 'process_cpu_usage_percent')?.values || [];
-        const memoryMetrics = metrics.find((m: any) => m.name === 'process_memory_usage_bytes')?.values || [];
-        const requestMetrics = metrics.find((m: any) => m.name === 'http_requests_total')?.values || [];
-        const dbMetrics = metrics.find((m: any) => m.name === 'database_query_duration_seconds')?.values || [];
-
         const newData = {
           system: [{
-            cpu_usage: parseFloat(systemMetrics[0]?.value || '0'),
-            memory_used: parseFloat(memoryMetrics[0]?.value || '0') / (1024 * 1024), // Convert to MB
-            memory_total: parseFloat(memoryMetrics[0]?.value || '0') / (1024 * 1024),
+            cpu_usage: 0,
+            memory_used: 0,
+            memory_total: 0,
             timestamp: now
           }],
           api: [{
-            request_count: parseInt(requestMetrics[0]?.value || '0'),
-            error_count: parseInt(requestMetrics.find((m: any) => m.labels?.status_code >= '400')?.value || '0'),
+            request_count: 0,
+            error_count: 0,
             avg_response_time: 0,
             timestamp: now
           }],
           database: [{
-            active_connections: parseInt(metrics.find((m: any) => m.name === 'database_connections_active')?.values[0]?.value || '0'),
-            query_duration: parseFloat(dbMetrics[0]?.value || '0'),
+            active_connections: 0,
+            query_duration: 0,
             timestamp: now
           }]
         };
+
+        // Parse CPU metrics
+        const cpuMetric = metrics.find((m: any) => m.name === 'process_cpu_usage_percent');
+        if (cpuMetric && cpuMetric.values && cpuMetric.values.length > 0) {
+          newData.system[0].cpu_usage = parseFloat(cpuMetric.values[0].value);
+        }
+
+        // Parse Memory metrics
+        const memoryMetric = metrics.find((m: any) => m.name === 'process_memory_usage_bytes');
+        if (memoryMetric && memoryMetric.values && memoryMetric.values.length > 0) {
+          const memoryBytes = parseFloat(memoryMetric.values[0].value);
+          newData.system[0].memory_used = memoryBytes / (1024 * 1024); // Convert to MB
+          newData.system[0].memory_total = memoryBytes / (1024 * 1024);
+        }
+
+        // Parse API metrics
+        const requestMetrics = metrics.find((m: any) => m.name === 'http_requests_total');
+        if (requestMetrics && requestMetrics.values && requestMetrics.values.length > 0) {
+          newData.api[0].request_count = parseInt(requestMetrics.values[0].value);
+          // Count error requests (status code >= 400)
+          const errorMetrics = metrics.filter((m: any) => 
+            m.name === 'http_requests_total' && 
+            m.labels && 
+            parseInt(m.labels.status_code) >= 400
+          );
+          newData.api[0].error_count = errorMetrics.reduce((sum: number, m: any) => 
+            sum + parseInt(m.values[0].value), 0);
+        }
+
+        // Parse Database metrics
+        const dbMetric = metrics.find((m: any) => m.name === 'database_query_duration_seconds');
+        if (dbMetric && dbMetric.values && dbMetric.values.length > 0) {
+          newData.database[0].query_duration = parseFloat(dbMetric.values[0].value);
+        }
+
+        const connectionsMetric = metrics.find((m: any) => m.name === 'database_connections_active');
+        if (connectionsMetric && connectionsMetric.values && connectionsMetric.values.length > 0) {
+          newData.database[0].active_connections = parseInt(connectionsMetric.values[0].value);
+        }
 
         console.log('Transformed metrics data:', newData);
         return newData;
@@ -124,8 +167,13 @@ export default function AnalyticsSettingsPage() {
         description: "Failed to load system metrics. Please try again later.",
         variant: "destructive"
       });
-    }
+    },
+    enabled: !!user?.superAdmin // Only fetch if user is superAdmin
   });
+
+  if (!user?.superAdmin) {
+    return null;
+  }
 
   const formatTime = (timestamp: number) => {
     return new Date(timestamp).toLocaleTimeString();
@@ -152,7 +200,11 @@ export default function AnalyticsSettingsPage() {
         </CardHeader>
         <CardContent>
           <div className="h-[300px]">
-            {metricsData.system.length === 0 ? (
+            {error ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-destructive">Failed to load metrics</p>
+              </div>
+            ) : metricsData.system.length === 0 ? (
               <div className="flex items-center justify-center h-full">
                 <p>Loading metrics...</p>
               </div>
@@ -206,7 +258,11 @@ export default function AnalyticsSettingsPage() {
         </CardHeader>
         <CardContent>
           <div className="h-[300px]">
-            {metricsData.api.length === 0 ? (
+            {error ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-destructive">Failed to load API metrics</p>
+              </div>
+            ) : metricsData.api.length === 0 ? (
               <div className="flex items-center justify-center h-full">
                 <p>Loading API metrics...</p>
               </div>
@@ -240,7 +296,11 @@ export default function AnalyticsSettingsPage() {
         </CardHeader>
         <CardContent>
           <div className="h-[300px]">
-            {metricsData.database.length === 0 ? (
+            {error ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-destructive">Failed to load database metrics</p>
+              </div>
+            ) : metricsData.database.length === 0 ? (
               <div className="flex items-center justify-center h-full">
                 <p>Loading database metrics...</p>
               </div>

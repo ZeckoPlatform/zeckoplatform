@@ -29,6 +29,7 @@ const JWT_SECRET = process.env.REPL_ID!;
 const verifyToken = (token: string) => {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+    log('Token verified successfully:', decoded);
     return decoded;
   } catch (error) {
     log('Token verification failed:', error instanceof Error ? error.message : String(error));
@@ -38,6 +39,9 @@ const verifyToken = (token: string) => {
 
 export function registerRoutes(app: Express): Server {
   try {
+    // Initialize monitoring
+    initializeMonitoring();
+
     // Add metrics middleware
     app.use(metricsMiddleware);
 
@@ -52,10 +56,12 @@ export function registerRoutes(app: Express): Server {
       const decoded = verifyToken(token);
 
       if (!decoded || !(decoded as any).superAdmin) {
+        log('Access denied - Not a super admin:', decoded);
         return res.status(403).json({ error: 'Access denied' });
       }
 
       try {
+        log('Getting Prometheus metrics...');
         const metrics = await getMetrics();
         res.set('Content-Type', 'text/plain');
         res.send(metrics);
@@ -76,11 +82,14 @@ export function registerRoutes(app: Express): Server {
       const decoded = verifyToken(token);
 
       if (!decoded || !(decoded as any).superAdmin) {
+        log('Access denied - Not a super admin:', decoded);
         return res.status(403).json({ error: 'Access denied' });
       }
 
       try {
+        log('Getting metrics as JSON...');
         const metrics = await getMetricsAsJSON();
+        log('Retrieved metrics:', metrics);
         res.json(metrics);
       } catch (error) {
         log('Error fetching metrics JSON:', error instanceof Error ? error.message : String(error));
