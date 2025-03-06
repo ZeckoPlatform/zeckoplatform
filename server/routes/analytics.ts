@@ -71,37 +71,22 @@ router.get("/logs", authenticateToken, checkSuperAdminAccess, async (req, res) =
       });
     }
 
-    // Add some sample logs if none exist (for development)
+    // Add initial system startup log if none exist
     if (inMemoryLogs.length === 0) {
-      const sampleLogs = [
-        {
-          '@timestamp': new Date().toISOString(),
-          level: 'info' as const,
-          message: 'Application started successfully',
-          service: 'system',
-          category: 'startup',
-          metadata: {}
-        },
-        {
-          '@timestamp': new Date(Date.now() - 5000).toISOString(),
-          level: 'error' as const,
-          message: 'Failed to connect to database',
-          service: 'database',
-          category: 'connection',
-          metadata: { attempt: 1 }
-        },
-        {
-          '@timestamp': new Date(Date.now() - 10000).toISOString(),
-          level: 'warning' as const,
-          message: 'High memory usage detected',
-          service: 'system',
-          category: 'performance',
-          metadata: { memoryUsage: '85%' }
+      const startupLog = {
+        '@timestamp': new Date().toISOString(),
+        level: 'info' as const,
+        message: 'System monitoring initialized successfully',
+        service: 'system',
+        category: 'startup',
+        metadata: {
+          version: '1.0.0',
+          environment: 'development'
         }
-      ];
+      };
 
-      inMemoryLogs.push(...sampleLogs);
-      filteredLogs = [...sampleLogs];
+      inMemoryLogs.push(startupLog);
+      filteredLogs = [startupLog];
     }
 
     logInfo('Returning filtered logs:', {
