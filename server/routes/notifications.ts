@@ -33,11 +33,12 @@ router.post("/notifications/test", authenticateToken, checkSuperAdminAccess, asy
     const [notification] = await db
       .insert(notifications)
       .values({
-        user_id: req.user!.id,
-        type: severity === 'critical' ? 'error' : 'info',
+        userId: req.user!.id,
+        title: `Test ${severity.toUpperCase()} Notification`,
         message: message || `This is a test ${severity} notification`,
+        type: severity === 'critical' ? 'error' : 'info',
         read: false,
-        created_at: new Date(),
+        createdAt: new Date(),
         metadata: {
           severity,
           test: true,
@@ -101,13 +102,13 @@ router.post("/notifications/test", authenticateToken, checkSuperAdminAccess, asy
 // Get notifications
 router.get("/notifications", authenticateToken, async (req, res) => {
   try {
-    const notifications = await db
+    const userNotifications = await db
       .select()
       .from(notifications)
-      .where(eq(notifications.user_id, req.user!.id))
-      .orderBy(notifications.created_at);
+      .where(eq(notifications.userId, req.user!.id))
+      .orderBy(notifications.createdAt);
 
-    return res.json(notifications);
+    return res.json(userNotifications);
   } catch (error) {
     logError("Error fetching notifications:", error);
 
