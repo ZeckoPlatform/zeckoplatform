@@ -1,31 +1,32 @@
 import { Router } from "express";
 import { authenticateToken, checkSuperAdminAccess } from "../auth";
 import { db } from "@db";
-import { notifications } from "@db/schema";
+import { notifications, users } from "@db/schema";
 import { eq } from "drizzle-orm";
 import { WebSocket } from 'ws';
 import { sendEmail } from "../services/email";
 
 const router = Router();
 
-// Global WebSocket server reference
-declare global {
-  var wss: any;
-}
-
 // Add test notification endpoint
 router.post("/notifications/test", authenticateToken, checkSuperAdminAccess, async (req, res) => {
   try {
     const { type, message, severity } = req.body;
+
+    // Get admin user for email
+    const [admin] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, req.user!.id));
 
     // Create notification in database
     const [notification] = await db
       .insert(notifications)
       .values({
         userId: req.user!.id,
-        title: `Test ${type.toUpperCase()} Notification`,
-        message,
-        type: 'test',
+        title: `Test ${severity.toUpperCase()} Alert`,
+        message: message || `This is a test ${severity} notification`,
+        type: severity === 'critical' ? 'bug_report' : 'customer_feedback',
         read: false,
         metadata: {
           severity,
@@ -45,12 +46,12 @@ router.post("/notifications/test", authenticateToken, checkSuperAdminAccess, asy
     }
 
     // Send email for critical notifications
-    if (severity === 'critical' && req.user?.email) {
+    if (severity === 'critical' && admin?.email) {
       await sendEmail({
-        to: req.user.email,
-        subject: `[CRITICAL] Test Notification`,
-        text: message,
-        html: `<h2>Critical Test Notification</h2><p>${message}</p>`
+        to: admin.email,
+        subject: `[CRITICAL] System Alert`,
+        text: message || `This is a test critical notification`,
+        html: `<h2>Critical System Alert</h2><p>${message || 'This is a test critical notification'}</p>`
       });
     }
 

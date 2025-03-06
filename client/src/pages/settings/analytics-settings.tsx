@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import { Link } from "wouter";
 import LogsView from "./analytics-logs";
+import { apiRequest } from "@/lib/queryClient";
 
 // Types for our metrics
 type SystemMetrics = {
@@ -67,33 +68,14 @@ export default function AnalyticsSettingsPage() {
 
   // Fetch metrics with auto-refresh
   const { data: metricsResponse, error } = useQuery({
-    queryKey: ['/api/metrics/json'],
+    queryKey: ['/api/analytics/metrics'],
     queryFn: async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          console.error('No auth token found');
-          throw new Error('No auth token');
-        }
-
-        console.log('Fetching metrics with token:', token);
-        const response = await fetch('/api/metrics/json', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-        });
-
+        const response = await apiRequest("GET", "/api/analytics/metrics");
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Failed to fetch metrics:', response.status, errorText);
           throw new Error(`Failed to fetch metrics: ${response.statusText}`);
         }
-
-        const metrics = await response.json();
-        console.log('Raw metrics response:', metrics);
-
-        return metrics;
+        return response.json();
       } catch (err) {
         console.error('Error in metrics fetch:', err);
         throw err;
@@ -109,76 +91,29 @@ export default function AnalyticsSettingsPage() {
       const now = Date.now();
       const newData = {
         system: [{
-          cpu_usage: 0,
-          memory_used: 0,
-          memory_total: 0,
+          cpu_usage: metricsResponse.system?.cpu_usage || 0,
+          memory_used: metricsResponse.system?.memory_used || 0,
+          memory_total: metricsResponse.system?.memory_total || 0,
           timestamp: now
         }],
         api: [{
-          request_count: 0,
-          error_count: 0,
-          avg_response_time: 0,
+          request_count: metricsResponse.api?.request_count || 0,
+          error_count: metricsResponse.api?.error_count || 0,
+          avg_response_time: metricsResponse.api?.avg_response_time || 0,
           timestamp: now
         }],
         database: [{
-          active_connections: 0,
-          query_duration: 0,
+          active_connections: metricsResponse.database?.active_connections || 0,
+          query_duration: metricsResponse.database?.query_duration || 0,
           timestamp: now
         }]
       };
 
-      try {
-        // Parse CPU metrics
-        const cpuMetric = metricsResponse.find((m: any) => m.name === 'process_cpu_usage_percent');
-        if (cpuMetric?.values?.length > 0) {
-          newData.system[0].cpu_usage = parseFloat(cpuMetric.values[0].value);
-          console.log('CPU usage:', newData.system[0].cpu_usage);
-        }
-
-        // Parse Memory metrics
-        const memoryMetric = metricsResponse.find((m: any) => m.name === 'process_memory_usage_bytes');
-        if (memoryMetric?.values?.length > 0) {
-          const memoryBytes = parseFloat(memoryMetric.values[0].value);
-          newData.system[0].memory_used = memoryBytes / (1024 * 1024); // Convert to MB
-          console.log('Memory usage (MB):', newData.system[0].memory_used);
-        }
-
-        // Parse API metrics
-        const requestMetrics = metricsResponse.filter((m: any) => m.name === 'http_requests_total');
-        if (requestMetrics.length > 0) {
-          const totalRequests = requestMetrics.reduce((sum: number, m: any) =>
-            sum + (parseInt(m.values[0]?.value) || 0), 0);
-
-          const errorRequests = requestMetrics
-            .filter((m: any) => m.labels?.status_code && parseInt(m.labels.status_code) >= 400)
-            .reduce((sum: number, m: any) => sum + (parseInt(m.values[0]?.value) || 0), 0);
-
-          newData.api[0].request_count = totalRequests;
-          newData.api[0].error_count = errorRequests;
-          console.log('Request metrics:', { total: totalRequests, errors: errorRequests });
-        }
-
-        // Parse Database metrics
-        const dbMetric = metricsResponse.find((m: any) => m.name === 'database_query_duration_seconds');
-        if (dbMetric?.values?.length > 0) {
-          newData.database[0].query_duration = parseFloat(dbMetric.values[0].value);
-          console.log('Query duration:', newData.database[0].query_duration);
-        }
-
-        const connectionsMetric = metricsResponse.find((m: any) => m.name === 'database_connections_active');
-        if (connectionsMetric?.values?.length > 0) {
-          newData.database[0].active_connections = parseInt(connectionsMetric.values[0].value);
-          console.log('Active connections:', newData.database[0].active_connections);
-        }
-
-        setMetricsData(current => ({
-          system: [...current.system.slice(-9), ...newData.system],
-          api: [...current.api.slice(-9), ...newData.api],
-          database: [...current.database.slice(-9), ...newData.database]
-        }));
-      } catch (err) {
-        console.error('Error processing metrics:', err);
-      }
+      setMetricsData(current => ({
+        system: [...current.system.slice(-9), ...newData.system],
+        api: [...current.api.slice(-9), ...newData.api],
+        database: [...current.database.slice(-9), ...newData.database]
+      }));
     }
   }, [metricsResponse]);
 

@@ -11,6 +11,7 @@ import {
 } from "@db/schema";
 import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
 import { logInfo, logError } from "../services/logging";
+import os from 'os';
 
 const router = Router();
 
@@ -47,7 +48,7 @@ router.get("/logs", authenticateToken, checkSuperAdminAccess, async (req, res) =
 
     if (search) {
       const searchLower = (search as string).toLowerCase();
-      filteredLogs = filteredLogs.filter(log => 
+      filteredLogs = filteredLogs.filter(log =>
         log.message.toLowerCase().includes(searchLower) ||
         log.service.toLowerCase().includes(searchLower) ||
         log.category.toLowerCase().includes(searchLower)
@@ -318,6 +319,57 @@ router.get("/analytics/dashboard", authenticateToken, async (req, res) => {
       message: "Failed to fetch dashboard analytics",
       error: error instanceof Error ? error.message : "Unknown error",
     });
+  }
+});
+
+// Get system metrics
+router.get("/analytics/metrics", authenticateToken, checkSuperAdminAccess, async (req, res) => {
+  try {
+    // Get system metrics
+    const totalMemory = os.totalmem();
+    const freeMemory = os.freemem();
+    const usedMemory = totalMemory - freeMemory;
+    const cpuUsage = os.loadavg()[0] * 100 / os.cpus().length; // Convert load average to percentage
+
+    // Get API metrics from analytics logs
+    const apiLogs = await db.query.analyticsLogs.findMany({
+      where: gte(analyticsLogs.created_at, new Date(Date.now() - 5 * 60 * 1000)) // Last 5 minutes
+    });
+
+    const requestCount = apiLogs.length;
+    const errorCount = apiLogs.filter(log => log.metadata?.error).length;
+
+    // Get database metrics
+    const dbMetrics = await db.select({
+      connectionCount: sql<number>`count(*)`.mapWith(Number)
+    }).from(users)
+      .where(gte(users.lastLoginAt, new Date(Date.now() - 5 * 60 * 1000))); // Active in last 5 minutes
+
+    const metrics = {
+      system: {
+        cpu_usage: cpuUsage,
+        memory_used: usedMemory,
+        memory_total: totalMemory
+      },
+      api: {
+        request_count: requestCount,
+        error_count: errorCount,
+        avg_response_time: 0 // TODO: Implement response time tracking
+      },
+      database: {
+        active_connections: dbMetrics[0]?.connectionCount || 0,
+        query_duration: 0 // TODO: Implement query duration tracking
+      }
+    };
+
+    logInfo('Metrics collected successfully:', metrics);
+    res.json(metrics);
+  } catch (error) {
+    logError('Error collecting metrics:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    res.status(500).json({ error: "Failed to collect metrics" });
   }
 });
 
