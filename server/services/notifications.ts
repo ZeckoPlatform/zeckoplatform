@@ -6,6 +6,11 @@ import { logInfo, logError } from './logging';
 import { WebSocket } from 'ws';
 import { sendEmail } from './email';
 
+// Define global type for WebSocket server
+declare global {
+  var wss: WebSocket.Server;
+}
+
 // Define notification severity levels
 export const SeverityLevels = {
   INFO: "info",
@@ -31,7 +36,7 @@ const notificationSchema = z.object({
   userId: z.union([z.number(), z.array(z.number())]).optional(),
   title: z.string(),
   message: z.string(),
-  type: z.enum(["api_failure", "system_metric", "database_issue", "security_alert"]),
+  type: z.enum(["api_failure", "system_metric", "database_issue", "security_alert", "bug_report", "customer_feedback"]),
   severity: z.enum(["info", "warning", "critical"]).default("info"),
   link: z.string().optional(),
   metadata: z.record(z.any()).optional(),
@@ -67,7 +72,7 @@ async function sendEmailNotification(userId: number, notification: any) {
     if (user?.email) {
       await sendEmail({
         to: user.email,
-        subject: `[${notification.severity.toUpperCase()}] ${notification.title}`,
+        subject: `[${notification.metadata?.severity?.toUpperCase() || 'ALERT'}] ${notification.title}`,
         text: notification.message,
         html: `<h2>${notification.title}</h2><p>${notification.message}</p>`,
       });
@@ -98,9 +103,11 @@ export async function createNotification(
           title: validatedData.title,
           message: validatedData.message,
           type: validatedData.type,
-          severity: validatedData.severity,
           link: validatedData.link,
-          metadata: validatedData.metadata,
+          metadata: {
+            ...validatedData.metadata,
+            severity: validatedData.severity,
+          },
           read: false,
         };
 
@@ -133,9 +140,11 @@ export async function createNotification(
           title: validatedData.title,
           message: validatedData.message,
           type: validatedData.type,
-          severity: validatedData.severity,
           link: validatedData.link,
-          metadata: validatedData.metadata,
+          metadata: {
+            ...validatedData.metadata,
+            severity: validatedData.severity,
+          },
           read: false,
         };
 

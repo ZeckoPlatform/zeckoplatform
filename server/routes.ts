@@ -1,11 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer } from 'ws';
-import { initializeMonitoring, metricsMiddleware, getMetrics, getMetricsAsJSON } from './services/monitoring';
+import { initializeMonitoring, metricsMiddleware } from './services/monitoring';
 import jwt from 'jsonwebtoken';
 import { log } from "./vite";
-import path from 'path';
-import fs from 'fs';
 import express from "express";
 import { registerWebSocket } from "./services/notifications";
 import authRoutes from './routes/auth';
@@ -13,7 +11,7 @@ import uploadRoutes from './routes/upload';
 import subscriptionRoutes from './routes/subscription';
 import invoiceRoutes from './routes/invoice';
 import analyticsRoutes from './routes/analytics';
-import notificationRoutes from './routes/notification';
+import notificationRoutes from './routes/notifications';
 import adminRoutes from './routes/admin';
 import documentRoutes from './routes/document';
 import reviewRoutes from './routes/review';
@@ -54,6 +52,9 @@ export function registerRoutes(app: Express): Server {
       server: httpServer,
       path: '/ws/notifications'
     });
+
+    // Store WebSocket server globally for notifications
+    global.wss = wss;
 
     wss.on('connection', (ws, req) => {
       log('New WebSocket connection');

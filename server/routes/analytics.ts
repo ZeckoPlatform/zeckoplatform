@@ -9,7 +9,7 @@ import {
   vendorTransactions,
   users,
 } from "@db/schema";
-import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
+import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { logInfo, logError } from "../services/logging";
 import os from 'os';
 
@@ -27,8 +27,8 @@ let inMemoryLogs: Array<{
 
 // Add a log entry
 export function addLogEntry(logEntry: typeof inMemoryLogs[0]) {
-  inMemoryLogs.unshift(logEntry); // Add to start of array
-  if (inMemoryLogs.length > 1000) { // Keep only last 1000 logs
+  inMemoryLogs.unshift(logEntry);
+  if (inMemoryLogs.length > 1000) {
     inMemoryLogs = inMemoryLogs.slice(0, 1000);
   }
 }
@@ -332,18 +332,18 @@ router.get("/analytics/metrics", authenticateToken, checkSuperAdminAccess, async
     const cpuUsage = os.loadavg()[0] * 100 / os.cpus().length; // Convert load average to percentage
 
     // Get API metrics from analytics logs
-    const apiLogs = await db.query.analyticsLogs.findMany({
-      where: gte(analyticsLogs.created_at, new Date(Date.now() - 5 * 60 * 1000)) // Last 5 minutes
+    const recentLogs = inMemoryLogs.filter(log => {
+      const timestamp = new Date(log['@timestamp']).getTime();
+      return Date.now() - timestamp <= 5 * 60 * 1000; // Last 5 minutes
     });
 
-    const requestCount = apiLogs.length;
-    const errorCount = apiLogs.filter(log => log.metadata?.error).length;
+    const requestCount = recentLogs.length;
+    const errorCount = recentLogs.filter(log => log.level === 'error').length;
 
-    // Get database metrics
-    const dbMetrics = await db.select({
-      connectionCount: sql<number>`count(*)`.mapWith(Number)
-    }).from(users)
-      .where(gte(users.lastLoginAt, new Date(Date.now() - 5 * 60 * 1000))); // Active in last 5 minutes
+    // Get active user count as a proxy for database connections
+    const activeUsers = await db.select().from(users).where(
+      gte(users.lastLoginAt as any, new Date(Date.now() - 5 * 60 * 1000))
+    );
 
     const metrics = {
       system: {
@@ -354,15 +354,14 @@ router.get("/analytics/metrics", authenticateToken, checkSuperAdminAccess, async
       api: {
         request_count: requestCount,
         error_count: errorCount,
-        avg_response_time: 0 // TODO: Implement response time tracking
+        avg_response_time: 0 // Placeholder for now
       },
       database: {
-        active_connections: dbMetrics[0]?.connectionCount || 0,
-        query_duration: 0 // TODO: Implement query duration tracking
+        active_connections: activeUsers.length,
+        query_duration: 0 // Placeholder for now
       }
     };
 
-    logInfo('Metrics collected successfully:', metrics);
     res.json(metrics);
   } catch (error) {
     logError('Error collecting metrics:', {
