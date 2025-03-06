@@ -340,10 +340,10 @@ router.get("/analytics/metrics", authenticateToken, checkSuperAdminAccess, async
     const requestCount = recentLogs.length;
     const errorCount = recentLogs.filter(log => log.level === 'error').length;
 
-    // Get active user count as a proxy for database connections
-    const activeUsers = await db.select().from(users).where(
-      gte(users.lastLoginAt as any, new Date(Date.now() - 5 * 60 * 1000))
-    );
+    // Get active connections (simplified)
+    const activeConnections = await db.select({
+      count: sql<number>`count(*)::int`
+    }).from(users);
 
     const metrics = {
       system: {
@@ -357,7 +357,7 @@ router.get("/analytics/metrics", authenticateToken, checkSuperAdminAccess, async
         avg_response_time: 0 // Placeholder for now
       },
       database: {
-        active_connections: activeUsers.length,
+        active_connections: activeConnections[0]?.count || 0,
         query_duration: 0 // Placeholder for now
       }
     };
