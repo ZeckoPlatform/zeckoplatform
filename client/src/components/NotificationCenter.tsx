@@ -9,10 +9,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "./ui/sheet";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { Switch } from "./ui/switch";
-import { Label } from "./ui/label";
-import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -39,7 +35,7 @@ export default function NotificationCenter() {
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
 
       // Play sound based on severity
-      if (notification.severity === 'critical') {
+      if (notification.metadata?.severity === 'critical') {
         playNotification('send');
       } else {
         playNotification('receive');
@@ -49,7 +45,7 @@ export default function NotificationCenter() {
       toast({
         title: notification.title,
         description: notification.message,
-        variant: notification.severity === 'critical' ? 'destructive' : 'default',
+        variant: notification.metadata?.severity === 'critical' ? 'destructive' : 'default',
       });
     };
 
@@ -98,15 +94,38 @@ export default function NotificationCenter() {
   };
 
   // Get severity color for badge
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'critical':
+  const getSeverityColor = (notification: any) => {
+    // For test notifications, use the severity from metadata
+    if (notification.type === 'test') {
+      switch (notification.metadata?.severity) {
+        case 'critical':
+          return 'destructive';
+        case 'warning':
+          return 'warning';
+        default:
+          return 'secondary';
+      }
+    }
+
+    // For existing notification types
+    switch (notification.type) {
+      case 'bug_report':
         return 'destructive';
-      case 'warning':
-        return 'warning';
+      case 'customer_feedback':
+        return 'success';
       default:
         return 'secondary';
     }
+  };
+
+  // Get notification type display text
+  const getNotificationType = (notification: any) => {
+    if (notification.type === 'test') {
+      return notification.metadata?.severity?.toUpperCase() || 'INFO';
+    }
+    return notification.type.split('_').map((word: string) => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
   };
 
   const unreadCount = notifications.filter((n: any) => !n.read).length;
@@ -152,8 +171,8 @@ export default function NotificationCenter() {
                       <h4 className={`text-sm font-semibold ${!notification.read ? 'text-foreground' : 'text-muted-foreground'}`}>
                         {notification.title}
                       </h4>
-                      <Badge variant={getSeverityColor(notification.severity)}>
-                        {notification.severity}
+                      <Badge variant={getSeverityColor(notification)}>
+                        {getNotificationType(notification)}
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">

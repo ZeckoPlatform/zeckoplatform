@@ -15,18 +15,30 @@ router.post("/notifications/test", authenticateToken, checkSuperAdminAccess, asy
     const { type, message, severity } = req.body;
 
     // Create the test notification
-    await createNotification({
-      title: `Test ${type} Notification`,
-      message,
-      type: type === 'critical' ? 'api_failure' : 'system_metric',
-      severity,
-      notifyAdmins: true,
-      sendEmail: severity === 'critical',
-      metadata: {
-        test: true,
-        timestamp: new Date().toISOString()
-      }
-    });
+    const [notification] = await db
+      .insert(notifications)
+      .values({
+        userId: req.user!.id,
+        title: `Test ${type.toUpperCase()} Notification`,
+        message,
+        type: 'test',
+        read: false,
+        metadata: {
+          severity,
+          test: true,
+          timestamp: new Date().toISOString()
+        }
+      })
+      .returning();
+
+    // Send real-time notification via WebSocket
+    if (global.wss) {
+      global.wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify(notification));
+        }
+      });
+    }
 
     res.status(200).json({ success: true });
   } catch (error) {
