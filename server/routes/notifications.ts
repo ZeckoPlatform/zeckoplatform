@@ -5,8 +5,8 @@ import { notifications } from "@db/schema";
 import { eq } from "drizzle-orm";
 import { WebSocket } from 'ws';
 import { sendEmail } from "../services/email";
-import { createNotification } from "../services/notifications";
 import { logInfo, logError } from "../services/logging";
+import { addLogEntry } from "./analytics";
 
 const router = Router();
 
@@ -15,15 +15,29 @@ router.post("/notifications/test", authenticateToken, checkSuperAdminAccess, asy
   try {
     const { severity = 'info', message } = req.body;
 
+    // Log the test notification attempt
+    addLogEntry({
+      '@timestamp': new Date().toISOString(),
+      level: severity as 'info' | 'warning' | 'error',
+      message: message || `Test ${severity} notification`,
+      service: 'notifications',
+      category: 'test',
+      metadata: {
+        userId: req.user?.id,
+        severity,
+        test: true
+      }
+    });
+
     // Create notification
     const [notification] = await db
       .insert(notifications)
       .values({
-        userId: req.user!.id,
-        title: `Test ${severity.toUpperCase()} Alert`,
+        user_id: req.user!.id,
+        type: severity === 'critical' ? 'error' : 'info',
         message: message || `This is a test ${severity} notification`,
-        type: 'customer_feedback',
         read: false,
+        created_at: new Date(),
         metadata: {
           severity,
           test: true,
@@ -52,12 +66,34 @@ router.post("/notifications/test", authenticateToken, checkSuperAdminAccess, asy
         });
       } catch (emailError) {
         logError('Failed to send notification email:', emailError);
+
+        // Log email failure
+        addLogEntry({
+          '@timestamp': new Date().toISOString(),
+          level: 'error',
+          message: 'Failed to send notification email',
+          service: 'email',
+          category: 'notification',
+          metadata: { error: emailError }
+        });
       }
     }
 
     res.status(200).json({ success: true, notification });
   } catch (error) {
+    // Log the error
     logError("Error creating test notification:", error);
+
+    // Add to analytics logs
+    addLogEntry({
+      '@timestamp': new Date().toISOString(),
+      level: 'error',
+      message: 'Failed to create test notification',
+      service: 'notifications',
+      category: 'test',
+      metadata: { error }
+    });
+
     res.status(500).json({ error: "Failed to create test notification" });
   }
 });
@@ -68,12 +104,23 @@ router.get("/notifications", authenticateToken, async (req, res) => {
     const notifications = await db
       .select()
       .from(notifications)
-      .where(eq(notifications.userId, req.user!.id))
-      .orderBy(notifications.createdAt);
+      .where(eq(notifications.user_id, req.user!.id))
+      .orderBy(notifications.created_at);
 
     return res.json(notifications);
   } catch (error) {
     logError("Error fetching notifications:", error);
+
+    // Add to analytics logs
+    addLogEntry({
+      '@timestamp': new Date().toISOString(),
+      level: 'error',
+      message: 'Failed to fetch notifications',
+      service: 'notifications',
+      category: 'query',
+      metadata: { error }
+    });
+
     return res.status(500).json({ error: "Failed to fetch notifications" });
   }
 });
@@ -94,6 +141,17 @@ router.patch("/notifications/:id/read", authenticateToken, async (req, res) => {
     return res.json({ success: true });
   } catch (error) {
     logError("Error marking notification as read:", error);
+
+    // Add to analytics logs
+    addLogEntry({
+      '@timestamp': new Date().toISOString(),
+      level: 'error',
+      message: 'Failed to mark notification as read',
+      service: 'notifications',
+      category: 'update',
+      metadata: { error }
+    });
+
     return res.status(500).json({ error: "Failed to mark notification as read" });
   }
 });

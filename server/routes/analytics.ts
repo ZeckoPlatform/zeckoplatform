@@ -3,10 +3,6 @@ import { authenticateToken, checkSuperAdminAccess } from "../auth";
 import { db } from "@db";
 import {
   analyticsLogs,
-  leadAnalytics,
-  businessAnalytics,
-  revenueAnalytics,
-  vendorTransactions,
   users,
 } from "@db/schema";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
@@ -27,10 +23,30 @@ let inMemoryLogs: Array<{
 
 // Add a log entry
 export function addLogEntry(logEntry: typeof inMemoryLogs[0]) {
+  // Add to start of array
   inMemoryLogs.unshift(logEntry);
+  // Keep only last 1000 logs
   if (inMemoryLogs.length > 1000) {
     inMemoryLogs = inMemoryLogs.slice(0, 1000);
   }
+
+  // Also log to console for debugging
+  console.log(`[${logEntry.level.toUpperCase()}] ${logEntry.service} - ${logEntry.message}`);
+}
+
+// Initialize with a startup log if empty
+if (inMemoryLogs.length === 0) {
+  addLogEntry({
+    '@timestamp': new Date().toISOString(),
+    level: 'info',
+    message: 'System monitoring initialized successfully',
+    service: 'system',
+    category: 'startup',
+    metadata: {
+      version: '1.0.0',
+      environment: 'development'
+    }
+  });
 }
 
 // Fetch logs with filtering and search
@@ -72,35 +88,15 @@ router.get("/logs", authenticateToken, checkSuperAdminAccess, async (req, res) =
       });
     }
 
-    // Add initial system startup log if none exist
-    if (inMemoryLogs.length === 0) {
-      const startupLog = {
-        '@timestamp': new Date().toISOString(),
-        level: 'info' as const,
-        message: 'System monitoring initialized successfully',
-        service: 'system',
-        category: 'startup',
-        metadata: {
-          version: '1.0.0',
-          environment: 'development'
-        }
-      };
-
-      inMemoryLogs.push(startupLog);
-      filteredLogs = [startupLog];
-    }
-
     logInfo('Returning filtered logs:', {
       total: filteredLogs.length,
       filters: { search, level, category, dateFrom, dateTo }
     });
 
+    // Return paginated results
     res.json(filteredLogs.slice(Number(from), Number(from) + Number(size)));
   } catch (error) {
-    logError('Error fetching logs:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
-    });
+    logError('Error fetching logs:', error);
     res.status(500).json({
       message: "Failed to fetch logs",
       error: error instanceof Error ? error.message : "Unknown error",
@@ -362,12 +358,30 @@ router.get("/analytics/metrics", authenticateToken, checkSuperAdminAccess, async
       }
     };
 
+    // Log metrics collection
+    addLogEntry({
+      '@timestamp': new Date().toISOString(),
+      level: 'info',
+      message: 'System metrics collected',
+      service: 'analytics',
+      category: 'metrics',
+      metadata: metrics
+    });
+
     res.json(metrics);
   } catch (error) {
-    logError('Error collecting metrics:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
+    logError('Error collecting metrics:', error);
+
+    // Log metrics collection failure
+    addLogEntry({
+      '@timestamp': new Date().toISOString(),
+      level: 'error',
+      message: 'Failed to collect metrics',
+      service: 'analytics',
+      category: 'metrics',
+      metadata: { error: error instanceof Error ? error.message : String(error) }
     });
+
     res.status(500).json({ error: "Failed to collect metrics" });
   }
 });
