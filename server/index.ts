@@ -16,6 +16,29 @@ const isProd = process.env.NODE_ENV === 'production';
 const startTime = performance.now();
 let lastCheckpoint = startTime;
 
+// Check Node.js version compatibility
+const requiredNodeVersion = '16.0.0';
+const currentNodeVersion = process.versions.node;
+if (compareVersions(currentNodeVersion, requiredNodeVersion) < 0) {
+  logError("Node.js version incompatible:", {
+    current: currentNodeVersion,
+    required: requiredNodeVersion,
+    suggestion: 'Please upgrade Node.js to version 16.0.0 or higher'
+  });
+  process.exit(1);
+}
+
+function compareVersions(a: string, b: string): number {
+  const aParts = a.split('.').map(Number);
+  const bParts = b.split('.').map(Number);
+  for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
+    const aVal = aParts[i] || 0;
+    const bVal = bParts[i] || 0;
+    if (aVal !== bVal) return aVal - bVal;
+  }
+  return 0;
+}
+
 function logTiming(step: string) {
   const now = performance.now();
   const stepDuration = now - lastCheckpoint;
@@ -29,10 +52,25 @@ function logTiming(step: string) {
   lastCheckpoint = now;
 }
 
+// Add process warning handler
+process.on('warning', (warning) => {
+  logError('Process warning detected:', {
+    name: warning.name,
+    message: warning.message,
+    stack: warning.stack,
+    detail: warning.toString()
+  });
+});
+
 // Startup logging
 logInfo('=== Server Initialization Started ===', {
   environment: process.env.NODE_ENV,
-  processId: process.pid
+  processId: process.pid,
+  nodeVersion: process.versions.node,
+  v8Version: process.versions.v8,
+  platform: process.platform,
+  arch: process.arch,
+  memory: process.memoryUsage()
 });
 
 // Basic middleware setup
@@ -66,6 +104,22 @@ try {
     error: error instanceof Error ? error.message : String(error),
     duration: performance.now() - lastCheckpoint
   });
+}
+
+// Initialize database connection
+console.log('Initializing database connection...');
+try {
+  const { db } = await import('@db');
+  // Test the connection
+  await db.execute(sql`SELECT 1`);
+  console.log('Database initialization completed');
+  logTiming('Database initialization');
+} catch (error) {
+  logError('Database initialization failed:', {
+    error: error instanceof Error ? error.message : String(error),
+    duration: performance.now() - lastCheckpoint
+  });
+  process.exit(1);
 }
 
 // Register API routes
