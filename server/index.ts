@@ -53,27 +53,6 @@ function logTiming(step: string) {
   lastCheckpoint = now;
 }
 
-// Add process warning handler
-process.on('warning', (warning) => {
-  logError('Process warning detected:', {
-    name: warning.name,
-    message: warning.message,
-    stack: warning.stack,
-    detail: warning.toString()
-  });
-});
-
-// Startup logging
-logInfo('=== Server Initialization Started ===', {
-  environment: process.env.NODE_ENV,
-  processId: process.pid,
-  nodeVersion: process.versions.node,
-  v8Version: process.versions.v8,
-  platform: process.platform,
-  arch: process.arch,
-  memory: process.memoryUsage()
-});
-
 // Basic middleware setup
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -83,8 +62,13 @@ logTiming('Basic middleware setup');
 app.use(cors({
   origin: function(origin, callback) {
     if (!origin) return callback(null, true);
-    const allowedOrigins = process.env.VITE_ALLOWED_HOSTS?.split(',') || [];
-    if (allowedOrigins.some(allowedOrigin => origin?.includes(allowedOrigin))) {
+    const allowedHosts = process.env.VITE_ALLOWED_HOSTS?.split(',') || [];
+    logInfo('CORS check for origin:', {
+      origin,
+      allowedHosts,
+      hasAllowedHosts: !!process.env.VITE_ALLOWED_HOSTS
+    });
+    if (allowedHosts.some(allowedOrigin => origin?.includes(allowedOrigin))) {
       return callback(null, true);
     }
     callback(new Error('Not allowed by CORS'));
@@ -111,7 +95,7 @@ try {
   process.exit(1);
 }
 
-// Initialize authentication first
+// Initialize authentication
 try {
   setupAuth(app);
   logTiming('Authentication setup');
@@ -173,34 +157,9 @@ const PORT = Number(process.env.PORT) || 5000;
 httpServer.listen(PORT, '0.0.0.0', () => {
   logTiming('Server startup complete');
   logInfo(`Server started successfully on port ${PORT}`, {
-    totalStartupTime: `${(performance.now() - startTime).toFixed(2)}ms`
+    totalStartupTime: `${(performance.now() - startTime).toFixed(2)}ms`,
+    allowedHosts: process.env.VITE_ALLOWED_HOSTS
   });
-
-  // Defer heavy initialization tasks
-  setTimeout(() => {
-    const initStart = performance.now();
-
-    // Initialize monitoring
-    try {
-      initializeMonitoring();
-      logTiming('Monitoring initialization');
-    } catch (error) {
-      logError('Failed to initialize monitoring:', {
-        error: error instanceof Error ? error.message : String(error),
-        duration: performance.now() - initStart
-      });
-    }
-
-    // Initialize analytics
-    initializeAnalytics().then(() => {
-      logTiming('Analytics initialization');
-    }).catch(error => {
-      logError('Failed to initialize analytics:', {
-        error: error instanceof Error ? error.message : String(error),
-        duration: performance.now() - initStart
-      });
-    });
-  }, 5000); // 5 second delay
 });
 
 // Handle process termination
