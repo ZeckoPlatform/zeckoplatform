@@ -23,7 +23,11 @@ async function initializeDatabase() {
         port: parseInt(process.env.PGPORT || '5432'),
         database: process.env.PGDATABASE,
         // Disable SSL for local development
-        ssl: false
+        ssl: false,
+        // Pool configuration
+        max: 20, // Maximum number of clients
+        idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
+        connectionTimeoutMillis: 2000, // Return an error after 2 seconds if connection could not be established
       });
 
       // Add query monitoring
@@ -64,6 +68,15 @@ async function initializeDatabase() {
         log('Pool error occurred, will attempt to recover');
       });
 
+      // Add connection event listeners
+      pool.on('connect', () => {
+        log('New client connected to the pool');
+      });
+
+      pool.on('remove', () => {
+        log('Client removed from pool');
+      });
+
       return pool;
     } catch (err) {
       lastError = err;
@@ -78,7 +91,7 @@ async function initializeDatabase() {
       }
 
       log(`Retrying in ${RETRY_DELAY/1000} seconds... (${retries} attempts remaining)`);
-      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * Math.pow(2, MAX_RETRIES - retries)));
     }
   }
 

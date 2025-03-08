@@ -8,6 +8,7 @@ import { initializeMonitoring } from "./services/monitoring";
 import { initializeAnalytics } from "./routes/analytics";
 import cors from 'cors';
 import { performance } from 'perf_hooks';
+import { sql } from "drizzle-orm";
 
 const app = express();
 const isProd = process.env.NODE_ENV === 'production';
@@ -95,17 +96,6 @@ app.use(cors({
 }));
 logTiming('CORS setup');
 
-// Initialize authentication first
-try {
-  setupAuth(app);
-  logTiming('Authentication setup');
-} catch (error) {
-  logError('Auth setup failed:', {
-    error: error instanceof Error ? error.message : String(error),
-    duration: performance.now() - lastCheckpoint
-  });
-}
-
 // Initialize database connection
 console.log('Initializing database connection...');
 try {
@@ -120,6 +110,17 @@ try {
     duration: performance.now() - lastCheckpoint
   });
   process.exit(1);
+}
+
+// Initialize authentication first
+try {
+  setupAuth(app);
+  logTiming('Authentication setup');
+} catch (error) {
+  logError('Auth setup failed:', {
+    error: error instanceof Error ? error.message : String(error),
+    duration: performance.now() - lastCheckpoint
+  });
 }
 
 // Register API routes
