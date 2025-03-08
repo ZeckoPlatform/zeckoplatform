@@ -42,6 +42,29 @@ export const users = pgTable("users", {
       postalCode: string;
       country: string;
     };
+    matchPreferences?: {
+      preferredCategories?: string[];
+      locationPreference?: string[];
+      budgetRange?: {
+        min: number;
+        max: number;
+      };
+      radius?: number; // Distance in miles/kilometers
+      availability?: {
+        days: ('monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday')[];
+        hours: {
+          start: string; // Format: "HH:mm"
+          end: string; // Format: "HH:mm"
+        };
+      };
+      serviceCategories?: string[]; // Specific services within categories
+      industryExperience?: string[]; // Specific industries
+      leadVolume?: {
+        min: number;
+        max: number;
+        timeframe: 'daily' | 'weekly' | 'monthly';
+      };
+    };
   }>(),
 });
 

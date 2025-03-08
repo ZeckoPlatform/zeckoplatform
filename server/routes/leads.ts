@@ -5,6 +5,7 @@ import { z } from "zod";
 import { eq, and, isNull, or, not } from "drizzle-orm";
 import { calculateMatchScore } from "../utils/matching";
 import { sql } from "drizzle-orm";
+import authenticateToken from '../middleware/auth'; // Assuming this middleware exists
 
 const router = Router();
 
@@ -21,7 +22,7 @@ const createLeadSchema = z.object({
   phone_number: z.string().optional().nullable()
 });
 
-router.get("/leads", async (req, res) => {
+router.get("/leads", authenticateToken, async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: "Authentication required" });
@@ -137,7 +138,7 @@ router.get("/leads", async (req, res) => {
   }
 });
 
-router.post("/leads", async (req, res) => {
+router.post("/leads", authenticateToken, async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: "Authentication required" });
@@ -191,7 +192,7 @@ router.post("/leads", async (req, res) => {
   }
 });
 
-router.delete("/leads/:id", async (req, res) => {
+router.delete("/leads/:id", authenticateToken, async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: "Authentication required" });
@@ -237,7 +238,7 @@ router.delete("/leads/:id", async (req, res) => {
   }
 });
 
-router.patch("/leads/:id", async (req, res) => {
+router.patch("/leads/:id", authenticateToken, async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: "Authentication required" });
@@ -298,7 +299,7 @@ const proposalSchema = z.object({
   proposal: z.string().min(1, "Proposal text is required"),
 });
 
-router.post("/leads/:id/responses", async (req, res) => {
+router.post("/leads/:id/responses", authenticateToken, async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: "Authentication required" });
@@ -380,7 +381,7 @@ router.post("/leads/:id/responses", async (req, res) => {
 });
 
 // Update the messaging route with better permission checks
-router.post("/leads/:id/messages", async (req, res) => {
+router.post("/leads/:id/messages", authenticateToken, async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: "Authentication required" });
@@ -460,7 +461,7 @@ router.post("/leads/:id/messages", async (req, res) => {
   }
 });
 
-router.post("/leads/:id/responses/:responseId/accept", async (req, res) => {
+router.post("/leads/:id/responses/:responseId/accept", authenticateToken, async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: "Authentication required" });
@@ -533,7 +534,7 @@ router.post("/leads/:id/responses/:responseId/accept", async (req, res) => {
 });
 
 // Add proposal rejection route
-router.post("/leads/:id/responses/:responseId/reject", async (req, res) => {
+router.post("/leads/:id/responses/:responseId/reject", authenticateToken, async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: "Authentication required" });
@@ -597,7 +598,7 @@ router.post("/leads/:id/responses/:responseId/reject", async (req, res) => {
 });
 
 // Add the message retrieval endpoint
-router.get("/leads/:id/messages", async (req, res) => {
+router.get("/leads/:id/messages", authenticateToken, async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: "Authentication required" });
@@ -667,7 +668,7 @@ router.get("/leads/:id/messages", async (req, res) => {
   }
 });
 
-router.post("/leads/:id/messages/read", async (req, res) => {
+router.post("/leads/:id/messages/read", authenticateToken, async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: "Authentication required" });
@@ -695,6 +696,105 @@ router.post("/leads/:id/messages/read", async (req, res) => {
     console.error("Error marking messages as read:", error);
     res.status(500).json({
       error: "Failed to mark messages as read",
+      details: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
+const searchLeadsSchema = z.object({
+  category: z.string().optional(),
+  minBudget: z.number().optional(),
+  maxBudget: z.number().optional(),
+  location: z.string().optional(),
+  radius: z.number().optional(),
+  status: z.enum(["open", "in_progress", "closed"]).optional(),
+});
+
+router.get("/leads/search", authenticateToken, async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const query = searchLeadsSchema.parse(req.query);
+
+    let sqlQuery = sql`
+      SELECT 
+        l.*,
+        COALESCE(
+          json_agg(
+            DISTINCT jsonb_build_object(
+              'id', lr.id,
+              'business_id', lr.business_id,
+              'proposal', lr.proposal,
+              'status', lr.status,
+              'created_at', lr.created_at
+            )
+          ) FILTER (WHERE lr.id IS NOT NULL AND lr.status IN ('pending', 'accepted')),
+          '[]'
+        ) as responses,
+        COALESCE(
+          json_agg(
+            DISTINCT jsonb_build_object(
+              'id', m.id,
+              'sender_id', m.sender_id,
+              'receiver_id', m.receiver_id,
+              'content', m.content,
+              'read', m.read,
+              'created_at', m.created_at
+            )
+          ) FILTER (WHERE m.id IS NOT NULL),
+          '[]'
+        ) as messages
+      FROM leads l
+      LEFT JOIN lead_responses lr ON l.id = lr.lead_id
+      LEFT JOIN messages m ON l.id = m.lead_id
+      WHERE l.deleted_at IS NULL
+    `;
+
+    const conditions = [];
+    const params: any[] = [];
+
+    if (query.category) {
+      conditions.push(sql`l.category = ${query.category}`);
+    }
+
+    if (query.minBudget !== undefined) {
+      conditions.push(sql`l.budget >= ${query.minBudget}`);
+    }
+
+    if (query.maxBudget !== undefined) {
+      conditions.push(sql`l.budget <= ${query.maxBudget}`);
+    }
+
+    if (query.location) {
+      conditions.push(sql`l.location ILIKE ${`%${query.location}%`}`);
+    }
+
+    if (query.status) {
+      conditions.push(sql`l.status = ${query.status}`);
+    }
+
+    // Add conditions to SQL query
+    if (conditions.length > 0) {
+      sqlQuery = sql`${sqlQuery} AND ${sql.join(conditions, sql` AND `)}`;
+    }
+
+    // Add group by and order by
+    sqlQuery = sql`
+      ${sqlQuery}
+      GROUP BY l.id
+      ORDER BY l.created_at DESC
+    `;
+
+    const searchResults = await db.execute(sqlQuery);
+
+    console.log(`Found ${searchResults.rows.length} leads matching search criteria`);
+    return res.json(searchResults.rows);
+  } catch (error) {
+    console.error("Error searching leads:", error);
+    return res.status(500).json({
+      error: "Failed to search leads",
       details: error instanceof Error ? error.message : "Unknown error"
     });
   }
