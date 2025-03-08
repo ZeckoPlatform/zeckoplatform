@@ -7,9 +7,27 @@ import { logInfo, logError } from "./services/logging";
 import { initializeMonitoring } from "./services/monitoring";
 import { initializeAnalytics } from "./routes/analytics";
 import cors from 'cors';
+import { performance } from 'perf_hooks';
 
 const app = express();
 const isProd = process.env.NODE_ENV === 'production';
+
+// Start timing server initialization
+const startTime = performance.now();
+let lastCheckpoint = startTime;
+
+function logTiming(step: string) {
+  const now = performance.now();
+  const stepDuration = now - lastCheckpoint;
+  const totalDuration = now - startTime;
+  logInfo(`Startup timing - ${step}`, {
+    step,
+    stepDuration: `${stepDuration.toFixed(2)}ms`,
+    totalDuration: `${totalDuration.toFixed(2)}ms`,
+    timestamp: new Date().toISOString()
+  });
+  lastCheckpoint = now;
+}
 
 // Startup logging
 logInfo('=== Server Initialization Started ===', {
@@ -20,47 +38,51 @@ logInfo('=== Server Initialization Started ===', {
 // Basic middleware setup
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+logTiming('Basic middleware setup');
 
 // Enhanced CORS setup for development
 app.use(cors({
   origin: function(origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-
-    // Allow requests from localhost and Replit domains
     if (origin.includes('localhost') || 
         origin.includes('.replit.dev') || 
         origin.includes('replit.app')) {
       return callback(null, true);
     }
-
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
 }));
+logTiming('CORS setup');
 
 // Initialize authentication first
-setupAuth(app);
+try {
+  setupAuth(app);
+  logTiming('Authentication setup');
+} catch (error) {
+  logError('Auth setup failed:', {
+    error: error instanceof Error ? error.message : String(error),
+    duration: performance.now() - lastCheckpoint
+  });
+}
 
 // Register API routes
 try {
   registerRoutes(app);
-  logInfo('Routes registered successfully');
+  logTiming('Routes registration');
 } catch (error) {
   logError('Fatal error during route registration:', {
-    error: error instanceof Error ? error.message : String(error)
+    error: error instanceof Error ? error.message : String(error),
+    duration: performance.now() - lastCheckpoint
   });
   process.exit(1);
 }
 
 // Create HTTP server
 const httpServer = createServer(app);
-log('Created HTTP server instance');
-
-// Initialize monitoring after server is running
-let monitoringInitialized = false;
+logTiming('HTTP server creation');
 
 // Setup frontend serving
 if (isProd) {
@@ -74,16 +96,18 @@ if (isProd) {
       res.sendFile('index.html', { root: './client/dist' });
     }
   });
+  logTiming('Production static serving setup');
 } else {
   // Handle development mode with Vite
   logInfo('Setting up Vite development server');
   (async () => {
     try {
       await setupVite(app, httpServer);
-      logInfo('Vite setup completed successfully');
+      logTiming('Vite setup');
     } catch (error) {
       logError('Fatal error during Vite setup:', {
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
+        duration: performance.now() - lastCheckpoint
       });
       process.exit(1);
     }
@@ -93,18 +117,36 @@ if (isProd) {
 // Start server
 const PORT = Number(process.env.PORT) || 5000;
 httpServer.listen(PORT, '0.0.0.0', () => {
-  logInfo('Server started successfully on port ' + PORT);
+  logTiming('Server startup complete');
+  logInfo(`Server started successfully on port ${PORT}`, {
+    totalStartupTime: `${(performance.now() - startTime).toFixed(2)}ms`
+  });
 
-  // Initialize analytics with a delay after server has started
+  // Defer heavy initialization tasks
   setTimeout(() => {
+    const initStart = performance.now();
+
+    // Initialize monitoring
+    try {
+      initializeMonitoring();
+      logTiming('Monitoring initialization');
+    } catch (error) {
+      logError('Failed to initialize monitoring:', {
+        error: error instanceof Error ? error.message : String(error),
+        duration: performance.now() - initStart
+      });
+    }
+
+    // Initialize analytics
     initializeAnalytics().then(() => {
-      logInfo('Analytics system initialized successfully after server startup');
+      logTiming('Analytics initialization');
     }).catch(error => {
-      logError('Failed to initialize analytics after server startup:', {
-        error: error instanceof Error ? error.message : String(error)
+      logError('Failed to initialize analytics:', {
+        error: error instanceof Error ? error.message : String(error),
+        duration: performance.now() - initStart
       });
     });
-  }, 10000); // 10 second delay
+  }, 5000); // 5 second delay
 });
 
 // Handle process termination
@@ -119,7 +161,8 @@ process.on('SIGTERM', () => {
 process.on('uncaughtException', (error) => {
   logError('Uncaught Exception:', {
     error: error instanceof Error ? error.message : String(error),
-    stack: error.stack
+    stack: error.stack,
+    uptime: `${(performance.now() - startTime).toFixed(2)}ms`
   });
   process.exit(1);
 });
