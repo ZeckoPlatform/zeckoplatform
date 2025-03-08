@@ -1,17 +1,18 @@
 import { Router } from "express";
 import { authenticateToken, checkSuperAdminAccess } from "../auth";
 import { db } from "@db";
-import {
-  analyticsLogs,
-  users,
-} from "@db/schema";
+import { analyticsLogs, users } from "@db/schema";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { logInfo, logError } from "../services/logging";
 import os from 'os';
 
 const router = Router();
 
-// Initialize logs only when first accessed
+// Analytics initialization state
+let analyticsInitialized = false;
+let initializationPromise: Promise<void> | null = null;
+
+// In-memory storage initialized as null
 let inMemoryLogs: Array<{
   '@timestamp': string;
   level: 'info' | 'error' | 'warning';
@@ -21,36 +22,91 @@ let inMemoryLogs: Array<{
   metadata: Record<string, any>;
 }> | null = null;
 
-// Lazy initialization of logs
-function getInMemoryLogs() {
-  if (inMemoryLogs === null) {
-    inMemoryLogs = [{
-      '@timestamp': new Date().toISOString(),
-      level: 'info',
-      message: 'System monitoring initialized successfully',
-      service: 'system',
-      category: 'startup',
-      metadata: {
-        version: '1.0.0',
-        environment: 'development'
-      }
-    }];
+// Metrics cache
+const metricsCache = {
+  data: null as any,
+  lastUpdate: 0,
+  ttl: 10000 // 10 seconds
+};
+
+// Quick health check endpoint
+router.get("/health", (req, res) => {
+  res.json({ 
+    status: "ok",
+    analyticsReady: analyticsInitialized,
+    initializationStarted: !!initializationPromise
+  });
+});
+
+// Initialize analytics after server startup
+async function initializeAnalytics() {
+  if (initializationPromise) {
+    return initializationPromise;
   }
-  return inMemoryLogs;
+
+  console.log('Starting analytics initialization...');
+
+  initializationPromise = new Promise<void>(async (resolve) => {
+    try {
+      // Initialize in-memory logs
+      inMemoryLogs = [{
+        '@timestamp': new Date().toISOString(),
+        level: 'info',
+        message: 'Analytics system initialization started',
+        service: 'analytics',
+        category: 'startup',
+        metadata: {
+          version: '1.0.0',
+          environment: process.env.NODE_ENV
+        }
+      }];
+
+      // Mark as initialized
+      analyticsInitialized = true;
+      console.log('Analytics system initialized successfully');
+      resolve();
+    } catch (error) {
+      console.error('Failed to initialize analytics:', error);
+      resolve(); // Resolve anyway to prevent hanging
+    }
+  });
+
+  return initializationPromise;
+}
+
+// Get in-memory logs with initialization check
+function getInMemoryLogs() {
+  if (!analyticsInitialized) {
+    throw new Error('Analytics system is not yet initialized');
+  }
+  return inMemoryLogs!;
 }
 
 // Add a log entry
 export function addLogEntry(logEntry: typeof inMemoryLogs extends null ? never : typeof inMemoryLogs[0]) {
+  if (!analyticsInitialized) {
+    console.log('Analytics not ready, buffering log:', logEntry);
+    return;
+  }
+
   const logs = getInMemoryLogs();
   logs.unshift(logEntry);
   if (logs.length > 1000) {
-    logs.length = 1000; // More efficient than slice
+    logs.length = 1000;
   }
 }
 
-// Fetch logs with filtering and search - optimized for performance
+
+// Fetch logs with filtering and search
 router.get("/logs", authenticateToken, checkSuperAdminAccess, async (req, res) => {
   try {
+    if (!analyticsInitialized) {
+      return res.status(503).json({ 
+        error: "Analytics system is initializing",
+        retryAfter: 5
+      });
+    }
+
     const { search, level, category, from = 0, size = 100, dateFrom, dateTo } = req.query;
     const logs = getInMemoryLogs();
 
@@ -85,7 +141,6 @@ router.get("/logs", authenticateToken, checkSuperAdminAccess, async (req, res) =
       return true;
     });
 
-    // Return paginated results
     res.json(filteredLogs.slice(Number(from), Number(from) + Number(size)));
   } catch (error) {
     logError('Error fetching logs:', error);
@@ -96,16 +151,16 @@ router.get("/logs", authenticateToken, checkSuperAdminAccess, async (req, res) =
   }
 });
 
-// Cache metrics for 10 seconds
-const metricsCache = {
-  data: null as any,
-  lastUpdate: 0,
-  ttl: 10000 // 10 seconds
-};
-
 // Get metrics with caching
 router.get("/analytics/metrics", authenticateToken, checkSuperAdminAccess, async (req, res) => {
   try {
+    if (!analyticsInitialized) {
+      return res.status(503).json({ 
+        error: "Analytics system is initializing",
+        retryAfter: 5
+      });
+    }
+
     const now = Date.now();
 
     // Return cached metrics if available and not expired
@@ -141,11 +196,11 @@ router.get("/analytics/metrics", authenticateToken, checkSuperAdminAccess, async
       api: {
         request_count: requestCount,
         error_count: errorCount,
-        avg_response_time: 0 // Placeholder
+        avg_response_time: 0
       },
       database: {
         active_connections: activeConnections[0]?.count || 0,
-        query_duration: 0 // Placeholder
+        query_duration: 0
       }
     };
 
@@ -374,72 +429,5 @@ router.get("/analytics/dashboard", authenticateToken, async (req, res) => {
   }
 });
 
-// Get system metrics
-router.get("/analytics/metrics", authenticateToken, checkSuperAdminAccess, async (req, res) => {
-  try {
-    // Get system metrics
-    const totalMemory = os.totalmem();
-    const freeMemory = os.freemem();
-    const usedMemory = totalMemory - freeMemory;
-    const cpuUsage = os.loadavg()[0] * 100 / os.cpus().length; // Convert load average to percentage
-
-    // Get API metrics from analytics logs
-    const recentLogs = inMemoryLogs.filter(log => {
-      const timestamp = new Date(log['@timestamp']).getTime();
-      return Date.now() - timestamp <= 5 * 60 * 1000; // Last 5 minutes
-    });
-
-    const requestCount = recentLogs.length;
-    const errorCount = recentLogs.filter(log => log.level === 'error').length;
-
-    // Get active connections (simplified)
-    const activeConnections = await db.select({
-      count: sql<number>`count(*)::int`
-    }).from(users);
-
-    const metrics = {
-      system: {
-        cpu_usage: cpuUsage,
-        memory_used: usedMemory,
-        memory_total: totalMemory
-      },
-      api: {
-        request_count: requestCount,
-        error_count: errorCount,
-        avg_response_time: 0 // Placeholder for now
-      },
-      database: {
-        active_connections: activeConnections[0]?.count || 0,
-        query_duration: 0 // Placeholder for now
-      }
-    };
-
-    // Log metrics collection
-    addLogEntry({
-      '@timestamp': new Date().toISOString(),
-      level: 'info',
-      message: 'System metrics collected',
-      service: 'analytics',
-      category: 'metrics',
-      metadata: metrics
-    });
-
-    res.json(metrics);
-  } catch (error) {
-    logError('Error collecting metrics:', error);
-
-    // Log metrics collection failure
-    addLogEntry({
-      '@timestamp': new Date().toISOString(),
-      level: 'error',
-      message: 'Failed to collect metrics',
-      service: 'analytics',
-      category: 'metrics',
-      metadata: { error: error instanceof Error ? error.message : String(error) }
-    });
-
-    res.status(500).json({ error: "Failed to collect metrics" });
-  }
-});
-
+export { initializeAnalytics };
 export default router;

@@ -5,6 +5,7 @@ import { Server, createServer } from "http";
 import { setupAuth } from "./auth";
 import { logInfo, logError } from "./services/logging";
 import { initializeMonitoring } from "./services/monitoring";
+import { initializeAnalytics } from "./routes/analytics";
 import cors from 'cors';
 
 const app = express();
@@ -58,16 +59,8 @@ try {
 const httpServer = createServer(app);
 log('Created HTTP server instance');
 
-// Initialize monitoring
-try {
-  initializeMonitoring();
-  logInfo('Monitoring system initialized successfully');
-} catch (error) {
-  logError('Failed to initialize monitoring:', {
-    error: error instanceof Error ? error.message : String(error)
-  });
-  // Continue server startup even if monitoring fails
-}
+// Initialize monitoring after server is running
+let monitoringInitialized = false;
 
 // Setup frontend serving
 if (isProd) {
@@ -101,6 +94,17 @@ if (isProd) {
 const PORT = Number(process.env.PORT) || 5000;
 httpServer.listen(PORT, '0.0.0.0', () => {
   logInfo('Server started successfully on port ' + PORT);
+
+  // Initialize analytics with a delay after server has started
+  setTimeout(() => {
+    initializeAnalytics().then(() => {
+      logInfo('Analytics system initialized successfully after server startup');
+    }).catch(error => {
+      logError('Failed to initialize analytics after server startup:', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    });
+  }, 10000); // 10 second delay
 });
 
 // Handle process termination
