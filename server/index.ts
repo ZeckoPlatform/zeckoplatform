@@ -83,9 +83,8 @@ logTiming('Basic middleware setup');
 app.use(cors({
   origin: function(origin, callback) {
     if (!origin) return callback(null, true);
-    if (origin.includes('localhost') || 
-        origin.includes('.replit.dev') || 
-        origin.includes('replit.app')) {
+    const allowedOrigins = process.env.VITE_ALLOWED_HOSTS?.split(',') || [];
+    if (allowedOrigins.some(allowedOrigin => origin?.includes(allowedOrigin))) {
       return callback(null, true);
     }
     callback(new Error('Not allowed by CORS'));
