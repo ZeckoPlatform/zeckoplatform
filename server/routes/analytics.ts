@@ -11,7 +11,7 @@ import os from 'os';
 
 const router = Router();
 
-// In-memory log storage for development
+// Initialize logs only when first accessed
 let inMemoryLogs: Array<{
   '@timestamp': string;
   level: 'info' | 'error' | 'warning';
@@ -19,78 +19,70 @@ let inMemoryLogs: Array<{
   service: string;
   category: string;
   metadata: Record<string, any>;
-}> = [];
+}> | null = null;
+
+// Lazy initialization of logs
+function getInMemoryLogs() {
+  if (inMemoryLogs === null) {
+    inMemoryLogs = [{
+      '@timestamp': new Date().toISOString(),
+      level: 'info',
+      message: 'System monitoring initialized successfully',
+      service: 'system',
+      category: 'startup',
+      metadata: {
+        version: '1.0.0',
+        environment: 'development'
+      }
+    }];
+  }
+  return inMemoryLogs;
+}
 
 // Add a log entry
-export function addLogEntry(logEntry: typeof inMemoryLogs[0]) {
-  // Add to start of array
-  inMemoryLogs.unshift(logEntry);
-  // Keep only last 1000 logs
-  if (inMemoryLogs.length > 1000) {
-    inMemoryLogs = inMemoryLogs.slice(0, 1000);
+export function addLogEntry(logEntry: typeof inMemoryLogs extends null ? never : typeof inMemoryLogs[0]) {
+  const logs = getInMemoryLogs();
+  logs.unshift(logEntry);
+  if (logs.length > 1000) {
+    logs.length = 1000; // More efficient than slice
   }
-
-  // Also log to console for debugging
-  console.log(`[${logEntry.level.toUpperCase()}] ${logEntry.service} - ${logEntry.message}`);
 }
 
-// Initialize with a startup log if empty
-if (inMemoryLogs.length === 0) {
-  addLogEntry({
-    '@timestamp': new Date().toISOString(),
-    level: 'info',
-    message: 'System monitoring initialized successfully',
-    service: 'system',
-    category: 'startup',
-    metadata: {
-      version: '1.0.0',
-      environment: 'development'
-    }
-  });
-}
-
-// Fetch logs with filtering and search
+// Fetch logs with filtering and search - optimized for performance
 router.get("/logs", authenticateToken, checkSuperAdminAccess, async (req, res) => {
   try {
-    logInfo('Logs request received:', {
-      query: req.query,
-      user: req.user?.email
-    });
-
     const { search, level, category, from = 0, size = 100, dateFrom, dateTo } = req.query;
+    const logs = getInMemoryLogs();
 
-    // Filter logs based on criteria
-    let filteredLogs = [...inMemoryLogs];
+    // Use Set for O(1) lookups
+    const levelFilter = level && level !== 'all' ? new Set([level]) : null;
+    const categoryFilter = category && category !== 'all' ? new Set([category]) : null;
 
-    if (search) {
-      const searchLower = (search as string).toLowerCase();
-      filteredLogs = filteredLogs.filter(log =>
-        log.message.toLowerCase().includes(searchLower) ||
-        log.service.toLowerCase().includes(searchLower) ||
-        log.category.toLowerCase().includes(searchLower)
-      );
-    }
+    const dateFromTime = dateFrom ? new Date(dateFrom as string).getTime() : 0;
+    const dateToTime = dateTo ? new Date(dateTo as string).getTime() : Infinity;
 
-    if (level && level !== 'all') {
-      filteredLogs = filteredLogs.filter(log => log.level === level);
-    }
+    const searchLower = search ? (search as string).toLowerCase() : null;
 
-    if (category && category !== 'all') {
-      filteredLogs = filteredLogs.filter(log => log.category === category);
-    }
+    // Single pass filtering for better performance
+    const filteredLogs = logs.filter(log => {
+      // Date filter
+      const timestamp = new Date(log['@timestamp']).getTime();
+      if (timestamp < dateFromTime || timestamp > dateToTime) return false;
 
-    if (dateFrom || dateTo) {
-      filteredLogs = filteredLogs.filter(log => {
-        const timestamp = new Date(log['@timestamp']).getTime();
-        const fromTime = dateFrom ? new Date(dateFrom as string).getTime() : 0;
-        const toTime = dateTo ? new Date(dateTo as string).getTime() : Infinity;
-        return timestamp >= fromTime && timestamp <= toTime;
-      });
-    }
+      // Level filter
+      if (levelFilter && !levelFilter.has(log.level)) return false;
 
-    logInfo('Returning filtered logs:', {
-      total: filteredLogs.length,
-      filters: { search, level, category, dateFrom, dateTo }
+      // Category filter
+      if (categoryFilter && !categoryFilter.has(log.category)) return false;
+
+      // Search filter
+      if (searchLower) {
+        return log.message.toLowerCase().includes(searchLower) ||
+               log.service.toLowerCase().includes(searchLower) ||
+               log.category.toLowerCase().includes(searchLower);
+      }
+
+      return true;
     });
 
     // Return paginated results
@@ -101,6 +93,70 @@ router.get("/logs", authenticateToken, checkSuperAdminAccess, async (req, res) =
       message: "Failed to fetch logs",
       error: error instanceof Error ? error.message : "Unknown error",
     });
+  }
+});
+
+// Cache metrics for 10 seconds
+const metricsCache = {
+  data: null as any,
+  lastUpdate: 0,
+  ttl: 10000 // 10 seconds
+};
+
+// Get metrics with caching
+router.get("/analytics/metrics", authenticateToken, checkSuperAdminAccess, async (req, res) => {
+  try {
+    const now = Date.now();
+
+    // Return cached metrics if available and not expired
+    if (metricsCache.data && (now - metricsCache.lastUpdate) < metricsCache.ttl) {
+      return res.json(metricsCache.data);
+    }
+
+    // System metrics
+    const totalMemory = os.totalmem();
+    const freeMemory = os.freemem();
+    const usedMemory = totalMemory - freeMemory;
+    const cpuUsage = os.loadavg()[0] * 100 / os.cpus().length;
+
+    // API metrics from recent logs
+    const recentLogs = getInMemoryLogs().filter(log => 
+      now - new Date(log['@timestamp']).getTime() <= 5 * 60 * 1000
+    );
+
+    const requestCount = recentLogs.length;
+    const errorCount = recentLogs.filter(log => log.level === 'error').length;
+
+    // Get active connections (simplified and cached)
+    const activeConnections = await db.select({
+      count: sql<number>`count(*)::int`
+    }).from(users);
+
+    const metrics = {
+      system: {
+        cpu_usage: cpuUsage,
+        memory_used: usedMemory,
+        memory_total: totalMemory
+      },
+      api: {
+        request_count: requestCount,
+        error_count: errorCount,
+        avg_response_time: 0 // Placeholder
+      },
+      database: {
+        active_connections: activeConnections[0]?.count || 0,
+        query_duration: 0 // Placeholder
+      }
+    };
+
+    // Update cache
+    metricsCache.data = metrics;
+    metricsCache.lastUpdate = now;
+
+    res.json(metrics);
+  } catch (error) {
+    logError('Error collecting metrics:', error);
+    res.status(500).json({ error: "Failed to collect metrics" });
   }
 });
 
