@@ -45,10 +45,32 @@ function logTiming(step: string) {
   lastCheckpoint = now;
 }
 
+// Enhanced CORS configuration for development
+const corsOptions = {
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+
+    const allowedHost = process.env.VITE_ALLOWED_HOSTS;
+    if (allowedHost && (origin.includes(allowedHost) || origin === 'null')) {
+      callback(null, true);
+    } else {
+      logError('CORS blocked request from origin:', { origin });
+      callback(new Error('CORS policy: Origin not allowed'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+};
+
 // Basic middleware setup
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cors());
+app.use(cors(corsOptions));
 logTiming('Basic middleware setup');
 
 // Create HTTP server
