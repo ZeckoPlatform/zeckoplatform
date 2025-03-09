@@ -17,7 +17,16 @@
 
 ## Required Local Changes
 
-### 1. Package.json Modifications
+### 1. Authentication Changes
+Replace Replit-specific authentication in server/auth.ts:
+```typescript
+// Change from:
+const JWT_SECRET = process.env.REPL_ID!;
+// To:
+const JWT_SECRET = process.env.JWT_SECRET;
+```
+
+### 2. Package.json Modifications
 Current scripts section needs these adjustments for Heroku:
 ```json
 {
@@ -31,7 +40,7 @@ Current scripts section needs these adjustments for Heroku:
 }
 ```
 
-### 2. Environment Variables
+### 3. Environment Variables
 Update the following in your local .env file:
 ```env
 # Server configuration
@@ -39,21 +48,30 @@ PORT=5000
 HOST=0.0.0.0
 NODE_ENV=development
 
+# Security
+JWT_SECRET=your_jwt_secret_key
+
 # Database Configuration (Update for your PostgreSQL instance)
 DATABASE_URL=your_database_url
 
 # Optional: Stripe configuration (if using payment features)
 STRIPE_SECRET_KEY=your_stripe_secret_key
 STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key
+STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret
+
+# Optional: AWS configuration (if using email features)
+AWS_ACCESS_KEY_ID=your_aws_access_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+AWS_REGION=your_aws_region
 ```
 
-### 3. Database Configuration
+### 4. Database Configuration
 The drizzle.config.ts is already set up correctly for both environments. Ensure you:
 1. Create a PostgreSQL database for your application
 2. Update DATABASE_URL in your environment variables
 3. Run migrations using `npm run db:push`
 
-### 4. Running the project
+### 5. Running the project
 - The workflow named 'Start application' is already setup and runs `npm run dev` which starts an Express server for the backend and a Vite server for the frontend.
 - After making edits, the workflow will automatically be restarted for you.
 
