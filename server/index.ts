@@ -10,9 +10,6 @@ import { performance } from 'perf_hooks';
 import { sql } from "drizzle-orm";
 import path from 'path';
 
-// Force production mode to bypass Vite
-process.env.NODE_ENV = 'production';
-
 const app = express();
 
 // Start timing server initialization
@@ -20,7 +17,7 @@ const startTime = performance.now();
 let lastCheckpoint = startTime;
 
 // Log environment diagnostics
-logInfo('Starting server in production mode:', {
+logInfo('Starting server:', {
   node_version: process.version,
   environment: process.env.NODE_ENV,
   platform: process.platform,
@@ -48,19 +45,25 @@ app.use(cors());
 // Create HTTP server
 const httpServer = createServer(app);
 
-// Setup production static file serving
-logInfo('Setting up production static file serving');
-app.use(express.static(path.join(process.cwd(), 'dist', 'public')));
+// Serve static files from client directory
+app.use(express.static(path.join(process.cwd(), 'client', 'public')));
+app.use('/src', express.static(path.join(process.cwd(), 'client', 'src'), {
+  setHeaders: (res, path) => {
+    if (path.endsWith('.ts') || path.endsWith('.tsx')) {
+      res.setHeader('Content-Type', 'application/javascript');
+    }
+  }
+}));
 
-// Handle client-side routing
+// Serve index.html for all non-API routes
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api')) {
     return next();
   }
-  res.sendFile(path.join(process.cwd(), 'dist', 'public', 'index.html'));
+  res.sendFile(path.join(process.cwd(), 'client', 'index.html'));
 });
 
-logTiming('Static serving setup');
+logTiming('Static file serving setup');
 
 // Initialize database
 try {
@@ -83,6 +86,7 @@ try {
   logError('Auth setup failed:', {
     error: error instanceof Error ? error.message : String(error)
   });
+  process.exit(1);
 }
 
 // Register routes
@@ -100,7 +104,7 @@ try {
 const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, '0.0.0.0', () => {
   logTiming('Server startup complete');
-  logInfo('Server started successfully in production mode', {
+  logInfo('Server started successfully', {
     port: PORT,
     environment: process.env.NODE_ENV,
     startup_duration_ms: (performance.now() - startTime).toFixed(2)
