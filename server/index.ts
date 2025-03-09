@@ -69,7 +69,7 @@ app.use(cors({
         return origin.endsWith(host);
       }
       // For Replit's dynamic domains (UUID pattern)
-      if (origin.includes('riker.replit.dev')) {
+      if (origin.includes('.replit.dev') || origin.includes('.riker.replit.dev') || origin.includes('.repl.co')) {
         return true;
       }
       return origin.includes(host);
