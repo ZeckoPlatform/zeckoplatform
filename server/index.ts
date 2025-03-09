@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
-import { setupVite, log } from "./vite";
+import { setupVite, log, serveStatic } from "./vite";
 import { createServer } from "http";
 import { setupAuth } from "./auth";
 import { logInfo, logError } from "./services/logging";
@@ -58,7 +58,7 @@ try {
   process.exit(1);
 }
 
-// Register routes
+// Register API routes first
 try {
   registerRoutes(app);
   logInfo('Routes registered successfully');
@@ -81,6 +81,9 @@ if (process.env.NODE_ENV !== 'production') {
     });
     process.exit(1);
   }
+} else {
+  // In production, serve static files
+  serveStatic(app);
 }
 
 // Detailed error handling middleware
