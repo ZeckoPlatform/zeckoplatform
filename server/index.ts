@@ -36,20 +36,32 @@ const httpServer = createServer(app);
 // Setup static file serving
 logInfo('Setting up static file serving', {
   mode: process.env.NODE_ENV,
-  static_path: process.env.STATIC_PATH || 'client/public'
+  static_path: process.env.STATIC_PATH || 'client/public',
+  cwd: process.cwd()
 });
 
-const staticPath = path.join(process.cwd(), process.env.STATIC_PATH || 'client/public');
+// Log directory access attempt
+try {
+  const stats = fs.statSync(process.cwd());
+  logInfo('Current working directory access check:', {
+    path: process.cwd(),
+    readable: Boolean(stats.mode & fs.constants.R_OK),
+    writable: Boolean(stats.mode & fs.constants.W_OK),
+    executable: Boolean(stats.mode & fs.constants.X_OK)
+  });
+} catch (error) {
+  logError('Failed to check working directory permissions:', {
+    error: error instanceof Error ? error.message : String(error)
+  });
+}
 
-// Ensure static directory exists
-if (!fs.existsSync(staticPath)) {
-  logInfo('Creating static directory', { path: staticPath });
-  try {
-    fs.mkdirSync(staticPath, { recursive: true });
+// Serve a basic HTML page directly for all non-API routes
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    return next();
+  }
 
-    // Create a basic index.html if it doesn't exist
-    const indexPath = path.join(staticPath, 'index.html');
-    const htmlContent = `
+  const htmlContent = `
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -87,30 +99,12 @@ if (!fs.existsSync(staticPath)) {
   </body>
 </html>`;
 
-    fs.writeFileSync(indexPath, htmlContent);
-    logInfo('Created index.html file', { path: indexPath });
-  } catch (error) {
-    logError('Failed to create static directory or index.html', {
-      error: error instanceof Error ? error.message : String(error),
-      path: staticPath
-    });
-    process.exit(1);
-  }
-}
-
-// Verify directory exists after creation
-if (!fs.existsSync(staticPath)) {
-  logError('Failed to create static directory', { path: staticPath });
-  process.exit(1);
-}
-
-// Serve static files
-app.use(express.static(staticPath));
+  res.type('html').send(htmlContent);
+});
 
 // Initialize database
 try {
   const { db } = await import('@db');
-  // Simple health check query without using eq
   await db.execute(sql`SELECT 1 as health_check`);
   logInfo('Database connection successful');
 } catch (error) {
@@ -142,14 +136,6 @@ try {
   });
   process.exit(1);
 }
-
-// Serve index.html for client-side routing after API routes
-app.get('*', (req, res, next) => {
-  if (req.path.startsWith('/api')) {
-    return next();
-  }
-  res.sendFile(path.join(staticPath, 'index.html'));
-});
 
 // Detailed error handling middleware
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
