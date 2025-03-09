@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { createServer } from "http";
@@ -17,7 +18,7 @@ const startTime = performance.now();
 let lastCheckpoint = startTime;
 
 // Log environment diagnostics
-logInfo('Starting server:', {
+logInfo('Starting server in production mode:', {
   node_version: process.version,
   environment: process.env.NODE_ENV,
   platform: process.platform,
@@ -45,42 +46,19 @@ app.use(cors());
 // Create HTTP server
 const httpServer = createServer(app);
 
-// Development mode - serve client files directly
-if (process.env.NODE_ENV !== 'production') {
-  logInfo('Setting up development static file serving');
+// Setup production static file serving
+logInfo('Setting up production static file serving');
+app.use(express.static(path.join(process.cwd(), 'dist', 'public')));
 
-  // Serve public assets
-  app.use(express.static(path.join(process.cwd(), 'client', 'public')));
+// Handle client-side routing
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    return next();
+  }
+  res.sendFile(path.join(process.cwd(), 'dist', 'public', 'index.html'));
+});
 
-  // Serve client source files with proper MIME types
-  app.use('/src', express.static(path.join(process.cwd(), 'client', 'src'), {
-    setHeaders: (res, filePath) => {
-      if (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) {
-        res.setHeader('Content-Type', 'application/javascript');
-      }
-    }
-  }));
-
-  // Serve index.html for client-side routing
-  app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api')) {
-      return next();
-    }
-    res.sendFile(path.join(process.cwd(), 'client', 'index.html'));
-  });
-} else {
-  // Production mode - serve from dist
-  logInfo('Setting up production server');
-  app.use(express.static(path.join(process.cwd(), 'dist', 'public')));
-  app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api')) {
-      return next();
-    }
-    res.sendFile(path.join(process.cwd(), 'dist', 'public', 'index.html'));
-  });
-}
-
-logTiming('Server setup');
+logTiming('Static serving setup');
 
 // Initialize database
 try {
@@ -117,13 +95,13 @@ try {
   process.exit(1);
 }
 
-// Start server with proper host binding
+// Start server
 const PORT = process.env.PORT || 5000;
-const HOST = '0.0.0.0'; // Always bind to all interfaces
+const HOST = '0.0.0.0';
 
 httpServer.listen(PORT, HOST, () => {
   logTiming('Server startup complete');
-  logInfo('Server started successfully', {
+  logInfo('Server started successfully in production mode', {
     host: HOST,
     port: PORT,
     environment: process.env.NODE_ENV,
@@ -143,15 +121,17 @@ httpServer.listen(PORT, HOST, () => {
   });
 });
 
-// Error handling
-process.on('uncaughtException', (error) => {
-  logError('Uncaught Exception:', {
-    error: error instanceof Error ? error.message : String(error),
-    stack: error.stack
+// Error handling middleware
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+  logError('Express error:', {
+    error: err.message,
+    stack: err.stack,
+    path: req.path
   });
-  process.exit(1);
+  res.status(500).json({ error: 'Internal server error' });
 });
 
+// Graceful shutdown
 process.on('SIGTERM', () => {
   logInfo('Received SIGTERM signal, initiating graceful shutdown');
   httpServer.close(() => {
