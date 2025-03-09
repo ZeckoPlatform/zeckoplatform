@@ -60,74 +60,81 @@ register.registerMetric(activeConnectionsGauge);
 register.registerMetric(errorCounter);
 
 // Initialize monitoring
-export const initializeMonitoring = () => {
-  try {
-    logInfo('Initializing Prometheus monitoring...');
+export const initializeMonitoring = async () => {
+  // Return a promise that resolves even if monitoring setup fails
+  return new Promise<void>((resolve) => {
+    try {
+      logInfo('Initializing Prometheus monitoring...');
 
-    // Start collecting default metrics
-    promClient.collectDefaultMetrics({
-      register,
-      prefix: 'zecko_',
-      gcDurationBuckets: [0.001, 0.01, 0.1, 1, 2, 5]
-    });
+      // Start collecting default metrics
+      promClient.collectDefaultMetrics({
+        register,
+        prefix: 'zecko_',
+        gcDurationBuckets: [0.001, 0.01, 0.1, 1, 2, 5]
+      });
 
-    // Start periodic system metrics collection only in production
-    if (process.env.NODE_ENV === 'production') {
-      setInterval(async () => {
-        try {
-          // Update memory metrics
-          const used = process.memoryUsage();
-          Object.entries(used).forEach(([key, value]) => {
-            memoryUsageGauge.labels(key).set(value);
-          });
+      // Start periodic system metrics collection only in production
+      if (process.env.NODE_ENV === 'production') {
+        setInterval(async () => {
+          try {
+            // Update memory metrics
+            const used = process.memoryUsage();
+            Object.entries(used).forEach(([key, value]) => {
+              memoryUsageGauge.labels(key).set(value);
+            });
 
-          // Calculate CPU usage percentage
-          const startUsage = process.cpuUsage();
-          const startTime = process.hrtime();
+            // Calculate CPU usage percentage
+            const startUsage = process.cpuUsage();
+            const startTime = process.hrtime();
 
-          // Wait a bit to measure CPU usage
-          await new Promise(resolve => setTimeout(resolve, 100));
+            // Wait a bit to measure CPU usage
+            await new Promise(resolve => setTimeout(resolve, 100));
 
-          const elapsedTime = process.hrtime(startTime);
-          const elapsedUsage = process.cpuUsage(startUsage);
+            const elapsedTime = process.hrtime(startTime);
+            const elapsedUsage = process.cpuUsage(startUsage);
 
-          // Calculate CPU usage percentage
-          const elapsedMs = elapsedTime[0] * 1000 + elapsedTime[1] / 1000000;
-          const cpuPercent = ((elapsedUsage.user + elapsedUsage.system) / 1000) / elapsedMs * 100;
+            // Calculate CPU usage percentage
+            const elapsedMs = elapsedTime[0] * 1000 + elapsedTime[1] / 1000000;
+            const cpuPercent = ((elapsedUsage.user + elapsedUsage.system) / 1000) / elapsedMs * 100;
 
-          cpuUsageGauge.set(cpuPercent);
+            cpuUsageGauge.set(cpuPercent);
 
-          logInfo('Updated system metrics', {
-            metadata: {
-              cpu: cpuPercent,
-              memory: used
-            }
-          });
+            logInfo('Updated system metrics', {
+              metadata: {
+                cpu: cpuPercent,
+                memory: used
+              }
+            });
 
-        } catch (error) {
-          logError('Error collecting system metrics', {
-            metadata: {
-              error: error instanceof Error ? error.message : String(error)
-            }
-          });
-        }
-      }, 1000);
-    }
-
-    logInfo('Prometheus monitoring initialized successfully');
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logError('Failed to initialize monitoring', {
-      metadata: {
-        error: errorMessage,
-        mode: process.env.NODE_ENV
+          } catch (error) {
+            logError('Error collecting system metrics', {
+              metadata: {
+                error: error instanceof Error ? error.message : String(error)
+              }
+            });
+          }
+        }, 1000);
       }
-    });
-    // Don't throw in development
-    if (process.env.NODE_ENV === 'production') {
-      throw error;
+
+      logInfo('Prometheus monitoring initialized successfully');
+      resolve();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logError('Failed to initialize monitoring', {
+        metadata: {
+          error: errorMessage,
+          mode: process.env.NODE_ENV
+        }
+      });
+      // Don't throw in development
+      if (process.env.NODE_ENV === 'production') {
+        logError('Monitoring initialization failed but continuing', {
+          error: errorMessage
+        });
+      }
+      resolve(); // Resolve anyway to prevent application failure
     }
-  }
+  });
 };
 
 // Middleware to track HTTP requests

@@ -185,6 +185,23 @@ httpServer.listen(PORT, '0.0.0.0', () => {
     totalStartupTime: `${(performance.now() - startTime).toFixed(2)}ms`,
     allowedHosts: process.env.VITE_ALLOWED_HOSTS
   });
+
+  // Initialize monitoring and analytics in the background
+  // Don't fail if they can't connect
+  Promise.allSettled([
+    initializeMonitoring().catch(error => {
+      logError('Monitoring initialization failed (non-critical):', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }),
+    initializeAnalytics().catch(error => {
+      logError('Analytics initialization failed (non-critical):', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    })
+  ]).then(() => {
+    logInfo('Background services initialization completed');
+  });
 });
 
 // Handle process termination
