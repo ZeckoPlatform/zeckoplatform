@@ -9,6 +9,16 @@ import { promisify } from "util";
 import { sendEmail } from "../services/email";
 import { esClient } from '../elasticsearch';
 import { getRecentLogs, logError, logInfo, logSystem } from '../services/logging';
+import { Request } from 'express';
+
+// Add type for authenticated request
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: number;
+    email?: string;
+    superAdmin?: boolean;
+  };
+}
 
 const router = Router();
 const scryptAsync = promisify(scrypt);
@@ -20,7 +30,7 @@ async function hashPassword(password: string) {
 }
 
 // Middleware to check super admin access
-const checkSuperAdminAccess = (req: any, res: any, next: any) => {
+const checkSuperAdminAccess = (req: AuthenticatedRequest, res: any, next: any) => {
   if (!req.user || !req.user.superAdmin) {
     return res.status(403).json({ message: "Super admin access required" });
   }
@@ -28,7 +38,7 @@ const checkSuperAdminAccess = (req: any, res: any, next: any) => {
 };
 
 // Create user account (super admin only)
-router.post("/admin/users/create", authenticateToken, checkSuperAdminAccess, async (req, res) => {
+router.post("/admin/users/create", authenticateToken, checkSuperAdminAccess, async (req: AuthenticatedRequest, res) => {
   try {
     const {
       email,
@@ -42,7 +52,7 @@ router.post("/admin/users/create", authenticateToken, checkSuperAdminAccess, asy
 
     // Check if user with email already exists
     const existingUser = await db.query.users.findFirst({
-      where: eq(users.email, email),
+      where: (users) => eq(users.email, email),
     });
 
     if (existingUser) {
@@ -56,7 +66,7 @@ router.post("/admin/users/create", authenticateToken, checkSuperAdminAccess, asy
     const hashedPassword = await hashPassword(password);
 
     try {
-      // Create new user
+      // Create new user with properly typed insert
       const [newUser] = await db.insert(users).values({
         email,
         username,
@@ -69,7 +79,7 @@ router.post("/admin/users/create", authenticateToken, checkSuperAdminAccess, asy
         createdAt: new Date(),
         updatedAt: new Date(),
         superAdmin: false,
-        profile: null,
+        profile: {},
         verificationCode: null,
         resetPasswordToken: null,
         resetPasswordExpiry: null,
@@ -80,21 +90,19 @@ router.post("/admin/users/create", authenticateToken, checkSuperAdminAccess, asy
       // If creating a business or vendor account, create initial subscription
       if ((userType === "business" || userType === "vendor") && newUser?.id) {
         try {
-          const subscription = await db.insert(subscriptions).values({
-            user_id: newUser.id, // Fixed: Changed userId to user_id to match schema
+          const [subscription] = await db.insert(subscriptions).values({
+            userId: newUser.id,
             status: "active",
             type: userType,
-            price: userType === "business" ? 2999 : 4999, // Price in pence
-            start_date: new Date(),
-            end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-            auto_renew: false
+            price: userType === "business" ? 2999 : 4999,
+            startDate: new Date(),
+            endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            autoRenew: false
           }).returning();
 
-          console.log('Subscription created:', subscription[0]);
+          console.log('Subscription created:', subscription);
         } catch (subscriptionError) {
           console.error("Error creating subscription:", subscriptionError);
-          // Don't fail the whole operation if subscription creation fails
-          // Just log it and continue
         }
       }
 
@@ -568,12 +576,9 @@ router.post("/messages/:userId", authenticateToken, checkSuperAdminAccess, async
 // Add logs endpoint to admin routes
 router.get("/admin/logs", authenticateToken, checkSuperAdminAccess, async (req, res) => {
   try {
-    // Check if Elasticsearch is available and configured
     if (!esClient || process.env.LOGGING_MODE === 'console') {
-      // Return recent logs from memory
       const logs = getRecentLogs();
       if (logs.length === 0) {
-        // Add initial log if no logs exist
         return res.json([{
           '@timestamp': new Date().toISOString(),
           level: 'info',
@@ -586,11 +591,11 @@ router.get("/admin/logs", authenticateToken, checkSuperAdminAccess, async (req, 
       return res.json(logs);
     }
 
-    // Query elasticsearch for logs
+    // Query elasticsearch with proper typing
     const result = await esClient.search({
       index: 'zecko-logs-*',
       sort: [{ '@timestamp': { order: 'desc' } }],
-      size: 100, // Last 100 logs
+      size: 100,
       body: {
         query: {
           match_all: {}
@@ -598,20 +603,19 @@ router.get("/admin/logs", authenticateToken, checkSuperAdminAccess, async (req, 
       }
     });
 
-    // Transform and return logs
-    const logs = result.hits.hits.map(hit => ({
-      '@timestamp': hit._source['@timestamp'],
-      level: hit._source.level,
-      message: hit._source.message,
-      service: hit._source.service,
-      category: hit._source.category,
-      metadata: hit._source.metadata
+    // Transform and return logs with type checking
+    const logs = result.hits.hits.map((hit: any) => ({
+      '@timestamp': hit._source?.['@timestamp'] || new Date().toISOString(),
+      level: hit._source?.level || 'info',
+      message: hit._source?.message || '',
+      service: hit._source?.service || 'zecko-api',
+      category: hit._source?.category || 'system',
+      metadata: hit._source?.metadata || {}
     }));
 
     return res.json(logs);
   } catch (error) {
     console.error("Error fetching logs:", error);
-    // If error occurs, return logs from memory as fallback
     const logs = getRecentLogs();
     return res.json(logs.length > 0 ? logs : [{
       '@timestamp': new Date().toISOString(),
