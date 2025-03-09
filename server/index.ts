@@ -36,8 +36,22 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 logTiming('Basic middleware setup');
 
-// CORS configuration with improved error handling
-const allowedHosts = process.env.VITE_ALLOWED_HOSTS?.split(',') || ['localhost', 'replit.app', '.replit.dev', '.repl.co'];
+// CORS configuration with improved error handling and expanded allowed hosts
+const allowedHosts = [
+  'localhost',
+  'replit.app',
+  '.replit.dev',
+  '.repl.co',
+  'riker.replit.dev',
+  '.riker.replit.dev',
+  '.repl.dev'  // Add general Replit development domain
+];
+
+// Add any additional hosts from environment variable
+if (process.env.VITE_ALLOWED_HOSTS) {
+  allowedHosts.push(...process.env.VITE_ALLOWED_HOSTS.split(','));
+}
+
 app.use(cors({
   origin: function(origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -48,8 +62,20 @@ app.use(cors({
       return callback(null, true);
     }
 
-    // In production, check against allowlist
-    if (allowedHosts.some(host => origin.includes(host))) {
+    // Check if the origin matches any of the allowed patterns
+    const isAllowed = allowedHosts.some(host => {
+      if (host.startsWith('.')) {
+        // For wildcard subdomains
+        return origin.endsWith(host);
+      }
+      // For Replit's dynamic domains (UUID pattern)
+      if (origin.includes('riker.replit.dev')) {
+        return true;
+      }
+      return origin.includes(host);
+    });
+
+    if (isAllowed) {
       return callback(null, true);
     }
 
@@ -103,10 +129,15 @@ if (isProd) {
   }
 
   // Development proxy configuration with improved error handling
-  app.use('/api', createProxyMiddleware({
+  const proxyConfig = {
     target: `http://localhost:${process.env.PORT || 5000}`,
     changeOrigin: true,
     ws: true,
+    logLevel: 'debug',
+    secure: false,
+    headers: {
+      Connection: 'keep-alive'
+    },
     onError: (err: Error, req: Request, res: Response) => {
       logError('Proxy error:', {
         error: err.message,
@@ -118,13 +149,14 @@ if (isProd) {
       });
       res.end('Proxy Error');
     }
-  }));
+  };
+
+  app.use('/api', createProxyMiddleware(proxyConfig));
 
   // Handle Vite HMR WebSocket connections separately
   app.use('/__vite_hmr', createProxyMiddleware({
-    target: `ws://localhost:${process.env.PORT || 5000}`,
-    ws: true,
-    changeOrigin: true
+    ...proxyConfig,
+    target: `ws://localhost:${process.env.PORT || 5000}`
   }));
 }
 
@@ -157,7 +189,7 @@ httpServer.listen(PORT, '0.0.0.0', () => {
   logTiming('Server startup complete');
   logInfo(`Server started successfully on port ${PORT}`, {
     totalStartupTime: `${(performance.now() - startTime).toFixed(2)}ms`,
-    allowedHosts: process.env.VITE_ALLOWED_HOSTS
+    allowedHosts: allowedHosts.join(',')
   });
 
   // Initialize monitoring and analytics in the background
