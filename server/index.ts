@@ -1,23 +1,21 @@
 import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
-import { setupVite, log } from "./vite";
+import { setupVite, serveStatic, log } from "./vite";
 import { createServer } from "http";
 import { setupAuth } from "./auth";
 import { logInfo, logError } from "./services/logging";
 import { sql } from 'drizzle-orm';
 
-// Global error handlers for better debugging
+// Global error handlers
 process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
   logError('Uncaught Exception:', {
     error: err.message,
     stack: err.stack
   });
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+process.on('unhandledRejection', (reason) => {
   logError('Unhandled Rejection:', {
     reason: reason instanceof Error ? reason.message : String(reason)
   });
@@ -66,11 +64,21 @@ try {
   process.exit(1);
 }
 
-// Setup Vite in development mode
-if (process.env.NODE_ENV !== 'production') {
+// Handle static files in production or setup Vite in development
+if (process.env.NODE_ENV === 'production') {
+  try {
+    serveStatic(app);
+    logInfo('Static file serving initialized');
+  } catch (error) {
+    logError('Failed to initialize static serving:', {
+      error: error instanceof Error ? error.message : String(error)
+    });
+    process.exit(1);
+  }
+} else {
   try {
     await setupVite(app, httpServer);
-    logInfo('Vite development server initialized successfully');
+    logInfo('Vite development server initialized');
   } catch (error) {
     logError('Failed to initialize Vite:', {
       error: error instanceof Error ? error.message : String(error)
@@ -84,8 +92,7 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   logError('Request error:', {
     message: err.message,
     path: req.path,
-    method: req.method,
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    method: req.method
   });
 
   res.status(500).json({
@@ -95,13 +102,13 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 
 // Start server
 const PORT = Number(process.env.PORT) || 5000;
-const HOST = '0.0.0.0';
+const HOST = process.env.HOST || '0.0.0.0';
 
 httpServer.listen(PORT, HOST, () => {
   logInfo('Server started successfully', {
     host: HOST,
     port: PORT,
-    environment: process.env.NODE_ENV
+    mode: process.env.NODE_ENV
   });
 });
 

@@ -1,10 +1,6 @@
 import winston from 'winston';
 import { log as viteLog } from '../vite';
 
-// Store recent logs in memory when in console mode
-const recentLogs: any[] = [];
-const MAX_RECENT_LOGS = 100;
-
 // Create custom format for structured logging
 const structuredFormat = winston.format.combine(
   winston.format.timestamp(),
@@ -29,24 +25,11 @@ const logger = winston.createLogger({
   ]
 });
 
-// Get recent logs (for console mode)
-export function getRecentLogs() {
-  return recentLogs;
-}
-
-// Logging categories
-export enum LogCategory {
-  REQUEST = 'request',
-  ERROR = 'error',
-  BUSINESS = 'business',
-  SYSTEM = 'system'
-}
-
 // Wrapper functions for categorized logging
 export function logRequest(message: string, meta?: any) {
   const metadata = {
     ...meta,
-    category: LogCategory.REQUEST
+    category: 'request'
   };
   logger.info(message, metadata);
   viteLog(`[REQUEST] ${message}`);
@@ -55,25 +38,16 @@ export function logRequest(message: string, meta?: any) {
 export function logError(message: string, meta?: any) {
   const metadata = {
     ...meta,
-    category: LogCategory.ERROR
+    category: 'error'
   };
   logger.error(message, metadata);
   viteLog(`[ERROR] ${message}`);
 }
 
-export function logBusiness(message: string, meta?: any) {
-  const metadata = {
-    ...meta,
-    category: LogCategory.BUSINESS
-  };
-  logger.info(message, metadata);
-  viteLog(`[BUSINESS] ${message}`);
-}
-
 export function logSystem(message: string, meta?: any) {
   const metadata = {
     ...meta,
-    category: LogCategory.SYSTEM
+    category: 'system'
   };
   logger.info(message, metadata);
   viteLog(`[SYSTEM] ${message}`);
@@ -87,11 +61,9 @@ export { logger };
 
 // Initialize logging
 if (process.env.NODE_ENV !== 'production') {
-  process.env.LOGGING_MODE = 'console';
-  logSystem('Application startup complete', {
+  logSystem('Development mode active', {
     metadata: {
       startupTime: new Date().toISOString(),
-      mode: process.env.LOGGING_MODE,
       environment: process.env.NODE_ENV
     }
   });
