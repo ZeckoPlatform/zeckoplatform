@@ -1,6 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
-import { serveStatic, log } from "./vite";
+import { setupVite, serveStatic, log } from "./vite";
 import { Server, createServer } from "http";
 import { setupAuth } from "./auth";
 import { logInfo, logError } from "./services/logging";
@@ -12,21 +12,25 @@ import { sql } from "drizzle-orm";
 
 const app = express();
 
-// Force production mode
-process.env.NODE_ENV = 'production';
-const isProd = true;
+// We'll keep development mode for now until build is fixed
+const isProd = process.env.NODE_ENV === 'production';
 
 // Start timing server initialization
 const startTime = performance.now();
 let lastCheckpoint = startTime;
 
 // Log environment diagnostics
-logInfo('Starting server in production mode:', {
+logInfo('Starting server with diagnostics:', {
   node_version: process.version,
   environment: process.env.NODE_ENV,
   platform: process.platform,
   arch: process.arch,
-  memory: process.memoryUsage()
+  memory: process.memoryUsage(),
+  env_vars: {
+    PORT: process.env.PORT,
+    NODE_ENV: process.env.NODE_ENV,
+    VITE_ALLOWED_HOSTS: process.env.VITE_ALLOWED_HOSTS
+  }
 });
 
 function logTiming(step: string) {
@@ -36,8 +40,7 @@ function logTiming(step: string) {
   logInfo(`Startup timing - ${step}`, {
     step,
     stepDuration: `${stepDuration.toFixed(2)}ms`,
-    totalDuration: `${totalDuration.toFixed(2)}ms`,
-    timestamp: new Date().toISOString()
+    totalDuration: `${totalDuration.toFixed(2)}ms`
   });
   lastCheckpoint = now;
 }
@@ -45,15 +48,38 @@ function logTiming(step: string) {
 // Basic middleware setup
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cors()); // Added cors middleware
+app.use(cors());
+logTiming('Basic middleware setup');
 
 // Create HTTP server
 const httpServer = createServer(app);
 
-// Setup production static file serving
-logInfo('Setting up production static file serving');
-app.use(serveStatic);
-logTiming('Static serving setup');
+// Setup development mode with enhanced error handling
+if (!isProd) {
+  logInfo('Setting up development environment');
+  try {
+    await setupVite(app, httpServer);
+    logTiming('Vite setup complete');
+  } catch (error) {
+    logError('Failed to setup Vite:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    process.exit(1);
+  }
+} else {
+  try {
+    logInfo('Setting up production static serving');
+    app.use(serveStatic);
+    logTiming('Static serving setup');
+  } catch (error) {
+    logError('Failed to setup static serving:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    process.exit(1);
+  }
+}
 
 // Initialize database
 try {
@@ -93,7 +119,7 @@ try {
 const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, '0.0.0.0', () => {
   logTiming('Server startup complete');
-  logInfo('Server started successfully in production mode', {
+  logInfo('Server started successfully', {
     port: PORT,
     environment: process.env.NODE_ENV,
     startup_duration_ms: (performance.now() - startTime).toFixed(2)
