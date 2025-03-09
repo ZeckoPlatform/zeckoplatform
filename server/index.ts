@@ -59,6 +59,7 @@ app.use(cors({
 
     // In development mode, accept all origins
     if (!isProd) {
+      logInfo('Development mode - allowing origin:', { origin });
       return callback(null, true);
     }
 
@@ -76,6 +77,7 @@ app.use(cors({
     });
 
     if (isAllowed) {
+      logInfo('Allowed origin:', { origin });
       return callback(null, true);
     }
 
@@ -88,11 +90,70 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'X-Vite-Dev-Server-Hostname']
 }));
 
 // Create HTTP server early to allow Vite to attach its WebSocket handler
 const httpServer = createServer(app);
+
+// Setup development mode with enhanced proxy configuration
+if (!isProd) {
+  logInfo('Setting up Vite development server');
+  try {
+    await setupVite(app, httpServer);
+    logTiming('Vite setup');
+
+    // Development proxy configuration with improved error handling
+    const proxyConfig = {
+      target: `http://localhost:${process.env.PORT || 5000}`,
+      changeOrigin: true,
+      ws: true,
+      logLevel: 'debug',
+      secure: false,
+      headers: {
+        Connection: 'keep-alive',
+        'X-Forwarded-Host': process.env.VITE_ALLOWED_HOSTS || '*'
+      },
+      onProxyReq: (proxyReq: any) => {
+        // Add custom headers to help with host validation
+        proxyReq.setHeader('X-Vite-Dev-Server-Hostname', 'true');
+        if (process.env.VITE_ALLOWED_HOSTS) {
+          proxyReq.setHeader('X-Forwarded-Host', process.env.VITE_ALLOWED_HOSTS);
+        }
+      },
+      onError: (err: Error, req: Request, res: Response) => {
+        logError('Proxy error:', {
+          error: err.message,
+          path: req.path,
+          method: req.method
+        });
+        res.writeHead(500, {
+          'Content-Type': 'text/plain'
+        });
+        res.end('Proxy Error');
+      }
+    };
+
+    app.use('/api', createProxyMiddleware(proxyConfig));
+
+    // Handle Vite HMR WebSocket connections
+    app.use('/__vite_hmr', createProxyMiddleware({
+      ...proxyConfig,
+      target: `ws://localhost:${process.env.PORT || 5000}`,
+      ws: true
+    }));
+  } catch (error) {
+    logError('Failed to setup Vite:', {
+      error: error instanceof Error ? error.message : String(error)
+    });
+    process.exit(1);
+  }
+} else {
+  // Setup frontend serving
+  logInfo('Setting up production static file serving');
+  app.use(serveStatic);
+  logTiming('Production static serving setup');
+}
 
 // Initialize database connection with improved error handling
 console.log('Initializing database connection...');
@@ -108,56 +169,6 @@ try {
     duration: performance.now() - lastCheckpoint
   });
   process.exit(1);
-}
-
-// Setup frontend serving - do this before other middleware
-if (isProd) {
-  logInfo('Setting up production static file serving');
-  app.use(serveStatic);
-  logTiming('Production static serving setup');
-} else {
-  // Setup Vite in development mode with improved error handling
-  logInfo('Setting up Vite development server');
-  try {
-    await setupVite(app, httpServer);
-    logTiming('Vite setup');
-  } catch (error) {
-    logError('Failed to setup Vite:', {
-      error: error instanceof Error ? error.message : String(error)
-    });
-    process.exit(1);
-  }
-
-  // Development proxy configuration with improved error handling
-  const proxyConfig = {
-    target: `http://localhost:${process.env.PORT || 5000}`,
-    changeOrigin: true,
-    ws: true,
-    logLevel: 'debug',
-    secure: false,
-    headers: {
-      Connection: 'keep-alive'
-    },
-    onError: (err: Error, req: Request, res: Response) => {
-      logError('Proxy error:', {
-        error: err.message,
-        path: req.path,
-        method: req.method
-      });
-      res.writeHead(500, {
-        'Content-Type': 'text/plain'
-      });
-      res.end('Proxy Error');
-    }
-  };
-
-  app.use('/api', createProxyMiddleware(proxyConfig));
-
-  // Handle Vite HMR WebSocket connections separately
-  app.use('/__vite_hmr', createProxyMiddleware({
-    ...proxyConfig,
-    target: `ws://localhost:${process.env.PORT || 5000}`
-  }));
 }
 
 // Initialize authentication
