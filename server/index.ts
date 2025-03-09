@@ -9,6 +9,7 @@ import { initializeAnalytics } from "./routes/analytics";
 import cors from 'cors';
 import { performance } from 'perf_hooks';
 import { sql } from "drizzle-orm";
+import { createProxyMiddleware } from 'http-proxy-middleware';
 
 const app = express();
 const isProd = process.env.NODE_ENV === 'production';
@@ -60,7 +61,7 @@ logTiming('Basic middleware setup');
 
 // Enhanced CORS setup for development
 app.use(cors({
-  origin: function(origin, callback) {
+  origin: function(origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
     if (!origin) return callback(null, true);
     const allowedHosts = process.env.VITE_ALLOWED_HOSTS?.split(',') || [];
     logInfo('CORS check for origin:', {
@@ -78,6 +79,30 @@ app.use(cors({
   allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
 }));
 logTiming('CORS setup');
+
+// Add proxy middleware for development
+if (!isProd) {
+  // Proxy API requests
+  app.use('/api', createProxyMiddleware({
+    target: `http://localhost:${process.env.PORT || 5000}`,
+    changeOrigin: true,
+    secure: false,
+    onProxyReq: (proxyReq: any, req: Request) => {
+      logInfo('Proxying request:', {
+        path: req.path,
+        method: req.method,
+        origin: req.headers.origin
+      });
+    },
+    onError: (err: Error, req: Request, res: Response) => {
+      logError('Proxy error:', {
+        error: err.message,
+        path: req.path,
+        method: req.method
+      });
+    }
+  }));
+}
 
 // Initialize database connection
 console.log('Initializing database connection...');
