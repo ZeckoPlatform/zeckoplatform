@@ -18,29 +18,6 @@ const isProd = process.env.NODE_ENV === 'production';
 const startTime = performance.now();
 let lastCheckpoint = startTime;
 
-// Check Node.js version compatibility
-const requiredNodeVersion = '16.0.0';
-const currentNodeVersion = process.versions.node;
-if (compareVersions(currentNodeVersion, requiredNodeVersion) < 0) {
-  logError("Node.js version incompatible:", {
-    current: currentNodeVersion,
-    required: requiredNodeVersion,
-    suggestion: 'Please upgrade Node.js to version 16.0.0 or higher'
-  });
-  process.exit(1);
-}
-
-function compareVersions(a: string, b: string): number {
-  const aParts = a.split('.').map(Number);
-  const bParts = b.split('.').map(Number);
-  for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
-    const aVal = aParts[i] || 0;
-    const bVal = bParts[i] || 0;
-    if (aVal !== bVal) return aVal - bVal;
-  }
-  return 0;
-}
-
 function logTiming(step: string) {
   const now = performance.now();
   const stepDuration = now - lastCheckpoint;
@@ -65,7 +42,7 @@ app.use(cors({
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
 
-    // In development mode, accept all Replit domains and localhost
+    // In development mode, accept all origins
     if (!isProd) {
       return callback(null, true);
     }
@@ -88,49 +65,8 @@ app.use(cors({
   allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
 }));
 
-logTiming('CORS setup');
-
-// Development proxy configuration
-if (!isProd) {
-  // Proxy API requests
-  app.use('/api', createProxyMiddleware({
-    target: `http://localhost:${process.env.PORT || 5000}`,
-    changeOrigin: true,
-    secure: false,
-    ws: true,
-    xfwd: true,
-    onProxyReq: (proxyReq: any, req: Request) => {
-      // Add CORS headers
-      proxyReq.setHeader('Access-Control-Allow-Origin', '*');
-      proxyReq.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE');
-      proxyReq.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-      logInfo('Proxying request:', {
-        path: req.path,
-        method: req.method,
-        origin: req.headers.origin
-      });
-    },
-    onError: (err: Error, req: Request, res: Response) => {
-      logError('Proxy error:', {
-        error: err.message,
-        path: req.path,
-        method: req.method
-      });
-      res.writeHead(500, {
-        'Content-Type': 'text/plain'
-      });
-      res.end('Proxy Error');
-    }
-  }));
-
-  // Also proxy websocket connections
-  app.use('/ws', createProxyMiddleware({
-    target: `ws://localhost:${process.env.PORT || 5000}`,
-    ws: true,
-    changeOrigin: true
-  }));
-}
+// Create HTTP server early to allow Vite to attach its WebSocket handler
+const httpServer = createServer(app);
 
 // Initialize database connection
 console.log('Initializing database connection...');
@@ -146,6 +82,44 @@ try {
     duration: performance.now() - lastCheckpoint
   });
   process.exit(1);
+}
+
+// Setup frontend serving - do this before other middleware
+if (isProd) {
+  logInfo('Setting up production static file serving');
+  app.use(serveStatic);
+  logTiming('Production static serving setup');
+} else {
+  // Setup Vite in development mode
+  logInfo('Setting up Vite development server');
+  await setupVite(app, httpServer);
+  logTiming('Vite setup');
+
+  // Development proxy configuration for API requests
+  app.use('/api', createProxyMiddleware({
+    target: `http://localhost:${process.env.PORT || 5000}`,
+    changeOrigin: true,
+    ws: true,
+    onError: (err: Error, req: Request, res: Response) => {
+      logError('Proxy error:', {
+        error: err.message,
+        path: req.path,
+        method: req.method
+      });
+      res.writeHead(500, {
+        'Content-Type': 'text/plain'
+      });
+      res.end('Proxy Error');
+    }
+  }));
+
+  // Handle Vite HMR WebSocket connections separately
+  app.use('/__vite_hmr', createProxyMiddleware({
+    target: `ws://localhost:${process.env.PORT || 5000}`,
+    ws: true,
+    changeOrigin: true,
+    logLevel: 'silent'
+  }));
 }
 
 // Initialize authentication
@@ -171,40 +145,6 @@ try {
   process.exit(1);
 }
 
-// Create HTTP server
-const httpServer = createServer(app);
-logTiming('HTTP server creation');
-
-// Setup frontend serving
-if (isProd) {
-  logInfo('Setting up production static file serving');
-  app.use(serveStatic);
-
-  // Fallback route for SPA
-  app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api')) {
-      logInfo(`Serving index.html for path: ${req.path}`);
-      res.sendFile('index.html', { root: './client/dist' });
-    }
-  });
-  logTiming('Production static serving setup');
-} else {
-  // Handle development mode with Vite
-  logInfo('Setting up Vite development server');
-  (async () => {
-    try {
-      await setupVite(app, httpServer);
-      logTiming('Vite setup');
-    } catch (error) {
-      logError('Fatal error during Vite setup:', {
-        error: error instanceof Error ? error.message : String(error),
-        duration: performance.now() - lastCheckpoint
-      });
-      process.exit(1);
-    }
-  })();
-}
-
 // Start server
 const PORT = Number(process.env.PORT) || 5000;
 httpServer.listen(PORT, '0.0.0.0', () => {
@@ -215,7 +155,6 @@ httpServer.listen(PORT, '0.0.0.0', () => {
   });
 
   // Initialize monitoring and analytics in the background
-  // Don't fail if they can't connect
   Promise.allSettled([
     initializeMonitoring().catch(error => {
       logError('Monitoring initialization failed (non-critical):', {
