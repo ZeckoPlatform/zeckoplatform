@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
+import { setupVite, log } from "./vite";
 import { createServer } from "http";
 import { setupAuth } from "./auth";
 import { logInfo, logError } from "./services/logging";
@@ -32,75 +33,6 @@ app.use(express.urlencoded({ extended: true }));
 
 // Create HTTP server
 const httpServer = createServer(app);
-
-// Setup static file serving
-logInfo('Setting up static file serving', {
-  mode: process.env.NODE_ENV,
-  static_path: process.env.STATIC_PATH || 'client/public',
-  cwd: process.cwd()
-});
-
-// Log directory access attempt
-try {
-  const stats = fs.statSync(process.cwd());
-  logInfo('Current working directory access check:', {
-    path: process.cwd(),
-    readable: Boolean(stats.mode & fs.constants.R_OK),
-    writable: Boolean(stats.mode & fs.constants.W_OK),
-    executable: Boolean(stats.mode & fs.constants.X_OK)
-  });
-} catch (error) {
-  logError('Failed to check working directory permissions:', {
-    error: error instanceof Error ? error.message : String(error)
-  });
-}
-
-// Serve a basic HTML page directly for all non-API routes
-app.get('*', (req, res, next) => {
-  if (req.path.startsWith('/api')) {
-    return next();
-  }
-
-  const htmlContent = `
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <title>Zecko Platform</title>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-      body {
-        font-family: system-ui, -apple-system, sans-serif;
-        margin: 0;
-        padding: 2rem;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        min-height: 100vh;
-        background: #f5f5f5;
-      }
-      .container {
-        text-align: center;
-        padding: 2rem;
-        background: white;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      }
-      h1 { color: #333; margin-bottom: 1rem; }
-      p { color: #666; }
-    </style>
-  </head>
-  <body>
-    <div class="container">
-      <h1>Welcome to Zecko Platform</h1>
-      <p>The application is starting up...</p>
-      <div id="root"></div>
-    </div>
-  </body>
-</html>`;
-
-  res.type('html').send(htmlContent);
-});
 
 // Initialize database
 try {
@@ -135,6 +67,20 @@ try {
     error: error instanceof Error ? error.message : String(error)
   });
   process.exit(1);
+}
+
+// Setup Vite in development mode
+if (process.env.NODE_ENV !== 'production') {
+  try {
+    await setupVite(app, httpServer);
+    logInfo('Vite development server initialized successfully');
+  } catch (error) {
+    logError('Failed to initialize Vite:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    process.exit(1);
+  }
 }
 
 // Detailed error handling middleware
