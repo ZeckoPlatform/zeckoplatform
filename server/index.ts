@@ -59,27 +59,26 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 logTiming('Basic middleware setup');
 
-// Enhanced CORS setup for development
+// CORS configuration section
 app.use(cors({
   origin: function(origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
 
-    const allowedHosts = process.env.VITE_ALLOWED_HOSTS?.split(',') || [];
-    logInfo('CORS check for origin:', {
-      origin,
-      allowedHosts,
-      hasAllowedHosts: !!process.env.VITE_ALLOWED_HOSTS
-    });
-
-    // More permissive CORS in development
+    // In development mode, accept all Replit domains and localhost
     if (!isProd) {
       return callback(null, true);
     }
 
-    // In production, strictly check against allowed hosts
-    if (allowedHosts.some(allowedOrigin => origin?.includes(allowedOrigin))) {
+    // In production, use strict allowlist from environment variable
+    const allowedHosts = process.env.VITE_ALLOWED_HOSTS?.split(',') || [];
+    if (allowedHosts.some(host => origin.includes(host))) {
       return callback(null, true);
+    }
+
+    // Log blocked origins in development for debugging
+    if (!isProd) {
+      logInfo('Blocked origin:', { origin });
     }
 
     callback(new Error('Not allowed by CORS'));
@@ -88,17 +87,18 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
 }));
+
 logTiming('CORS setup');
 
-// Add proxy middleware for development
+// Development proxy configuration
 if (!isProd) {
   // Proxy API requests
   app.use('/api', createProxyMiddleware({
     target: `http://localhost:${process.env.PORT || 5000}`,
     changeOrigin: true,
     secure: false,
-    ws: true, // Enable WebSocket proxy
-    xfwd: true, // Add x-forward headers
+    ws: true,
+    xfwd: true,
     onProxyReq: (proxyReq: any, req: Request) => {
       // Add CORS headers
       proxyReq.setHeader('Access-Control-Allow-Origin', '*');
@@ -117,7 +117,6 @@ if (!isProd) {
         path: req.path,
         method: req.method
       });
-      // Don't throw on proxy errors, just log them
       res.writeHead(500, {
         'Content-Type': 'text/plain'
       });
