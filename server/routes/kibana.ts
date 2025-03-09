@@ -1,29 +1,19 @@
 import { Router } from "express";
-import { authenticateToken } from "../auth";
-import { logInfo, logError } from "../services/logging";
-import { 
-  kibanaAuthMiddleware, 
-  createKibanaProxy,
-  initializeKibana 
-} from "../services/kibana";
+import { logInfo } from "../services/logging";
 
 const router = Router();
 
-// Initialize Kibana when the router is created
-initializeKibana().catch(error => {
-  logError('Failed to initialize Kibana router:', {
-    error: error instanceof Error ? error.message : String(error)
+// Simplified router that returns a service unavailable response
+router.use('/', (req, res) => {
+  logInfo('Kibana service request received (service disabled)', {
+    path: req.path,
+    method: req.method
+  });
+
+  res.status(503).json({
+    success: false,
+    message: "Analytics service is currently disabled"
   });
 });
-
-// Protect Kibana access with authentication and admin check
-router.use('/', authenticateToken, async (req, res, next) => {
-  logInfo('Received Kibana request:', {
-    path: req.path,
-    method: req.method,
-    user: req.user?.email
-  });
-  next();
-}, kibanaAuthMiddleware, createKibanaProxy());
 
 export default router;

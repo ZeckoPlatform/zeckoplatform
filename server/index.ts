@@ -1,13 +1,12 @@
 import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
-import { setupVite, log, serveStatic } from "./vite";
+import { setupVite, log } from "./vite";
 import { createServer } from "http";
 import { setupAuth } from "./auth";
 import { logInfo, logError } from "./services/logging";
 import path from 'path';
 import { sql } from 'drizzle-orm';
-import fs from 'fs';
 
 // Global error handlers for better debugging
 process.on('uncaughtException', (err) => {
@@ -81,9 +80,6 @@ if (process.env.NODE_ENV !== 'production') {
     });
     process.exit(1);
   }
-} else {
-  // In production, serve static files
-  serveStatic(app);
 }
 
 // Detailed error handling middleware

@@ -1,7 +1,5 @@
 import winston from 'winston';
-import { ElasticsearchTransport } from 'winston-elasticsearch';
 import { log as viteLog } from '../vite';
-import { esClient, checkElasticsearchHealth } from '../elasticsearch';
 
 // Store recent logs in memory when in console mode
 const recentLogs: any[] = [];
@@ -26,7 +24,7 @@ class MemoryTransport extends winston.Transport {
     try {
       const logEntry = {
         '@timestamp': new Date().toISOString(),
-        timestamp: new Date().toISOString(), // For backward compatibility
+        timestamp: new Date().toISOString(),
         level: info.level,
         message: info.message,
         service: info.service || 'zecko-api',
@@ -46,74 +44,21 @@ class MemoryTransport extends winston.Transport {
   }
 }
 
-// Create Winston logger with console transport initially
+// Create Winston logger with console transport
 const logger = winston.createLogger({
   level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
   format: structuredFormat,
   defaultMeta: { service: 'zecko-api' },
   transports: [
-    // Console transport for development
     new winston.transports.Console({
       format: winston.format.combine(
         winston.format.colorize(),
         winston.format.simple()
       )
-    })
+    }),
+    new MemoryTransport()
   ]
 });
-
-// Add memory transport
-logger.add(new MemoryTransport());
-
-// Add Elasticsearch transport if available
-if (esClient && process.env.LOGGING_MODE !== 'console') {
-  const esTransport = new ElasticsearchTransport({
-    client: esClient,
-    level: 'info',
-    indexPrefix: 'zecko-logs',
-    indexSuffixPattern: 'YYYY.MM.DD',
-    handleExceptions: true,
-    indexTemplate: {
-      index_patterns: ['zecko-logs-*'],
-      settings: {
-        number_of_shards: 1,
-        number_of_replicas: 1,
-        index: {
-          refresh_interval: '5s'
-        }
-      },
-      mappings: {
-        properties: {
-          '@timestamp': { type: 'date' },
-          level: { type: 'keyword' },
-          message: { type: 'text' },
-          service: { type: 'keyword' },
-          category: { type: 'keyword' },
-          metadata: { type: 'object' }
-        }
-      }
-    }
-  });
-
-  // Handle transport errors
-  esTransport.on('error', (error) => {
-    console.error('Elasticsearch transport error:', error);
-    viteLog('[ERROR] Elasticsearch transport error - falling back to console logging');
-  });
-
-  // Add transport after error handler is set up
-  logger.add(esTransport);
-  viteLog('[INFO] Elasticsearch transport added to logger');
-} else {
-  viteLog('[INFO] Running with console logging only');
-}
-
-// Structured logging interface
-interface LogMetadata {
-  category?: string;
-  traceId?: string;
-  [key: string]: any;
-}
 
 // Get recent logs (for console mode)
 export function getRecentLogs() {
@@ -129,7 +74,7 @@ export enum LogCategory {
 }
 
 // Wrapper functions for categorized logging
-export function logRequest(message: string, meta?: Partial<LogMetadata>) {
+export function logRequest(message: string, meta?: any) {
   const metadata = {
     ...meta,
     category: LogCategory.REQUEST
@@ -138,7 +83,7 @@ export function logRequest(message: string, meta?: Partial<LogMetadata>) {
   viteLog(`[REQUEST] ${message}`);
 }
 
-export function logError(message: string, meta?: Partial<LogMetadata>) {
+export function logError(message: string, meta?: any) {
   const metadata = {
     ...meta,
     category: LogCategory.ERROR
@@ -147,7 +92,7 @@ export function logError(message: string, meta?: Partial<LogMetadata>) {
   viteLog(`[ERROR] ${message}`);
 }
 
-export function logBusiness(message: string, meta?: Partial<LogMetadata>) {
+export function logBusiness(message: string, meta?: any) {
   const metadata = {
     ...meta,
     category: LogCategory.BUSINESS
@@ -156,7 +101,7 @@ export function logBusiness(message: string, meta?: Partial<LogMetadata>) {
   viteLog(`[BUSINESS] ${message}`);
 }
 
-export function logSystem(message: string, meta?: Partial<LogMetadata>) {
+export function logSystem(message: string, meta?: any) {
   const metadata = {
     ...meta,
     category: LogCategory.SYSTEM
@@ -171,7 +116,7 @@ export const logInfo = logSystem;
 // Export logger instance for direct use if needed
 export { logger };
 
-// Initialize logging but don't block on errors
+// Initialize logging
 if (process.env.NODE_ENV !== 'production') {
   process.env.LOGGING_MODE = 'console';
   logSystem('Application startup complete', {
