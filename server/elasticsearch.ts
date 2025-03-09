@@ -34,7 +34,7 @@ export async function testElasticsearchConnection() {
     log(`Error connecting to Elasticsearch: ${errorMessage}`);
 
     if (isProduction) {
-      throw new Error('Failed to connect to Elasticsearch in production');
+      log('Warning: Elasticsearch not available in production');
     }
 
     return false;

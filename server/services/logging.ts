@@ -171,7 +171,7 @@ export async function testLogging() {
     // Check Elasticsearch health first
     const healthStatus = await checkElasticsearchHealth();
     logSystem('Logging system test initiated', {
-      metadata: { 
+      metadata: {
         elasticsearchStatus: healthStatus,
         mode: process.env.LOGGING_MODE || 'console'
       }
