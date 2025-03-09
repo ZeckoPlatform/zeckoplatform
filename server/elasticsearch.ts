@@ -2,18 +2,20 @@ import { Client } from '@elastic/elasticsearch';
 import { log } from "./vite";
 
 // Initialize Elasticsearch client only if we're using ES logging
-const shouldUseElasticsearch = process.env.LOGGING_MODE !== 'console';
+const shouldUseElasticsearch = process.env.LOGGING_MODE === 'elasticsearch' && process.env.NODE_ENV === 'production';
 const isProduction = process.env.NODE_ENV === 'production';
 
 // Export a null client if we're not using Elasticsearch
 export const esClient = shouldUseElasticsearch ? new Client({
-  node: process.env.ELASTICSEARCH_URL || 'http://localhost:9200'
+  node: process.env.ELASTICSEARCH_URL || 'http://localhost:9200',
+  requestTimeout: 5000,
+  maxRetries: 3
 }) : null;
 
 // Test Elasticsearch connection
 export async function testElasticsearchConnection() {
   if (!shouldUseElasticsearch) {
-    log('Elasticsearch is disabled, using console logging only');
+    log('Elasticsearch is disabled, using console logging');
     return false;
   }
 
@@ -31,10 +33,11 @@ export async function testElasticsearchConnection() {
     return true;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    log(`Error connecting to Elasticsearch: ${errorMessage}`);
 
     if (isProduction) {
-      log('Warning: Elasticsearch not available in production');
+      log('Warning: Elasticsearch not available in production environment');
+    } else {
+      log('Info: Elasticsearch not available in development - using console logging');
     }
 
     return false;
@@ -44,7 +47,11 @@ export async function testElasticsearchConnection() {
 // Health check function
 export async function checkElasticsearchHealth() {
   if (!shouldUseElasticsearch || !esClient) {
-    return { available: false, reason: 'Elasticsearch is disabled' };
+    return { 
+      available: false, 
+      reason: 'Elasticsearch is disabled or not configured',
+      mode: process.env.LOGGING_MODE || 'console'
+    };
   }
 
   try {
@@ -67,10 +74,10 @@ export async function checkElasticsearchHealth() {
 // Initialize connection check without blocking
 if (shouldUseElasticsearch) {
   testElasticsearchConnection().then(connected => {
-    if (!connected && !isProduction) {
-      log('Warning: Elasticsearch is not available, falling back to console logging');
+    if (!connected) {
+      log('Elasticsearch unavailable - falling back to console logging');
     }
   }).catch(err => {
-    log('Elasticsearch initialization error:', err instanceof Error ? err.message : String(err));
+    log('Elasticsearch initialization error (non-critical):', err instanceof Error ? err.message : String(err));
   });
 }

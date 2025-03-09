@@ -36,7 +36,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 logTiming('Basic middleware setup');
 
-// CORS configuration section
+// CORS configuration with improved error handling
+const allowedHosts = process.env.VITE_ALLOWED_HOSTS?.split(',') || ['localhost', 'replit.app', '.replit.dev', '.repl.co'];
 app.use(cors({
   origin: function(origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -47,8 +48,7 @@ app.use(cors({
       return callback(null, true);
     }
 
-    // In production, use strict allowlist from environment variable
-    const allowedHosts = process.env.VITE_ALLOWED_HOSTS?.split(',') || [];
+    // In production, check against allowlist
     if (allowedHosts.some(host => origin.includes(host))) {
       return callback(null, true);
     }
@@ -68,7 +68,7 @@ app.use(cors({
 // Create HTTP server early to allow Vite to attach its WebSocket handler
 const httpServer = createServer(app);
 
-// Initialize database connection
+// Initialize database connection with improved error handling
 console.log('Initializing database connection...');
 try {
   const { db } = await import('@db');
@@ -90,12 +90,19 @@ if (isProd) {
   app.use(serveStatic);
   logTiming('Production static serving setup');
 } else {
-  // Setup Vite in development mode
+  // Setup Vite in development mode with improved error handling
   logInfo('Setting up Vite development server');
-  await setupVite(app, httpServer);
-  logTiming('Vite setup');
+  try {
+    await setupVite(app, httpServer);
+    logTiming('Vite setup');
+  } catch (error) {
+    logError('Failed to setup Vite:', {
+      error: error instanceof Error ? error.message : String(error)
+    });
+    process.exit(1);
+  }
 
-  // Development proxy configuration for API requests
+  // Development proxy configuration with improved error handling
   app.use('/api', createProxyMiddleware({
     target: `http://localhost:${process.env.PORT || 5000}`,
     changeOrigin: true,
@@ -117,8 +124,7 @@ if (isProd) {
   app.use('/__vite_hmr', createProxyMiddleware({
     target: `ws://localhost:${process.env.PORT || 5000}`,
     ws: true,
-    changeOrigin: true,
-    logLevel: 'silent'
+    changeOrigin: true
   }));
 }
 

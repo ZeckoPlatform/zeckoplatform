@@ -59,19 +59,27 @@ register.registerMetric(databaseQueryDurationHistogram);
 register.registerMetric(activeConnectionsGauge);
 register.registerMetric(errorCounter);
 
-// Initialize monitoring
+// Initialize monitoring with better error handling
 export const initializeMonitoring = async () => {
   // Return a promise that resolves even if monitoring setup fails
   return new Promise<void>((resolve) => {
     try {
       logInfo('Initializing Prometheus monitoring...');
 
-      // Start collecting default metrics
-      promClient.collectDefaultMetrics({
-        register,
-        prefix: 'zecko_',
-        gcDurationBuckets: [0.001, 0.01, 0.1, 1, 2, 5]
-      });
+      // Start collecting default metrics with error handling
+      try {
+        promClient.collectDefaultMetrics({
+          register,
+          prefix: 'zecko_',
+          gcDurationBuckets: [0.001, 0.01, 0.1, 1, 2, 5]
+        });
+      } catch (error) {
+        logError('Error collecting default metrics', {
+          metadata: {
+            error: error instanceof Error ? error.message : String(error)
+          }
+        });
+      }
 
       // Start periodic system metrics collection only in production
       if (process.env.NODE_ENV === 'production') {

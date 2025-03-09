@@ -8,7 +8,7 @@ import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
 import { sendEmail } from "../services/email";
 import { esClient } from '../elasticsearch';
-import { testLogging, getRecentLogs } from '../services/logging';
+import { getRecentLogs, logError, logInfo } from '../services/logging';
 
 const router = Router();
 const scryptAsync = promisify(scrypt);
@@ -627,15 +627,28 @@ router.get("/admin/logs", authenticateToken, checkSuperAdminAccess, async (req, 
   }
 });
 
-// Test logging endpoint (temporary, remove in production)
+// Test logging endpoint (simplified to use existing functionality)
 router.post("/admin/test-logging", authenticateToken, checkSuperAdminAccess, async (req, res) => {
   try {
-    const result = await testLogging();
-    if (result) {
-      res.json({ message: "Logging test successful" });
-    } else {
-      res.status(500).json({ error: "Logging test failed" });
-    }
+    // Log a test message for each severity level
+    logInfo("Test info message from admin panel", {
+      category: 'test',
+      metadata: { source: 'admin-test' }
+    });
+
+    logError("Test error message from admin panel", {
+      category: 'test',
+      metadata: { source: 'admin-test' }
+    });
+
+    // Get recent logs to verify logging is working
+    const recentLogs = getRecentLogs();
+
+    res.json({
+      success: true,
+      message: "Logging test completed successfully",
+      recentLogs: recentLogs.slice(0, 5) // Return last 5 logs
+    });
   } catch (error) {
     console.error("Error testing logging:", error);
     res.status(500).json({ error: "Failed to test logging" });

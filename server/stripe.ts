@@ -7,7 +7,7 @@ let stripe: Stripe | null = null;
 export function getStripeClient() {
   if (!stripe && env.STRIPE_SECRET_KEY) {
     stripe = new Stripe(env.STRIPE_SECRET_KEY, {
-      apiVersion: '2023-10-16',
+      apiVersion: '2025-01-27.acacia',
     });
   }
   return stripe;
@@ -39,8 +39,10 @@ export async function createConnectedAccount(email: string) {
         card_payments: { requested: true },
         transfers: { requested: true },
       },
-      tax_id_collection: {
-        enabled: true // Enable tax ID collection for VAT
+      settings: {
+        tax_reporting: {
+          enabled: true // Enable tax reporting for VAT
+        }
       }
     });
 
@@ -97,9 +99,6 @@ export async function createPaymentIntent(baseAmount: number, vendorStripeAccoun
       metadata: {
         baseAmount: baseAmount,
         vatAmount: totalAmount - baseAmount,
-      },
-      automatic_tax: {
-        enabled: true, // Enable automatic tax calculation
       },
       tax_rates: ['txr_1234'], // Replace with your actual VAT tax rate ID from Stripe
     });

@@ -16,25 +16,13 @@ const structuredFormat = winston.format.combine(
   winston.format.json()
 );
 
-// Create Winston logger with console transport initially
-const logger = winston.createLogger({
-  level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
-  format: structuredFormat,
-  defaultMeta: { service: 'zecko-api' },
-  transports: [
-    // Console transport for development
-    new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.colorize(),
-        winston.format.simple()
-      )
-    })
-  ]
-});
+// Create custom transport for storing logs in memory
+class MemoryTransport extends winston.Transport {
+  constructor(opts?: any) {
+    super(opts);
+  }
 
-// Create a custom transport for storing logs in memory
-const memoryTransport = new winston.Transport({
-  log: (info, callback) => {
+  log(info: any, callback: () => void) {
     try {
       const logEntry = {
         '@timestamp': new Date().toISOString(),
@@ -52,12 +40,30 @@ const memoryTransport = new winston.Transport({
       }
       callback();
     } catch (error) {
-      callback(error);
+      callback();
+      console.error('Error in memory transport:', error);
     }
   }
+}
+
+// Create Winston logger with console transport initially
+const logger = winston.createLogger({
+  level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+  format: structuredFormat,
+  defaultMeta: { service: 'zecko-api' },
+  transports: [
+    // Console transport for development
+    new winston.transports.Console({
+      format: winston.format.combine(
+        winston.format.colorize(),
+        winston.format.simple()
+      )
+    })
+  ]
 });
 
-logger.add(memoryTransport);
+// Add memory transport
+logger.add(new MemoryTransport());
 
 // Add Elasticsearch transport if available
 if (esClient && process.env.LOGGING_MODE !== 'console') {
@@ -67,7 +73,7 @@ if (esClient && process.env.LOGGING_MODE !== 'console') {
     indexPrefix: 'zecko-logs',
     indexSuffixPattern: 'YYYY.MM.DD',
     handleExceptions: true,
-    mappingTemplate: {
+    indexTemplate: {
       index_patterns: ['zecko-logs-*'],
       settings: {
         number_of_shards: 1,
@@ -104,7 +110,7 @@ if (esClient && process.env.LOGGING_MODE !== 'console') {
 
 // Structured logging interface
 interface LogMetadata {
-  category: LogCategory;
+  category?: string;
   traceId?: string;
   [key: string]: any;
 }
@@ -164,42 +170,6 @@ export const logInfo = logSystem;
 
 // Export logger instance for direct use if needed
 export { logger };
-
-// Test function to verify logging functionality
-export async function testLogging() {
-  try {
-    // Check Elasticsearch health first
-    const healthStatus = await checkElasticsearchHealth();
-    logSystem('Logging system test initiated', {
-      metadata: {
-        elasticsearchStatus: healthStatus,
-        mode: process.env.LOGGING_MODE || 'console'
-      }
-    });
-
-    // Test different log categories
-    logRequest('Test API request', {
-      method: 'GET',
-      path: '/api/test',
-      duration: 100
-    });
-
-    logBusiness('Test business action', {
-      action: 'create_lead',
-      userId: 123
-    });
-
-    logError('Test error occurred', {
-      error: new Error('Test error'),
-      code: 500
-    });
-
-    return true;
-  } catch (error) {
-    console.error('Failed to initialize logging:', error);
-    return false;
-  }
-}
 
 // Initialize logging but don't block on errors
 if (process.env.NODE_ENV !== 'production') {

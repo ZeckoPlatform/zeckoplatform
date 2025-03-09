@@ -2,46 +2,55 @@ import { logInfo, logError } from './logging';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { Request, Response, NextFunction } from 'express';
 
+// Only enable Kibana in production unless explicitly configured
+const shouldUseKibana = process.env.ENABLE_KIBANA === 'true' || process.env.NODE_ENV === 'production';
+const KIBANA_URL = process.env.KIBANA_URL || 'http://localhost:5601';
+
 // Initialize Kibana client
 export async function checkKibanaHealth() {
+  if (!shouldUseKibana) {
+    logInfo('Kibana is disabled in development mode');
+    return false;
+  }
+
   try {
     logInfo('Attempting Kibana health check...', {
       metadata: {
-        kibanaUrl: 'http://localhost:5601/api/status',
+        kibanaUrl: `${KIBANA_URL}/api/status`,
       }
     });
 
-    const auth = Buffer.from('zeckoinfo@gmail.com:Bobo19881').toString('base64');
-    const response = await fetch('http://localhost:5601/api/status', {
+    const response = await fetch(`${KIBANA_URL}/api/status`, {
       headers: {
-        'Authorization': `Basic ${auth}`,
         'kbn-xsrf': 'true'
       }
     });
 
     if (!response.ok) {
-      const responseText = await response.text();
       logError('Kibana health check failed:', {
         status: response.status,
-        statusText: response.statusText,
-        responseBody: responseText
+        statusText: response.statusText
       });
-      throw new Error(`Kibana health check failed: ${response.statusText}`);
+      return false;
     }
 
     const data = await response.json();
     logInfo('Kibana health check successful', { status: data.status });
     return true;
   } catch (error) {
-    logError('Kibana health check failed:', {
-      error: error instanceof Error ? error.message : String(error)
-    });
+    if (process.env.NODE_ENV === 'production') {
+      logError('Kibana health check failed in production:', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    } else {
+      logInfo('Kibana not available in development mode - skipping');
+    }
     return false;
   }
 }
 
 // Middleware to handle Kibana authentication
-export function kibanaAuthMiddleware(req: Request, res: Response, next: NextFunction) {
+export function kibanaAuthMiddleware(req: Request & { user?: any }, res: Response, next: NextFunction) {
   if (!req.user?.superAdmin) {
     logError('Unauthorized access attempt to Kibana', {
       user: req.user?.email,
@@ -57,36 +66,33 @@ export function kibanaAuthMiddleware(req: Request, res: Response, next: NextFunc
 
 // Create Kibana proxy middleware
 export function createKibanaProxy() {
+  if (!shouldUseKibana) {
+    return (req: Request, res: Response) => {
+      res.status(503).json({
+        success: false,
+        message: "Kibana service is not enabled in this environment"
+      });
+    };
+  }
+
   return createProxyMiddleware({
-    target: 'http://localhost:5601',
+    target: KIBANA_URL,
     changeOrigin: true,
     pathRewrite: {
       '^/admin/analytics/kibana': ''
     },
-    onProxyReq: (proxyReq) => {
-      // Add required headers for Kibana
+    onProxyReq: (proxyReq: any) => {
       proxyReq.setHeader('kbn-xsrf', 'true');
-      const auth = Buffer.from('zeckoinfo@gmail.com:Bobo19881').toString('base64');
-      proxyReq.setHeader('Authorization', `Basic ${auth}`);
-
-      logInfo('Proxying request to Kibana', {
-        path: proxyReq.path,
-        headers: {
-          'kbn-xsrf': proxyReq.getHeader('kbn-xsrf'),
-          'Authorization': 'Basic **********' // Masked for security
-        }
-      });
     },
-    onProxyRes: (proxyRes, req, res) => {
-      // Log proxy response status
+    onProxyRes: (proxyRes: any, req: Request, res: Response) => {
       logInfo('Kibana proxy response', {
         status: proxyRes.statusCode,
         path: req.path
       });
     },
-    onError: (err, req, res) => {
+    onError: (err: Error, req: Request, res: Response) => {
       logError('Kibana proxy error:', {
-        error: err instanceof Error ? err.message : String(err),
+        error: err.message,
         path: req.path
       });
       res.status(503).json({
@@ -99,6 +105,11 @@ export function createKibanaProxy() {
 
 // Initialize Kibana integration
 export async function initializeKibana() {
+  if (!shouldUseKibana) {
+    logInfo('Kibana initialization skipped - not enabled in this environment');
+    return false;
+  }
+
   try {
     const isHealthy = await checkKibanaHealth();
     if (!isHealthy) {
