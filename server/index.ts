@@ -45,25 +45,42 @@ app.use(cors());
 // Create HTTP server
 const httpServer = createServer(app);
 
-// Serve static files from client directory
-app.use(express.static(path.join(process.cwd(), 'client', 'public')));
-app.use('/src', express.static(path.join(process.cwd(), 'client', 'src'), {
-  setHeaders: (res, path) => {
-    if (path.endsWith('.ts') || path.endsWith('.tsx')) {
-      res.setHeader('Content-Type', 'application/javascript');
+// Development mode - serve client files directly
+if (process.env.NODE_ENV !== 'production') {
+  logInfo('Setting up development static file serving');
+
+  // Serve public assets
+  app.use(express.static(path.join(process.cwd(), 'client', 'public')));
+
+  // Serve client source files with proper MIME types
+  app.use('/src', express.static(path.join(process.cwd(), 'client', 'src'), {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) {
+        res.setHeader('Content-Type', 'application/javascript');
+      }
     }
-  }
-}));
+  }));
 
-// Serve index.html for all non-API routes
-app.get('*', (req, res, next) => {
-  if (req.path.startsWith('/api')) {
-    return next();
-  }
-  res.sendFile(path.join(process.cwd(), 'client', 'index.html'));
-});
+  // Serve index.html for client-side routing
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    res.sendFile(path.join(process.cwd(), 'client', 'index.html'));
+  });
+} else {
+  // Production mode - serve from dist
+  logInfo('Setting up production server');
+  app.use(express.static(path.join(process.cwd(), 'dist', 'public')));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    res.sendFile(path.join(process.cwd(), 'dist', 'public', 'index.html'));
+  });
+}
 
-logTiming('Static file serving setup');
+logTiming('Server setup');
 
 // Initialize database
 try {
@@ -100,11 +117,14 @@ try {
   process.exit(1);
 }
 
-// Start server
+// Start server with proper host binding
 const PORT = process.env.PORT || 5000;
-httpServer.listen(PORT, '0.0.0.0', () => {
+const HOST = '0.0.0.0'; // Always bind to all interfaces
+
+httpServer.listen(PORT, HOST, () => {
   logTiming('Server startup complete');
   logInfo('Server started successfully', {
+    host: HOST,
     port: PORT,
     environment: process.env.NODE_ENV,
     startup_duration_ms: (performance.now() - startTime).toFixed(2)
