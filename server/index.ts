@@ -1,18 +1,14 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
-import { Server, createServer } from "http";
-import { setupAuth } from "./auth";
 import { logInfo, logError } from "./services/logging";
 import { initializeMonitoring } from "./services/monitoring";
 import { initializeAnalytics } from "./routes/analytics";
 import cors from 'cors';
 import { performance } from 'perf_hooks';
 import { sql } from "drizzle-orm";
+import path from 'path';
 
 const app = express();
-
-// We'll keep development mode for now until build is fixed
 const isProd = process.env.NODE_ENV === 'production';
 
 // Start timing server initialization
@@ -25,12 +21,7 @@ logInfo('Starting server with diagnostics:', {
   environment: process.env.NODE_ENV,
   platform: process.platform,
   arch: process.arch,
-  memory: process.memoryUsage(),
-  env_vars: {
-    PORT: process.env.PORT,
-    NODE_ENV: process.env.NODE_ENV,
-    VITE_ALLOWED_HOSTS: process.env.VITE_ALLOWED_HOSTS
-  }
+  memory: process.memoryUsage()
 });
 
 function logTiming(step: string) {
@@ -45,62 +36,80 @@ function logTiming(step: string) {
   lastCheckpoint = now;
 }
 
-// Enhanced CORS configuration for development
-const corsOptions = {
-  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) {
-      callback(null, true);
-      return;
-    }
+// Configure permissive CORS for development
+app.use(cors({
+  origin: true,
+  credentials: true
+}));
 
-    const allowedHost = process.env.VITE_ALLOWED_HOSTS;
-    if (allowedHost && (origin.includes(allowedHost) || origin === 'null')) {
-      callback(null, true);
-    } else {
-      logError('CORS blocked request from origin:', { origin });
-      callback(new Error('CORS policy: Origin not allowed'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-};
-
-// Basic middleware setup
+// Basic middleware setup with proper error handling
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cors(corsOptions));
-logTiming('Basic middleware setup');
+
+// Error handling middleware
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+  logError('Express error:', {
+    error: err.message,
+    stack: err.stack,
+    path: req.path
+  });
+  res.status(500).json({ error: 'Internal server error' });
+});
 
 // Create HTTP server
 const httpServer = createServer(app);
 
-// Setup development mode with enhanced error handling
+// Serve static files and handle routing
 if (!isProd) {
-  logInfo('Setting up development environment');
-  try {
-    await setupVite(app, httpServer);
-    logTiming('Vite setup complete');
-  } catch (error) {
-    logError('Failed to setup Vite:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
+  // Development mode - serve static files directly
+  logInfo('Setting up development server');
+
+  // Serve static files with proper MIME types
+  const staticOptions = {
+    setHeaders: (res: Response, filePath: string) => {
+      if (filePath.endsWith('.js')) {
+        res.setHeader('Content-Type', 'application/javascript');
+      } else if (filePath.endsWith('.css')) {
+        res.setHeader('Content-Type', 'text/css');
+      }
+      // Log served files in development
+      logInfo('Serving static file:', { path: filePath });
+    }
+  };
+
+  // Serve from client directory
+  app.use(express.static(path.join(process.cwd(), 'client'), staticOptions));
+
+  // API routes
+  app.use('/api', (req, res, next) => {
+    logInfo('API request:', { 
+      method: req.method,
+      path: req.path,
+      query: req.query
     });
-    process.exit(1);
-  }
+    next();
+  });
+
+  // Client-side routing fallback
+  app.use('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    res.sendFile(path.join(process.cwd(), 'client', 'index.html'));
+  });
+
+  logTiming('Development server setup');
 } else {
-  try {
-    logInfo('Setting up production static serving');
-    app.use(serveStatic);
-    logTiming('Static serving setup');
-  } catch (error) {
-    logError('Failed to setup static serving:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
-    });
-    process.exit(1);
-  }
+  // Production mode - serve from dist
+  logInfo('Setting up production server');
+  app.use(express.static(path.join(process.cwd(), 'dist', 'public')));
+  app.use('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    res.sendFile(path.join(process.cwd(), 'dist', 'public', 'index.html'));
+  });
+  logTiming('Production server setup');
 }
 
 // Initialize database
@@ -139,7 +148,7 @@ try {
 
 // Start server
 const PORT = process.env.PORT || 5000;
-httpServer.listen(PORT, '0.0.0.0', () => {
+httpServer.listen(PORT, () => {
   logTiming('Server startup complete');
   logInfo('Server started successfully', {
     port: PORT,
