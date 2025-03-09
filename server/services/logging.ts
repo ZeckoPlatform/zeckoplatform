@@ -79,7 +79,7 @@ export function logSystem(message: string, meta?: any) {
   viteLog(`[SYSTEM] ${message}`);
 }
 
-// For backward compatibility and general logging
+// For backward compatibility
 export const logInfo = logSystem;
 
 // Export logger instance for direct use if needed
