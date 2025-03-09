@@ -1,7 +1,6 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { log } from "./vite";
-import { trackDatabaseQuery } from "./services/monitoring";
 
 // Initialize database connection with retries
 const MAX_RETRIES = 5;
@@ -16,66 +15,18 @@ async function initializeDatabase() {
       log(`Attempting database connection (${MAX_RETRIES - retries + 1}/${MAX_RETRIES})...`);
 
       const pool = new Pool({
-        // Using individual credential components instead of connection string
-        user: process.env.PGUSER,
-        password: process.env.PGPASSWORD,
-        host: process.env.PGHOST,
-        port: parseInt(process.env.PGPORT || '5432'),
-        database: process.env.PGDATABASE,
-        // Disable SSL for local development
-        ssl: false,
-        // Pool configuration
-        max: 20, // Maximum number of clients
-        idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
-        connectionTimeoutMillis: 2000, // Return an error after 2 seconds if connection could not be established
+        connectionString: process.env.DATABASE_URL,
+        ssl: false, // Disable SSL for local development
+        max: 10, // Reduce max connections for testing
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 5000,
       });
-
-      // Add query monitoring
-      const originalQuery = pool.query.bind(pool);
-      pool.query = async function monitoredQuery(...args: any[]) {
-        const start = Date.now();
-        try {
-          const result = await originalQuery(...args);
-          const duration = Date.now() - start;
-
-          // Extract query type and table from the SQL
-          const sql = args[0]?.text || args[0];
-          const queryType = sql.trim().split(' ')[0].toUpperCase();
-          const tableMatch = sql.match(/FROM\s+([^\s,;]+)/i);
-          const table = tableMatch ? tableMatch[1] : 'unknown';
-
-          // Track query performance
-          trackDatabaseQuery(queryType, table, duration);
-
-          return result;
-        } catch (error) {
-          const duration = Date.now() - start;
-          trackDatabaseQuery('ERROR', 'unknown', duration);
-          throw error;
-        }
-      };
 
       // Test connection
       const client = await pool.connect();
       const result = await client.query('SELECT NOW()');
       log('Database connection successful:', result.rows[0]);
       client.release();
-
-      // Add error handler
-      pool.on('error', (err) => {
-        log('Unexpected error on idle client:', err.message);
-        // Don't exit process, just log the error
-        log('Pool error occurred, will attempt to recover');
-      });
-
-      // Add connection event listeners
-      pool.on('connect', () => {
-        log('New client connected to the pool');
-      });
-
-      pool.on('remove', () => {
-        log('Client removed from pool');
-      });
 
       return pool;
     } catch (err) {
@@ -86,12 +37,11 @@ async function initializeDatabase() {
 
       if (retries === 0) {
         log('Failed to connect to database after maximum retries');
-        log('Last error:', err instanceof Error ? err.message : String(err));
         throw new Error(`Database connection failed: ${err instanceof Error ? err.message : String(err)}`);
       }
 
       log(`Retrying in ${RETRY_DELAY/1000} seconds... (${retries} attempts remaining)`);
-      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * Math.pow(2, MAX_RETRIES - retries)));
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
     }
   }
 

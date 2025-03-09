@@ -19,12 +19,14 @@ const httpServer = createServer(app);
 
 // Initialize database
 try {
+  logInfo('Attempting database connection...');
   const { db } = await import('@db');
   await db.execute(sql`SELECT 1 as health_check`);
   logInfo('Database connection successful');
 } catch (error) {
   logError('Database initialization failed:', {
-    error: error instanceof Error ? error.message : String(error)
+    error: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : undefined
   });
   process.exit(1);
 }
@@ -97,6 +99,7 @@ if (process.env.BYPASS_VITE === 'true') {
 } else if (process.env.NODE_ENV === 'development') {
   // Normal development mode with Vite
   try {
+    logInfo('Initializing Vite development server...');
     await setupVite(app, httpServer);
     logInfo('Vite development server initialized');
   } catch (error) {
