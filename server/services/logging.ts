@@ -9,40 +9,10 @@ const MAX_RECENT_LOGS = 100;
 const structuredFormat = winston.format.combine(
   winston.format.timestamp(),
   winston.format.metadata({
-    fillWith: ['timestamp', 'level', 'message', 'service', 'category', 'traceId']
+    fillWith: ['timestamp', 'level', 'message', 'service', 'category']
   }),
   winston.format.json()
 );
-
-// Create custom transport for storing logs in memory
-class MemoryTransport extends winston.Transport {
-  constructor(opts?: any) {
-    super(opts);
-  }
-
-  log(info: any, callback: () => void) {
-    try {
-      const logEntry = {
-        '@timestamp': new Date().toISOString(),
-        timestamp: new Date().toISOString(),
-        level: info.level,
-        message: info.message,
-        service: info.service || 'zecko-api',
-        category: info.metadata?.category || 'system',
-        metadata: info.metadata || {}
-      };
-
-      recentLogs.unshift(logEntry);
-      while (recentLogs.length > MAX_RECENT_LOGS) {
-        recentLogs.pop();
-      }
-      callback();
-    } catch (error) {
-      callback();
-      console.error('Error in memory transport:', error);
-    }
-  }
-}
 
 // Create Winston logger with console transport
 const logger = winston.createLogger({
@@ -55,8 +25,7 @@ const logger = winston.createLogger({
         winston.format.colorize(),
         winston.format.simple()
       )
-    }),
-    new MemoryTransport()
+    })
   ]
 });
 

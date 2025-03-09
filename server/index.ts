@@ -5,7 +5,6 @@ import { setupVite, log } from "./vite";
 import { createServer } from "http";
 import { setupAuth } from "./auth";
 import { logInfo, logError } from "./services/logging";
-import path from 'path';
 import { sql } from 'drizzle-orm';
 
 // Global error handlers for better debugging
@@ -40,8 +39,7 @@ try {
   logInfo('Database connection successful');
 } catch (error) {
   logError('Database initialization failed:', {
-    error: error instanceof Error ? error.message : String(error),
-    stack: error instanceof Error ? error.stack : undefined
+    error: error instanceof Error ? error.message : String(error)
   });
   process.exit(1);
 }
@@ -57,7 +55,7 @@ try {
   process.exit(1);
 }
 
-// Register API routes first
+// Register API routes
 try {
   registerRoutes(app);
   logInfo('Routes registered successfully');
@@ -75,29 +73,23 @@ if (process.env.NODE_ENV !== 'production') {
     logInfo('Vite development server initialized successfully');
   } catch (error) {
     logError('Failed to initialize Vite:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
+      error: error instanceof Error ? error.message : String(error)
     });
     process.exit(1);
   }
 }
 
-// Detailed error handling middleware
+// Error handling middleware
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  const errorDetails = {
+  logError('Request error:', {
     message: err.message,
-    type: err.constructor.name,
     path: req.path,
     method: req.method,
     stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
-  };
-
-  logError('Request error:', errorDetails);
+  });
 
   res.status(500).json({
-    error: process.env.NODE_ENV === 'development'
-      ? errorDetails
-      : 'Internal server error'
+    error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
   });
 });
 
@@ -109,8 +101,7 @@ httpServer.listen(PORT, HOST, () => {
   logInfo('Server started successfully', {
     host: HOST,
     port: PORT,
-    environment: process.env.NODE_ENV,
-    static_serving: true
+    environment: process.env.NODE_ENV
   });
 });
 
