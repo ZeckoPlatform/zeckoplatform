@@ -17,6 +17,16 @@ app.use(express.urlencoded({ extended: true }));
 // Create HTTP server
 const httpServer = createServer(app);
 
+// Log environment variables for debugging
+logInfo('Starting server with configuration:', {
+  env: process.env.NODE_ENV,
+  bypass_vite: process.env.BYPASS_VITE,
+  vite_allowed_hosts: process.env.VITE_ALLOWED_HOSTS,
+  vite_dev_server_hostname: process.env.VITE_DEV_SERVER_HOSTNAME,
+  vite_force_dev_server: process.env.VITE_FORCE_DEV_SERVER,
+  host_url: process.env.HOST_URL
+});
+
 // Initialize database
 try {
   logInfo('Attempting database connection...');
@@ -59,7 +69,8 @@ app.get('/health', (req, res) => {
     status: 'ok',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
-    bypass_vite: process.env.BYPASS_VITE === 'true'
+    bypass_vite: process.env.BYPASS_VITE === 'true',
+    vite_allowed_hosts: process.env.VITE_ALLOWED_HOSTS
   });
 });
 
@@ -76,30 +87,21 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   });
 });
 
+// Log before Vite setup
+logInfo('Preparing to initialize Vite...', {
+  bypass_vite: process.env.BYPASS_VITE === 'true',
+  vite_allowed_hosts: process.env.VITE_ALLOWED_HOSTS
+});
+
 // Handle frontend serving based on environment and bypass flag
-if (process.env.BYPASS_VITE === 'true') {
-  // In bypass mode, serve a simple HTML response
-  app.get('/', (req, res) => {
-    res.send(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Zecko Platform (Bypass Mode)</title>
-        </head>
-        <body>
-          <h1>Zecko Platform</h1>
-          <p>Server is running in bypass mode</p>
-          <p>Environment: ${process.env.NODE_ENV}</p>
-          <p>Time: ${new Date().toISOString()}</p>
-        </body>
-      </html>
-    `);
-  });
-  logInfo('Running in Vite bypass mode');
-} else if (process.env.NODE_ENV === 'development') {
-  // Normal development mode with Vite
+if (process.env.NODE_ENV === 'development') {
   try {
     logInfo('Initializing Vite development server...');
+
+    // Serve static content first
+    app.use(express.static(path.join(process.cwd(), 'public')));
+
+    // Then initialize Vite
     await setupVite(app, httpServer);
     logInfo('Vite development server initialized');
   } catch (error) {
@@ -131,7 +133,8 @@ httpServer.listen(PORT, HOST, () => {
     host: HOST,
     port: PORT,
     mode: process.env.NODE_ENV,
-    bypass_vite: process.env.BYPASS_VITE === 'true'
+    bypass_vite: process.env.BYPASS_VITE === 'true',
+    vite_allowed_hosts: process.env.VITE_ALLOWED_HOSTS
   });
 });
 
