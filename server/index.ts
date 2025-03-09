@@ -62,16 +62,26 @@ logTiming('Basic middleware setup');
 // Enhanced CORS setup for development
 app.use(cors({
   origin: function(origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
+
     const allowedHosts = process.env.VITE_ALLOWED_HOSTS?.split(',') || [];
     logInfo('CORS check for origin:', {
       origin,
       allowedHosts,
       hasAllowedHosts: !!process.env.VITE_ALLOWED_HOSTS
     });
+
+    // More permissive CORS in development
+    if (!isProd) {
+      return callback(null, true);
+    }
+
+    // In production, strictly check against allowed hosts
     if (allowedHosts.some(allowedOrigin => origin?.includes(allowedOrigin))) {
       return callback(null, true);
     }
+
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
@@ -87,7 +97,14 @@ if (!isProd) {
     target: `http://localhost:${process.env.PORT || 5000}`,
     changeOrigin: true,
     secure: false,
+    ws: true, // Enable WebSocket proxy
+    xfwd: true, // Add x-forward headers
     onProxyReq: (proxyReq: any, req: Request) => {
+      // Add CORS headers
+      proxyReq.setHeader('Access-Control-Allow-Origin', '*');
+      proxyReq.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE');
+      proxyReq.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
       logInfo('Proxying request:', {
         path: req.path,
         method: req.method,
@@ -100,7 +117,19 @@ if (!isProd) {
         path: req.path,
         method: req.method
       });
+      // Don't throw on proxy errors, just log them
+      res.writeHead(500, {
+        'Content-Type': 'text/plain'
+      });
+      res.end('Proxy Error');
     }
+  }));
+
+  // Also proxy websocket connections
+  app.use('/ws', createProxyMiddleware({
+    target: `ws://localhost:${process.env.PORT || 5000}`,
+    ws: true,
+    changeOrigin: true
   }));
 }
 

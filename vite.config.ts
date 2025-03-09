@@ -7,6 +7,7 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
 export default defineConfig({
   plugins: [react(), runtimeErrorOverlay(), themePlugin()],
   resolve: {
@@ -20,4 +21,15 @@ export default defineConfig({
     outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: true,
   },
+  // ✅ Fix: Allow Replit Host to Prevent "Blocked Request" Issue
+  server: {
+    host: true, // Allow external access
+    strictPort: false,
+    cors: true,
+    allowedHosts: [
+      "localhost",
+      "replit.app",
+      "e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev"
+    ]
+  }
 });
