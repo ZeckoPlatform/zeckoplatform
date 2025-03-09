@@ -27,5 +27,6 @@ export default defineConfig({
     strictPort: false,
     cors: true,
     allowedHosts: "all", // Allows all hosts without manual updates
+
   }
 });
