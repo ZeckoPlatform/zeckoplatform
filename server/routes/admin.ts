@@ -8,7 +8,7 @@ import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
 import { sendEmail } from "../services/email";
 import { esClient } from '../elasticsearch';
-import { getRecentLogs, logError, logInfo } from '../services/logging';
+import { getRecentLogs, logError, logInfo, logSystem } from '../services/logging';
 
 const router = Router();
 const scryptAsync = promisify(scrypt);
@@ -631,6 +631,11 @@ router.get("/admin/logs", authenticateToken, checkSuperAdminAccess, async (req, 
 router.post("/admin/test-logging", authenticateToken, checkSuperAdminAccess, async (req, res) => {
   try {
     // Log a test message for each severity level
+    logSystem("Test system message from admin panel", {
+      category: 'test',
+      metadata: { source: 'admin-test' }
+    });
+
     logInfo("Test info message from admin panel", {
       category: 'test',
       metadata: { source: 'admin-test' }
