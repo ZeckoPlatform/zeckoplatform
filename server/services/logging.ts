@@ -58,13 +58,3 @@ export const logInfo = logSystem;
 
 // Export logger instance for direct use if needed
 export { logger };
-
-// Initialize logging
-if (process.env.NODE_ENV !== 'production') {
-  logSystem('Development mode active', {
-    metadata: {
-      startupTime: new Date().toISOString(),
-      environment: process.env.NODE_ENV
-    }
-  });
-}
