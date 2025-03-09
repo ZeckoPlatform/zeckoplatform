@@ -30,7 +30,8 @@ export default defineConfig({
       "localhost",
       "replit.app",
       ".replit.dev",
-      ".repl.co"
+      ".repl.co",
+      "e20cb7ed-14fe-40d3-8b0c-1d8b1601dba7-00-1qxa6jldbdcn6.riker.replit.dev"
     ]
   }
 });
